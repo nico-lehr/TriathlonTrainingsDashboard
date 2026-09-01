@@ -1,0 +1,208 @@
+/* Basis-Layout, Navigation, globale Animationen */
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Dezenter Parallax-Hintergrund (wie auf der Landingpage): drei weich
+     verlaufende Farbflecken in den Sportart-Farben, die sich beim
+     Mausbewegen minimal verschieben. Rein dekorativ, keine Klicks. */
+  .parallax-bg {
+    position: fixed; inset: 0;
+    pointer-events: none; z-index: 0; overflow: hidden;
+  }
+
+  .glow-orb {
+    position: absolute; border-radius: 50%;
+    filter: blur(90px); opacity: 0.18;
+    transition: transform 0.15s cubic-bezier(0.1, 1, 0.1, 1);
+    will-change: transform;
+  }
+
+  /* glow-1/glow-2 bewusst so platziert, dass sie im oberen Bereich (Header +
+     Zeitraum-Zusammenfassung) sichtbar durchscheinen, nicht erst weiter unten.
+     Positionierung relativ zur Mitte (calc(50% ± px)) statt an den reinen
+     Viewport-Rändern - sonst driften die Flecken auf breiten Bildschirmen
+     (großer Monitor, wo .page mit max-width:1240px zentriert viel schmaler
+     als der Viewport ist) seitlich aus dem sichtbaren Inhalt heraus. */
+  .glow-1 { width: 520px; height: 520px; background: var(--c-schwimmen); top: -60px; left: calc(50% - 780px); }
+
+  .glow-2 { width: 560px; height: 560px; background: var(--c-rad); top: -20px; left: calc(50% + 260px); }
+
+  .glow-3 { width: 500px; height: 500px; background: var(--c-laufen); bottom: -140px; left: calc(50% - 250px); }
+
+  .page {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 48px 32px 96px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Logo/Marke (angelehnt an die Landingpage): drei Sportart-Punkte + Titel
+     mit Gradient-Verlauf über die Sportart-Farben. */
+  .brand-mark { display: inline-flex; align-items: center; gap: 5px; margin-right: 4px; }
+
+  .brand-dot { width: 9px; height: 9px; border-radius: 50%; }
+
+  .brand-dot.swim { background: var(--c-schwimmen); }
+
+  .brand-dot.bike { background: var(--c-rad); }
+
+  .brand-dot.run  { background: var(--c-laufen); }
+
+  header.top h1 {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px 12px; min-width: 0;
+  }
+
+  header.top h1 .gradient-text {
+    background: linear-gradient(135deg, var(--c-schwimmen), var(--c-rad), var(--c-laufen));
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+
+  header.top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    margin-bottom: 24px;
+  }
+
+  header.top h1 {
+    font-size: 30px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+
+  header.top .meta {
+    color: var(--text-secondary);
+    font-size: 14px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* top navigation (Übersicht / Kalender / Rekorde) */
+  .topnav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    margin: 0 0 20px;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: transparent;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    padding: 14px 0;
+  }
+
+  .theme-toggle-btn {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--surface-1);
+    color: var(--text-primary); font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex: none; transition: background 0.15s ease, transform 0.1s ease;
+  }
+
+  .theme-toggle-btn:hover { background: var(--page); }
+
+  .theme-toggle-btn:active { transform: scale(0.9); }
+
+  .topnav-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--surface-1);
+    border-radius: 14px;
+    padding: 4px;
+    box-shadow: var(--card-shadow);
+  }
+
+  /* Suchfeld: standardmäßig auf die Lupe minimiert (spart Platz in der
+     Topnav), klappt erst bei Klick auf die Lupe zum Texteingabefeld auf -
+     siehe initCardSearch() in js/components/card-search.js. */
+  .search-wrap {
+    display: flex; align-items: center; gap: 0;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 7px; box-shadow: var(--card-shadow); flex: none;
+    transition: flex-basis 0.22s cubic-bezier(.2,.8,.2,1), padding 0.22s ease, gap 0.22s ease, max-width 0.22s ease;
+  }
+
+  .search-wrap.expanded {
+    gap: 8px; padding: 7px 12px; flex: 1; min-width: 140px; max-width: 260px;
+  }
+
+  .search-icon-btn {
+    font-size: 12px; opacity: 0.6; flex: none;
+    border: none; background: none; padding: 2px; cursor: pointer; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+
+  .search-icon-btn:hover { opacity: 1; transform: scale(1.08); }
+
+  .search-input {
+    font-family: inherit; font-size: 12.5px; color: var(--text-primary);
+    background: none; border: none; outline: none; min-width: 0;
+    width: 0; opacity: 0; pointer-events: none;
+    transition: width 0.22s cubic-bezier(.2,.8,.2,1), opacity 0.15s ease;
+  }
+
+  .search-wrap.expanded .search-input { width: 100%; opacity: 1; pointer-events: auto; }
+
+  .search-input::placeholder { color: var(--text-muted); }
+
+  .search-no-match { font-size: 11px; color: var(--text-muted); white-space: nowrap; flex: none; }
+
+  .tab-btn {
+    border: none;
+    background: none;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 620;
+    font-family: inherit;
+    padding: 8px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  .tab-btn:hover { background: var(--page); }
+
+  .tab-btn.active { background: var(--text-primary); color: var(--surface-1); }
+
+  .view { display: none; }
+
+  .view.active { display: block; }
+
+  footer.note {
+    margin-top: 28px;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+  }
+
+  /* ---------- Micro-Animationen ---------- */
+  @keyframes fadeSlideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  @keyframes fadeScaleIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+
+  @keyframes wedgeIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+
+  @keyframes barGrowY { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+  @keyframes barGrowX { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+  @keyframes btnPulse { 0% { transform: scale(1); } 45% { transform: scale(1.06); } 100% { transform: scale(1); } }
+
+  @keyframes rowHighlight { 0% { background: var(--row-added-wash); } 100% { background: transparent; } }

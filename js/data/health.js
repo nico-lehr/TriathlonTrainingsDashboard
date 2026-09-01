@@ -1,0 +1,79 @@
+// Erholungs-Check: Laden/Speichern, taeglicher Reset mit Logbuch-Archivierung.
+
+const RECOVERY_KEY = "triathlon_dashboard_recovery_v1";
+
+const RECOVERY_LOG_KEY = "triathlon_dashboard_recovery_log_v1";
+
+const RECOVERY_LOG_MAX_DAYS = 90;
+
+let recoveryCheck = { date: null, soreness: null, sorenessLocation: null, energy: null, injury: "no", injuryNote: null };
+
+let recoveryLog = [];
+
+const RECOVERY_SORENESS_OPTIONS = [
+  { value: "none", label: "Keiner" }, { value: "light", label: "Leicht" },
+  { value: "moderate", label: "Mittel" }, { value: "severe", label: "Stark" },
+];
+
+const RECOVERY_ENERGY_OPTIONS = [
+  { value: "low", label: "Erschöpft" }, { value: "reduced", label: "Reduziert" },
+  { value: "normal", label: "Normal" }, { value: "high", label: "Top fit" },
+];
+
+const RECOVERY_INJURY_OPTIONS = [{ value: "no", label: "Keine" }, { value: "yes", label: "Ja" }];
+
+const RECOVERY_SORENESS_LABELS = Object.fromEntries(RECOVERY_SORENESS_OPTIONS.map(o => [o.value, o.label.toLowerCase()]));
+
+const RECOVERY_ENERGY_LABELS = Object.fromEntries(RECOVERY_ENERGY_OPTIONS.map(o => [o.value, o.label.toLowerCase()]));
+
+
+function loadRecoveryLog() {
+  try {
+    const raw = localStorage.getItem(RECOVERY_LOG_KEY);
+    recoveryLog = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(recoveryLog)) recoveryLog = [];
+  } catch (e) { recoveryLog = []; }
+}
+
+function saveRecoveryLog() {
+  try { localStorage.setItem(RECOVERY_LOG_KEY, JSON.stringify(recoveryLog.slice(-RECOVERY_LOG_MAX_DAYS))); } catch (e) {}
+}
+
+function isRecoveryCheckEmpty(c) {
+  return !c.soreness && !c.energy && c.injury !== "yes";
+}
+// Prüft beim Laden, ob der gespeicherte Stand noch von heute ist. Falls
+// nicht: Vortag (sofern ausgefüllt) ins Logbuch schreiben, dann für den
+// neuen Tag zurücksetzen.
+
+function loadRecoveryCheck() {
+  loadRecoveryLog();
+  const today = new Date().toISOString().slice(0, 10);
+  try {
+    const raw = localStorage.getItem(RECOVERY_KEY);
+    if (raw) recoveryCheck = { ...recoveryCheck, ...JSON.parse(raw) };
+  } catch (e) { /* Default beibehalten */ }
+  if (recoveryCheck.date && recoveryCheck.date !== today) {
+    if (!isRecoveryCheckEmpty(recoveryCheck)) {
+      recoveryLog.push({
+        date: recoveryCheck.date,
+        soreness: recoveryCheck.soreness,
+        sorenessLocation: recoveryCheck.sorenessLocation || null,
+        energy: recoveryCheck.energy,
+        injury: recoveryCheck.injury,
+        injuryNote: recoveryCheck.injuryNote || null,
+      });
+      saveRecoveryLog();
+    }
+    recoveryCheck = { date: today, soreness: null, sorenessLocation: null, energy: null, injury: "no", injuryNote: null };
+    saveRecoveryCheck();
+  } else if (!recoveryCheck.date) {
+    recoveryCheck.date = today;
+  }
+}
+
+function saveRecoveryCheck() {
+  recoveryCheck.date = new Date().toISOString().slice(0, 10);
+  try { localStorage.setItem(RECOVERY_KEY, JSON.stringify(recoveryCheck)); } catch (e) {}
+}
+

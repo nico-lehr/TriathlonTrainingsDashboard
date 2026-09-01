@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TriDashboard</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23101010'/%3E%3Ccircle cx='24' cy='23' r='15' fill='%231baf7a' fill-opacity='0.92'/%3E%3Ccircle cx='40' cy='23' r='15' fill='%232a78d6' fill-opacity='0.92'/%3E%3Ccircle cx='32' cy='41' r='15' fill='%23eb6834' fill-opacity='0.92'/%3E%3C/svg%3E">
+<script>
+// Manuellen Theme-Wunsch (falls gespeichert) VOR dem ersten Rendern setzen,
+// damit die Seite nicht kurz im falschen Theme aufblitzt.
+(function () {
+  try {
+    var t = localStorage.getItem("triathlon_dashboard_theme_v1");
+    if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+  } catch (e) { /* localStorage evtl. nicht verfügbar */ }
+})();
+</script>
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/main.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div class="parallax-bg">
+  <div class="glow-orb glow-1" id="glow1"></div>
+  <div class="glow-orb glow-2" id="glow2"></div>
+  <div class="glow-orb glow-3" id="glow3"></div>
+</div>
+<div class="page">
+
+  <header class="top">
+    <h1>
+      <span class="brand-mark"><span class="brand-dot swim"></span><span class="brand-dot bike"></span><span class="brand-dot run"></span></span>
+      <span class="gradient-text">TriDashboard</span>
+    </h1>
+    <div class="meta" id="meta-range"></div>
+  </header>
+
+  <nav class="topnav">
+    <div class="topnav-tabs" id="topnav-tabs">
+      <button class="tab-btn active" data-view="overview">Übersicht</button>
+      <button class="tab-btn" data-view="calendar">Kalender</button>
+      <button class="tab-btn" data-view="coach">Coach</button>
+      <button class="tab-btn" data-view="nutrition">Ernährung</button>
+      <button class="tab-btn" data-view="records">Rekorde</button>
+    </div>
+    <div class="search-wrap" id="search-wrap">
+      <button type="button" class="search-icon-btn" id="search-icon-btn" aria-label="Dashboard durchsuchen" title="Dashboard durchsuchen (auch Einstellungen)">🔍</button>
+      <input type="search" id="card-search" class="search-input" placeholder="Dashboard durchsuchen…" autocomplete="off">
+      <span class="search-no-match" id="search-no-match" style="display:none;">keine Treffer</span>
+    </div>
+    <div class="update-group">
+      <button class="theme-toggle-btn" id="global-settings-btn" type="button" title="Einstellungen">⚙️</button>
+      <button class="theme-toggle-btn" id="theme-toggle-btn" type="button" title="Hell/Dunkel umschalten">🌙</button>
+      <input type="file" id="file-input" webkitdirectory directory multiple style="display:none">
+      <input type="file" id="file-input-single" multiple accept=".fit" style="display:none">
+      <div class="update-menu-wrap" id="update-menu-wrap">
+        <button class="update-btn update-menu-trigger" id="update-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false">
+          <span class="spin"></span><span class="btn-icon">⟳</span> Aktualisieren <span class="menu-caret">▾</span>
+        </button>
+        <div class="update-menu" id="update-menu">
+          <div class="update-menu-meta" id="update-meta"></div>
+          <button class="update-menu-item" id="menu-item-folder" type="button"><span class="menu-item-icon">📁</span> Aktualisieren</button>
+          <button class="update-menu-item" id="menu-item-dnd" type="button"><span class="menu-item-icon">⬆️</span> Drag &amp; Drop zur Auswahl</button>
+          <div class="update-menu-divider"></div>
+          <button class="update-menu-item update-menu-item-muted" id="reset-btn" type="button" title="Setzt den im Browser gespeicherten Update-Stand zurück auf den zuletzt von Claude gebauten, vollständigen Datenstand"><span class="menu-item-icon">↺</span> Datenstand zurücksetzen</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+  <div class="update-status" id="update-status" style="display:none;"></div>
+
+  <div id="view-overview" class="view active">
+  <section class="filter-bar">
+    <div class="filter-group" id="range-filter">
+      <span class="filter-label">Zeitraum</span>
+    </div>
+    <div class="filter-group" id="sport-filter">
+      <span class="filter-label">Sportart</span>
+    </div>
+    <div class="filter-group range-custom-group">
+      <span class="filter-label">Von / Bis</span>
+      <input type="date" id="range-from" class="coach-input range-date-input" aria-label="Zeitraum von">
+      <span class="range-sep">–</span>
+      <input type="date" id="range-to" class="coach-input range-date-input" aria-label="Zeitraum bis">
+    </div>
+  </section>
+
+  <div id="equipment-banner-overview" class="equipment-banner" hidden></div>
+
+  <section class="stat-row" id="stat-row"></section>
+
+  <div class="dash-grid-bar">
+    <span class="dash-grid-hint">↔ Karten per Drag &amp; Drop (Griff oben rechts) umsortieren</span>
+    <button class="reset-link" id="reset-layout-btn">Layout zurücksetzen</button>
+  </div>
+
+  <div class="dash-grid" id="dash-grid" data-layout-key="triathlon_dashboard_layout_v1">
+    <div class="card full" data-card-id="monthcompare">
+      <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+      <h2>Monatsvergleich
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Aktueller Kalendermonat (bis heute) im Vergleich zum selben Zeitabschnitt des Vormonats — unabhängig vom oben gewählten Zeitraum-Filter.</div></span>
+      </h2>
+      <div class="pmc-substats" id="monthcompare-stats"></div>
+    </div>
+
+    <div class="card" data-card-id="weekly">
+      <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+      <h2>Trainingsumfang pro Woche
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Trainingsstunden je Kalenderwoche, gestapelt nach Sportart. Zeigt, ob dein Umfang im gewählten Zeitraum steigt, stagniert oder fällt — Grundlage für stetigen, kontrollierten Aufbau statt sprunghafter Belastungsspitzen.</div></span>
+      </h2>
+      <p class="card-sub">Stunden pro Sportart</p>
+      <div class="legend" id="legend-weekly"></div>
+      <div class="chart-wrap" id="chart-weekly"></div>
+    </div>
+    <div class="card" data-card-id="donut">
+      <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+      <h2>Trainingsverteilung nach Sportart
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Wie sich deine gesamte Trainingszeit im gewählten Zeitraum auf Schwimmen/Rad/Laufen/Sonstiges verteilt — hilfreich, um z.B. für einen Triathlon eine ausgewogene Verteilung auf alle drei Disziplinen zu prüfen.</div></span>
+      </h2>
+      <p class="card-sub">Anteil an der Gesamtzeit</p>
+      <div class="chart-wrap" id="chart-donut"></div>
+    </div>
+
+    <div class="card full" data-card-id="pmc">
+      <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+      <h2>Fitness &amp; Form (Performance Management Chart)
+        <span id="load-status-badge"></span>
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover"><b>CTL</b> (Chronic Training Load, 42-Tage-Ø) zeigt die aufgebaute Grundlagenfitness · <b>ATL</b> (Acute Training Load, 7-Tage-Ø) die kurzfristige Ermüdung · <b>TSB</b> = CTL − ATL, die „Form“: positiv = frisch/erholt, stark negativ = hohes Übertrainingsrisiko. CTL/ATL werden immer aus der vollständigen geladenen Historie berechnet (nicht nur dem gewählten Zeitraum), damit die Werte stabil bleiben.</div></span>
+      </h2>
+      <div class="legend" id="legend-pmc"></div>
+      <div class="chart-wrap" id="chart-pmc"></div>
+      <div class="pmc-substats" id="pmc-substats"></div>
+    </div>
+
+    <div class="card" data-card-id="acwr">
+      <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+      <h2>Trainingsbelastungsverhältnis (ACWR)
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Akute (7-Tage-Ø) im Verhältnis zur chronischen (42-Tage-Ø) Belastung</div></span>
+      </h2>
+      <div class="gauge-wrap chart-wrap" id="chart-acwr"></div>
+    </div>
+    <div class="card" data-card-id="focus">
+      <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+      <h2>Trainingsbelastungsfokus
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Zeitanteil je Intensitätszone im gewählten Zeitraum — polarisiertes Modell nach Seiler</div></span>
+      </h2>
+      <div class="chart-wrap" id="chart-focus"></div>
+    </div>
+
+    <div class="card" data-card-id="hr">
+      <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+      <h2>Herzfrequenz-Trend
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Durchschnitts- und Maximalpuls jeder Einheit im zeitlichen Verlauf. Ein bei gleicher Belastung sinkender Ø-Puls über Wochen deutet auf steigende Fitness hin, ein auffällig erhöhter Ø-Puls kann ein früher Hinweis auf Ermüdung oder beginnenden Infekt sein.</div></span>
+      </h2>
+      <p class="card-sub">Ø- und Max-Herzfrequenz je Einheit</p>
+      <div class="legend" id="legend-hr"></div>
+      <div class="chart-wrap" id="chart-hr"></div>
+    </div>
+    <div class="card" data-card-id="hrzones">
+      <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+      <h2>Herzfrequenz-Zonen
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Verteilung der Trainingszeit nach Intensität (Ø HF je Einheit, gewichtet mit Dauer)</div></span>
+      </h2>
+      <div class="chart-wrap" id="chart-hrzones"></div>
+    </div>
+
+    <div class="card full" data-card-id="hrdist">
+      <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+      <h2>Herzfrequenzverteilung nach Aktivität
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Zeigt je Sportart, in welchem Pulsbereich tatsächlich die meiste Zeit verbracht wurde (aus den Sekunden-Pulswerten aller Einheiten, nicht nur dem Ø-Puls) — je höher die Kurve an einer Stelle, desto mehr Zeit bei diesem Puls.</div></span>
+      </h2>
+      <p class="card-sub">Puls-Zeitanteil je Sportart im gewählten Zeitraum</p>
+      <div class="chart-wrap" id="chart-hrdist"></div>
+    </div>
+
+    <div class="card full" data-card-id="monotony">
+      <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+      <h2>Trainingsmonotonie
+        <span id="monotony-status-badge"></span>
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Nach Foster (1998): Ø Tagesbelastung ÷ Standardabweichung der Tagesbelastung über ein rollierendes 7-Tage-Fenster. Hohe Werte (&gt; 2,0) bedeuten sehr gleichmäßige Belastung ohne echte Erholungstage — das erhöht unabhängig von der absoluten Belastungshöhe das Übertrainingsrisiko.</div></span>
+      </h2>
+      <div class="chart-wrap" id="chart-monotony"></div>
+    </div>
+
+    <div class="card full" data-card-id="pace">
+      <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+      <h2>Pace- / Geschwindigkeitsentwicklung
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Entwicklung von Pace (Laufen/Schwimmen) bzw. Geschwindigkeit (Rad) je Einheit über den gewählten Zeitraum — zeigt, ob du bei vergleichbarer Anstrengung schneller wirst.</div></span>
+      </h2>
+      <p class="card-sub">Je Sportart im gewählten Zeitraum</p>
+      <div class="small-multiples" id="chart-pace"></div>
+    </div>
+
+    <div class="card full" data-card-id="workouts">
+      <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+      <h2>Workouts
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Angezeigte Spalten anpassen" title="Angezeigte Spalten anpassen">⚙</button><div class="info-popover workouts-columns-popover" id="workouts-columns-popover">
+          <p class="workouts-columns-title">Angezeigte Spalten</p>
+          <label class="workouts-col-toggle"><input type="checkbox" data-col="duration"> Dauer</label>
+          <label class="workouts-col-toggle"><input type="checkbox" data-col="distance"> Distanz</label>
+          <label class="workouts-col-toggle"><input type="checkbox" data-col="hravg"> Ø HF</label>
+          <label class="workouts-col-toggle"><input type="checkbox" data-col="hrmax"> Max HF</label>
+          <label class="workouts-col-toggle"><input type="checkbox" data-col="pace"> Pace / Speed</label>
+          <label class="workouts-col-toggle"><input type="checkbox" data-col="elevation"> Höhenmeter</label>
+          <label class="workouts-col-toggle"><input type="checkbox" data-col="load"> Load</label>
+          <label class="workouts-col-toggle"><input type="checkbox" data-col="kcal"> Kalorien</label>
+        </div></span>
+      </h2>
+      <p class="card-sub">Klicke auf eine Zeile für den Verlauf der Einheit (Puls &amp; Pace) — neueste zuerst · über ⚙ Spalten anpassen</p>
+      <div class="table-scroll">
+        <table class="workouts" id="workouts-table">
+          <thead>
+            <tr>
+              <th>Datum</th>
+              <th>Sportart</th>
+              <th class="num" data-col="duration">Dauer</th>
+              <th class="num" data-col="distance">Distanz</th>
+              <th class="num" data-col="hravg">Ø HF</th>
+              <th class="num" data-col="hrmax">Max HF</th>
+              <th class="num" data-col="pace">Pace / Speed</th>
+              <th class="num" data-col="elevation">Höhenm.</th>
+              <th class="num" data-col="load">Load</th>
+              <th class="num" data-col="kcal">kcal</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="table-expand-wrap" id="table-expand-wrap" style="display:none;">
+        <button class="chip" id="table-expand-btn" type="button">Alle anzeigen</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="note" id="footer-note"></footer>
+  </div>
+
+  <div id="view-calendar" class="view">
+    <section class="card full">
+      <h2>Trainingskalender
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Monats-, Wochen- und Tagesansicht wie bei TrainingsPeaks · rechts/unten die Zusammenfassung (Zeit, Load &amp; Sportarten)</div></span>
+      </h2>
+      <p class="card-sub">Klick auf einen Tag öffnet die Tagesansicht · Klick auf einen Punkt/Eintrag öffnet direkt den Trainings-Verlauf</p>
+      <div id="equipment-banner-calendar" class="equipment-banner" hidden></div>
+      <div class="cal-monthbar">
+        <div class="cal-month-title" id="cal-month-title"></div>
+        <div class="cal-controls">
+          <div class="cal-view-toggle" id="cal-view-toggle">
+            <button class="cal-view-btn active" data-mode="month" type="button">Monat</button>
+            <button class="cal-view-btn" data-mode="week" type="button">Woche</button>
+            <button class="cal-view-btn" data-mode="day" type="button">Tag</button>
+          </div>
+          <select class="cal-select" id="cal-sport-filter">
+            <option value="all">Alle Sportarten</option>
+            <option value="Schwimmen">Schwimmen</option>
+            <option value="Rad">Rad</option>
+            <option value="Laufen">Laufen</option>
+            <option value="Sonstiges">Sonstiges</option>
+          </select>
+          <button class="cal-nav-btn" id="cal-prev" type="button" aria-label="Zurück">‹</button>
+          <button class="cal-today-btn" id="cal-today" type="button">Heute</button>
+          <button class="cal-nav-btn" id="cal-next" type="button" aria-label="Weiter">›</button>
+          <button class="update-btn" id="cal-add-workout-btn" type="button" title="Workout manuell für den gerade fokussierten Tag anlegen">+ Workout</button>
+        </div>
+      </div>
+      <div class="cal-grid-scroll">
+        <div class="cal-grid-month" id="calendar-grid"></div>
+      </div>
+    </section>
+  </div>
+
+  <div id="view-coach" class="view">
+   <div class="coach-content" id="coach-content">
+    <section class="coach-header">
+      <div class="coach-header-top">
+        <h2>Coach
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Ziel-Event eintragen — der Coach erstellt daraus eine Trainingsempfehlung auf Basis deiner Form, Historie und Bestzeiten. Läuft lokal über <a href="https://ollama.com" target="_blank" rel="noopener">Ollama</a>, deine Daten bleiben auf deinem Rechner.</div></span>
+        </h2>
+        <div class="coach-header-actions">
+          <button class="update-btn onb-start-btn" id="onboarding-start-btn" type="button">Onboarding starten</button>
+        </div>
+      </div>
+      <p class="card-sub onb-start-hint">Neu hier? "Onboarding starten" beantwortet in 5 kurzen Schritten die wichtigsten Fragen für Profil &amp; Ziel. Ollama-Verbindung &amp; Athletenprofil findest du jetzt oben rechts unter ⚙️ Einstellungen.</p>
+    </section>
+
+    <div class="dash-grid-bar">
+      <span class="dash-grid-hint">↔ Karten per Drag &amp; Drop (Griff oben rechts) umsortieren</span>
+      <button class="reset-link" id="reset-coach-layout-btn">Layout zurücksetzen</button>
+    </div>
+
+    <div class="dash-grid" id="coach-grid" data-layout-key="triathlon_dashboard_coach_layout_v1">
+      <div class="card full recovery-card" data-card-id="recovery">
+        <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+        <h2>Dein Coach
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Kurzüberblick aus Form (PMC), Hauptevent-Fortschritt, Trainingsplan-Treue und nächster geplanter Einheit — automatisch berechnet, keine KI nötig.</div></span>
+        </h2>
+        <div id="coach-summary-body" class="coach-summary"></div>
+
+        <div class="coach-summary-divider"></div>
+
+        <h3 class="coach-recovery-heading">Erholungs-Check <span id="recovery-status-badge"></span>
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Fließt automatisch in die nächste Trainingsempfehlung ein und wird täglich zurückgesetzt — der Vortag landet dabei im Erholungs-Logbuch, damit auch der Verlauf über die Zeit für Auswertungen zur Verfügung steht.</div></span>
+        </h3>
+        <p class="card-sub">Wie fühlst du dich heute?</p>
+        <div class="recovery-check">
+          <div class="recovery-row">
+            <span class="recovery-label">Muskelkater</span>
+            <div class="onb-radio-group recovery-group" id="recovery-soreness-group"></div>
+          </div>
+          <div class="goal-form-row" id="recovery-soreness-location-row" style="display:none;">
+            <label for="recovery-soreness-location">Wo? (optional)</label>
+            <input type="text" id="recovery-soreness-location" class="coach-input" placeholder="z.B. Waden, rechtes Knie">
+          </div>
+          <div class="recovery-row">
+            <span class="recovery-label">Energie</span>
+            <div class="onb-radio-group recovery-group" id="recovery-energy-group"></div>
+          </div>
+          <div class="recovery-row">
+            <span class="recovery-label">Verletzung</span>
+            <div class="onb-radio-group recovery-group" id="recovery-injury-group"></div>
+          </div>
+          <div class="goal-form-row" id="recovery-injury-note-row" style="display:none;">
+            <label for="recovery-injury-note">Stelle / Notiz (optional)</label>
+            <input type="text" id="recovery-injury-note" class="coach-input" placeholder="z.B. rechtes Knie, seit 2 Tagen">
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-card-id="new-goal" id="new-goal-card" hidden>
+        <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+        <h2>Neues Ziel</h2>
+        <form class="goal-form" id="goal-form">
+          <div class="goal-form-row">
+            <label for="goal-name">Event / Ziel</label>
+            <input type="text" id="goal-name" class="coach-input" placeholder="z.B. Ironman 70.3 Kraichgau" required>
+          </div>
+          <div class="goal-form-row">
+            <label for="goal-sport">Sportart</label>
+            <select id="goal-sport" class="coach-input">
+              <option value="Triathlon">Triathlon</option>
+              <option value="Laufen">Laufen</option>
+              <option value="Rad">Rad</option>
+              <option value="Schwimmen">Schwimmen</option>
+            </select>
+          </div>
+          <div class="goal-form-row">
+            <label for="goal-date">Datum</label>
+            <input type="date" id="goal-date" class="coach-input" required>
+          </div>
+          <div class="goal-form-row">
+            <label for="goal-target-time">Zielzeit (optional)</label>
+            <input type="text" id="goal-target-time" class="coach-input" placeholder="z.B. 5:30">
+          </div>
+          <div class="goal-form-row">
+            <label for="goal-distance">Distanz in km (optional)</label>
+            <input type="number" id="goal-distance" class="coach-input" step="0.1" min="0" placeholder="z.B. 113">
+          </div>
+          <div class="goal-form-row-wide goal-subdisciplines" id="goal-subdisciplines" style="display:none;">
+            <label>Unterdisziplinen (optional)</label>
+            <div class="goal-subdiscipline-row">
+              <span class="goal-subdiscipline-label"><span class="sport-dot" style="background:var(--c-schwimmen)"></span>Schwimmen</span>
+              <input type="number" id="goal-sub-swim-distance" class="coach-input" step="0.1" min="0" placeholder="Distanz km">
+              <input type="text" id="goal-sub-swim-time" class="coach-input" placeholder="Zielzeit z.B. 0:40:00">
+            </div>
+            <div class="goal-subdiscipline-row">
+              <span class="goal-subdiscipline-label"><span class="sport-dot" style="background:var(--c-rad)"></span>Rad</span>
+              <input type="number" id="goal-sub-bike-distance" class="coach-input" step="0.1" min="0" placeholder="Distanz km">
+              <input type="text" id="goal-sub-bike-time" class="coach-input" placeholder="Zielzeit z.B. 2:30:00">
+            </div>
+            <div class="goal-subdiscipline-row">
+              <span class="goal-subdiscipline-label"><span class="sport-dot" style="background:var(--c-laufen)"></span>Laufen</span>
+              <input type="number" id="goal-sub-run-distance" class="coach-input" step="0.1" min="0" placeholder="Distanz km">
+              <input type="text" id="goal-sub-run-time" class="coach-input" placeholder="Zielzeit z.B. 1:40:00">
+            </div>
+          </div>
+          <div class="goal-form-row goal-form-row-wide">
+            <label for="goal-notes">Notizen (optional)</label>
+            <input type="text" id="goal-notes" class="coach-input" placeholder="z.B. erste Langdistanz, Laufen ist meine Schwäche">
+          </div>
+          <button type="submit" class="update-btn goal-submit-btn">Ziel hinzufügen</button>
+        </form>
+      </div>
+
+      <div class="card full" data-card-id="goals">
+        <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+        <div class="goals-card-head">
+          <h2>Deine Ziele</h2>
+          <button type="button" class="chip goals-add-toggle-btn" id="new-goal-toggle-btn">+ Neues Ziel/Event</button>
+        </div>
+        <div id="goals-list"></div>
+      </div>
+
+      <div class="card full" data-card-id="trainingplan">
+        <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+        <h2>Trainingsplan
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Plant rollierend jeweils die nächsten Tage für dein Hauptevent (★ bei „Deine Ziele"). Läuft der Vorrat aus, wird automatisch nachgeplant — du kannst hier auch jederzeit manuell nachplanen. Geplante Einheiten stehen zusätzlich im Kalender und lassen sich dort per Drag & Drop verschieben. Die Zeitleiste darunter zeigt die Trainingsphasen bis zu deinem Event und wo du gerade stehst.</div></span>
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erweiterte Einstellungen" title="Erweiterte Einstellungen">⚙</button><div class="info-popover trainingplan-settings-popover" id="trainingplan-settings-popover">
+            <p class="workouts-columns-title">Erweiterte Einstellungen</p>
+            <p class="card-sub" style="margin:0 0 8px;">Zusätzliche Wünsche, die die KI ab jetzt bei der Trainingsplan-Erstellung (inkl. „Kürzere Variante"/„Alternative Einheit") berücksichtigt.</p>
+            <textarea id="trainingplan-custom-wishes" class="coach-input plan-edit-textarea" rows="3" placeholder="z.B. 1x Zugseiltraining pro Woche, montags kein Rad"></textarea>
+            <div class="coach-settings-row" style="margin-top:8px;">
+              <button type="button" class="update-btn" id="trainingplan-wishes-save-btn">Speichern</button>
+              <span class="coach-test-status" id="trainingplan-wishes-status"></span>
+            </div>
+          </div></span>
+        </h2>
+        <div id="plan-timeline"></div>
+        <div id="trainingplan-body"></div>
+      </div>
+      <div class="card" data-card-id="coach-workouts">
+        <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+        <h2>Trainings-Auswertung
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Kompakter Überblick der letzten Einheiten (wie in Übersicht &gt; Workouts) — Klick auf eine Zeile öffnet die volle Auswertung inkl. Diagrammen.</div></span>
+        </h2>
+        <p class="card-sub">Neueste zuerst · <a href="#" class="coach-workouts-full-link" id="coach-workouts-full-link">alle Workouts ansehen</a></p>
+        <div class="table-scroll">
+          <table class="workouts workouts-compact" id="coach-workouts-table">
+            <thead>
+              <tr>
+                <th>Datum</th>
+                <th>Sportart</th>
+                <th class="num">Dauer</th>
+                <th class="num">Pace / Speed</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+   </div>
+
+   <div class="coach-gate" id="coach-gate">
+     <div class="coach-gate-card">
+       <p class="coach-gate-title">Kurz einrichten, dann geht's los</p>
+       <p class="coach-gate-sub">5 kurze Fragen zu dir und deinem Ziel — danach ist der komplette Coach-Bereich freigeschaltet.</p>
+       <button class="update-btn coach-gate-btn" id="onboarding-gate-btn" type="button">Onboarding starten</button>
+       <button class="coach-gate-skip" id="coach-gate-skip" type="button">Ohne Onboarding fortfahren</button>
+     </div>
+   </div>
+  </div>
+
+  <div id="view-nutrition" class="view">
+    <section class="card full">
+      <h2>Ernährung
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Rein rechnerisch, keine KI-Schätzung — die Werte kombinieren dein Körpergewicht, deinen Trainingsplan (heutige/nächste geplante Einheit) und dein Hauptevent-Ziel mit etablierten Sporternährungs-Richtlinien (ACSM/ISSN). Ohne Körpergewicht im Profil bzw. ohne Zielzeit bleiben die jeweiligen Karten leer, statt etwas zu erfinden.</div></span>
+      </h2>
+      <p class="card-sub">Makro-Ziele, Pre-Workout-Timing und ein Wettkampf-Verpflegungsplan — abgestimmt auf deinen Trainingsplan.</p>
+    </section>
+
+    <div class="dash-grid">
+      <div class="card">
+        <h2>Gewichtsverlauf</h2>
+        <p class="card-sub">Wird für die Berechnungen unten genutzt (Makros pro kg Körpergewicht) und als Verlauf gespeichert.</p>
+        <div class="goal-form">
+          <div class="goal-form-row">
+            <label for="nutrition-weight-input">Aktuelles Gewicht (kg)</label>
+            <input type="number" id="nutrition-weight-input" class="coach-input" step="0.1" min="0" placeholder="z.B. 72.3">
+          </div>
+        </div>
+        <button type="button" class="cal-today-btn" id="nutrition-weight-save-btn">Eintragen</button>
+        <div id="nutrition-weight-summary"></div>
+      </div>
+
+      <div class="card">
+        <h2>Tagesziel Makros
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover" id="nutrition-macros-info">Kohlenhydrate richten sich nach dem heutigen geplanten Trainingsumfang (bzw. Carb-Loading kurz vor dem Hauptevent), Eiweiß und Fett sind feste Richtwerte für Ausdauerathleten. Quellen: ACSM/AND/DC-Positionspapier (2016), ISSN-Positionspapier Protein (2017).</div></span>
+        </h2>
+        <div id="nutrition-macros-body"></div>
+      </div>
+
+      <div class="card full">
+        <h2>Vor dem Training
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Bezieht sich standardmäßig auf deine nächste geplante Einheit im Trainingsplan, per Klick auch auf eine der Einheiten danach. Da geplante Einheiten keine Uhrzeit haben, ist die Angabe relativ zum Start ("X Stunden vorher"), nicht als feste Uhrzeit.</div></span>
+        </h2>
+        <p class="card-sub">Zeigt immer die tatsächlich im Kalender geplanten Einheiten — bei mehreren anstehenden Einheiten oben umschaltbar.</p>
+        <div id="nutrition-preworkout-body"></div>
+      </div>
+
+      <div class="card full racefueling-card" id="racefueling-card">
+        <h2>Wettkampf-Verpflegung
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Aus den Zielzeiten deines Hauptevent-Ziels (★ bei „Deine Ziele" im Coach-Tab). Erscheint erst ausführlich ab der Taper-Phase (14 Tage vor dem Wettkampf) — vorher bleibt die Kachel bewusst klein, da sich Zielzeiten und Verpflegungsbedarf bis dahin noch ändern können. Ohne hinterlegte Zielzeit je Teildisziplin kann ohnehin keine Dauer und damit kein Verpflegungsbedarf berechnet werden.</div></span>
+        </h2>
+        <div id="nutrition-racefueling-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="view-records" class="view">
+    <section class="card full" id="achievements-card">
+      <h2>Erfolge
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Automatisch erkannte Meilensteine (Trainingsanzahl, Bestzeiten, Streak) — keine erfundenen Punkte, jedes Abzeichen bildet eine echte Leistung ab.</div></span>
+      </h2>
+      <div id="achievements-body"></div>
+    </section>
+
+    <section class="card full">
+      <h2>Persönliche Rekorde
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Bestleistungen je Sportart — angelehnt an die Personal-Records-Ansicht von TrainingsPeaks.</div></span>
+      </h2>
+      <p class="card-sub">Klick auf einen Rekord öffnet die zugehörige Einheit.</p>
+      <div id="records-grid"></div>
+    </section>
+  </div>
+
+  <div id="view-settings" class="view">
+    <section class="card full settings-page-head">
+      <button type="button" class="reset-link settings-back-btn" id="settings-back-btn">← Zurück</button>
+      <h2>Einstellungen</h2>
+      <p class="card-sub">Gelten für das ganze Dashboard, nicht nur den Coach-Tab. Bleiben nur lokal auf diesem Gerät gespeichert.</p>
+    </section>
+
+    <div class="dash-grid">
+      <div class="card full">
+        <h2>Ollama-Verbindung</h2>
+        <p class="card-sub">Für den KI-Coach (Trainingsempfehlungen, Auswertungen). Läuft lokal, deine Daten bleiben auf deinem Rechner.</p>
+        <div class="coach-settings-row">
+          <label for="coach-ollama-url">Adresse</label>
+          <input type="text" id="coach-ollama-url" class="coach-input" placeholder="http://localhost:11434">
+        </div>
+        <div class="coach-settings-row">
+          <label for="coach-ollama-model">Modell</label>
+          <input type="text" id="coach-ollama-model" class="coach-input" placeholder="llama3.1">
+        </div>
+        <div class="coach-settings-row">
+          <button class="cal-today-btn" id="coach-test-btn" type="button">Verbindung testen</button>
+          <span class="coach-test-status" id="coach-test-status"></span>
+        </div>
+        <p class="card-sub coach-setup-hint">
+          Einmalig einrichten: <a href="https://ollama.com/download" target="_blank" rel="noopener">Ollama installieren</a>,
+          ein Modell laden (Terminal: <code>ollama pull llama3.1</code>), Ollama für den Zugriff aus dieser Datei freischalten
+          (Terminal: <code>launchctl setenv OLLAMA_ORIGINS "*"</code>, dann Ollama neu starten) — Details in der README.
+        </p>
+      </div>
+
+      <div class="card full">
+        <h2>Claude API (optional)</h2>
+        <p class="card-sub">Alternative bzw. Ergänzung zu Ollama — nutzt ein stärkeres Modell über die Anthropic API (kostenpflichtig, eigener API-Key). Läuft direkt aus dem Browser, kein eigenes Backend nötig.</p>
+        <div class="coach-settings-row">
+          <label for="claude-api-key">API-Key</label>
+          <input type="password" id="claude-api-key" class="coach-input" placeholder="sk-ant-...">
+        </div>
+        <div class="coach-settings-row">
+          <label for="claude-model">Modell</label>
+          <input type="text" id="claude-model" class="coach-input" placeholder="claude-haiku-4-5-20251001">
+        </div>
+        <div class="coach-settings-row">
+          <button class="cal-today-btn" id="claude-test-btn" type="button">Verbindung testen</button>
+          <span class="coach-test-status" id="claude-test-status"></span>
+        </div>
+        <p class="card-sub coach-setup-hint">
+          API-Key erstellen unter <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
+          Standardmodell ist bewusst das güntigste verfügbare (Haiku), um die Kosten so gering wie möglich zu halten.
+          Der Key wird nur lokal in diesem Browser gespeichert, nie an einen eigenen Server geschickt.
+        </p>
+      </div>
+
+      <div class="card full">
+        <h2>Hybrid-Modus — welche Aufgabe nutzt welchen Anbieter?</h2>
+        <p class="card-sub">Standardmäßig läuft alles lokal & kostenlos über Ollama. Einzelne Aufgaben können gezielt auf Claude umgestellt werden, z.B. nur die selten aufgerufene Trainingsplan-Erstellung — so bleiben die API-Kosten minimal.</p>
+        <div class="coach-settings-row">
+          <label for="hybrid-task-plan">Trainingsplan-Erstellung</label>
+          <select id="hybrid-task-plan" class="coach-input" data-task="plan">
+            <option value="ollama">Ollama (lokal)</option>
+            <option value="claude">Claude API</option>
+          </select>
+        </div>
+        <div class="coach-settings-row">
+          <label for="hybrid-task-analysis">Workout-Auswertung</label>
+          <select id="hybrid-task-analysis" class="coach-input" data-task="analysis">
+            <option value="ollama">Ollama (lokal)</option>
+            <option value="claude">Claude API</option>
+          </select>
+        </div>
+        <div class="coach-settings-row">
+          <label for="hybrid-task-recommendation">Ziel-Empfehlung</label>
+          <select id="hybrid-task-recommendation" class="coach-input" data-task="recommendation">
+            <option value="ollama">Ollama (lokal)</option>
+            <option value="claude">Claude API</option>
+          </select>
+        </div>
+        <div class="coach-settings-row">
+          <label for="hybrid-task-lessons">Lessons Learned</label>
+          <select id="hybrid-task-lessons" class="coach-input" data-task="lessons">
+            <option value="ollama">Ollama (lokal)</option>
+            <option value="claude">Claude API</option>
+          </select>
+        </div>
+        <div class="coach-settings-row">
+          <label for="hybrid-task-focus">Trainingsbelastungsfokus (Ist/Soll)</label>
+          <select id="hybrid-task-focus" class="coach-input" data-task="focus">
+            <option value="ollama">Ollama (lokal)</option>
+            <option value="claude">Claude API</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Persönliche Daten</h2>
+        <p class="card-sub">Optional. Name wird z.B. in Begrüßungen genutzt, Geburtsdatum nur für eine Geburtstags-Nachricht im Dashboard - beides wird nirgends sonst ausgewertet und ersetzt nicht das Coach-Onboarding (Leistungswerte/Ziel) unten.</p>
+        <div class="goal-form">
+          <div class="goal-form-row">
+            <label for="profile-name">Name</label>
+            <input type="text" id="profile-name" class="coach-input" placeholder="z.B. Nico">
+          </div>
+          <div class="goal-form-row">
+            <label for="profile-gender">Geschlecht</label>
+            <select id="profile-gender" class="coach-input">
+              <option value="">– keine Angabe –</option>
+              <option value="m">männlich</option>
+              <option value="w">weiblich</option>
+              <option value="divers">divers</option>
+            </select>
+          </div>
+          <div class="goal-form-row">
+            <label for="profile-birthdate">Geburtsdatum</label>
+            <input type="date" id="profile-birthdate" class="coach-input">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Trainingswerte</h2>
+        <p class="card-sub">Optional — hilft dem Coach bei konkreteren Empfehlungen und schaltet einzelne Kacheln frei.</p>
+        <div class="goal-form">
+          <div class="goal-form-row">
+            <label for="profile-ftp">FTP Rad (Watt)</label>
+            <input type="number" id="profile-ftp" class="coach-input" min="0" placeholder="z.B. 250">
+          </div>
+          <div class="goal-form-row">
+            <label for="profile-run-pace">Schwellenpace Laufen (min/km)</label>
+            <input type="text" id="profile-run-pace" class="coach-input" placeholder="z.B. 4:45">
+          </div>
+          <div class="goal-form-row">
+            <label for="profile-swim-pace">CSS Schwimmen (min/100m)</label>
+            <input type="text" id="profile-swim-pace" class="coach-input" placeholder="z.B. 1:45">
+          </div>
+          <div class="goal-form-row">
+            <label for="profile-max-hr">Maximale Herzfrequenz (bpm)</label>
+            <input type="number" id="profile-max-hr" class="coach-input" min="0" placeholder="z.B. 188">
+          </div>
+          <div class="goal-form-row">
+            <label for="profile-resting-hr">Ruhe-Herzfrequenz (bpm)</label>
+            <input type="number" id="profile-resting-hr" class="coach-input" min="0" placeholder="z.B. 52">
+          </div>
+          <div class="goal-form-row">
+            <label for="profile-weight-kg">Körpergewicht (kg)</label>
+            <input type="number" id="profile-weight-kg" class="coach-input" min="0" step="0.1" placeholder="z.B. 72">
+          </div>
+        </div>
+        <p class="card-sub" style="margin-top:10px;">Maximale &amp; Ruhe-Herzfrequenz werden für TRIMP und die Herzfrequenzreserve in der Trainings-Detailansicht gebraucht (Trainingsbelastung-Kachel) — ohne diese zwei Werte bleibt sie ausgeblendet. Das Körpergewicht wird nur für die Rad-VO2max-Schätzung aus Leistungsdaten (Watt) gebraucht — ohne Gewicht bleibt diese Schätzung leer, statt geraten zu werden.</p>
+      </div>
+
+      <div class="card">
+        <h2>Planung</h2>
+        <p class="card-sub">Fließt in den Trainingsplan des Coaches ein.</p>
+        <div class="goal-form-row">
+          <label for="profile-weekly-hours">Verfügbare Stunden/Woche</label>
+          <input type="number" id="profile-weekly-hours" class="coach-input" min="0" step="0.5" placeholder="z.B. 8">
+        </div>
+        <div class="goal-form-row" style="margin-top:12px;">
+          <label class="onb-checkbox-row"><input type="checkbox" id="profile-include-strength">Krafttraining in den Trainingsplan einplanen</label>
+        </div>
+        <div class="goal-form-row">
+          <label class="onb-checkbox-row"><input type="checkbox" id="profile-include-mobility">Mobility/Beweglichkeit in den Trainingsplan einplanen</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Kalender-Abo (iCal)
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Geplante Einheiten als abonnierbaren Kalender-Feed (webcal), z.B. für Apple/Google Kalender. Braucht den lokalen Backend-Server (siehe DEPLOYMENT.md) - funktioniert nur, während "python backend/app.py" auf diesem Rechner läuft, noch nicht "online" von unterwegs.</div></span>
+        </h2>
+        <p class="card-sub" id="ical-status-hint">Prüfe, ob der Backend-Server erreichbar ist …</p>
+        <div class="goal-form-row goal-form-row-wide" id="ical-url-row" hidden>
+          <label for="ical-url-input">Abo-Adresse (in Kalender-App als Internetkalender/webcal hinzufügen)</label>
+          <div class="wd-rating-elevation-inputs">
+            <input type="text" id="ical-url-input" class="coach-input" readonly style="flex:1;">
+            <button type="button" class="chip" id="ical-copy-btn">Kopieren</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Equipment
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Kilometerstand von Laufschuhen/Rad wird automatisch aus deinen Trainings gezählt, solange ein Item als "Standard" für die Sportart markiert ist. Verschleißteile (Kette, Reifen, Bremsbeläge) teilen sich die Kilometer des zugehörigen Rads. Warnt hier, im Kalender und auf dem Dashboard, sobald ein Service-/Austausch-Intervall erreicht ist.</div></span>
+        </h2>
+        <p class="card-sub">Optional — nur sichtbar, wenn du Equipment hinterlegst.</p>
+        <div id="equipment-list"></div>
+        <button type="button" class="chip goals-add-toggle-btn" id="equipment-add-toggle-btn">+ Equipment hinzufügen</button>
+        <div class="card" id="equipment-add-card" hidden style="margin-top:10px; box-shadow:none; border:1px solid var(--border);">
+          <form class="goal-form" id="equipment-form">
+            <div class="goal-form-row">
+              <label for="equipment-name">Name</label>
+              <input type="text" id="equipment-name" class="coach-input" placeholder="z.B. Laufschuhe Adidas Adizero" required>
+            </div>
+            <div class="goal-form-row">
+              <label for="equipment-category">Kategorie</label>
+              <select id="equipment-category" class="coach-input">
+                <option value="Laufschuhe">Laufschuhe</option>
+                <option value="Rad">Rad</option>
+                <option value="Verschleißteil">Verschleißteil (Kette/Reifen/Bremsbeläge …)</option>
+                <option value="Sonstiges">Sonstiges</option>
+              </select>
+            </div>
+            <div class="goal-form-row" id="equipment-sport-row">
+              <label for="equipment-sport">Sportart (für automatisches km-Tracking)</label>
+              <select id="equipment-sport" class="coach-input">
+                <option value="">– keine (manuelle km-Eingabe) –</option>
+                <option value="Laufen">Laufen</option>
+                <option value="Rad">Rad</option>
+                <option value="Schwimmen">Schwimmen</option>
+              </select>
+            </div>
+            <div class="goal-form-row" id="equipment-parent-row" style="display:none;">
+              <label for="equipment-parent">Gehört zu</label>
+              <select id="equipment-parent" class="coach-input"></select>
+            </div>
+            <div class="goal-form-row">
+              <label for="equipment-interval">Service-/Austausch-Intervall (km)</label>
+              <input type="number" id="equipment-interval" class="coach-input" min="0" placeholder="z.B. 700">
+            </div>
+            <div class="goal-form-row" id="equipment-startkm-row">
+              <label for="equipment-startkm">Bereits gefahrene/gelaufene km (falls nicht neu)</label>
+              <input type="number" id="equipment-startkm" class="coach-input" min="0" step="0.1" placeholder="0">
+            </div>
+            <div class="goal-form-row">
+              <label for="equipment-note">Notiz (optional)</label>
+              <input type="text" id="equipment-note" class="coach-input" placeholder="z.B. Modell, Kaufdatum">
+            </div>
+            <div class="goal-actions">
+              <button type="submit" class="update-btn">Anlegen</button>
+              <button type="button" class="chip" id="equipment-cancel-btn">Abbrechen</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+<div class="achievement-toast" id="achievement-toast"></div>
+<div class="achievement-toast" id="birthday-toast"></div>
+
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-card">
+    <button class="modal-close" id="modal-close">✕</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="plan-edit-overlay">
+  <div class="modal-card plan-edit-card">
+    <button class="modal-close" id="plan-edit-close">✕</button>
+    <div id="plan-edit-body"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="confirm-overlay">
+  <div class="modal-card confirm-card">
+    <p class="confirm-message" id="confirm-message"></p>
+    <div class="confirm-actions">
+      <button class="chip" id="confirm-cancel-btn" type="button">Abbrechen</button>
+      <button class="update-btn confirm-danger-btn" id="confirm-ok-btn" type="button">Löschen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Workouts vergleichen: erst Auswahl (welche zusätzlichen Einheiten),
+     dann die eigentliche Vergleichsansicht (nebeneinander/übereinander),
+     siehe js/components/compare.js. Reuse von .modal-overlay/.modal-card. -->
+<div class="modal-overlay" id="compare-picker-overlay">
+  <div class="modal-card compare-picker-card">
+    <button class="modal-close" id="compare-picker-close" type="button">✕</button>
+    <div id="compare-picker-body"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="compare-overlay">
+  <div class="modal-card compare-card">
+    <button class="modal-close" id="compare-close" type="button">✕</button>
+    <div id="compare-body"></div>
+  </div>
+</div>
+
+
+
+<div class="onb-overlay" id="onb-overlay">
+  <div class="onb-card">
+    <button class="onb-close" id="onb-close" type="button">✕</button>
+    <div class="onb-progress" id="onb-progress-label">Schritt 1 von 5</div>
+    <div class="onb-progress-bar" id="onb-progress-bar"></div>
+    <div id="onb-step-body"></div>
+    <div class="onb-actions">
+      <button class="chip" id="onb-back-btn" type="button">Zurück</button>
+      <button class="update-btn" id="onb-next-btn" type="button">Weiter</button>
+    </div>
+  </div>
+</div>
+
+<div class="dnd-overlay" id="dnd-overlay">
+  <div class="dnd-card">
+    <button class="dnd-close" id="dnd-close" type="button">✕</button>
+    <h3 class="dnd-title">.fit-Dateien hinzufügen</h3>
+    <p class="dnd-sub-title">Einzelne .fit-Dateien per Drag &amp; Drop hier ablegen oder klicken, um sie auszuwählen. Bereits vorhandene Trainings werden ergänzt, nichts wird ersetzt.</p>
+    <div class="dnd-zone" id="dnd-zone">
+      <div class="dnd-zone-icon">⬆️</div>
+      <div class="dnd-zone-text">Dateien hierher ziehen</div>
+      <div class="dnd-zone-sub">oder klicken zum Auswählen (.fit)</div>
+    </div>
+    <div class="dnd-filelist" id="dnd-filelist"></div>
+    <div class="dnd-status" id="dnd-status"></div>
+  </div>
+</div>
+
+<!-- Reihenfolge ist wichtig: jede Datei darf beim Laden nur auf bereits
+     geladene Dateien zugreifen (siehe docs/PROJECT_MAP.md). -->
+<script src="js/data/api-client.js"></script>
+<script src="data/workouts-data.js"></script>
+<script src="js/utils/dates.js"></script>
+<script src="js/utils/formatting.js"></script>
+<script src="js/utils/calculations.js"></script>
+<script src="js/data/fit-parser.js"></script>
+<script src="js/data/workouts.js"></script>
+<script src="js/data/workout-notes.js"></script>
+<script src="js/data/goals.js"></script>
+<script src="js/data/gpx-parser.js"></script>
+<script src="js/data/athlete.js"></script>
+<script src="js/data/health.js"></script>
+<script src="js/data/planned-workouts.js"></script>
+<script src="js/data/fit-workout-writer.js"></script>
+<script src="js/data/weight-log.js"></script>
+<script src="js/data/equipment.js"></script>
+<script src="js/data/achievements.js"></script>
+<script src="js/analytics/training-load.js"></script>
+<script src="js/analytics/performance.js"></script>
+<script src="js/analytics/workout-comparison.js"></script>
+<script src="js/analytics/race-readiness.js"></script>
+<script src="js/analytics/hr-distribution.js"></script>
+<script src="js/analytics/workout-profile.js"></script>
+<script src="js/analytics/training-plan.js"></script>
+<script src="js/analytics/zones.js"></script>
+<script src="js/analytics/nutrition.js"></script>
+<script src="js/analytics/streak.js"></script>
+<script src="js/analytics/achievements.js"></script>
+<script src="js/ai/context-builder.js"></script>
+<script src="js/ai/prompts.js"></script>
+<script src="js/ai/ollama.js"></script>
+<script src="js/ai/claude.js"></script>
+<script src="js/ai/provider.js"></script>
+<script src="js/components/chart.js"></script>
+<script src="js/components/app-shell.js"></script>
+<script src="js/components/card-search.js"></script>
+<script src="js/components/dashboard.js"></script>
+<script src="js/components/calendar.js"></script>
+<script src="js/components/records.js"></script>
+<script src="js/components/equipment.js"></script>
+<script src="js/components/health-status.js"></script>
+<script src="js/components/coach.js"></script>
+<script src="js/components/training-plan.js"></script>
+<script src="js/components/nutrition.js"></script>
+<script src="js/components/achievements.js"></script>
+<script src="js/components/workout-card.js"></script>
+<script src="js/components/compare.js"></script>
+<script src="js/components/data-import.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+# Enthält echte, persönliche Trainingsdaten (Herzfrequenz, Zeiten, Distanzen,
+# Kalorien) - bleibt bewusst lokal und wird nicht ins öffentliche Repo geladen.
+workouts.json
+
+# Generiert aus workouts.json (siehe build_dashboard.py) und enthält daher
+# dieselben persönlichen Trainingsdaten eingebettet - ebenfalls lokal, nicht
+# im Repo. index.html selbst ist reiner Code und bleibt im Repo.
+data/workouts-data.js
+
+# Phase 1 Backend - lokale Entwicklung
+training.db
+backend/*.log
+*.token
+.env
+.env.local
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+venv/
+.venv/
+
+# System-/Editor-Dateien
+.DS_Store
+.vscode/
+*.swp
+*.swo
