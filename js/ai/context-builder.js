@@ -1,6 +1,10 @@
 // Baut den kompakten Text-Kontext (Form, Umfang, Bestzeiten, Profil, Erholung, Ziel)
 // fuer das LLM - bewusst aggregiert statt Rohdaten, siehe docs/AI_CONTEXT.md.
 
+// `goal` ist optional - ohne Ziel (z.B. für die allgemeine KI-
+// Leistungszustand-Zusammenfassung im Coach-Tab, siehe buildPerformanceSummaryPrompt()
+// in prompts.js) werden die zielspezifischen Zeilen (Ziel/Unterdisziplinen/
+// Race-Readiness) einfach weggelassen statt mit leeren Werten aufzufüllen.
 function buildCompactContext(goal) {
   const series = computeLoadSeries();
   const last = series && series.length ? series[series.length - 1] : null;
@@ -18,7 +22,7 @@ function buildCompactContext(goal) {
   });
 
   const todayMid = new Date(); todayMid.setHours(0, 0, 0, 0);
-  const eventDate = goal.date ? new Date(goal.date + "T00:00:00") : null;
+  const eventDate = goal && goal.date ? new Date(goal.date + "T00:00:00") : null;
   const daysUntil = eventDate ? Math.round((eventDate - todayMid) / 86400000) : null;
 
   const lines = [];
@@ -63,7 +67,8 @@ function buildCompactContext(goal) {
   if (volBits.length) lines.push(`Letzte 4 Wochen: ${volBits.join(" | ")}`);
 
   const profBits = [];
-  if (athleteProfile.age) profBits.push(`${athleteProfile.age} Jahre`);
+  const athleteAge = getAthleteAge();
+  if (athleteAge != null) profBits.push(`${athleteAge} Jahre`);
   if (athleteProfile.experienceLevel) profBits.push(`Erfahrung ${ONB_EXP_LABELS[athleteProfile.experienceLevel] || athleteProfile.experienceLevel}`);
   if (athleteProfile.strongDiscipline) profBits.push(`Stärke ${athleteProfile.strongDiscipline}`);
   if (athleteProfile.weakDiscipline) profBits.push(`Schwäche ${athleteProfile.weakDiscipline}`);
@@ -72,7 +77,9 @@ function buildCompactContext(goal) {
   } else if (athleteProfile.trainingDaysPerWeek) {
     profBits.push(`${athleteProfile.trainingDaysPerWeek} Tage/Woche`);
   }
-  if (athleteProfile.swimDay) profBits.push(`Schwimmtag ${WEEKDAY_LABELS[athleteProfile.swimDay] || athleteProfile.swimDay}`);
+  if (Array.isArray(athleteProfile.swimDays) && athleteProfile.swimDays.length) {
+    profBits.push(`Schwimmtage ${athleteProfile.swimDays.map(d => WEEKDAY_LABELS[d] || d).join("+")}`);
+  }
   if (Array.isArray(athleteProfile.longDays) && athleteProfile.longDays.length) {
     profBits.push(`lange Einheit ${athleteProfile.longDays.map(d => WEEKDAY_LABELS[d] || d).join("+")}`);
   }
@@ -133,30 +140,32 @@ function buildCompactContext(goal) {
     lines.push(`Ernährungsziel heute: ${bits.join(" | ")}`);
   }
 
-  const zielBits = [`${goal.name}`, goal.sport, goal.date];
-  if (daysUntil != null) zielBits.push(`in ${daysUntil} Tagen`);
-  if (goal.targetTime) zielBits.push(`Zielzeit ${goal.targetTime}`);
-  if (goal.distanceKm) zielBits.push(`${fmtNum(goal.distanceKm, 1)}km`);
-  lines.push(`Ziel: ${zielBits.join(" | ")}`);
-  if (goal.subDisciplines && goal.subDisciplines.length) {
-    const subBits = goal.subDisciplines.map(s => {
-      const parts = [];
-      if (s.distanceKm) parts.push(`${fmtNum(s.distanceKm, 1)}km`);
-      if (s.targetTime) parts.push(`Ziel ${s.targetTime}`);
-      return `${s.label}${parts.length ? " " + parts.join(", ") : ""}`;
-    });
-    lines.push(`Unterdisziplinen: ${subBits.join(" | ")}`);
-  }
-  if (goal.notes) lines.push(`Notiz: ${goal.notes}`);
+  if (goal) {
+    const zielBits = [`${goal.name}`, goal.sport, goal.date];
+    if (daysUntil != null) zielBits.push(`in ${daysUntil} Tagen`);
+    if (goal.targetTime) zielBits.push(`Zielzeit ${goal.targetTime}`);
+    if (goal.distanceKm) zielBits.push(`${fmtNum(goal.distanceKm, 1)}km`);
+    lines.push(`Ziel: ${zielBits.join(" | ")}`);
+    if (goal.subDisciplines && goal.subDisciplines.length) {
+      const subBits = goal.subDisciplines.map(s => {
+        const parts = [];
+        if (s.distanceKm) parts.push(`${fmtNum(s.distanceKm, 1)}km`);
+        if (s.targetTime) parts.push(`Ziel ${s.targetTime}`);
+        return `${s.label}${parts.length ? " " + parts.join(", ") : ""}`;
+      });
+      lines.push(`Unterdisziplinen: ${subBits.join(" | ")}`);
+    }
+    if (goal.notes) lines.push(`Notiz: ${goal.notes}`);
 
-  // Race Readiness Score (js/analytics/race-readiness.js) - fasst Form/ACWR/
-  // Trainingskonstanz/Taper-Phase speziell für dieses Ziel zu einer
-  // Einschätzung zusammen; wurde bisher nur im Coach-Tab angezeigt, nie an
-  // die KI selbst weitergegeben, obwohl genau dafür berechnet.
-  const readiness = computeRaceReadiness(goal);
-  if (readiness) {
-    const factorBits = readiness.factors.map(f => `${f.label}: ${f.note}`).join(" | ");
-    lines.push(`Race-Readiness-Score: ${readiness.score}/100 (${readiness.level.label}) — ${factorBits}`);
+    // Race Readiness Score (js/analytics/race-readiness.js) - fasst Form/ACWR/
+    // Trainingskonstanz/Taper-Phase speziell für dieses Ziel zu einer
+    // Einschätzung zusammen; wurde bisher nur im Coach-Tab angezeigt, nie an
+    // die KI selbst weitergegeben, obwohl genau dafür berechnet.
+    const readiness = computeRaceReadiness(goal);
+    if (readiness) {
+      const factorBits = readiness.factors.map(f => `${f.label}: ${f.note}`).join(" | ");
+      lines.push(`Race-Readiness-Score: ${readiness.score}/100 (${readiness.level.label}) — ${factorBits}`);
+    }
   }
 
   return lines.join("\n");
@@ -422,4 +431,24 @@ function buildFocusContext() {
   if (f.tsb != null && f.tsbStatus) lines.push(`Aktueller Erholungsstatus (TSB): ${fmtNum(f.tsb, 0)} - ${f.tsbStatus.text}`);
   if (f.acwr != null && f.acwrStatus) lines.push(`Aktuelles Belastungsverhaeltnis (ACWR): ${fmtNum(f.acwr, 2)} - ${f.acwrStatus.text}`);
   return lines.join("\n");
+}
+
+
+// Kontext fuer die kurze KI-Zusammenfassung "aktueller Leistungszustand" im
+// Coach-Tab (siehe buildPerformanceSummaryPrompt(), prompts.js) - der
+// allgemeine Athletenkontext OHNE Ziel-Bezug (buildCompactContext(goal)),
+// PLUS das bereits deterministisch berechnete Kurzverdikt aus
+// computePerformanceState() (js/analytics/training-load.js) als fertige
+// Einordnung, die die KI nur noch in Worte fassen, nicht neu bewerten soll
+// (AI_RULES: "Analytics feed AI, AI doesn't calculate"). Nutzt trotzdem das
+// Hauptevent als Kontext, falls eines hinterlegt ist (fuer "wie gut passt
+// das gerade zum Ziel"), ohne dass die Zusammenfassung zwingend eines braucht.
+function buildPerformanceSummaryContext() {
+  const goal = typeof getPrimaryGoal === "function" ? getPrimaryGoal() : null;
+  const lines = [buildCompactContext(goal)];
+  const state = typeof computePerformanceState === "function" ? computePerformanceState() : null;
+  if (state) {
+    lines.push(`Bereits berechnetes Kurzverdikt: "${state.verdict}" (Fitness/CTL ${fmtNum(state.ctl, 1)}, Trend ${state.ctlDelta >= 0 ? "+" : ""}${fmtNum(state.ctlDelta, 1)} ggü. vor 4 Wochen).`);
+  }
+  return lines.join("\n\n");
 }

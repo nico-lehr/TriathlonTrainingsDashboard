@@ -94,6 +94,47 @@ function monotonyStatusLabel(monotony) {
   return { cls: "ok", text: "unauffällig" };
 }
 
+/* ---------- Aktueller Leistungszustand (Kurzverdikt für Coach-Tab) ---------- */
+
+// Fasst Fitness-Trend (CTL über die letzten 4 Wochen), Form (TSB) und
+// Verletzungsrisiko (ACWR) zu EINEM präzisen Kurzverdikt zusammen - für die
+// Leistungszustand-Kachel im Coach-Tab (renderCoachSummary(), coach.js).
+// Reine Ableitung aus den bereits vorhandenen PMC-Werten (computeLoadSeries)
+// und denselben Schwellenwerten wie tsbStatusLabel()/acwrStatusLabel() weiter
+// oben - keine neue Berechnung, keine neue Datenquelle (AI_RULES Regel 5:
+// "Analytics feed AI/UI, nie zweimal dieselbe Zahl anders herleiten").
+function computePerformanceState() {
+  const series = computeLoadSeries();
+  if (!series || !series.length) return null;
+  const last = series[series.length - 1];
+
+  // CTL vor ca. 4 Wochen (28 Tage) für den Fitness-Trend - fällt bei
+  // kürzerer Historie auf den ältesten verfügbaren Punkt zurück, statt
+  // NaN/undefined zu produzieren.
+  const target = last.day - 28;
+  let prev = series[0];
+  for (const p of series) { if (p.day <= target) prev = p; else break; }
+  const ctlDelta = last.ctl - prev.ctl;
+
+  const acwr = last.ctl > 0.5 ? last.atl / last.ctl : null;
+  const acwrStatus = acwrStatusLabel(acwr);
+  const tsbStatus = tsbStatusLabel(last.tsb);
+
+  // Verletzungsrisiko/Übertraining haben Vorrang vor der Fitness-Story -
+  // ein hohes ACWR bzw. sehr negatives TSB soll nicht von "Fitness steigt"
+  // überdeckt werden.
+  let verdict, cls;
+  if (acwr != null && acwr > 1.5) { verdict = "Erhöhtes Verletzungsrisiko"; cls = "risk"; }
+  else if (last.tsb < -30) { verdict = "Übertrainingsrisiko"; cls = "risk"; }
+  else if ((acwr != null && acwr > 1.3) || last.tsb < -10) { verdict = "Ermüdet – Belastung im Auge behalten"; cls = "watch"; }
+  else if (last.tsb > 15) { verdict = "Sehr frisch / Tapering-Bereich"; cls = "ok"; }
+  else if (ctlDelta > 3) { verdict = "Im Aufbau"; cls = "ok"; }
+  else if (ctlDelta < -3) { verdict = "Fitness sinkt"; cls = "watch"; }
+  else { verdict = "Stabil"; cls = "ok"; }
+
+  return { verdict, cls, ctl: last.ctl, ctlDelta, tsb: last.tsb, tsbStatus, acwr, acwrStatus };
+}
+
 /* ---------- Monatsvergleich (aktueller vs. vorheriger Kalendermonat) ---------- */
 
 // Vergleicht den aktuellen Kalendermonat (Tag 1 bis heute) mit demselben

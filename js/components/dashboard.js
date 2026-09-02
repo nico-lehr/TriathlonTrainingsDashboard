@@ -82,12 +82,19 @@ function renderMonthComparison() {
   const host = document.getElementById("monthcompare-stats");
   if (!host) return;
   const cmp = computeMonthComparison();
+  // In den ersten Tagen eines Monats ist die Basis (wenige Tage, oft noch
+  // gar keine Einheit) zu klein fuer einen sinnvollen Prozentvergleich -
+  // ein einzelnes Training mehr/weniger als im Vormonat ergibt dann
+  // Ausreisser wie -99%. Bis Tag 4 zeigen wir deshalb nur die reinen
+  // Zahlen ohne Prozent-Delta.
+  const MIN_DAY_FOR_DELTA = 4;
+  const showDelta = cmp.dayOfMonth >= MIN_DAY_FOR_DELTA;
   const pctDelta = (a, b) => {
     if (b > 0) return ((a - b) / b) * 100;
     return a > 0 ? 100 : 0;
   };
   const deltaHtml = (a, b) => {
-    if (a === 0 && b === 0) return "";
+    if (!showDelta || (a === 0 && b === 0)) return "";
     const d = pctDelta(a, b);
     const sign = d >= 0 ? "+" : "";
     const tone = d >= 0 ? "good" : "warn";
@@ -98,7 +105,8 @@ function renderMonthComparison() {
     { l: "Einheiten", cur: cmp.current.count, delta: deltaHtml(cmp.current.count, cmp.previous.count) },
     { l: "Load", cur: fmtNum(cmp.current.load, 0), delta: deltaHtml(cmp.current.load, cmp.previous.load) },
   ];
-  host.innerHTML = rows.map(r => `<div class="sub-tile"><div class="l">${r.l}</div><div class="v">${r.cur}${r.delta}</div></div>`).join("");
+  host.innerHTML = rows.map(r => `<div class="sub-tile"><div class="l">${r.l}</div><div class="v">${r.cur}${r.delta}</div></div>`).join("")
+    + (!showDelta ? `<p class="onb-hint" style="flex-basis:100%;margin:2px 0 0;">Prozent-Vergleich erst ab Tag ${MIN_DAY_FOR_DELTA} des Monats (zu wenig Daten für einen sinnvollen Vergleich).</p>` : "");
 }
 
 // 3D-Tilt-Effekt für die Übersicht-Kacheln (wie auf der Landingpage): die

@@ -11,8 +11,9 @@ const HYBRID_SETTINGS_KEY = "triathlon_dashboard_hybrid_settings_v1";
 
 // task-Namen: "plan" (Trainingsplan-Erstellung), "analysis" (Workout-Analyse),
 // "recommendation" (Ziel-Empfehlung), "lessons" (Lessons Learned je Einheit),
-// "focus" (Ist/Soll-Einordnung Trainingsbelastungsfokus).
-let hybridSettings = { plan: "ollama", analysis: "ollama", recommendation: "ollama", lessons: "ollama", focus: "ollama" };
+// "focus" (Ist/Soll-Einordnung Trainingsbelastungsfokus), "perfSummary"
+// (Leistungszustand-Zusammenfassung im Coach-Tab).
+let hybridSettings = { plan: "ollama", analysis: "ollama", recommendation: "ollama", lessons: "ollama", focus: "ollama", perfSummary: "ollama" };
 
 function loadHybridSettings() {
   try {
@@ -35,7 +36,7 @@ function saveHybridSettings() {
 // braucht daher deutlich mehr Spielraum als die kurzen Fließtext-Antworten,
 // sonst wird die Antwort mitten im JSON abgeschnitten (siehe
 // CHANGE_REQUESTS.md: "Antwort war kein gültiges JSON"/"Leere Antwort").
-const CLAUDE_TASK_MAX_TOKENS = { plan: 4000, analysis: 900, recommendation: 900, lessons: 700, focus: 500 };
+const CLAUDE_TASK_MAX_TOKENS = { plan: 4000, analysis: 900, recommendation: 900, lessons: 700, focus: 500, perfSummary: 400 };
 
 async function callAiText(prompt, { task = "recommendation", json = false } = {}) {
   const provider = hybridSettings[task] || "ollama";

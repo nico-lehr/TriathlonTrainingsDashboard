@@ -5,7 +5,7 @@ const ATHLETE_PROFILE_KEY = "triathlon_dashboard_athlete_profile_v1";
 let athleteProfile = {
   ftpWatts: null, runThresholdPace: null, swimCss: null, weeklyHours: null,
   experienceLevel: null, strongDiscipline: null, weakDiscipline: null, trainingDaysPerWeek: null,
-  age: null, trainingDays: [], swimDay: null, longDays: [], typicalSessionMin: null,
+  age: null, trainingDays: [], swimDays: [], longDays: [], typicalSessionMin: null,
   maxHr: null, restingHr: null, // für TRIMP/Herzfrequenzreserve in der Trainings-Detailansicht (js/analytics/workout-profile.js)
   weightKg: null, // nur für die Rad-VO2max-Schätzung aus Watt (js/analytics/performance.js) - ohne Wert gibt's keine Rad-Schätzung statt einer geratenen
   includeStrength: false, includeMobility: false, // für den automatisch erstellten Trainingsplan (js/analytics/training-plan.js)
@@ -49,6 +49,26 @@ function saveAthleteProfile() {
 // Prüft nur Monat+Tag (nicht das Jahr) gegen das hinterlegte Geburtsdatum -
 // für die Geburtstags-Nachricht im Dashboard (checkAndShowBirthdayMessage(),
 // js/components/dashboard.js). null, falls kein Geburtsdatum hinterlegt ist.
+// Alter aus dem Geburtsdatum berechnet (kein eigenes manuelles Feld mehr im
+// Onboarding - das war redundant/inkonsistent zum Geburtsdatum). Fällt auf
+// ein evtl. noch vorhandenes altes athleteProfile.age zurück (Profile von
+// vor diesem Wechsel, die nur ein manuelles Alter ohne Geburtsdatum haben).
+function getAthleteAgeFromBirthDate(birthDate) {
+  if (!birthDate) return null;
+  const bd = new Date(birthDate + "T00:00:00");
+  if (isNaN(bd)) return null;
+  const today = new Date();
+  let age = today.getFullYear() - bd.getFullYear();
+  const beforeBirthday = (today.getMonth() < bd.getMonth()) ||
+    (today.getMonth() === bd.getMonth() && today.getDate() < bd.getDate());
+  if (beforeBirthday) age--;
+  return age;
+}
+
+function getAthleteAge() {
+  return getAthleteAgeFromBirthDate(athleteProfile.birthDate) ?? (athleteProfile.age || null);
+}
+
 function isTodayBirthday() {
   if (!athleteProfile.birthDate) return false;
   const bd = new Date(athleteProfile.birthDate + "T00:00:00");

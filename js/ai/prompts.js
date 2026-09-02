@@ -151,3 +151,24 @@ Gib eine kurze Einordnung auf Deutsch (max. ca. 100 Wörter):
 
 Nur normaler Fließtext in 1-2 kurzen Absaetzen - KEIN Markdown (keine **, keine #-Ueberschriften, keine Aufzaehlungszeichen/nummerierten Listen), keine Tabellen/Code-Bloecke.`;
 }
+
+
+// Prompt fuer die kurze KI-Zusammenfassung "aktueller Leistungszustand" im
+// Coach-Tab (Kachel unter Form/Streak/Hauptevent/Naechstes Training) - freier
+// Text statt einer weiteren Zahlen-Kachel, siehe buildPerformanceSummaryContext()
+// (context-builder.js). Bewusst sehr kurz (Kurzueberblick-Kachel, kein
+// eigener Dialog wie bei der Ziel-Empfehlung).
+function buildPerformanceSummaryPrompt() {
+  const ctx = buildPerformanceSummaryContext();
+  return `Du bist ein erfahrener Triathlon-Coach. Hier ist der aktuelle Trainingszustand eines Athleten:
+
+${ctx}
+
+Fasse den aktuellen Leistungszustand in einer kurzen, praezisen Zusammenfassung auf Deutsch zusammen (max. ca. 80 Woerter, 2-4 Saetze, EIN einziger Absatz):
+- Wie die Form (TSB), Fitness-Trend (CTL) und das Verletzungsrisiko (ACWR) gerade zusammenspielen - nutze dafuer das oben bereits berechnete Kurzverdikt als Basis, nicht selbst neu bewerten oder widersprechen.
+- Falls ein Ziel/Hauptevent angegeben ist: kurz einordnen, ob der aktuelle Zustand dazu passt (z.B. rechtzeitig im Aufbau, oder Taper faellig).
+- Falls unter "Erholung heute" Muskelkater, wenig Energie oder eine Verletzung angegeben ist, das kurz erwaehnen.
+- Auf den Punkt gebracht, keine Wiederholung der reinen Zahlen (die stehen bereits in den Kacheln daneben) - stattdessen die Einordnung/Bedeutung fuer den Athleten in Worten.
+
+Nur normaler Fliesstext - KEIN Markdown (keine **, keine #-Ueberschriften, keine Aufzaehlungszeichen/nummerierten Listen), keine Tabellen/Code-Bloecke.`;
+}

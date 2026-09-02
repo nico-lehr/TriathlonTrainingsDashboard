@@ -329,3 +329,28 @@ async function generateFocusInsight() {
     if (typeof renderFocusInsight === "function") renderFocusInsight();
   }
 }
+
+
+/* ---------- Leistungszustand: KI-Zusammenfassung als Text (Coach-Tab) ---------- */
+
+// Gleiches Zustands-Schema wie focusInsight oben (Text/Zeitpunkt/Ladezustand/
+// Fehler), global statt pro Ziel/Einheit - gerendert von
+// renderPerformanceSummary() (js/components/coach.js).
+let performanceSummary = { text: null, at: null, loading: false, error: null };
+
+async function generatePerformanceSummary() {
+  performanceSummary.loading = true; performanceSummary.error = null;
+  if (typeof renderPerformanceSummary === "function") renderPerformanceSummary();
+  try {
+    const prompt = buildPerformanceSummaryPrompt();
+    const text = await callAiText(prompt, { task: "perfSummary" });
+    performanceSummary.text = text;
+    performanceSummary.at = new Date().toISOString();
+    performanceSummary.error = null;
+  } catch (e) {
+    performanceSummary.error = describeAiError(e, "perfSummary");
+  } finally {
+    performanceSummary.loading = false;
+    if (typeof renderPerformanceSummary === "function") renderPerformanceSummary();
+  }
+}

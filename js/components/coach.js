@@ -23,6 +23,7 @@ function renderCoachSummary() {
     chips.push({ label: "Form", value: `${last.tsb >= 0 ? "+" : ""}${fmtNum(last.tsb, 1)}`, sub: status.text });
   }
 
+
   // Trainingsplan-Treue-Streak (dieselbe Logik wie die Streak-Kachel in der
   // Übersicht) - nur wenn Trainingstage im Profil hinterlegt sind.
   const streak = typeof computeAdherenceStreak === "function" ? computeAdherenceStreak() : null;
@@ -68,6 +69,35 @@ function renderCoachSummary() {
       <div class="csc-value">${c.value}</div>
       ${c.sub ? `<div class="csc-sub">${escapeHtml(c.sub)}</div>` : ""}
     </div>`).join("");
+
+  // Re-rendert nur die bestehende KI-Zusammenfassung (Text/Lade-/Fehlerzustand
+  // bleiben erhalten, siehe performanceSummary in js/ai/ollama.js) - so muss
+  // nicht jeder der Aufrufer von renderCoachSummary() zusätzlich daran denken.
+  if (typeof renderPerformanceSummary === "function") renderPerformanceSummary();
+}
+
+// KI-Zusammenfassung "aktueller Leistungszustand" als kurzer Text (statt
+// einer weiteren Zahlen-Kachel) - gleiches Muster (Button + Ergebnis/Fehler/
+// Lade-Zustand) wie buildFocusInsightHtml (js/components/dashboard.js), aber
+// im Coach-Tab neben renderCoachSummary() (siehe performanceSummary, js/ai/ollama.js).
+function buildPerformanceSummaryHtml() {
+  const btnLabel = performanceSummary.loading ? "Analysiere …" : (performanceSummary.text ? "Neu zusammenfassen" : "KI-Zusammenfassung abrufen");
+  return `
+    <label>KI-Zusammenfassung <span class="wd-analysis-hint">Kurze Einordnung deines aktuellen Leistungszustands in Worten</span></label>
+    <div class="goal-actions">
+      <button type="button" class="chip" id="perf-summary-btn" ${performanceSummary.loading ? "disabled" : ""}>${btnLabel}</button>
+      ${performanceSummary.at ? `<span class="goal-rec-date">Stand: ${fmtDateFull(new Date(performanceSummary.at))}</span>` : ""}
+    </div>
+    ${performanceSummary.error ? `<p class="goal-error">${escapeHtml(performanceSummary.error)}</p>` : ""}
+    ${performanceSummary.text ? `<div class="goal-recommendation">${formatRecommendation(performanceSummary.text)}</div>` : ""}`;
+}
+
+function renderPerformanceSummary() {
+  const host = document.getElementById("perf-summary-block");
+  if (!host) return;
+  host.innerHTML = buildPerformanceSummaryHtml();
+  const btn = document.getElementById("perf-summary-btn");
+  if (btn) btn.addEventListener("click", () => generatePerformanceSummary());
 }
 
 // Minimalistische Karten: pro Ziel nur Name/Datum/Countdown + kompakte
@@ -259,13 +289,12 @@ function resetOnbState() {
     name: athleteProfile.name || "",
     gender: athleteProfile.gender || "",
     birthDate: athleteProfile.birthDate || "",
-    age: athleteProfile.age || "",
     experienceLevel: athleteProfile.experienceLevel || null,
     raceExperience: athleteProfile.raceExperience || null,
     strongDiscipline: athleteProfile.strongDiscipline || "",
     weakDiscipline: athleteProfile.weakDiscipline || "",
     trainingDays: [...(athleteProfile.trainingDays || [])],
-    swimDay: athleteProfile.swimDay || null,
+    swimDays: [...(athleteProfile.swimDays || [])],
     longDays: [...(athleteProfile.longDays || [])],
     typicalSessionMin: athleteProfile.typicalSessionMin || "",
     weeklyHours: athleteProfile.weeklyHours || "",
@@ -312,7 +341,7 @@ function renderWeekdayGroup(containerId, selected, allowedDays, variantClass) {
 function renderOnbAvailabilityPickers() {
   const days = onbState.trainingDays || [];
   renderWeekdayGroup("onb-training-days", days, null, null);
-  renderWeekdayGroup("onb-swim-day", onbState.swimDay, days, "selected-swim");
+  renderWeekdayGroup("onb-swim-day", onbState.swimDays || [], days, "selected-swim");
   renderWeekdayGroup("onb-long-days", onbState.longDays || [], days, "selected-long");
   document.querySelectorAll("#onb-training-days .onb-weekday-chip").forEach(btn => {
     btn.onclick = () => {
@@ -321,7 +350,7 @@ function renderOnbAvailabilityPickers() {
       const idx = set.indexOf(day);
       if (idx >= 0) set.splice(idx, 1); else set.push(day);
       // Tag rausgenommen -> Schwimmtag/lange Einheiten dort bereinigen
-      if (onbState.swimDay && !set.includes(onbState.swimDay)) onbState.swimDay = null;
+      onbState.swimDays = (onbState.swimDays || []).filter(d => set.includes(d));
       onbState.longDays = (onbState.longDays || []).filter(d => set.includes(d));
       renderOnbAvailabilityPickers();
     };
@@ -330,7 +359,9 @@ function renderOnbAvailabilityPickers() {
     btn.onclick = () => {
       if (btn.disabled) return;
       const day = btn.dataset.value;
-      onbState.swimDay = onbState.swimDay === day ? null : day;
+      const set = onbState.swimDays || (onbState.swimDays = []);
+      const idx = set.indexOf(day);
+      if (idx >= 0) set.splice(idx, 1); else set.push(day);
       renderOnbAvailabilityPickers();
     };
   });
@@ -358,7 +389,8 @@ function buildOnbSummary() {
   const expLabel = ONB_EXP_LABELS[onbState.experienceLevel];
   const introBits = [];
   if (expLabel) introBits.push(expLabel);
-  if (onbState.age) introBits.push(`${onbState.age} Jahre`);
+  const onbAge = getAthleteAgeFromBirthDate(onbState.birthDate);
+  if (onbAge != null) introBits.push(`${onbAge} Jahre`);
   if (ONB_RACE_EXP_LABELS[onbState.raceExperience]) introBits.push(ONB_RACE_EXP_LABELS[onbState.raceExperience]);
   if (introBits.length) lines.push(`<div>Erfahrung: <b>${escapeHtml(introBits.join(" · "))}</b></div>`);
   if (onbState.strongDiscipline || onbState.weakDiscipline) {
@@ -370,7 +402,7 @@ function buildOnbSummary() {
     lines.push(`<div>Trainingstage: <b>${escapeHtml(dayLabels)}</b>${onbState.weeklyHours ? ` · <b>${onbState.weeklyHours} h</b>/Woche` : ""}</div>`);
   }
   const refineBits = [];
-  if (onbState.swimDay) refineBits.push(`Schwimmen ${WEEKDAY_LABELS[onbState.swimDay]}`);
+  if ((onbState.swimDays || []).length) refineBits.push(`Schwimmen ${onbState.swimDays.map(d => WEEKDAY_LABELS[d]).join("+")}`);
   if ((onbState.longDays || []).length) refineBits.push(`Lange Einheit ${onbState.longDays.map(d => WEEKDAY_LABELS[d]).join("+")}`);
   if (onbState.typicalSessionMin) refineBits.push(`~${onbState.typicalSessionMin} Min./Einheit`);
   if (refineBits.length) lines.push(`<div>Details: <b>${escapeHtml(refineBits.join(" · "))}</b></div>`);
@@ -432,10 +464,7 @@ function renderOnbStep() {
         <label>Wettkampferfahrung</label>
         ${onbRadioChips("raceExperience", [["none", "Noch keine"], ["few", "1–3 Rennen"], ["some", "4–10 Rennen"], ["many", "10+ Rennen"]], onbState.raceExperience)}
       </div>
-      <div class="onb-row-3">
-        <div class="onb-field"><label for="onb-age">Alter</label>
-          <input type="number" id="onb-age" class="coach-input" min="0" max="120" placeholder="z.B. 34">
-        </div>
+      <div class="onb-row">
         <div class="onb-field"><label for="onb-strong">Stärkste Disziplin</label>
           <select id="onb-strong" class="coach-input"><option value="">– auswählen –</option><option value="Schwimmen">Schwimmen</option><option value="Rad">Rad</option><option value="Laufen">Laufen</option></select>
         </div>
@@ -454,9 +483,9 @@ function renderOnbStep() {
       </div>
       <div class="onb-row">
         <div class="onb-field">
-          <label>Schwimmtag</label>
+          <label>Schwimmtag(e)</label>
           <div class="onb-weekday-group" id="onb-swim-day"></div>
-          <p class="onb-hint">Nur unter den oben gewählten Tagen wählbar.</p>
+          <p class="onb-hint">Nur unter den oben gewählten Tagen wählbar — auch mehrere Tage möglich.</p>
         </div>
         <div class="onb-field">
           <label>Lange Einheit(en)</label>
@@ -554,7 +583,6 @@ function wireOnbStepInputs() {
   bind("onb-name", "name");
   bind("onb-gender", "gender");
   bind("onb-birthdate", "birthDate");
-  bind("onb-age", "age");
   bind("onb-strong", "strongDiscipline");
   bind("onb-weak", "weakDiscipline");
   bind("onb-session-min", "typicalSessionMin");
@@ -621,10 +649,9 @@ function finishOnboarding() {
     athleteProfile.raceExperience = onbState.raceExperience || null;
     athleteProfile.strongDiscipline = onbState.strongDiscipline || null;
     athleteProfile.weakDiscipline = onbState.weakDiscipline || null;
-    athleteProfile.age = onbState.age ? Number(onbState.age) : null;
     athleteProfile.trainingDays = onbState.trainingDays ? [...onbState.trainingDays] : [];
     athleteProfile.trainingDaysPerWeek = athleteProfile.trainingDays.length || null;
-    athleteProfile.swimDay = onbState.swimDay || null;
+    athleteProfile.swimDays = onbState.swimDays ? [...onbState.swimDays] : [];
     athleteProfile.longDays = onbState.longDays ? [...onbState.longDays] : [];
     athleteProfile.typicalSessionMin = onbState.typicalSessionMin ? Number(onbState.typicalSessionMin) : null;
     athleteProfile.weeklyHours = onbState.weeklyHours ? Number(onbState.weeklyHours) : null;

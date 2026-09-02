@@ -86,8 +86,6 @@
     </div>
   </section>
 
-  <div id="equipment-banner-overview" class="equipment-banner" hidden></div>
-
   <section class="stat-row" id="stat-row"></section>
 
   <div class="dash-grid-bar">
@@ -242,7 +240,6 @@
         <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Monats-, Wochen- und Tagesansicht wie bei TrainingsPeaks · rechts/unten die Zusammenfassung (Zeit, Load &amp; Sportarten)</div></span>
       </h2>
       <p class="card-sub">Klick auf einen Tag öffnet die Tagesansicht · Klick auf einen Punkt/Eintrag öffnet direkt den Trainings-Verlauf</p>
-      <div id="equipment-banner-calendar" class="equipment-banner" hidden></div>
       <div class="cal-monthbar">
         <div class="cal-month-title" id="cal-month-title"></div>
         <div class="cal-controls">
@@ -293,9 +290,10 @@
       <div class="card full recovery-card" data-card-id="recovery">
         <span class="card-drag-handle" title="Karte verschieben">⠿</span>
         <h2>Dein Coach
-          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Kurzüberblick aus Form (PMC), Hauptevent-Fortschritt, Trainingsplan-Treue und nächster geplanter Einheit — automatisch berechnet, keine KI nötig.</div></span>
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Kurzüberblick aus Form (PMC), Hauptevent-Fortschritt, Trainingsplan-Treue und nächster geplanter Einheit — automatisch berechnet, keine KI nötig. Darunter optional eine KI-Zusammenfassung deines aktuellen Leistungszustands als Text.</div></span>
         </h2>
         <div id="coach-summary-body" class="coach-summary"></div>
+        <div id="perf-summary-block" class="onb-field pe-lessons"></div>
 
         <div class="coach-summary-divider"></div>
 
@@ -590,6 +588,13 @@
         <div class="coach-settings-row">
           <label for="hybrid-task-focus">Trainingsbelastungsfokus (Ist/Soll)</label>
           <select id="hybrid-task-focus" class="coach-input" data-task="focus">
+            <option value="ollama">Ollama (lokal)</option>
+            <option value="claude">Claude API</option>
+          </select>
+        </div>
+        <div class="coach-settings-row">
+          <label for="hybrid-task-perfSummary">Leistungszustand-Zusammenfassung</label>
+          <select id="hybrid-task-perfSummary" class="coach-input" data-task="perfSummary">
             <option value="ollama">Ollama (lokal)</option>
             <option value="claude">Claude API</option>
           </select>
