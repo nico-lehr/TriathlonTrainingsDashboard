@@ -3,13 +3,15 @@
 
 const STORAGE_KEY = "triathlon_dashboard_data_v1";
 
-// Wie weit "Aktualisieren" beim Ordner-Scan zurückschaut. War bisher 400 Tage
-// (>1 Jahr) - eine willkürliche, nie technisch begründete Vorgabe ("für
-// Jahresüberblick"), keine Performance-/Speichergrenze. Auf 10 Jahre erhöht,
-// damit auch eine mehrjährige .fit-Historie (z.B. 1000+ Dateien über
-// mehrere Jahre) komplett eingelesen wird, statt ältere Dateien stillschweigend
-// zu überspringen (siehe CHANGE_REQUESTS.md).
-const SCAN_WINDOW_DAYS = 3650;
+// Wie weit "Aktualisieren" beim Ordner-Scan zurückschaut. War testweise auf
+// 3650 Tage (10 Jahre) gesetzt, das hat bei Nicos 1000+ .fit-Dateien aber das
+// Browser-Speicherlimit (localStorage, ca. 5-10MB) gesprengt (siehe
+// persistError-Warnung in data-import.js) - deshalb bewusst wieder auf 2 Jahre
+// begrenzt. Das begrenzt nur, wie weit "Aktualisieren" zurückschaut, nicht
+// die Gesamthistorie: bereits eingelesene ältere Workouts bleiben erhalten
+// (Merge nach Dateiname, siehe processFitFiles), nur ein NEUER Scan über
+// noch nicht eingelesene, sehr alte Dateien würde sie nicht mehr aufnehmen.
+const SCAN_WINDOW_DAYS = 730;
 
 
 // EMBEDDED_DATA kommt aus data/workouts-data.js - diese Datei enthält echte
