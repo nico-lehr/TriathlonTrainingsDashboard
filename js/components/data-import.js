@@ -93,7 +93,21 @@ async function processFitFiles(files, onProgress) {
     workouts: allWorkouts,
   };
 
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(RAW)); } catch (e) { /* Speicher evtl. voll/deaktiviert */ }
+  // Speichern kann bei sehr vielen/großen Workouts (GPS-/HF-Streams) am
+  // Browser-Speicherlimit (localStorage, meist 5-10MB pro Seite) scheitern.
+  // Das wurde bisher still verschluckt - dann waren die neu eingelesenen
+  // Workouts zwar sofort sichtbar (RAW/ALL/DATA sind im Speicher aktuell),
+  // gingen aber beim nächsten Neuladen der Seite wieder verloren, ohne dass
+  // Nico das gemerkt hätte. Jetzt wird das als Fehler in der Update-Meldung
+  // sichtbar gemacht statt zu verschwinden.
+  let persistError = null;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(RAW));
+  } catch (e) {
+    persistError = (e && e.name === "QuotaExceededError")
+      ? "Browser-Speicher ist voll - die Workouts unten sind nur für diese Sitzung sichtbar und gehen beim nächsten Neuladen wieder verloren. Am besten ein paar ältere/größere Workouts entfernen oder in kleineren Portionen einlesen."
+      : `Konnte nicht dauerhaft gespeichert werden (${(e && e.message) || e}) - die Workouts unten sind nur für diese Sitzung sichtbar.`;
+  }
 
   recomputeDerived();
   renderAll();
@@ -102,9 +116,11 @@ async function processFitFiles(files, onProgress) {
   if (addedCount) parts.push(`${addedCount} neu hinzugefügt`);
   if (refreshedCount) parts.push(`${refreshedCount} aktualisiert`);
   const summary = parts.length ? parts.join(", ") : "keine Änderungen";
-  const msg = `${summary} · ${allWorkouts.length} Workouts insgesamt` + (errors ? ` (${errors} Dateien übersprungen)` : "");
-  notify(msg, false);
-  return { ok: true, isErr: false, message: msg, addedCount, refreshedCount, total: allWorkouts.length, errors };
+  const msg = `${summary} · ${allWorkouts.length} Workouts insgesamt`
+    + (errors ? ` (${errors} Dateien übersprungen)` : "")
+    + (persistError ? ` — ⚠️ ${persistError}` : "");
+  notify(msg, !!persistError);
+  return { ok: true, isErr: !!persistError, message: msg, addedCount, refreshedCount, total: allWorkouts.length, errors, persistError };
 }
 
 // Setzt den im Browser gespeicherten Update-Stand zurück auf den zuletzt von

@@ -3,7 +3,13 @@
 
 const STORAGE_KEY = "triathlon_dashboard_data_v1";
 
-const SCAN_WINDOW_DAYS = 400; // wie weit "Aktualisieren" beim Ordner-Scan zurückschaut (>1 Jahr, für Jahresüberblick)
+// Wie weit "Aktualisieren" beim Ordner-Scan zurückschaut. War bisher 400 Tage
+// (>1 Jahr) - eine willkürliche, nie technisch begründete Vorgabe ("für
+// Jahresüberblick"), keine Performance-/Speichergrenze. Auf 10 Jahre erhöht,
+// damit auch eine mehrjährige .fit-Historie (z.B. 1000+ Dateien über
+// mehrere Jahre) komplett eingelesen wird, statt ältere Dateien stillschweigend
+// zu überspringen (siehe CHANGE_REQUESTS.md).
+const SCAN_WINDOW_DAYS = 3650;
 
 
 // EMBEDDED_DATA kommt aus data/workouts-data.js - diese Datei enthält echte
