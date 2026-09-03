@@ -3,15 +3,13 @@
 
 const STORAGE_KEY = "triathlon_dashboard_data_v1";
 
-// Wie weit "Aktualisieren" beim Ordner-Scan zurückschaut. War testweise auf
-// 3650 Tage (10 Jahre) gesetzt, das hat bei Nicos 1000+ .fit-Dateien aber das
-// Browser-Speicherlimit (localStorage, ca. 5-10MB) gesprengt (siehe
-// persistError-Warnung in data-import.js) - deshalb bewusst wieder auf 2 Jahre
-// begrenzt. Das begrenzt nur, wie weit "Aktualisieren" zurückschaut, nicht
-// die Gesamthistorie: bereits eingelesene ältere Workouts bleiben erhalten
-// (Merge nach Dateiname, siehe processFitFiles), nur ein NEUER Scan über
-// noch nicht eingelesene, sehr alte Dateien würde sie nicht mehr aufnehmen.
-const SCAN_WINDOW_DAYS = 730;
+// Wie weit "Aktualisieren" beim Ordner-Scan zurückschaut. War kurzzeitig auf
+// 2 Jahre (730) reduziert, weil 10 Jahre bei Nicos 1000+ .fit-Dateien das
+// localStorage-Limit gesprengt haben - das war aber nur eine Notlösung, der
+// eigentliche Speicherplatz-Engpass ist jetzt behoben (Umstellung von
+// localStorage auf IndexedDB, siehe js/data/idb-store.js und
+// loadPersistedWorkouts() unten). Deshalb wieder auf 10 Jahre erhöht.
+const SCAN_WINDOW_DAYS = 3650;
 
 
 // EMBEDDED_DATA kommt aus data/workouts-data.js - diese Datei enthält echte
@@ -21,27 +19,54 @@ const SCAN_WINDOW_DAYS = 730;
 // dass das komplette Dashboard mit einem ReferenceError abstürzt.
 const EMPTY_EMBEDDED_DATA = { generated_at: null, source_folder: null, count: 0, skipped: [], workouts: [] };
 let RAW = (typeof EMBEDDED_DATA !== "undefined") ? EMBEDDED_DATA : EMPTY_EMBEDDED_DATA;
-try {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved) {
-    const parsed = JSON.parse(saved);
-    if (parsed && Array.isArray(parsed.workouts) && parsed.workouts.length) {
-      // Den im Browser gespeicherten Stand NIE blind übernehmen, sondern
-      // immer mit den eingebetteten Daten (dem bei der letzten Erstellung
-      // aktuellen, vollständigen Stand) zusammenführen. So kann ein älterer
-      // oder unvollständiger localStorage-Stand (z.B. von einem früheren,
-      // fehlerhaften "Aktualisieren"-Versuch) nie dazu führen, dass Trainings
-      // beim Öffnen des Dashboards "verschwinden" - er kann nur ergänzen.
+
+// Lädt den zuletzt gespeicherten Workout-Stand aus IndexedDB (js/data/idb-store.js)
+// und führt ihn wie bisher mit den eingebetteten Daten zusammen. War früher
+// ein synchroner localStorage-Read direkt hier an dieser Stelle (Skript-Ladezeit) -
+// IndexedDB ist aber grundsätzlich asynchron, deshalb jetzt eine eigene
+// Funktion, die app.js VOR dem ersten renderAll() abwartet (siehe dort).
+// Grund für den Wechsel: localStorage ist pro Seite hart auf ca. 5-10MB
+// gedeckelt - bei Nicos 1000+ Workouts (auch mit dem bereits vorhandenen
+// 200-Punkte-Downsampling der Kurven in fit-parser.js) reicht das nicht mehr.
+async function loadPersistedWorkouts() {
+  try {
+    let saved = await idbGetRaw();
+
+    // Einmalige Migration: falls noch ein alter Stand aus localStorage von
+    // VOR dieser Umstellung existiert (und IndexedDB noch leer ist), diesen
+    // übernehmen statt ihn kommentarlos zu verlieren.
+    if (!saved) {
+      try {
+        const legacy = localStorage.getItem(STORAGE_KEY);
+        if (legacy) {
+          const parsedLegacy = JSON.parse(legacy);
+          if (parsedLegacy && Array.isArray(parsedLegacy.workouts) && parsedLegacy.workouts.length) {
+            saved = parsedLegacy;
+            await idbSaveRaw(saved);
+          }
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      } catch (e) { /* kein verwertbarer alter Stand - ignorieren */ }
+    }
+
+    if (saved && Array.isArray(saved.workouts) && saved.workouts.length) {
+      // Den gespeicherten Stand NIE blind übernehmen, sondern immer mit den
+      // eingebetteten Daten (dem bei der letzten Erstellung aktuellen,
+      // vollständigen Stand) zusammenführen. So kann ein älterer oder
+      // unvollständiger Stand (z.B. von einem früheren, fehlerhaften
+      // "Aktualisieren"-Versuch) nie dazu führen, dass Trainings beim Öffnen
+      // des Dashboards "verschwinden" - er kann nur ergänzen.
       const base = (typeof EMBEDDED_DATA !== "undefined") ? EMBEDDED_DATA : EMPTY_EMBEDDED_DATA;
       const merged = new Map(base.workouts.map(w => [w.file, w]));
-      parsed.workouts.forEach(w => { if (w && w.file) merged.set(w.file, w); });
+      saved.workouts.forEach(w => { if (w && w.file) merged.set(w.file, w); });
       const allWorkouts = [...merged.values()];
       postProcessWorkouts(allWorkouts);
       allWorkouts.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-      RAW = { ...base, ...parsed, workouts: allWorkouts, count: allWorkouts.length };
+      RAW = { ...base, ...saved, workouts: allWorkouts, count: allWorkouts.length };
     }
-  }
-} catch (e) { /* localStorage evtl. nicht verfügbar oder beschädigt - eingebettete Daten nutzen */ }
+  } catch (e) { /* IndexedDB evtl. nicht verfügbar (z.B. privater Modus) - eingebettete Daten nutzen */ }
+  recomputeDerived();
+}
 
 /* ======================================================================
    Hell/Dunkel-Schalter: übersteuert die automatische Betriebssystem-

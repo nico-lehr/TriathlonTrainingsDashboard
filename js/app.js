@@ -50,15 +50,24 @@ function checkAutoReplan() {
 /* ======================================================================
    6) INIT
    ====================================================================== */
-initTopNav();
-initFilterBar();
-initCalendarControls();
-initCoach();
-initEquipment();
-initNutrition();
-loadAchievements();
-initInfoPopovers();
-initCardSearch();
-renderAll();
-checkAutoReplan();
+// Als async IIFE, weil das Laden der Workout-Rohdaten jetzt aus IndexedDB
+// kommt (loadPersistedWorkouts(), js/data/workouts.js) statt wie bisher
+// synchron aus localStorage - renderAll() muss darauf warten, sonst würde
+// beim allerersten Laden kurz der (unvollständige) eingebettete Datenstand
+// gerendert. Alle anderen Init-Schritte bleiben unverändert in derselben
+// Reihenfolge, nur einmal await davor.
+(async function initApp() {
+  await loadPersistedWorkouts();
+  initTopNav();
+  initFilterBar();
+  initCalendarControls();
+  initCoach();
+  initEquipment();
+  initNutrition();
+  loadAchievements();
+  initInfoPopovers();
+  initCardSearch();
+  renderAll();
+  checkAutoReplan();
+})();
 

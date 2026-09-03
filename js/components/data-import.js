@@ -93,19 +93,20 @@ async function processFitFiles(files, onProgress) {
     workouts: allWorkouts,
   };
 
-  // Speichern kann bei sehr vielen/großen Workouts (GPS-/HF-Streams) am
-  // Browser-Speicherlimit (localStorage, meist 5-10MB pro Seite) scheitern.
-  // Das wurde bisher still verschluckt - dann waren die neu eingelesenen
-  // Workouts zwar sofort sichtbar (RAW/ALL/DATA sind im Speicher aktuell),
-  // gingen aber beim nächsten Neuladen der Seite wieder verloren, ohne dass
-  // Nico das gemerkt hätte. Jetzt wird das als Fehler in der Update-Meldung
-  // sichtbar gemacht statt zu verschwinden.
+  // Gespeichert wird in IndexedDB statt localStorage (js/data/idb-store.js,
+  // idbSaveRaw) - localStorage war pro Seite hart auf ca. 5-10MB gedeckelt
+  // und ist bei Nicos 1000+ Workouts (auch mit dem 200-Punkte-Downsampling
+  // der Kurven, buildStream() in fit-parser.js) übergelaufen. Ein Fehler
+  // hier (z.B. wenn wirklich der gesamte Plattenplatz voll ist) wird
+  // sichtbar in der Update-Meldung gemeldet statt lautlos verschluckt zu
+  // werden - sonst wären neu eingelesene Workouts nur bis zum nächsten
+  // Neuladen sichtbar gewesen, ohne dass Nico das gemerkt hätte.
   let persistError = null;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(RAW));
+    await idbSaveRaw(RAW);
   } catch (e) {
     persistError = (e && e.name === "QuotaExceededError")
-      ? "Browser-Speicher ist voll - die Workouts unten sind nur für diese Sitzung sichtbar und gehen beim nächsten Neuladen wieder verloren. Am besten ein paar ältere/größere Workouts entfernen oder in kleineren Portionen einlesen."
+      ? "Speicherplatz für dieses Dashboard ist voll - die Workouts unten sind nur für diese Sitzung sichtbar und gehen beim nächsten Neuladen wieder verloren. Bitte Speicherplatz auf dem Rechner freigeben."
       : `Konnte nicht dauerhaft gespeichert werden (${(e && e.message) || e}) - die Workouts unten sind nur für diese Sitzung sichtbar.`;
   }
 
@@ -126,8 +127,9 @@ async function processFitFiles(files, onProgress) {
 // Setzt den im Browser gespeicherten Update-Stand zurück auf den zuletzt von
 // Claude gebauten, vollständigen Datenstand - als Ausweg, falls im
 // gespeicherten Stand mal etwas durcheinandergerät.
-resetBtn.addEventListener("click", () => {
-  try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignorieren */ }
+resetBtn.addEventListener("click", async () => {
+  try { await idbClearRaw(); } catch (e) { /* ignorieren */ }
+  try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* falls noch ein alter Stand von vor der IndexedDB-Umstellung da ist */ }
   RAW = (typeof EMBEDDED_DATA !== "undefined") ? EMBEDDED_DATA : EMPTY_EMBEDDED_DATA;
   justAddedFiles = new Set();
   recomputeDerived();
