@@ -88,8 +88,8 @@ function renderCalendar() {
 }
 
 function calWorkoutsOfDay(dayDate) {
-  const key = dayDate.toISOString().slice(0, 10);
-  return ALL.filter(w => w._date && w._date.toISOString().slice(0, 10) === key
+  const key = dayDate.getFullYear() + '-' + String(dayDate.getMonth() + 1).padStart(2, '0') + '-' + String(dayDate.getDate()).padStart(2, '0');
+  return ALL.filter(w => w._date && w._date.getFullYear() + '-' + String(w._date.getMonth() + 1).padStart(2, '0') + '-' + String(w._date.getDate()).padStart(2, '0') === key
     && (calSportFilter === "all" || sportGroup(w.sport) === calSportFilter));
 }
 
@@ -148,7 +148,7 @@ function renderCalendarMonth() {
   const withDate = ALL.filter(w => w._date && (calSportFilter === "all" || sportGroup(w.sport) === calSportFilter));
   const byDay = new Map(); // "YYYY-MM-DD" -> Workouts
   withDate.forEach(w => {
-    const key = w._date.toISOString().slice(0, 10);
+    const key = w._date.getFullYear() + '-' + String(w._date.getMonth() + 1).padStart(2, '0') + '-' + String(w._date.getDate()).padStart(2, '0');
     if (!byDay.has(key)) byDay.set(key, []);
     byDay.get(key).push(w);
   });

@@ -124,7 +124,7 @@
       <span class="card-drag-handle" title="Karte verschieben">⠿</span>
       <h2>Fitness &amp; Form (Performance Management Chart)
         <span id="load-status-badge"></span>
-        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover"><b>CTL</b> (Chronic Training Load, 42-Tage-Ø) zeigt die aufgebaute Grundlagenfitness · <b>ATL</b> (Acute Training Load, 7-Tage-Ø) die kurzfristige Ermüdung · <b>TSB</b> = CTL − ATL, die „Form“: positiv = frisch/erholt, stark negativ = hohes Übertrainingsrisiko. CTL/ATL werden immer aus der vollständigen geladenen Historie berechnet (nicht nur dem gewählten Zeitraum), damit die Werte stabil bleiben.</div></span>
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover"><b>CTL</b> (Chronic Training Load, 42-Tage-Ø) zeigt die aufgebaute Grundlagenfitness · <b>ATL</b> (Acute Training Load, 7-Tage-Ø) die kurzfristige Ermüdung · <b>TSB</b> = CTL − ATL, die „Form": positiv = frisch/erholt, stark negativ = hohes Übertrainingsrisiko. CTL/ATL werden immer aus der vollständigen geladenen Historie berechnet (nicht nur dem gewählten Zeitraum), damit die Werte stabil bleiben.</div></span>
       </h2>
       <div class="legend" id="legend-pmc"></div>
       <div class="chart-wrap" id="chart-pmc"></div>
@@ -525,6 +525,9 @@
           <button class="cal-today-btn" id="coach-test-btn" type="button">Verbindung testen</button>
           <span class="coach-test-status" id="coach-test-status"></span>
         </div>
+        <div class="coach-settings-row">
+          <button class="cal-today-btn" id="ollama-setup-btn" type="button">⚙️ Ollama Setup</button>
+        </div>
         <p class="card-sub coach-setup-hint">
           Einmalig einrichten: <a href="https://ollama.com/download" target="_blank" rel="noopener">Ollama installieren</a>,
           ein Modell laden (Terminal: <code>ollama pull llama3.1</code>), Ollama für den Zugriff aus dieser Datei freischalten
@@ -549,7 +552,7 @@
         </div>
         <p class="card-sub coach-setup-hint">
           API-Key erstellen unter <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
-          Standardmodell ist bewusst das güntigste verfügbare (Haiku), um die Kosten so gering wie möglich zu halten.
+          Standardmodell ist bewusst das gündigste verfügbare (Haiku), um die Kosten so gering wie möglich zu halten.
           Der Key wird nur lokal in diesem Browser gespeichert, nie an einen eigenen Server geschickt.
         </p>
       </div>
@@ -824,6 +827,7 @@
      geladene Dateien zugreifen (siehe docs/PROJECT_MAP.md). -->
 <script src="js/data/api-client.js"></script>
 <script src="data/workouts-data.js"></script>
+<script src="js/data/training-effects.js"></script>
 <script src="js/data/idb-store.js"></script>
 <script src="js/utils/dates.js"></script>
 <script src="js/utils/formatting.js"></script>
@@ -866,6 +870,7 @@
 <script src="js/components/health-status.js"></script>
 <script src="js/components/coach.js"></script>
 <script src="js/components/training-plan.js"></script>
+<script src="js/components/ollama-setup.js"></script>
 <script src="js/components/nutrition.js"></script>
 <script src="js/components/achievements.js"></script>
 <script src="js/components/workout-card.js"></script>

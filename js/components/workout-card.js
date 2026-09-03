@@ -265,8 +265,10 @@ function buildWorkoutRatingHtml(w) {
         <label for="wd-rating-elevation-${encodeURIComponent(w.file)}">Höhenmeter nachtragen (fehlt in der Aufzeichnung)</label>
         <div class="wd-rating-elevation-inputs">
           <input type="number" id="wd-rating-elevation-${encodeURIComponent(w.file)}" class="coach-input wd-rating-elevation" min="0" step="1" value="${entry.elevationOverrideM != null ? entry.elevationOverrideM : ""}" placeholder="m">
+          ${w.sport_raw !== "swimming" ? `
           <button type="button" class="chip wd-rating-gpx-btn">GPX hochladen</button>
           <input type="file" accept=".gpx" class="wd-rating-gpx-input" hidden>
+          ` : ''}
         </div>
       </div>` : "";
   return `

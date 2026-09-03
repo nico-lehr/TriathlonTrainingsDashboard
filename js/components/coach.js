@@ -181,7 +181,7 @@ function renderGoals() {
             ${readiness.factors.map(f => `<li><b>${escapeHtml(f.label)}:</b> ${escapeHtml(f.note)}</li>`).join("")}
           </ul>
         </div>` : "";
-    const isOpen = goal._detailsOpen != null ? goal._detailsOpen : !!goal.recommendation;
+    const isOpen = goal._detailsOpen != null ? goal._detailsOpen : false; // Standardmäßig eingeklappt
     return `
       <div class="goal-card chart-enter${goal.isPrimary ? " goal-card-primary" : ""}">
         <div class="goal-head">

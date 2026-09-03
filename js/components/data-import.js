@@ -103,11 +103,27 @@ async function processFitFiles(files, onProgress) {
   // Neuladen sichtbar gewesen, ohne dass Nico das gemerkt hätte.
   let persistError = null;
   try {
-    await idbSaveRaw(RAW);
+    const result = await idbSaveRawFiltered(RAW, 185); // 185 = dein max HR (anpassen!)
+
+    let message = `✓ Gespeichert: ${RAW.count} Workouts (letzte 2 Jahre)`;
+    if (result.removed > 0) {
+      message += `\n⚠️  ${result.removed} Workouts gelöscht (älter als 2 Jahre)`;
+    }
+    message += `\n✨ Training Effects berechnet`;
+
+    console.log(message);
+
+    const statusEl = document.getElementById('import-status');
+    if (statusEl) {
+      statusEl.innerHTML = message.replace(/\n/g, '<br>');
+      statusEl.style.color = result.removed > 0 ? '#ff9800' : '#4caf50';
+    }
   } catch (e) {
-    persistError = (e && e.name === "QuotaExceededError")
-      ? "Speicherplatz für dieses Dashboard ist voll - die Workouts unten sind nur für diese Sitzung sichtbar und gehen beim nächsten Neuladen wieder verloren. Bitte Speicherplatz auf dem Rechner freigeben."
-      : `Konnte nicht dauerhaft gespeichert werden (${(e && e.message) || e}) - die Workouts unten sind nur für diese Sitzung sichtbar.`;
+    if (e.name === 'QuotaExceededError') {
+      persistError = "Browser-Speicher voll! Zu viele Workouts.";
+    } else {
+      persistError = `Konnte nicht dauerhaft gespeichert werden (${(e && e.message) || e}) - die Workouts unten sind nur für diese Sitzung sichtbar.`;
+    }
   }
 
   recomputeDerived();
@@ -290,4 +306,3 @@ dndZone.addEventListener("drop", e => {
 ["dragover", "drop"].forEach(evt => {
   document.addEventListener(evt, e => { e.preventDefault(); });
 });
-
