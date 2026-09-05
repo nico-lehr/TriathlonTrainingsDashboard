@@ -553,6 +553,18 @@
 
   .goals-card-head h2 { margin: 0; }
 
+  .goals-card-head-actions { display: flex; align-items: center; gap: 8px; }
+
+  .goals-collapse-btn { min-width: 32px; padding: 4px 8px; }
+
+  /* Eingeklappter Zustand der Ziele-Karte: nur ein kompakter Block mit
+     Hauptevent-Name, Countdown und Readiness statt der vollen Zielliste. */
+  .goals-mini-summary { padding: 8px 2px 2px; }
+
+  .goals-mini-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  .goals-mini-sub { color: var(--muted, #888); font-size: 13px; }
+
   .coach-header { margin-bottom: 4px; }
 
   .coach-header-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }

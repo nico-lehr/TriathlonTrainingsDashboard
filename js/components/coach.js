@@ -146,11 +146,75 @@ function buildGoalAdvancedHtml(goal) {
     </div>`;
 }
 
+// Ganze "Deine Ziele"-Karte ein-/ausklappbar: im Coach-Tab steht darüber schon
+// die kompakte Kurzübersicht (renderCoachSummary) und darunter der Trainingsplan
+// mit KI-Text - mit mehreren Zielen (jedes mit Notizen/Readiness/KI-Empfehlung)
+// nimmt die Ziele-Liste dann trotzdem noch zu viel Platz auf einen Blick ein.
+// Eingeklappt bleibt nur ein kleiner Block mit den wichtigsten Infos zum
+// Hauptevent sichtbar (Name, Countdown, Readiness) statt der vollen Liste.
+// Zustand wird gemerkt (localStorage), damit er nach einem Reload erhalten bleibt.
+const GOALS_CARD_COLLAPSE_KEY = "goalsCardCollapsed";
+let goalsCardCollapsed = localStorage.getItem(GOALS_CARD_COLLAPSE_KEY) === "1";
+
+function initGoalsCardCollapse() {
+  const btn = document.getElementById("goals-collapse-btn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    goalsCardCollapsed = !goalsCardCollapsed;
+    localStorage.setItem(GOALS_CARD_COLLAPSE_KEY, goalsCardCollapsed ? "1" : "0");
+    applyGoalsCardCollapseState();
+  });
+  applyGoalsCardCollapseState();
+}
+
+function applyGoalsCardCollapseState() {
+  const btn = document.getElementById("goals-collapse-btn");
+  const list = document.getElementById("goals-list");
+  const mini = document.getElementById("goals-mini-summary");
+  if (!btn || !list || !mini) return;
+  btn.textContent = goalsCardCollapsed ? "▸" : "▾";
+  btn.title = goalsCardCollapsed ? "Ziele-Liste einblenden" : "Ziele-Liste ausblenden";
+  list.hidden = goalsCardCollapsed;
+  mini.hidden = !goalsCardCollapsed;
+  if (goalsCardCollapsed) renderGoalsMiniSummary();
+}
+
+// Kleiner Block für den eingeklappten Zustand: nur Hauptevent (★) mit
+// Countdown + Readiness-Score, sonst nur die Anzahl der Ziele - bewusst
+// deterministisch (keine KI-Anfrage), dieselbe Quelle wie renderCoachSummary().
+function renderGoalsMiniSummary() {
+  const mini = document.getElementById("goals-mini-summary");
+  if (!mini) return;
+  if (!goals.length) {
+    mini.innerHTML = `<p class="empty-note" style="margin:0;">Noch keine Ziele eingetragen.</p>`;
+    return;
+  }
+  const goal = typeof getPrimaryGoal === "function" ? getPrimaryGoal() : null;
+  if (!goal) {
+    mini.innerHTML = `<p class="empty-note" style="margin:0;">${goals.length} Ziel${goals.length === 1 ? "" : "e"} eingetragen — kein Hauptevent (★) markiert.</p>`;
+    return;
+  }
+  const eventDate = goal.date ? new Date(goal.date + "T00:00:00") : null;
+  const todayMid = new Date(); todayMid.setHours(0, 0, 0, 0);
+  const days = eventDate ? Math.round((eventDate - todayMid) / 86400000) : null;
+  const daysLabel = days == null ? "" : days > 0 ? `in ${days} Tagen` : days === 0 ? "heute" : `vor ${Math.abs(days)} Tagen`;
+  const readiness = typeof computeRaceReadiness === "function" ? computeRaceReadiness(goal) : null;
+  mini.innerHTML = `
+    <div class="goals-mini-row">
+      <span class="sport-dot" style="background:${sportColor(goal.sport)}"></span>
+      <span class="goal-name">★ ${escapeHtml(goal.name)}</span>
+      ${daysLabel ? `<span class="goals-mini-sub">${daysLabel}</span>` : ""}
+      ${readiness ? `<span class="goal-readiness-pill" style="color:${readiness.level.color}" title="Race Readiness — ${escapeHtml(readiness.level.label)}">${readiness.score}</span>` : ""}
+      ${goals.length > 1 ? `<span class="goals-mini-sub">+${goals.length - 1} weitere${goals.length - 1 === 1 ? "s" : ""} Ziel${goals.length - 1 === 1 ? "" : "e"}</span>` : ""}
+    </div>`;
+}
+
 function renderGoals() {
   const el = document.getElementById("goals-list");
   if (!goals.length) {
     el.innerHTML = "<p class='empty-note'>Noch keine Ziele eingetragen — klicke oben auf „+ Neues Ziel/Event“.</p>";
     renderCoachSummary();
+    applyGoalsCardCollapseState();
     return;
   }
   const sorted = [...goals].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
@@ -268,6 +332,7 @@ function renderGoals() {
   }));
 
   renderCoachSummary();
+  applyGoalsCardCollapseState();
 }
 
 /* ----------------------------------------------------------------------
@@ -743,6 +808,7 @@ function initCoach() {
   loadAthleteProfile();
   loadGoals();
   loadPlannedWorkouts();
+  initGoalsCardCollapse();
   applyCoachGateState();
   const urlInput = document.getElementById("coach-ollama-url");
   const modelInput = document.getElementById("coach-ollama-model");

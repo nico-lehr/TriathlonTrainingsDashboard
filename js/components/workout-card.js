@@ -260,15 +260,15 @@ function buildWorkoutRatingHtml(w) {
   // Höhenmeter-Nachtrag nur anbieten, wenn die Aufzeichnung selbst KEINE
   // Höhenmeter hat (sonst wäre das verwirrend - der echte Wert hat immer
   // Vorrang, siehe effectiveElevationGainM(), js/data/workout-notes.js).
-  const elevationRowHtml = w.elevation_gain_m == null ? `
+  // Bei Swimming ergeben Höhenmeter (egal ob aufgezeichnet oder nachgetragen)
+  // keinen Sinn - komplette Zeile daher nur für Nicht-Schwimmen-Sportarten.
+  const elevationRowHtml = (w.elevation_gain_m == null && w.sport_raw !== "swimming") ? `
       <div class="wd-rating-elevation-row">
         <label for="wd-rating-elevation-${encodeURIComponent(w.file)}">Höhenmeter nachtragen (fehlt in der Aufzeichnung)</label>
         <div class="wd-rating-elevation-inputs">
           <input type="number" id="wd-rating-elevation-${encodeURIComponent(w.file)}" class="coach-input wd-rating-elevation" min="0" step="1" value="${entry.elevationOverrideM != null ? entry.elevationOverrideM : ""}" placeholder="m">
-          ${w.sport_raw !== "swimming" ? `
           <button type="button" class="chip wd-rating-gpx-btn">GPX hochladen</button>
           <input type="file" accept=".gpx" class="wd-rating-gpx-input" hidden>
-          ` : ''}
         </div>
       </div>` : "";
   return `

@@ -384,8 +384,12 @@
         <span class="card-drag-handle" title="Karte verschieben">⠿</span>
         <div class="goals-card-head">
           <h2>Deine Ziele</h2>
-          <button type="button" class="chip goals-add-toggle-btn" id="new-goal-toggle-btn">+ Neues Ziel/Event</button>
+          <div class="goals-card-head-actions">
+            <button type="button" class="chip goals-add-toggle-btn" id="new-goal-toggle-btn">+ Neues Ziel/Event</button>
+            <button type="button" class="chip goals-collapse-btn" id="goals-collapse-btn" title="Ziele-Liste ein-/ausklappen">▾</button>
+          </div>
         </div>
+        <div id="goals-mini-summary" class="goals-mini-summary" hidden></div>
         <div id="goals-list"></div>
       </div>
 
