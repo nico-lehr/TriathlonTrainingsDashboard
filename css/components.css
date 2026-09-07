@@ -548,6 +548,12 @@
      js/components/risk-adjust.js - bewusst wie eine Warn-Kachel gestaltet
      (Farbe an .plan-intensity-hart/.stat-tile.at-risk angelehnt), damit sie
      zwischen den neutralen Zusammenfassungs-Chips sofort auffällt. */
+  /* [hidden] hat dieselbe CSS-Spezifität wie .risk-adjust-banner, aber eine
+     eigene Regel schlägt die Browser-Standardregel "[hidden]{display:none}"
+     trotzdem IMMER (Autor- vor User-Agent-Stylesheet) - ohne diese Zeile
+     blieb der Banner als leere rote Box sichtbar, auch mit hidden-Attribut. */
+  .risk-adjust-banner[hidden] { display: none; }
+
   .risk-adjust-banner {
     display: flex; gap: 12px; align-items: flex-start;
     background: color-mix(in srgb, var(--c-crit) 10%, var(--page));

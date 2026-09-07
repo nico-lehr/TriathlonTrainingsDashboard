@@ -13,7 +13,7 @@ async function openOllamaSetupDialog() {
   const dialog = document.createElement("div");
   dialog.className = "modal-overlay";
   dialog.innerHTML = `
-    <div class="modal-content" style="max-width: 600px;">
+    <div class="modal-card" style="max-width: 600px;">
       <div class="modal-header">
         <h2>Ollama Setup & Model Manager</h2>
         <button class="modal-close" type="button">✕</button>
@@ -73,11 +73,19 @@ async function openOllamaSetupDialog() {
   `;
 
   document.body.appendChild(dialog);
+  // .open triggert die Sichtbar-Transition von .modal-overlay (CSS) - ohne
+  // diese Klasse bleibt der Dialog unsichtbar, obwohl er im DOM existiert.
+  requestAnimationFrame(() => dialog.classList.add("open"));
+
+  const closeDialog = () => {
+    dialog.classList.remove("open");
+    setTimeout(() => dialog.remove(), 250); // an CSS-Transition (0.22s) angepasst
+  };
 
   // Close button
-  dialog.querySelector(".modal-close").addEventListener("click", () => dialog.remove());
+  dialog.querySelector(".modal-close").addEventListener("click", closeDialog);
   dialog.addEventListener("click", (e) => {
-    if (e.target === dialog) dialog.remove();
+    if (e.target === dialog) closeDialog();
   });
 
   // Copy-to-Clipboard Buttons
