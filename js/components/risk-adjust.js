@@ -83,8 +83,8 @@ function renderRiskAdjustBanner() {
   const acceptBtn = document.getElementById("rab-accept-btn");
   if (acceptBtn) acceptBtn.addEventListener("click", applyRiskAdjustSuggestion);
   const reviewBtn = document.getElementById("rab-review-btn");
-  if (reviewBtn) reviewBtn.addEventListener("click", () => { openPlanEdit(pw.id); dismissRiskAdjustSuggestion(false); });
-  document.getElementById("rab-dismiss-btn").addEventListener("click", () => dismissRiskAdjustSuggestion(true));
+  if (reviewBtn) reviewBtn.addEventListener("click", () => { openPlanEdit(pw.id); dismissRiskAdjustSuggestion(); });
+  document.getElementById("rab-dismiss-btn").addEventListener("click", () => dismissRiskAdjustSuggestion());
 }
 
 function applyRiskAdjustSuggestion() {
@@ -98,12 +98,18 @@ function applyRiskAdjustSuggestion() {
     description: suggestion.description || pw.description,
     exercises: Array.isArray(suggestion.exercises) && suggestion.exercises.length ? suggestion.exercises : pw.exercises,
   });
-  dismissRiskAdjustSuggestion(false);
+  dismissRiskAdjustSuggestion();
   if (typeof renderCalendar === "function") renderCalendar();
   if (typeof renderTrainingPlanCard === "function") renderTrainingPlanCard();
 }
 
-function dismissRiskAdjustSuggestion(hide) {
+// Räumt den Banner-Zustand IMMER auf und blendet ihn aus - egal ob durch
+// "Übernehmen", "Im Dialog ansehen" oder "Verwerfen" ausgelöst. Vorher wurde
+// bei "Übernehmen" nur der Zustand zurückgesetzt, aber nicht neu gerendert -
+// der Banner blieb (mit den alten, jetzt ungültigen Buttons) sichtbar stehen
+// und ein Klick auf "Übernehmen" wirkte dadurch wie "passiert nichts",
+// obwohl die Einheit im Hintergrund bereits aktualisiert war.
+function dismissRiskAdjustSuggestion() {
   riskAdjustState = { pw: null, suggestion: null, reasons: [], loading: false, error: null };
-  if (hide) renderRiskAdjustBanner();
+  renderRiskAdjustBanner();
 }
