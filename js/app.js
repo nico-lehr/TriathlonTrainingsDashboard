@@ -69,5 +69,10 @@ function checkAutoReplan() {
   initCardSearch();
   renderAll();
   checkAutoReplan();
+  // Automatische Risiko-Kontrolle (ACWR/TSB/Monotonie + Erholungs-Check) für
+  // die naechsten 1-2 Tage - siehe js/components/risk-adjust.js. Wie
+  // checkAutoReplan() bewusst nicht awaited (Rest der App soll nicht auf
+  // eine evtl. KI-Anfrage warten) und läuft intern selbst nur einmal pro Tag.
+  checkTrainingRiskAdjustment();
 })();
 
