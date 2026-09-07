@@ -21,7 +21,7 @@ async function processFitFiles(files, onProgress) {
   const notify = onProgress || showUpdateStatus;
 
   const cutoff = new Date(Date.now() - SCAN_WINDOW_DAYS * 86400000);
-  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const cutoffStr = localDateStr(cutoff);
   const candidates = files.filter(f => {
     const name = f.name;
     if (!/\.fit$/i.test(name)) return false;

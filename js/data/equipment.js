@@ -43,7 +43,7 @@ function genEquipmentId() {
   return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ("eq" + Date.now() + Math.random().toString(16).slice(2));
 }
 
-function todayKey() { return new Date().toISOString().slice(0, 10); }
+function todayKey() { return todayStr(); }
 
 /* ---------- Anlegen / Ändern / Löschen ---------- */
 
@@ -150,7 +150,7 @@ function kmForSportWindow(sport, fromKey, toKey) {
   if (!fromKey) return 0;
   return ALL.reduce((sum, w) => {
     if (w.is_summary || !w._date || sportGroup(w.sport) !== sport) return sum;
-    const key = w._date.toISOString().slice(0, 10);
+    const key = localDateStr(w._date);
     if (key < fromKey) return sum;
     if (toKey && key >= toKey) return sum;
     return sum + (w.distance_km || 0);

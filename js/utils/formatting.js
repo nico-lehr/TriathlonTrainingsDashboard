@@ -4,6 +4,23 @@ const fmtH = min => (min / 60).toLocaleString("de-DE", { maximumFractionDigits: 
 
 const fmtNum = (n, dec = 1) => n == null ? "–" : n.toLocaleString("de-DE", { maximumFractionDigits: dec, minimumFractionDigits: 0 });
 
+// Liefert "YYYY-MM-DD" für den LOKALEN Kalendertag eines Date-Objekts - NICHT
+// date.toISOString().slice(0,10) verwenden, das serialisiert nach UTC und
+// verschiebt in Deutschland (UTC+1/+2) den Kalendertag um einen Tag, sobald
+// ein Date auf lokale Mitternacht gesetzt ist (z.B. Kalenderzellen) oder ein
+// Workout kurz nach lokaler Mitternacht stattfand. War die Ursache für
+// mehrere "falscher Tag"-Bugs (Kalenderzuordnung, geplante Trainings) -
+// AB JETZT IMMER localDateStr()/todayStr() für "an welchem Kalendertag ist
+// das" verwenden. toISOString() bleibt nur für echte Zeitstempel (createdAt
+// etc., wo es um den exakten UTC-Moment geht) korrekt.
+function localDateStr(date) {
+  return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
+}
+
+function todayStr() {
+  return localDateStr(new Date());
+}
+
 
 function escapeHtml(s) {
   const d = document.createElement("div");

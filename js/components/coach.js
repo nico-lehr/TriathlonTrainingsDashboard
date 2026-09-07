@@ -48,7 +48,7 @@ function renderCoachSummary() {
   // Nächste geplante Einheit für dieses Hauptevent (dieselbe Quelle wie die
   // Trainingsplan-Kachel weiter unten).
   if (goal && typeof plannedWorkoutsForGoal === "function") {
-    const todayKey = new Date().toISOString().slice(0, 10);
+    const todayKey = todayStr();
     const upcoming = plannedWorkoutsForGoal(goal.id).filter(p => p.date >= todayKey).sort((a, b) => a.date.localeCompare(b.date));
     if (upcoming.length) {
       const p = upcoming[0];

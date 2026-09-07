@@ -25,7 +25,7 @@ function saveWeightLog() {
 // dieses Datum bereits ein Eintrag, wird er überschrieben (max. ein Wert pro
 // Tag) statt einen Duplikat-Eintrag anzulegen.
 function logWeight(weightKg, date) {
-  const d = date || new Date().toISOString().slice(0, 10);
+  const d = date || todayStr();
   const w = Number(weightKg);
   if (!w || w <= 0) return null;
   const existing = weightLog.find(e => e.date === d);

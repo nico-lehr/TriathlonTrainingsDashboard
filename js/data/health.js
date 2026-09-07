@@ -48,7 +48,7 @@ function isRecoveryCheckEmpty(c) {
 
 function loadRecoveryCheck() {
   loadRecoveryLog();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayStr();
   try {
     const raw = localStorage.getItem(RECOVERY_KEY);
     if (raw) recoveryCheck = { ...recoveryCheck, ...JSON.parse(raw) };
@@ -73,7 +73,7 @@ function loadRecoveryCheck() {
 }
 
 function saveRecoveryCheck() {
-  recoveryCheck.date = new Date().toISOString().slice(0, 10);
+  recoveryCheck.date = todayStr();
   try { localStorage.setItem(RECOVERY_KEY, JSON.stringify(recoveryCheck)); } catch (e) {}
 }
 

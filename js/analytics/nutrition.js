@@ -29,7 +29,7 @@ const PROTEIN_G_PER_KG = 1.6;
 const FAT_G_PER_KG_MIN = 1.0;
 
 function todaysPlannedMinutesAndIntensity() {
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = todayStr();
   const todays = (typeof plannedWorkouts !== "undefined" ? plannedWorkouts : []).filter(p => p.date === todayKey);
   const minutes = todays.reduce((s, p) => s + (p.duration_min || 0), 0);
   const hasHart = todays.some(p => p.intensity === "hart");
@@ -133,7 +133,7 @@ function computeDailyMacroTargets() {
 // im Ernährungs-Tab, mit dem sich die Empfehlung für eine ANDERE der
 // nächsten Einheiten ansehen lässt (siehe renderPreWorkoutTiming, nutrition.js).
 function upcomingPreWorkoutCandidates(limit = 5) {
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = todayStr();
   return (typeof plannedWorkouts !== "undefined" ? plannedWorkouts : [])
     .filter(p => p.date >= todayKey && p.status === "geplant" && p.sport !== "Kraft" && p.sport !== "Mobility")
     .sort((a, b) => a.date.localeCompare(b.date))

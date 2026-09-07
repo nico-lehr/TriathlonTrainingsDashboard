@@ -33,7 +33,7 @@ function computePlanningWindow(goalId, days = 7) {
   }
   const dates = [];
   for (let i = 0; i < days; i++) {
-    dates.push(new Date(start.getTime() + i * 86400000).toISOString().slice(0, 10));
+    dates.push(localDateStr(new Date(start.getTime() + i * 86400000)));
   }
   return dates;
 }

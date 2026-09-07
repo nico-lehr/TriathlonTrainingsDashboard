@@ -84,7 +84,7 @@ function deletePlannedWorkout(id) {
 }
 
 function plannedWorkoutsOfDay(dayDate) {
-  const key = dayDate.toISOString().slice(0, 10);
+  const key = localDateStr(dayDate);
   return plannedWorkouts.filter(p => p.date === key);
 }
 
@@ -97,7 +97,7 @@ function plannedWorkoutsForGoal(goalId) {
 // generateTrainingPlan in js/ai/ollama.js). Bereits vergangene/erledigte
 // Einheiten bleiben als Trainingshistorie erhalten.
 function deleteFuturePlannedWorkoutsForGoal(goalId) {
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = todayStr();
   plannedWorkouts = plannedWorkouts.filter(p => !(p.goalId === goalId && p.date >= todayKey));
   savePlannedWorkouts();
 }
@@ -108,7 +108,7 @@ function deleteFuturePlannedWorkoutsForGoal(goalId) {
 // Kalender steht und sich mit dem neuen Plan widerspricht (mehrere,
 // gegensätzliche Trainings am selben Tag).
 function deleteFuturePlannedWorkoutsForOtherGoals(goalId) {
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = todayStr();
   const before = plannedWorkouts.length;
   plannedWorkouts = plannedWorkouts.filter(p => !(p.goalId && p.goalId !== goalId && p.date >= todayKey));
   if (plannedWorkouts.length !== before) savePlannedWorkouts();
@@ -118,6 +118,6 @@ function deleteFuturePlannedWorkoutsForOtherGoals(goalId) {
 // das rollierende Nachplanen (siehe computePlanningWindow/shouldAutoReplan
 // in js/analytics/training-plan.js).
 function futurePlannedDatesForGoal(goalId) {
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = todayStr();
   return [...new Set(plannedWorkouts.filter(p => p.goalId === goalId && p.date >= todayKey).map(p => p.date))].sort();
 }

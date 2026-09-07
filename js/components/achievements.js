@@ -50,7 +50,7 @@ const BIRTHDAY_TOAST_SHOWN_KEY = "triathlon_dashboard_birthday_shown_v1";
 
 function checkAndShowBirthdayMessage() {
   if (typeof isTodayBirthday !== "function" || !isTodayBirthday()) return;
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = todayStr();
   try {
     if (localStorage.getItem(BIRTHDAY_TOAST_SHOWN_KEY) === todayKey) return;
   } catch (e) { /* localStorage evtl. deaktiviert - dann einfach jedes Mal zeigen */ }

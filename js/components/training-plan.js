@@ -25,7 +25,7 @@ function renderTrainingPlanCard() {
   const daysUntil = goal.date ? Math.round((new Date(goal.date + "T00:00:00") - new Date(new Date().setHours(0, 0, 0, 0))) / 86400000) : null;
   const phase = computeTrainingPhase(daysUntil);
   const upcoming = plannedWorkoutsForGoal(goal.id)
-    .filter(p => p.date >= new Date().toISOString().slice(0, 10))
+    .filter(p => p.date >= todayStr())
     .sort((a, b) => a.date.localeCompare(b.date));
 
   if (timelineHost) renderPlanTimeline(timelineHost, goal, phase, daysUntil, upcoming);
@@ -260,7 +260,7 @@ function renderPlanEditLessons(pw) {
 function openPlanEdit(id, defaults) {
   const isNew = !id;
   const p = isNew ? {
-    date: (defaults && defaults.date) || new Date().toISOString().slice(0, 10),
+    date: (defaults && defaults.date) || todayStr(),
     sport: "Laufen", title: "", duration_min: null, intensity: null, description: null,
     exercises: null, status: "geplant",
     goalId: (defaults && defaults.goalId) || null, phase: (defaults && defaults.phase) || null,

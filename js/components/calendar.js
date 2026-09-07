@@ -33,7 +33,7 @@ function initCalendarControls() {
   const addBtn = document.getElementById("cal-add-workout-btn");
   if (addBtn) addBtn.addEventListener("click", () => {
     const goal = getPrimaryGoal();
-    openPlanEdit(null, { date: calFocusDay.toISOString().slice(0, 10), goalId: goal ? goal.id : null });
+    openPlanEdit(null, { date: localDateStr(calFocusDay), goalId: goal ? goal.id : null });
   });
 }
 
@@ -88,8 +88,8 @@ function renderCalendar() {
 }
 
 function calWorkoutsOfDay(dayDate) {
-  const key = dayDate.getFullYear() + '-' + String(dayDate.getMonth() + 1).padStart(2, '0') + '-' + String(dayDate.getDate()).padStart(2, '0');
-  return ALL.filter(w => w._date && w._date.getFullYear() + '-' + String(w._date.getMonth() + 1).padStart(2, '0') + '-' + String(w._date.getDate()).padStart(2, '0') === key
+  const key = localDateStr(dayDate);
+  return ALL.filter(w => w._date && localDateStr(w._date) === key
     && (calSportFilter === "all" || sportGroup(w.sport) === calSportFilter));
 }
 
@@ -120,7 +120,7 @@ function wireCalDropTarget(cellEl, dayDate) {
     cellEl.classList.remove("cal-drop-target");
     const id = e.dataTransfer.getData("text/plain");
     if (!id) return;
-    const newDate = dayDate.toISOString().slice(0, 10);
+    const newDate = localDateStr(dayDate);
     updatePlannedWorkout(id, { date: newDate });
     renderCalendar();
     renderTrainingPlanCard();
@@ -148,7 +148,7 @@ function renderCalendarMonth() {
   const withDate = ALL.filter(w => w._date && (calSportFilter === "all" || sportGroup(w.sport) === calSportFilter));
   const byDay = new Map(); // "YYYY-MM-DD" -> Workouts
   withDate.forEach(w => {
-    const key = w._date.getFullYear() + '-' + String(w._date.getMonth() + 1).padStart(2, '0') + '-' + String(w._date.getDate()).padStart(2, '0');
+    const key = localDateStr(w._date);
     if (!byDay.has(key)) byDay.set(key, []);
     byDay.get(key).push(w);
   });
@@ -161,7 +161,7 @@ function renderCalendarMonth() {
   const gridStart = weekStart(firstOfMonth).getTime();
   const gridEndWs = weekStart(lastOfMonth).getTime();
   const dayMs = 86400000, weekMs = 7 * dayMs;
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = todayStr();
 
   const frag = document.createDocumentFragment();
 
@@ -180,7 +180,7 @@ function renderCalendarMonth() {
     const weekWorkouts = [];
     for (let d = 0; d < 7; d++) {
       const dayDate = new Date(ws + d * dayMs);
-      const key = dayDate.toISOString().slice(0, 10);
+      const key = localDateStr(dayDate);
       const dayWorkouts = byDay.get(key) || [];
       weekWorkouts.push(...dayWorkouts);
       const inMonth = dayDate.getMonth() === calMonth.getMonth();
@@ -262,13 +262,13 @@ function renderCalendarWeek() {
   const el = document.getElementById("calendar-grid");
   const ws = weekStart(calFocusDay);
   const dayMs = 86400000;
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = todayStr();
   const weekWorkouts = [];
   const weekPlanned = []; // für den "Für Garmin exportieren"-Button unten - alle geplanten (noch nicht erledigten) Einheiten dieser Woche
 
   const cols = DOW_LABELS_DE.map((lbl, i) => {
     const dayDate = new Date(ws.getTime() + i * dayMs);
-    const key = dayDate.toISOString().slice(0, 10);
+    const key = localDateStr(dayDate);
     const dayWorkouts = calWorkoutsOfDay(dayDate);
     weekWorkouts.push(...dayWorkouts);
     const isToday = key === todayKey;

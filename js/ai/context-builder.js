@@ -26,7 +26,7 @@ function buildCompactContext(goal) {
   const daysUntil = eventDate ? Math.round((eventDate - todayMid) / 86400000) : null;
 
   const lines = [];
-  lines.push(`Heute: ${new Date().toISOString().slice(0, 10)}`);
+  lines.push(`Heute: ${todayStr()}`);
 
   // Status-Texte (tsbStatusLabel/acwrStatusLabel, js/analytics/training-load.js)
   // sind dieselbe Einordnung wie die Badges im Dashboard - so muss die KI die

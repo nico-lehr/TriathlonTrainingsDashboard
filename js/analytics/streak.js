@@ -28,7 +28,7 @@ function isDeclaredTrainingDay(dayDate) {
 }
 
 function hadRealWorkoutOn(dayKey) {
-  return ALL.some(w => w._date && !w.is_summary && w._date.toISOString().slice(0, 10) === dayKey);
+  return ALL.some(w => w._date && !w.is_summary && localDateStr(w._date) === dayKey);
 }
 
 // Dieselben Erholungs-Check-Felder wie im Coach-Tab (js/data/health.js) -
@@ -43,7 +43,7 @@ function isRecoveryProtected(dayKey) {
 // Ruhetag), "frozen" (Erholungsgrund eingetragen), "missed" (verpasst),
 // "open" (heute, Tag noch nicht vorbei), "future".
 function adherenceDayStatus(dayDate, todayKey) {
-  const dayKey = dayDate.toISOString().slice(0, 10);
+  const dayKey = localDateStr(dayDate);
   if (dayKey > todayKey) return "future";
   const trainDay = isDeclaredTrainingDay(dayDate);
   if (trainDay === false) return "maintained"; // laut Profil bewusst kein Trainingstag
@@ -58,7 +58,7 @@ function adherenceDayStatus(dayDate, todayKey) {
 // "Trainingstag verpasst" zu unterscheiden).
 function computeAdherenceStreak() {
   if (!Array.isArray(athleteProfile.trainingDays) || !athleteProfile.trainingDays.length) return null;
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = todayStr();
   let cursor = new Date(); cursor.setHours(0, 0, 0, 0);
 
   const todayStatus = adherenceDayStatus(cursor, todayKey);
