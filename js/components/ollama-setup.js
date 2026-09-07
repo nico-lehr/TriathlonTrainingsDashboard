@@ -25,6 +25,10 @@ async function openOllamaSetupDialog() {
           
           <div class="ollama-model-options">
             <div class="model-option">
+              <span class="model-name">qwen2.5:32b (dein aktuelles Modell, größer &amp; genauer)</span>
+              <button class="chip copy-btn" data-cmd="ollama pull qwen2.5:32b">In Clipboard kopieren</button>
+            </div>
+            <div class="model-option">
               <span class="model-name">llama3.1 (schnell, empfohlen)</span>
               <button class="chip copy-btn" data-cmd="ollama pull llama3.1">In Clipboard kopieren</button>
             </div>
