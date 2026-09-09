@@ -3,7 +3,6 @@
 
 function renderAll() {
   renderMeta();
-  renderTrainingStatus(); // nutzt immer die volle Historie (wie PMC/ACWR)
   const filtered = getFilteredData();
   renderStats(filtered);
   renderMonthComparison(); // nutzt immer die volle Historie (fester Kalendermonat-Vergleich, unabhängig vom Zeitraum-Filter)

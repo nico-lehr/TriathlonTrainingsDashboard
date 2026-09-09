@@ -1437,40 +1437,25 @@
 
   .load-status.risk  { background: rgba(208,59,59,0.10); color: #b13030; }
 
-  /* Trainingsstatus-Kachel ganz oben im Übersicht-Tab (Garmin-Connect-artig,
-     siehe renderTrainingStatus() in js/components/dashboard.js). Fünf
-     Zustände, drei Farbtöne (good/recovery teilen sich Grün-/Blauton,
-     watch=Amber, risk=Rot, muted=neutral für "noch keine Einordnung"). */
-  .training-status-main {
-    display: flex; align-items: center; gap: 14px;
-    border-radius: 14px; padding: 14px 16px;
-  }
+  /* Trainingsstatus als erste Stat-Kachel im Übersicht-Tab (Garmin-Connect-
+     artig, siehe renderStats() in js/components/dashboard.js) - gleiches
+     Muster wie .stat-tile.at-risk beim Streak: farbiger Rahmen je nach
+     Einordnung (good/recovery=freundlich, watch=Amber, risk=Rot, muted=
+     neutral für "noch keine Einordnung"), Text bleibt normal groß wie bei
+     den anderen Stat-Kacheln. */
+  .stat-tile.training-tile-good     { box-shadow: 0 0 0 1.5px var(--c-good), var(--card-shadow); }
+  .stat-tile.training-tile-good .sub     { color: var(--c-good); }
 
-  .training-status-icon { font-size: 30px; line-height: 1; flex-shrink: 0; }
+  .stat-tile.training-tile-recovery { box-shadow: 0 0 0 1.5px var(--accent), var(--card-shadow); }
+  .stat-tile.training-tile-recovery .sub { color: var(--accent); }
 
-  .training-status-label { font-size: 17px; font-weight: 700; margin-bottom: 2px; }
+  .stat-tile.training-tile-watch    { box-shadow: 0 0 0 1.5px var(--c-warn), var(--card-shadow); }
+  .stat-tile.training-tile-watch .sub    { color: var(--c-warn); }
 
-  .training-status-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.4; }
+  .stat-tile.training-tile-risk     { box-shadow: 0 0 0 1.5px var(--c-crit), var(--card-shadow); }
+  .stat-tile.training-tile-risk .sub     { color: var(--c-crit); }
 
-  .training-status-good     { background: rgba(12,163,12,0.10); }
-  .training-status-good .training-status-label     { color: #0a7a0a; }
-
-  .training-status-recovery { background: var(--accent-wash); }
-  .training-status-recovery .training-status-label { color: var(--accent); }
-
-  .training-status-watch    { background: rgba(250,178,25,0.16); }
-  .training-status-watch .training-status-label    { color: #93650a; }
-
-  .training-status-risk     { background: rgba(208,59,59,0.10); }
-  .training-status-risk .training-status-label     { color: #b13030; }
-
-  .training-status-muted    { background: var(--page); }
-  .training-status-muted .training-status-label    { color: var(--text-muted); }
-
-  .training-status-substats {
-    display: flex; flex-wrap: wrap; gap: 8px 18px;
-    margin-top: 10px; font-size: 12px; color: var(--text-muted);
-  }
+  .stat-tile.training-tile-muted    { }
 
   table.workouts {
     width: 100%;

@@ -15,35 +15,21 @@ function renderMeta() {
 }
 
 
-// Trainingsstatus-Kachel ganz oben im Übersicht-Tab (Garmin-Connect-artig) -
-// nutzt ausschließlich computeTrainingStatus() (js/analytics/training-load.js),
-// die wiederum computePerformanceState() wiederverwendet - hier wird nur
-// noch das HTML gebaut, keine eigene Berechnung.
-function renderTrainingStatus() {
-  const el = document.getElementById("training-status-body");
-  if (!el) return;
-  const status = computeTrainingStatus();
-
-  const parts = [];
-  if (status.ctlDelta != null) parts.push(`Fitness-Trend (28 Tage) ${status.ctlDelta >= 0 ? "+" : ""}${fmtNum(status.ctlDelta, 1)} CTL`);
-  if (status.tsb != null) parts.push(`Form (TSB) ${status.tsb >= 0 ? "+" : ""}${fmtNum(status.tsb, 0)}`);
-  if (status.acwr != null) parts.push(`ACWR ${fmtNum(status.acwr, 2)}`);
-
-  el.innerHTML = `
-    <div class="training-status-main training-status-${status.cls}">
-      <span class="training-status-icon">${status.icon}</span>
-      <div>
-        <div class="training-status-label">${escapeHtml(status.label)}</div>
-        <div class="training-status-desc">${escapeHtml(status.desc)}</div>
-      </div>
-    </div>
-    ${parts.length ? `<div class="training-status-substats">${parts.map(p => `<span>${escapeHtml(p)}</span>`).join("")}</div>` : ""}`;
-}
-
 function renderStats(data) {
   const totalMin = data.reduce((s, w) => s + (w.duration_min || 0), 0);
   const kmBy = sport => data.filter(w => w.sport === sport).reduce((s, w) => s + (w.distance_km || 0), 0);
   const tiles = [];
+
+  // Trainingsstatus (wie Garmin Connect) - immer als allererste Kachel,
+  // nutzt volle Historie (wie PMC/ACWR/VO2max), nicht den Zeitraum-Filter.
+  const trainingStatus = computeTrainingStatus();
+  tiles.push({
+    label: "Trainingsstatus",
+    target: 1,
+    fmt: () => `${trainingStatus.icon} ${trainingStatus.label}`,
+    sub: trainingStatus.desc,
+    extraClass: ` training-tile-${trainingStatus.cls}`,
+  });
 
   // Trainingsplan-Treue-Streak (js/analytics/streak.js) - nutzt wie VO2max
   // immer die volle Historie, nicht den Zeitraum-Filter oben, da er einen
