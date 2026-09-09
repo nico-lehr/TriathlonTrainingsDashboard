@@ -135,6 +135,42 @@ function computePerformanceState() {
   return { verdict, cls, ctl: last.ctl, ctlDelta, tsb: last.tsb, tsbStatus, acwr, acwrStatus };
 }
 
+/* ---------- Trainingsstatus (Garmin-Connect-artige Einordnung) ---------- */
+
+// Fasst Fitness-Trend (CTL-Verlauf), Form (TSB) und Belastungsverhältnis
+// (ACWR) zu EINER von 5 Kategorien zusammen, angelehnt an Garmin Connects
+// "Trainingsstatus": Formaufbau, Formerhalt, Erholung, Übertraining,
+// Formverlust. Reine Ableitung aus computePerformanceState() (ctlDelta/tsb/
+// acwr) - KEINE neue Berechnung/Datenquelle (AI_RULES Regel 5), nur eine
+// andere Einordnung derselben drei Werte für die Kachel ganz oben im
+// Übersicht-Tab (renderTrainingStatus(), js/components/dashboard.js).
+//
+// Priorität (wie computePerformanceState()): Risiko zuerst, dann Erholung,
+// dann Fitness-Trend, mit "Formerhalt" als neutralem Standardfall.
+const TRAINING_STATUS_DEFS = {
+  uebertraining: { label: "Übertraining", icon: "⚠️", cls: "risk", desc: "Belastung liegt deutlich über dem verträglichen Bereich — erhöhtes Verletzungs-/Übertrainingsrisiko. Entlastung oder Ruhetag einplanen." },
+  erholung:      { label: "Erholung", icon: "😌", cls: "recovery", desc: "Belastung ist bewusst reduziert, die Form erholt sich gerade." },
+  formverlust:   { label: "Formverlust", icon: "📉", cls: "watch", desc: "Belastung liegt seit längerem zu niedrig — die aufgebaute Fitness sinkt." },
+  formaufbau:    { label: "Formaufbau", icon: "📈", cls: "good", desc: "Fitness steigt bei angemessener Belastung — guter, produktiver Trainingsreiz." },
+  formerhalt:    { label: "Formerhalt", icon: "⚖️", cls: "good", desc: "Belastung und Form sind stabil, weder deutlicher Auf- noch Abbau." },
+  unklar:        { label: "Noch keine Einordnung", icon: "❔", cls: "muted", desc: "Dafür werden mehr Trainingsdaten benötigt (mindestens ein paar Wochen Historie)." },
+};
+
+function computeTrainingStatus() {
+  const state = computePerformanceState();
+  if (!state) return { key: "unklar", ...TRAINING_STATUS_DEFS.unklar, ctlDelta: null, tsb: null, acwr: null };
+
+  const { ctlDelta, tsb, acwr } = state;
+  let key;
+  if ((acwr != null && acwr > 1.5) || tsb < -30) key = "uebertraining";
+  else if (tsb > 10 && ctlDelta <= 2) key = "erholung";
+  else if (ctlDelta < -3 && (acwr == null || acwr < 0.8)) key = "formverlust";
+  else if (ctlDelta > 2 && acwr != null && acwr >= 0.8 && acwr <= 1.3) key = "formaufbau";
+  else key = "formerhalt";
+
+  return { key, ...TRAINING_STATUS_DEFS[key], ctlDelta, tsb, acwr };
+}
+
 /* ---------- Monatsvergleich (aktueller vs. vorheriger Kalendermonat) ---------- */
 
 // Vergleicht den aktuellen Kalendermonat (Tag 1 bis heute) mit demselben
