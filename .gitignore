@@ -22,6 +22,11 @@ garmin_tokens.json
 oauth1_token.json
 oauth2_token.json
 
+# Erzeugte Einzeldatei-Demo (4-5 MB, wird von build-demo.py generiert).
+# Gehoert nicht ins Repo - die veroeffentlichte Fassung liegt im
+# Landingpage-Projekt als dashboard.html.
+dashboard-demo.html
+
 # Phase 1 Backend - lokale Entwicklung
 training.db
 backend/*.log
