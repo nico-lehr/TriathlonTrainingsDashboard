@@ -1,182 +1,267 @@
 # Triathlon Trainings-Dashboard
 
-Ein komplett lokales, offline-fähiges Trainings-Dashboard für Triathleten.
-Es liest Garmin-`.fit`-Dateien ein und baut daraus einen Jahresüberblick mit
-sportwissenschaftlich fundierten Kennzahlen — inspiriert von
-[TrainingsPeaks](https://www.trainingpeaks.com/).
+Ein Trainings-Tagebuch für Triathleten, das auf deinem eigenen Mac läuft.
+Es liest die Trainingsdateien deiner Garmin-Uhr ein und macht daraus
+übersichtliche Auswertungen — Wochenumfang, Form, Bestzeiten, Erholung.
 
-**Keine Cloud, kein Konto, kein Server.** Das Dashboard ist eine normale
-HTML-Datei, die du per Doppelklick öffnest. Deine Trainings- und
-Gesundheitsdaten bleiben auf deinem Rechner.
-
-> Diese Anleitung gilt für **macOS**. Unter Windows lässt sich das Dashboard
-> selbst öffnen und per Ordner-Import nutzen, für den Garmin-Sync gibt es dort
-> aber noch keine Start-Datei.
+**Alles bleibt auf deinem Rechner.** Kein Konto, keine Cloud, keine
+monatlichen Kosten. Es gibt auch nichts zu programmieren — du klickst
+das Dashboard einfach auf wie eine normale Datei.
 
 ---
 
-# Installation
+# Einrichtung — Schritt für Schritt
 
-## Schritt 1 — Projekt herunterladen
+Dauert etwa 10 Minuten. Du brauchst nur einen Mac und eine
+Internetverbindung. **Vorkenntnisse sind nicht nötig** — jeder Schritt
+wird unten genau erklärt.
 
-**Empfohlen: per Terminal klonen.** Das ist der einfachste Weg, weil macOS
-heruntergeladene ZIP-Dateien blockiert (siehe Hinweis unten).
+> Diese Anleitung ist für **Mac**. Für Windows gibt es die Einrichtung
+> noch nicht.
 
-```bash
-git clone https://github.com/nico-lehr/TriathlonTrainingsDashboard.git Dashboard
-cd Dashboard
+## Schritt 1 — Die Dateien herunterladen
+
+1. Öffne diese Seite im Browser:
+   **https://github.com/nico-lehr/TriathlonTrainingsDashboard**
+2. Klicke rechts oben auf den grünen Knopf **`< > Code`**.
+3. Wähle im Menü ganz unten **`Download ZIP`**.
+4. Die Datei landet in deinem Ordner **Downloads**.
+
+## Schritt 2 — Die Dateien entpacken
+
+Doppelklicke die heruntergeladene Datei
+`TriathlonTrainingsDashboard-main.zip`.
+
+Daneben entsteht ein Ordner mit demselben Namen. **Lass ihn ruhig in
+Downloads liegen** — oder ziehe ihn irgendwohin, wo du ihn wiederfindest,
+zum Beispiel in „Dokumente". Merk dir nur, wohin.
+
+## Schritt 3 — Das Terminal öffnen
+
+> **Was ist das Terminal?** Ein Programm, das bei jedem Mac dabei ist. Statt
+> zu klicken, tippt man dort Befehle ein. Klingt technischer als es ist —
+> du brauchst genau **einen** Befehl, und den musst du nicht einmal
+> abtippen. Danach nie wieder.
+
+So öffnest du es:
+
+1. Drücke **`⌘` (Command) und die Leertaste** gleichzeitig. Oben in der
+   Mitte erscheint ein Suchfeld.
+2. Tippe **`Terminal`**.
+3. Drücke **Enter**.
+
+Es öffnet sich ein meist weißes oder schwarzes Fenster mit etwas Text und
+einem blinkenden Strich. Das ist richtig so.
+
+## Schritt 4 — Die Einrichtung starten
+
+Jetzt kommt der einzige Befehl. Du tippst nur den ersten Teil — den Rest
+erledigt ein Trick:
+
+1. Tippe im Terminal-Fenster:
+
+   ```
+   bash 
+   ```
+
+   **Wichtig: mit einem Leerzeichen am Ende.** Drücke noch NICHT Enter.
+
+2. Öffne den entpackten Ordner aus Schritt 2 im Finder.
+
+3. **Ziehe die Datei `setup.command` mit der Maus in das Terminal-Fenster**
+   und lass sie dort los.
+
+   Der Mac trägt daraufhin automatisch den kompletten Pfad ein. Die Zeile
+   sieht dann ungefähr so aus:
+
+   ```
+   bash /Users/deinname/Downloads/TriathlonTrainingsDashboard-main/setup.command
+   ```
+
+4. Jetzt **Enter** drücken.
+
+Die Einrichtung läuft los und meldet jeden Schritt mit einem grünen Haken.
+Am Ende öffnet sich das Dashboard von selbst im Browser.
+
+> **Warum über das Terminal und nicht per Doppelklick?** Weil macOS bei
+> Dateien aus dem Internet zuerst eine Sicherheitswarnung zeigt. Über das
+> Terminal umgehst du diese Warnung auf saubere Weise — und die Einrichtung
+> hebt die Sperre danach für dich auf. **Ab dann funktionieren Doppelklicks
+> ganz normal**, und du brauchst das Terminal nie wieder.
+
+### Was passiert, wenn Python fehlt?
+
+Die Einrichtung sagt dir das und bietet an, die Download-Seite zu öffnen.
+Installiere Python von dort (normaler Installer, „Weiter, Weiter, Fertig"),
+und starte dann Schritt 4 noch einmal.
+
+Python wird **nur** für die automatische Garmin-Synchronisierung gebraucht.
+Das Dashboard selbst funktioniert auch ohne.
+
+---
+
+# Deine Trainingsdaten holen
+
+Nach der Einrichtung ist das Dashboard noch leer. Zwei Möglichkeiten:
+
+## Möglichkeit A — Automatisch von Garmin Connect
+
+Doppelklicke im Projektordner auf **`sync-garmin.command`**.
+
+Beim ersten Mal wirst du nach deiner Garmin-E-Mail und deinem Passwort
+gefragt. Tippe sie ein und drücke Enter. Falls du die Bestätigung in zwei
+Schritten nutzt, wird zusätzlich der Code abgefragt.
+
+> **Dein Passwort wird nirgends gespeichert.** Es wird einmal verwendet, um
+> einen Zugangsschlüssel zu erhalten, und dann sofort verworfen. Ab dem
+> zweiten Mal musst du gar nichts mehr eingeben — es läuft einfach durch.
+
+Der erste Durchlauf holt die letzten 300 Tage und dauert ein paar Minuten.
+Danach öffnet sich dein fertiges Dashboard. Jeder weitere Durchlauf holt
+nur noch Neues und ist in Sekunden fertig.
+
+**Ab jetzt ist es ganz einfach:** Wenn du neue Trainings sehen willst,
+doppelklickst du `sync-garmin.command`. Mehr nicht.
+
+## Möglichkeit B — Eigene Dateien ohne Garmin-Konto
+
+Hast du deine `.fit`-Dateien schon irgendwo auf dem Rechner (zum Beispiel
+über die App HealthFit in iCloud)?
+
+1. Öffne das Dashboard (`index.html` doppelklicken).
+2. Klicke oben rechts auf **Aktualisieren**.
+3. Wähle im Menü **📁 Aktualisieren**.
+4. Such den Ordner mit deinen `.fit`-Dateien aus.
+
+Dafür brauchst du kein Python und kein Garmin-Konto.
+
+---
+
+# Der Alltag danach
+
+| Was du willst | Was du tust |
+|---|---|
+| Dashboard ansehen | `index.html` doppelklicken |
+| Neue Trainings holen | `sync-garmin.command` doppelklicken |
+| Dashboard griffbereit haben | `index.html` ins Dock ziehen oder ein Lesezeichen anlegen |
+
+---
+
+# Wenn etwas nicht klappt
+
+### „... kann nicht geöffnet werden, da es von einem nicht verifizierten Entwickler stammt"
+
+Das passiert, wenn du eine Datei **vor** der Einrichtung doppelklickst.
+Führe zuerst Schritt 4 aus (über das Terminal) — danach tritt die Meldung
+nicht mehr auf.
+
+Kommt sie trotzdem noch einmal:
+1. Klicke im Fenster auf **Fertig**.
+2. Öffne **Systemeinstellungen ▸ Datenschutz & Sicherheit**.
+3. Scrolle nach unten. Dort steht, dass eine Datei blockiert wurde.
+4. Klicke daneben auf **Trotzdem öffnen** und bestätige.
+
+### Das Terminal sagt „command not found: bash"
+
+Dann hast du vermutlich das Leerzeichen nach `bash` vergessen oder einen
+Tippfehler. Schreib die Zeile noch einmal neu — erst `bash`, dann
+Leerzeichen, dann die Datei hineinziehen.
+
+### Das Dashboard ist leer
+
+Es sind noch keine Trainingsdaten da. Siehe „Deine Trainingsdaten holen".
+Ob und wann zuletzt synchronisiert wurde, steht im Menü **Aktualisieren**.
+
+### Die Synchronisierung bricht mit einem Anmeldefehler ab
+
+Garmin ändert gelegentlich etwas an seiner Schnittstelle. Meistens hilft
+ein Update. Öffne dafür das Terminal (Schritt 3) und gib ein:
+
+```
+python3 -m pip install -U garminconnect curl_cffi
 ```
 
-*Alternativ als ZIP:* Auf GitHub „Code ▸ Download ZIP", dann entpacken.
-macOS markiert alle Dateien daraus als „aus dem Internet geladen" und
-verweigert zunächst den Doppelklick. Das Setup-Skript hebt diese Blockade
-für dich auf — du musst es nur **einmalig** an der Sperre vorbeistarten:
-**Rechtsklick auf `setup.command` ▸ Öffnen ▸ Öffnen**.
+### Der Knopf „Mit Garmin Connect synchronisieren" im Dashboard tut nichts
 
-## Schritt 2 — Setup ausführen
-
-Doppelklick auf **`setup.command`**.
-
-Das Skript erledigt alles Weitere und sagt bei jedem Schritt, was es tut:
-
-| Schritt | Was passiert |
-|---|---|
-| 1 | Prüft, ob Python 3 vorhanden ist |
-| 2 | Installiert die drei benötigten Python-Bibliotheken |
-| 3 | Legt die Arbeitsordner `fit-files/` und `data/` an |
-| 4 | Hebt die macOS-Blockade für die Start-Dateien auf |
-| 5 | Richtet den Sync-Knopf im Dashboard ein |
-| 6 | Öffnet das Dashboard |
-
-Fehlt Python, sagt das Skript Bescheid und bietet an, die Download-Seite zu
-öffnen. Danach das Setup einfach erneut starten.
-
-## Schritt 3 — Daten holen
-
-Jetzt fehlen nur noch deine Trainings. Zwei Wege:
-
-### Weg A: Garmin Connect (empfohlen)
-
-Doppelklick auf **`sync-garmin.command`** — oder im Dashboard oben rechts
-**Aktualisieren ▸ Mit Garmin Connect synchronisieren**.
-
-Beim ersten Mal wirst du nach E-Mail und Passwort gefragt, bei aktivierter
-Zwei-Faktor-Authentifizierung zusätzlich nach dem Code.
-
-> **Dein Passwort wird nicht gespeichert.** Es wird einmalig gegen ein Token
-> getauscht und sofort verworfen. Das Token liegt unter `~/.garminconnect`
-> und erneuert sich selbst — ab dem zweiten Mal brauchst du gar nichts mehr
-> einzugeben. Erfahrungsgemäß ist das Passwort etwa einmal im Jahr wieder
-> nötig.
-
-Der erste Lauf holt die letzten 300 Tage und dauert ein paar Minuten. Jeder
-weitere Lauf lädt nur noch Neues und ist in Sekunden fertig.
-
-### Weg B: Eigene `.fit`-Dateien
-
-Ohne Garmin-Konto: im Dashboard oben rechts auf **Aktualisieren** klicken und
-im Menü nochmals **📁 Aktualisieren** wählen — dann den Ordner mit deinen
-`.fit`-Dateien angeben (z. B. von
-[HealthFit](https://www.healthfit.app/) nach iCloud Drive synchronisiert).
-Alternativ **⬆️ Drag & Drop zur Auswahl**, um einzelne Dateien hineinzuziehen.
-Dafür wird kein Python gebraucht.
-
----
-
-# Voraussetzungen im Detail
-
-| Wofür | Was du brauchst | Pflicht? |
-|---|---|---|
-| Dashboard ansehen, eigene `.fit`-Dateien einlesen | Nur ein Browser | **ja** |
-| Garmin-Sync | Python 3.9+ und drei Bibliotheken | nur für Weg A |
-| KI-Coach | Ollama (lokal) **oder** ein Anthropic-Schlüssel | optional |
-| Kalender-Export (iCal) | Das Flask-Backend in `backend/` | optional |
-
-Die Python-Bibliotheken installiert das Setup automatisch:
-`garminconnect`, `curl_cffi` und `fitdecode` (siehe `requirements.txt`).
-
-## KI-Coach einrichten (optional)
-
-Der Coach-Bereich analysiert einzelne Einheiten und erstellt Trainingspläne.
-Er braucht ein Sprachmodell — entweder lokal oder über eine Schnittstelle:
-
-- **Lokal mit Ollama** (kostenlos, Daten bleiben auf dem Rechner):
-  [ollama.com](https://ollama.com) installieren, dann `ollama pull llama3.1`.
-  Das Dashboard erwartet Ollama unter `http://localhost:11434`; die Adresse
-  lässt sich im Coach-Tab hinter dem Zahnrad ändern.
-- **Anthropic-Schlüssel**: ebenfalls im Coach-Tab hinterlegbar.
-
-Ohne beides funktioniert das Dashboard vollständig — nur der Coach-Bereich
-bleibt leer.
+Doppelklicke stattdessen `sync-garmin.command` im Projektordner — das
+funktioniert immer.
 
 ---
 
 # Was mit deinen Daten passiert
 
-- Alles bleibt **lokal auf deinem Rechner**. Das Dashboard selbst hat keinen
-  Netzwerkzugriff und kennt keine Zugangsdaten.
-- Der Garmin-Sync ist ein **getrenntes Programm**, das du bewusst startest.
-  Es lädt herunter, nie hoch.
-- Passwörter werden nie gespeichert, Tokens liegen außerhalb des
-  Projektordners (`~/.garminconnect`, nur für dich lesbar).
-- Deine Trainingsdaten (`data/`, `fit-files/`, `workouts.json`) sind über
-  `.gitignore` vom Repository ausgeschlossen — ein versehentliches Hochladen
-  ist damit ausgeschlossen.
-- Nutzt du den Coach mit einem Anthropic-Schlüssel, werden die
-  zusammengefassten Kennzahlen an diese Schnittstelle geschickt. Mit Ollama
-  bleibt auch das lokal.
+- **Alles bleibt auf deinem Mac.** Das Dashboard hat keine Verbindung nach
+  außen und kennt keine Zugangsdaten.
+- Die Synchronisierung ist ein **eigenes kleines Programm**, das du bewusst
+  startest. Es lädt nur herunter, nie hoch.
+- **Passwörter werden nie gespeichert.** Der Zugangsschlüssel liegt
+  außerhalb des Projektordners und ist nur für dich lesbar.
+- Deine Trainings- und Gesundheitsdaten sind so eingerichtet, dass sie
+  **nicht versehentlich ins Internet hochgeladen** werden können.
+- Nutzt du den KI-Coach mit einem Anthropic-Schlüssel, gehen deine
+  zusammengefassten Kennzahlen an diesen Dienst. Mit Ollama (siehe unten)
+  bleibt auch das komplett lokal.
 
 ---
 
-# Wenn etwas nicht funktioniert
+# Für Fortgeschrittene
 
-**„... kann nicht geöffnet werden, da es von einem nicht verifizierten
-Entwickler stammt"**
-Du hast das ZIP heruntergeladen. Einmalig Rechtsklick auf die Datei ▸
-**Öffnen** ▸ **Öffnen**. Nach dem ersten Setup-Lauf tritt das nicht mehr auf.
+### Alternative: per Terminal klonen
 
-**„Safari kann die Seite nicht öffnen, da die Adresse ungültig ist"**
-Der Sync-Knopf im Dashboard funktioniert erst, wenn `setup.command` gelaufen
-ist. Alternativ jederzeit `sync-garmin.command` direkt doppelklicken — das
-geht immer.
-
-**Der Sync bricht mit einem Anmeldefehler ab**
-Garmin ändert gelegentlich seine interne Schnittstelle. Meist hilft:
+Wer `git` hat, kann Schritt 1 und 2 ersetzen durch:
 
 ```bash
-python3 -m pip install -U garminconnect curl_cffi
+git clone https://github.com/nico-lehr/TriathlonTrainingsDashboard.git Dashboard
+cd Dashboard && bash setup.command
 ```
 
-**Das Dashboard ist leer**
-Noch keine Daten eingelesen — siehe Schritt 3. Ob und wann zuletzt
-synchronisiert wurde, steht im Menü **Aktualisieren**.
+Vorteil: keine Sicherheitswarnung, weil die Dateien nicht als
+„aus dem Internet geladen" markiert werden.
 
-**Python wird nicht gefunden, obwohl es installiert ist**
-Das Setup sucht in den üblichen Pfaden. Hilft das nicht, einmal im Terminal
-`python3 -V` ausführen und prüfen, ob eine Version 3.9 oder neuer erscheint.
+### Voraussetzungen im Überblick
 
----
+| Wofür | Was nötig ist | Pflicht? |
+|---|---|---|
+| Dashboard ansehen, eigene `.fit`-Dateien | Nur ein Browser | **ja** |
+| Automatische Garmin-Synchronisierung | Python 3.9+ (Einrichtung installiert den Rest) | nur für Möglichkeit A |
+| KI-Coach | Ollama (lokal) **oder** ein Anthropic-Schlüssel | optional |
+| Trainingsplan als Kalender-Abo | Das Backend in `backend/` | optional |
 
-# Ordnerstruktur
+### KI-Coach einrichten (optional)
+
+Der Coach-Bereich wertet einzelne Einheiten aus und erstellt
+Trainingspläne. Dafür braucht er ein Sprachmodell:
+
+- **Lokal mit Ollama** (kostenlos, nichts verlässt den Rechner):
+  [ollama.com](https://ollama.com) installieren, dann im Terminal
+  `ollama pull llama3.1` ausführen. Das Dashboard erwartet Ollama unter
+  `http://localhost:11434`; die Adresse lässt sich im Coach-Tab hinter dem
+  Zahnrad ändern.
+- **Anthropic-Schlüssel**: ebenfalls im Coach-Tab hinterlegbar.
+
+Ohne beides funktioniert alles andere ganz normal — nur der Coach-Bereich
+bleibt leer.
+
+### Ordnerstruktur
 
 ```
-index.html              Das Dashboard — per Doppelklick öffnen
+index.html              Das Dashboard — zum Ansehen doppelklicken
 setup.command           Einmalige Einrichtung
-sync-garmin.command     Garmin-Sync starten
+sync-garmin.command     Neue Trainings holen
 
-css/  js/               Code des Dashboards
-tools/garmin_sync.py    Der Garmin-Downloader
-parse_fit.py            Liest .fit-Dateien ein  → workouts.json
-build_dashboard.py      Erzeugt daraus          → data/workouts-data.js
-docs/                   Datenmodell und Projektkarte
+css/  js/               Der Programmcode des Dashboards
+tools/garmin_sync.py    Holt die Daten von Garmin
+parse_fit.py            Liest .fit-Dateien ein   → workouts.json
+build_dashboard.py      Erzeugt daraus           → data/workouts-data.js
+docs/                   Technische Dokumentation
 
-fit-files/              Deine heruntergeladenen .fit-Dateien (lokal)
-data/                   Erzeugte Trainings- und Gesundheitsdaten (lokal)
+fit-files/              Deine heruntergeladenen Trainingsdateien
+data/                   Die aufbereiteten Daten fürs Dashboard
 ```
 
-Die Kette beim Sync ist immer dieselbe:
+Beim Synchronisieren läuft immer dieselbe Kette:
 **Garmin → `fit-files/` → `parse_fit.py` → `build_dashboard.py` → Dashboard.**
-`sync-garmin.command` führt sie komplett aus.
+`sync-garmin.command` erledigt das alles zusammen.
 
 ---
 
