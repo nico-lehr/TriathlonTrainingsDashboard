@@ -37,21 +37,25 @@ document.addEventListener("keydown", e => {
 
 function openComparePicker(baseWorkout) {
   const body = document.getElementById("compare-picker-body");
+  // Nur dieselbe Sportart, sonst wären die Achsen (Pace vs. km/h) nicht
+  // vergleichbar - und beim Rad zusätzlich nur dieselbe Umgebung, weil
+  // Indoor-km/h von der Plattform simuliert sind (sameComparisonGroup()).
+  const groupLabel = comparisonGroupLabel(baseWorkout);
   const candidates = ALL
-    .filter(w => w.file !== baseWorkout.file && w.sport_raw === baseWorkout.sport_raw)
+    .filter(w => w.file !== baseWorkout.file && w.sport_raw === baseWorkout.sport_raw && sameComparisonGroup(baseWorkout, w))
     .sort((a, b) => (b._date || 0) - (a._date || 0))
-    .slice(0, 30); // genug Auswahl, ohne die Liste unendlich lang zu machen - nur dieselbe Sportart, sonst wären Achsen (Pace vs. km/h) nicht vergleichbar
+    .slice(0, 30); // genug Auswahl, ohne die Liste unendlich lang zu machen
 
   body.innerHTML = `
     <h3>Mit anderen Einheiten vergleichen</h3>
-    <p class="modal-sub">Basis: <b>${baseWorkout.sport}</b>${baseWorkout._date ? " · " + fmtDateFull(baseWorkout._date) : ""} — wähle bis zu ${COMPARE_MAX_EXTRA} weitere ${escapeHtml(baseWorkout.sport)}-Einheiten zum Vergleich.</p>
+    <p class="modal-sub">Basis: <b>${escapeHtml(groupLabel)}</b>${baseWorkout._date ? " · " + fmtDateFull(baseWorkout._date) : ""} — wähle bis zu ${COMPARE_MAX_EXTRA} weitere ${escapeHtml(groupLabel)}-Einheiten zum Vergleich.</p>
     ${candidates.length ? `
     <div class="compare-picker-list">
       ${candidates.map(w => `
         <label class="compare-picker-item">
           <input type="checkbox" value="${encodeURIComponent(w.file)}">
           <span class="compare-picker-item-main">${w._date ? fmtDateWeekday(w._date) : "–"} · ${w.duration_min != null ? fmtNum(w.duration_min, 0) + " min" : "–"}</span>
-          <span class="compare-picker-item-sub">${w.pace_min_per_km ? w.pace_min_per_km + " /km" : w.pace_min_per_100m ? w.pace_min_per_100m + " /100m" : w.speed_kmh != null ? fmtNum(w.speed_kmh, 1) + " km/h" : "–"}${w.avg_hr != null ? " · Ø " + w.avg_hr + " bpm" : ""}</span>
+          <span class="compare-picker-item-sub">${paceOrSpeedDisplay(w)}${w.avg_hr != null ? " · Ø " + w.avg_hr + " bpm" : ""}</span>
         </label>`).join("")}
     </div>
     <p class="compare-picker-hint" id="compare-picker-hint"></p>
@@ -97,12 +101,23 @@ function openCompareView(files) {
 // Einheit"-Hervorhebung in Tabelle/Zusammenfassung. Für Laufen/Schwimmen
 // reuse von paceOrSpeedSeconds() (js/analytics/workout-comparison.js).
 function paceSortValue(w) {
+  // Indoor/virtuell: die Geschwindigkeit ist simuliert, belastbar ist die
+  // Leistung - deshalb wird dort nach Watt (negiert) sortiert.
+  if (isIndoorRide(w)) { const p = ridePowerValue(w); return p != null ? -p : null; }
   if (w.sport_raw === "cycling") return w.speed_kmh != null ? -w.speed_kmh : null;
   const s = paceOrSpeedSeconds(w);
   return s != null ? s : null;
 }
 
+// Für Indoor-Radeinheiten die maßgebliche Leistungsgröße: NP wenn vorhanden
+// (belastbarer bei wechselnder Intensität), sonst Ø-Watt.
+function ridePowerValue(w) { return w.normalized_power_w ?? w.avg_power_w ?? null; }
+
 function paceOrSpeedDisplay(w) {
+  if (isIndoorRide(w)) {
+    const p = ridePowerValue(w);
+    return p != null ? `${Math.round(p)} W${w.normalized_power_w != null ? " (NP)" : ""}` : "–";
+  }
   return w.pace_min_per_km ? w.pace_min_per_km + " /km" : w.pace_min_per_100m ? w.pace_min_per_100m + " /100m" : w.speed_kmh != null ? fmtNum(w.speed_kmh, 1) + " km/h" : "–";
 }
 
@@ -149,8 +164,11 @@ function renderCompareView(workouts) {
   const ratingEntries = workouts.map(w => (typeof getWorkoutNote === "function") ? getWorkoutNote(w.file) : null);
   const hasRating = ratingEntries.some(e => e && e.rating != null);
 
+  // Der Picker stellt sicher, dass alle gewählten Einheiten aus derselben
+  // Umgebung stammen - deshalb reicht die erste für die Spaltenbeschriftung.
+  const indoorCompare = isIndoorRide(workouts[0]);
   const headCells = [
-    "Einheit", "Dauer", "Distanz", "Pace / Speed", "Ø / Max HF",
+    "Einheit", "Dauer", indoorCompare ? "Distanz (virtuell)" : "Distanz", indoorCompare ? "Ø Leistung" : "Pace / Speed", "Ø / Max HF",
     ...(hasElevation ? ["Höhenmeter"] : []),
     ...(hasCalories ? ["Kalorien"] : []),
     ...(hasCadence ? [`Ø Kadenz (${cadUnit})`] : []),
@@ -324,7 +342,9 @@ function paceStreamPoints(w) {
 function extraCompareMetrics(workouts) {
   const cadUnit = workouts[0].sport_raw === "cycling" ? "U/min" : "spm";
   const metrics = [];
-  if (workouts[0].sport_raw !== "swimming") {
+  // Höhenprofil nicht beim Schwimmen - und nicht indoor: die Rolle/Plattform
+  // liefert dort allenfalls simulierte Höhenmeter, die keinen Verlauf zeigen.
+  if (workouts[0].sport_raw !== "swimming" && !isIndoorRide(workouts[0])) {
     metrics.push({ key: "alt", label: "Höhenprofil", getPts: altStreamPoints, unit: "m", fmtVal: v => fmtNum(v, 0), fmtAxis: v => Math.round(v) });
   }
   metrics.push({ key: "cad", label: "Kadenz", getPts: cadStreamPoints, unit: cadUnit, fmtVal: v => Math.round(v), fmtAxis: v => Math.round(v) });

@@ -58,7 +58,8 @@ Gelegenheit weiter in eigene Dateien (z. B. `coach.css`) aufgeteilt werden.
 
 ### `js/data/` — Datenhaltung (Laden/Speichern/Ableiten), keine UI
 - `fit-parser.js` — Binärparser für Garmin `.fit`-Dateien (kein Netzwerk, keine Abhängigkeiten). Liest auch Bahnen-Nachrichten (Schwimmen, SWOLF) und generische Developer-Felder mit ein — Fundament für künftige Garmin-Connect-/Strava-Daten, siehe `docs/DATA_MODEL.md`.
-- `workouts.js` — Rohdaten (`ALL`/`DATA`), localStorage-Persistenz, Zeitraum-/Sportart-Filter. Braucht `EMBEDDED_DATA` aus `data/workouts-data.js`.
+- `garmin-wellness.js` — Zugriffsschicht auf die Garmin-Gesundheitsdaten (`GARMIN_WELLNESS` aus `data/wellness-data.js`): `latestWellness()`, `wellnessSeries()`, `wellnessBaseline()`, `wellnessDeviation()` (Abweichung vom eigenen 30-Tage-Mittel — nur so ist ein HRV-Wert interpretierbar) und `syncGarminWeightIntoLog()`. Startet mit leerem Bestand, wenn nie synchronisiert wurde.
+- `workouts.js` — Rohdaten (`ALL`/`DATA`), localStorage-Persistenz, Zeitraum-/Sportart-Filter. Braucht `EMBEDDED_DATA` aus `data/workouts-data.js`. Enthält außerdem die zentralen Gruppierungs-Primitive, an denen JEDE Referenzgruppe hängt: `sportGroup()`, `rideEnvironment()` (Indoor/Outdoor beim Rad, als `_rideEnv` materialisiert), `comparisonGroupLabel()`, `isIndoorRide()`, `rideEnvBadgeHtml()` und vor allem `sameComparisonGroup()` — wer mit wem verglichen werden darf, wird nur dort entschieden (siehe `docs/DATA_MODEL.md`, Abschnitt "Indoor/Outdoor-Erkennung beim Rad").
 - `goals.js` — Ziel-Events (Laden/Speichern/Anlegen/Löschen).
 - `athlete.js` — Athletenprofil (Laden/Speichern), Trainingstage-Konstanten.
 - `health.js` — Erholungs-Check-Zustand inkl. täglichem Reset + Logbuch-Archivierung.
@@ -121,11 +122,32 @@ ganz normal auch bei `file://`-Aufruf (im Unterschied zu `fetch()`, das
 Chrome/Safari für lokale Dateien blockiert — deshalb kein direktes
 `fetch("workouts.json")`).
 
+`data/wellness-data.js` (`const GARMIN_WELLNESS = {...}`) wird von
+`tools/garmin_sync.py` erzeugt und enthält die Gesundheitsdaten aus Garmin
+Connect — gleiche Mechanik und gleicher Grund wie oben, ebenfalls in
+`.gitignore`. `data/garmin-raw-cache.json` hält die Garmin-Rohantworten, damit
+der Sync inkrementell bleibt. Beide sind optional: fehlen sie, startet das
+Dashboard mit leerem Bestand (`EMPTY_WELLNESS`), und die Erholungs-Karte
+blendet sich selbst aus.
+
+## Garmin-Connect-Sync (`tools/`)
+
+Getrenntes, freiwillig gestartetes lokales Werkzeug — **nicht Teil der App**.
+Das Dashboard selbst bleibt serverlos, loginfrei und offline; es liest nur die
+erzeugten lokalen Dateien. Siehe `docs/DATA_MODEL.md`, Abschnitt
+„Abgrenzung zum Garmin-Sync".
+
+| Datei | Zweck |
+|---|---|
+| `tools/garmin_sync.py` | Lädt Original-`.fit`-Dateien nach `fit-files/` und Gesundheitsdaten nach `data/wellness-data.js`. Anmeldung per Token unter `~/.garminconnect` (außerhalb des Projekts, da dieses in iCloud liegt); das Passwort wird nie gespeichert. |
+| `sync-garmin.command` | Doppelklick-Start der kompletten Kette: Download → `parse_fit.py` → `build_dashboard.py` → Dashboard öffnen. |
+| `tools/install-url-scheme.command` | Einmalige Einrichtung des URL-Schemas `tridash-sync://`, damit der Knopf im Update-Menü den Sync auslösen kann (eine Webseite darf kein Programm starten — macOS übernimmt das über das registrierte Schema). |
+
 ## Build/Entwicklungs-Skripte (nicht Teil der App selbst)
 
 | Datei | Zweck |
 |---|---|
-| `parse_fit.py` | Python-Referenzimplementierung, liest `.fit`-Dateien in `workouts.json`. |
+| `parse_fit.py` | Python-Referenzimplementierung, liest `.fit`-Dateien (Standard: `fit-files/`) in `workouts.json`. Quellordner/Ziel per Argument überschreibbar. |
 | `build_dashboard.py` | Erzeugt `data/workouts-data.js` aus `workouts.json`. |
 | `verify_parser.py` | Vergleicht den JS-FIT-Parser Feld für Feld gegen die Python-Referenz. |
 | `test_full_ui.py`, `test_new_features.py`, `test_dnd_ui.py` | Playwright-Regressionstests gegen `index.html`. |

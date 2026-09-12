@@ -18,14 +18,22 @@ function renderRecords() {
   let cardIndex = 0; // für gestaffelte Eintritts-Animation (animation-delay je Karte, siehe .record-card in components.css)
   function cardDelayStyle() { return ` style="animation-delay:${(cardIndex++) * 70}ms"`; }
 
-  function sportCard(sportName, color, extraRowsFn) {
-    const list = DATA.filter(w => w.sport === sportName);
+  // opts.list erlaubt eine vorgefilterte Menge (z.B. nur Outdoor-Rad),
+  // opts.title einen abweichenden Kartentitel, opts.skipDistanceRows lässt die
+  // Distanz-/Höhenmeter-Zeilen weg (indoor sind beide von der Plattform
+  // simuliert und als Bestwert sinnlos).
+  function sportCard(sportName, color, extraRowsFn, opts = {}) {
+    const list = opts.list || DATA.filter(w => w.sport === sportName);
     if (!list.length) return "";
-    let html = `<div class="record-card"${cardDelayStyle()}><h3><span class="dot" style="background:${color}"></span>${sportName}</h3>`;
+    let html = `<div class="record-card"${cardDelayStyle()}><h3><span class="dot" style="background:${color}"></span>${opts.title || sportName}</h3>`;
     html += extraRowsFn(list);
-    html += row("Längste Distanz", bestBy(list, w => w.distance_km), (() => { const w = bestBy(list, w => w.distance_km); return w ? fmtNum(w.distance_km, 2) + " km" : ""; })());
+    if (!opts.skipDistanceRows) {
+      html += row("Längste Distanz", bestBy(list, w => w.distance_km), (() => { const w = bestBy(list, w => w.distance_km); return w ? fmtNum(w.distance_km, 2) + " km" : ""; })());
+    }
     html += row("Längste Dauer", bestBy(list, w => w.duration_min), (() => { const w = bestBy(list, w => w.duration_min); return w ? fmtH(w.duration_min) + " h" : ""; })());
-    html += row("Größter Höhengewinn", bestBy(list, w => w.elevation_gain_m), (() => { const w = bestBy(list, w => w.elevation_gain_m); return w ? Math.round(w.elevation_gain_m) + " m" : ""; })());
+    if (!opts.skipDistanceRows) {
+      html += row("Größter Höhengewinn", bestBy(list, w => w.elevation_gain_m), (() => { const w = bestBy(list, w => w.elevation_gain_m); return w ? Math.round(w.elevation_gain_m) + " m" : ""; })());
+    }
     html += row("Höchste Ø-Herzfrequenz", bestBy(list, w => w.avg_hr), (() => { const w = bestBy(list, w => w.avg_hr); return w ? w.avg_hr + " bpm" : ""; })());
     html += row("Höchste Max-Herzfrequenz", bestBy(list, w => w.max_hr), (() => { const w = bestBy(list, w => w.max_hr); return w ? w.max_hr + " bpm" : ""; })());
     html += "</div>";
@@ -46,17 +54,25 @@ function renderRecords() {
     return h;
   });
 
-  // Rad: schnellste 10/20/40 km (geschätzt) + klassische Bestwerte
+  // Rad: EINE Karte fuer Indoor und Outdoor zusammen. Die km-/km-h-Bestwerte
+  // beruecksichtigen bewusst nur Einheiten mit echter Strecke - Indoor-Distanz
+  // und -Geschwindigkeit sind von der Plattform simuliert und waeren als
+  // "Bestzeit" irrefuehrend. Leistung, Dauer und Puls zaehlen dagegen ueberall.
   html += sportCard("Rad", "var(--c-rad)", list => {
+    const outdoor = list.filter(w => w._rideEnv !== "indoor");
     let h = "";
     [[10000, "Schnellste 10 km"], [20000, "Schnellste 20 km"], [40000, "Schnellste 40 km"]].forEach(([m, label]) => {
-      const best = bestEffortForDistance(list, m);
+      const best = bestEffortForDistance(outdoor, m);
       h += row(label + " *", best?.workout, best ? fmtDurationClock(best.seconds) : "", best ? fmtDateFull(best.workout._date) : "");
     });
-    const bestSpeed = bestBy(list, w => w.speed_kmh);
+    const bestSpeed = bestBy(outdoor, w => w.speed_kmh);
     h += row("Höchste Ø-Geschwindigkeit", bestSpeed, bestSpeed ? fmtNum(bestSpeed.speed_kmh, 1) + " km/h" : "");
-    const bestMaxSpeed = bestBy(list, w => w.max_speed_kmh);
+    const bestMaxSpeed = bestBy(outdoor, w => w.max_speed_kmh);
     h += row("Höchste Max-Geschwindigkeit", bestMaxSpeed, bestMaxSpeed ? fmtNum(bestMaxSpeed.max_speed_kmh, 1) + " km/h" : "");
+    const bestPower = bestBy(list, w => w.avg_power_w);
+    h += row("Höchste Ø-Leistung", bestPower, bestPower ? Math.round(bestPower.avg_power_w) + " W" : "");
+    const bestNp = bestBy(list, w => w.normalized_power_w);
+    h += row("Höchste normalisierte Leistung", bestNp, bestNp ? Math.round(bestNp.normalized_power_w) + " W" : "");
     return h;
   });
 

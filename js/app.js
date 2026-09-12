@@ -16,6 +16,7 @@ function renderAll() {
   renderHrDistribution(filtered);
   renderTrainingFocus(filtered);
   renderPace(filtered);
+  renderRecovery(); // Garmin-Erholungsdaten; blendet sich selbst aus, solange nichts synchronisiert wurde
   renderTable(filtered);
   renderCoachWorkoutsMini(filtered);
   renderCalendar(); // nutzt immer die volle Historie
@@ -58,6 +59,10 @@ function checkAutoReplan() {
 // Reihenfolge, nur einmal await davor.
 (async function initApp() {
   await loadPersistedWorkouts();
+  // Garmin-Waagedaten ins Gewichts-Log uebernehmen, bevor irgendetwas
+  // gerendert wird - sonst zeigt die erste Darstellung noch das alte Gewicht.
+  // Ergaenzt nur fehlende Tage, ueberschreibt keine manuellen Eintraege.
+  if (typeof syncGarminWeightIntoLog === "function") syncGarminWeightIntoLog();
   initTopNav();
   initFilterBar();
   initCalendarControls();

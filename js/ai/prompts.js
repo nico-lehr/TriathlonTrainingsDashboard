@@ -62,7 +62,7 @@ Antworte AUSSCHLIESSLICH mit einem JSON-Objekt in genau dieser Form, keinerlei T
 
 function buildWorkoutAnalysisPrompt(w, comparable) {
   const ctx = buildWorkoutAnalysisContext(w, comparable);
-  return `Du bist ein erfahrener Triathlon-Coach. Analysiere eine einzelne Trainingseinheit im Vergleich zu ähnlichen früheren Einheiten desselben Athleten (gleiche Sportart, ähnliche Distanz/Dauer):
+  return `Du bist ein erfahrener Triathlon-Coach. Analysiere eine einzelne Trainingseinheit im Vergleich zu ähnlichen früheren Einheiten desselben Athleten (gleiche Sportart UND gleiche Umgebung - Indoor wird nur mit Indoor verglichen, Outdoor nur mit Outdoor -, ähnliche Distanz/Dauer):
 
 ${ctx}
 

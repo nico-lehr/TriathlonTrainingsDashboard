@@ -13,16 +13,33 @@ function computeCompactRecords() {
     if (bestPace) r.pace = bestPace.pace_min_per_km + "/km";
     if (Object.keys(r).length) out.laufen = r;
   }
-  const rad = DATA.filter(w => w.sport === "Rad");
-  if (rad.length) {
+  // Rad getrennt nach Umgebung, weil diese Werte in den KI-Kontext fließen:
+  // Indoor-Distanzen und -Geschwindigkeiten sind von der Plattform simuliert,
+  // als "Bestzeit über 40 km" wären sie für das Modell irreführend. Indoor
+  // zählt daher über die Leistung. Unbekannte Umgebung (Altdaten) = Outdoor.
+  const radOutdoor = DATA.filter(w => w.sport === "Rad" && w._rideEnv !== "indoor");
+  if (radOutdoor.length) {
     const r = {};
     [[10000, "10km"], [20000, "20km"], [40000, "40km"]].forEach(([m, key]) => {
-      const best = bestEffortForDistance(rad, m);
+      const best = bestEffortForDistance(radOutdoor, m);
       if (best) r[key] = fmtDurationClock(best.seconds);
     });
-    const bestSpeed = bestBy(rad, w => w.speed_kmh);
+    const bestSpeed = bestBy(radOutdoor, w => w.speed_kmh);
     if (bestSpeed) r.geschw = fmtNum(bestSpeed.speed_kmh, 1) + "km/h";
-    if (Object.keys(r).length) out.rad = r;
+    if (Object.keys(r).length) out.rad_outdoor = r;
+  }
+  const radIndoor = DATA.filter(w => w.sport === "Rad" && w._rideEnv === "indoor");
+  if (radIndoor.length) {
+    const r = {};
+    const bestPower = bestBy(radIndoor, w => w.avg_power_w);
+    if (bestPower) r.watt_avg = Math.round(bestPower.avg_power_w) + "W";
+    const bestNp = bestBy(radIndoor, w => w.normalized_power_w);
+    if (bestNp) r.np = Math.round(bestNp.normalized_power_w) + "W";
+    const kg = (typeof athleteProfile !== "undefined" && athleteProfile) ? athleteProfile.weightKg : null;
+    if (kg && bestPower) r.w_pro_kg = fmtNum(bestPower.avg_power_w / kg, 2);
+    const bestDur = bestBy(radIndoor, w => w.duration_min);
+    if (bestDur) r.laengste_dauer = fmtH(bestDur.duration_min) + "h";
+    if (Object.keys(r).length) out.rad_indoor = r;
   }
   const schwimmen = DATA.filter(w => w.sport === "Schwimmen");
   if (schwimmen.length) {
@@ -101,6 +118,13 @@ function runVo2SubmaxPoint(w) {
 // Eine Radeinheit -> ein (Puls, Sauerstoffbedarf-bei-dieser-Leistung)-Punkt,
 // nach der ACSM-Rad-Ergometrie-Formel (VO2 = 7 + 10.8 × Watt ÷ Körpergewicht).
 // Braucht echte Leistungsdaten (Sensor) und das Körpergewicht - sonst kein Punkt.
+//
+// Indoor-/virtuelle Einheiten fließen hier ABSICHTLICH mit ein (anders als bei
+// den Bestzeiten oben): die Formel nutzt ausschließlich Watt, und Watt sind
+// umgebungsunabhängig - 200 W auf der Rolle sind 200 W auf der Straße. Eine
+// Trennung würde die Punktdichte der Regression halbieren und die Schätzung
+// verschlechtern; Rolleneinheiten sind hier sogar die zuverlässigeren Punkte,
+// weil ein Smart-Trainer immer Leistung liefert.
 function bikeVo2SubmaxPoint(w) {
   if (!w.avg_hr || !w.avg_power_w || !athleteProfile.weightKg || w.duration_min < 15) return null;
   const vo2 = 7 + (10.8 * w.avg_power_w) / athleteProfile.weightKg;
@@ -164,15 +188,36 @@ function sportVo2Regression(sportName, pointFn, maxHr) {
 
 function syncedVo2ForSport(sportName) {
   const synced = ALL.filter(w => w.sport === sportName && w._date && w.vo2max != null).sort((a, b) => b._date - a._date);
-  if (!synced.length) return null;
-  const latest = synced[0];
-  const cutoff = new Date(latest._date.getTime() - 90 * 86400000);
-  const older = synced.find(w => w._date <= cutoff);
-  return {
-    value: latest.vo2max,
-    methodLabel: "synchronisiert (Strava/Garmin Connect)",
-    trendLabel: older ? vo2TrendLabel(latest.vo2max, older.vo2max) : null,
-  };
+  if (synced.length) {
+    const latest = synced[0];
+    const cutoff = new Date(latest._date.getTime() - 90 * 86400000);
+    const older = synced.find(w => w._date <= cutoff);
+    return {
+      value: latest.vo2max,
+      methodLabel: "synchronisiert (Garmin Connect)",
+      trendLabel: older ? vo2TrendLabel(latest.vo2max, older.vo2max) : null,
+    };
+  }
+
+  // Garmin liefert VO2max als TAGESwert, nicht je Einheit (siehe
+  // js/data/garmin-wellness.js) - Laufen und Rad werden dort getrennt gefuehrt.
+  // Der gemessene Wert schlaegt jede eigene Schaetzung, deshalb steht er hier
+  // vor den Regressions-/Formel-Fallbacks der Aufrufer.
+  if (typeof latestWellness === "function") {
+    const field = sportName === "Rad" ? "vo2max_cycling" : "vo2max";
+    const cur = latestWellness(field, 60);
+    if (cur) {
+      const hist = (typeof wellnessSeries === "function") ? wellnessSeries(field, 180) : [];
+      const cutoffMs = new Date(cur.date).getTime() - 90 * 86400000;
+      const older = hist.filter(p => p.date.getTime() <= cutoffMs).pop();
+      return {
+        value: cur.value,
+        methodLabel: "synchronisiert (Garmin Connect)",
+        trendLabel: older ? vo2TrendLabel(cur.value, older.value) : null,
+      };
+    }
+  }
+  return null;
 }
 
 function computeRunVo2MaxEstimate() {

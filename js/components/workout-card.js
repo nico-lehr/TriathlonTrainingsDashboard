@@ -29,7 +29,7 @@ function renderTable(data) {
     const cls = "row-enter" + (justAddedFiles.has(w.file) ? " row-added" : "");
     return `<tr data-file="${encodeURIComponent(w.file)}" class="${cls}" style="animation-delay:${Math.min(i, 14) * 22}ms">
       <td>${w._date ? fmtDateWeekday(w._date) : "–"}</td>
-      <td class="sport-cell"><span class="sport-dot" style="background:${sportColor(w.sport)}"></span>${w.sport}</td>
+      <td class="sport-cell"><span class="sport-dot" style="background:${sportColor(w.sport)}"></span>${w.sport}${rideEnvBadgeHtml(w)}</td>
       <td class="num" data-col="duration">${w.duration_min != null ? fmtNum(w.duration_min, 0) + " min" : "–"}</td>
       <td class="num" data-col="distance">${w.distance_km != null ? fmtNum(w.distance_km, 2) + " km" : "–"}</td>
       <td class="num" data-col="hravg">${w.avg_hr ?? "–"}</td>
@@ -63,7 +63,7 @@ function renderCoachWorkoutsMini(data) {
       : w.speed_kmh != null ? fmtNum(w.speed_kmh, 1) + " km/h" : "–";
     return `<tr data-file="${encodeURIComponent(w.file)}" class="row-enter" style="animation-delay:${i * 22}ms">
       <td>${w._date ? fmtDateWeekday(w._date) : "–"}</td>
-      <td class="sport-cell"><span class="sport-dot" style="background:${sportColor(w.sport)}"></span>${w.sport}</td>
+      <td class="sport-cell"><span class="sport-dot" style="background:${sportColor(w.sport)}"></span>${w.sport}${rideEnvBadgeHtml(w)}</td>
       <td class="num">${w.duration_min != null ? fmtNum(w.duration_min, 0) + " min" : "–"}</td>
       <td class="num">${paceOrSpeed}</td>
     </tr>`;
@@ -167,9 +167,13 @@ function openDetail(w) {
 // jeweils gescoped auf das übergebene Root-Element).
 function buildWorkoutDetailHtml(w) {
   const stream = w.stream;
+  // Indoor/virtuell: Distanz und Geschwindigkeit stammen von der Plattform und
+  // sind nicht mit Outdoor vergleichbar - deshalb werden sie als "(virtuell)"
+  // gekennzeichnet und die Leistung nach vorne gezogen (siehe unten).
+  const indoor = isIndoorRide(w);
   const paceOrSpeed = w.pace_min_per_km ? w.pace_min_per_km + " min/km"
     : w.pace_min_per_100m ? w.pace_min_per_100m + " min/100m"
-    : w.speed_kmh != null ? fmtNum(w.speed_kmh, 1) + " km/h" : "–";
+    : w.speed_kmh != null ? fmtNum(w.speed_kmh, 1) + " km/h" + (indoor ? " (virtuell)" : "") : "–";
 
   // Zusätzliche Kennzahl-Kacheln nur anzeigen, wenn das Gerät/Zubehör die
   // jeweiligen Werte tatsächlich aufgezeichnet hat (Lauf-Dynamik/Leistung
@@ -193,6 +197,20 @@ function buildWorkoutDetailHtml(w) {
   // Schwimmstil (dominant_stroke) bewusst nicht mehr angezeigt - die Erkennung
   // war falsch (unverifizierte FIT-Feldnummern, siehe fit-parser.js) und wird
   // von der KI ohnehin nicht genutzt, siehe CHANGE_REQUESTS.md.
+
+  // Indoor: Intensitätsfaktor (NP ÷ FTP) + Leistungszone. Nur wenn eine FTP im
+  // Athletenprofil hinterlegt ist - ohne Bezugswert wäre die Zahl bedeutungslos.
+  if (indoor) {
+    const ftp = (typeof athleteProfile !== "undefined" && athleteProfile) ? athleteProfile.ftpWatts : null;
+    const np = w.normalized_power_w ?? w.avg_power_w;
+    if (ftp && np != null) {
+      extraStats.push([`Intensität (IF)`, fmtNum(np / ftp, 2)]);
+      extraStats.push([`% FTP`, Math.round((np / ftp) * 100) + " %"]);
+    }
+    const kg = (typeof athleteProfile !== "undefined" && athleteProfile) ? athleteProfile.weightKg : null;
+    if (kg && w.avg_power_w != null) extraStats.push(["Ø Leistung pro kg", fmtNum(w.avg_power_w / kg, 2) + " W/kg"]);
+  }
+
   const extraStatsHtml = extraStats.map(([l, v]) => `<div class="st"><div class="l">${l}</div><div class="v">${v}</div></div>`).join("");
 
   // Welche Detail-Charts (über HF/Pace hinaus) tatsächlich Sekundendaten
@@ -208,16 +226,16 @@ function buildWorkoutDetailHtml(w) {
   return `
     <div class="modal-head">
       <span class="sport-dot" style="background:${sportColor(w.sport)}"></span>
-      <h3>${w.sport}</h3>
+      <h3>${w.sport}</h3>${rideEnvBadgeHtml(w)}
       <button type="button" class="chip wd-compare-btn" data-file="${encodeURIComponent(w.file)}" title="Diese Einheit mit anderen vergleichen">⚖ Vergleichen</button>
     </div>
     <p class="modal-sub">${w._date ? fmtDateFull(w._date) + " · " + w._date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) + " Uhr" : ""}</p>
     <div class="modal-stats">
       <div class="st"><div class="l">Dauer</div><div class="v">${w.duration_min != null ? fmtNum(w.duration_min, 0) + " min" : "–"}</div></div>
-      <div class="st"><div class="l">Distanz</div><div class="v">${w.distance_km != null ? fmtNum(w.distance_km, 2) + " km" : "–"}</div></div>
+      <div class="st"><div class="l">Distanz${indoor ? " (virtuell)" : ""}</div><div class="v">${w.distance_km != null ? fmtNum(w.distance_km, 2) + " km" : "–"}</div></div>
       <div class="st"><div class="l">Ø HF / Max HF</div><div class="v">${w.avg_hr ?? "–"} / ${w.max_hr ?? "–"}</div></div>
-      <div class="st"><div class="l">Pace / Speed</div><div class="v">${paceOrSpeed}</div></div>
-      <div class="st"><div class="l">Höhenmeter${w.elevation_gain_m == null && effectiveElevationGainM(w) != null ? " (nachgetragen)" : ""}</div><div class="v">${effectiveElevationGainM(w) != null ? Math.round(effectiveElevationGainM(w)) + " m" : "–"}</div></div>
+      <div class="st"><div class="l">${indoor ? "Geschwindigkeit (virtuell)" : "Pace / Speed"}</div><div class="v">${paceOrSpeed}</div></div>
+      ${indoor ? "" : `<div class="st"><div class="l">Höhenmeter${w.elevation_gain_m == null && effectiveElevationGainM(w) != null ? " (nachgetragen)" : ""}</div><div class="v">${effectiveElevationGainM(w) != null ? Math.round(effectiveElevationGainM(w)) + " m" : "–"}</div></div>`}
       <div class="st"><div class="l">Load</div><div class="v">${w.training_load != null ? fmtNum(w.training_load, 0) : "–"}</div></div>
       <div class="st"><div class="l">Kalorien</div><div class="v">${w.calories != null ? Math.round(w.calories) + " kcal" : "–"}</div></div>
       ${extraStatsHtml}
@@ -595,7 +613,7 @@ function renderWorkoutHrProfile(w, host) {
   const legend = document.createElement("div");
   legend.className = "legend";
   legend.innerHTML = `<span class="item"><b>${variability}</b></span>` +
-    (compareDensity ? `<span class="item"><span class="swatch line" style="background:var(--text-muted)"></span>Ø ${sportGroup(w.sport)} sonst</span>` : "");
+    (compareDensity ? `<span class="item"><span class="swatch line" style="background:var(--text-muted)"></span>Ø ${comparisonGroupLabel(w)} sonst</span>` : "");
   host.appendChild(legend);
 }
 
@@ -610,6 +628,7 @@ function fmtRadarValue(axis, useAvg) {
     case "kcal/Min.": return fmtNum(v, 1) + " kcal/min";
     case "HF Ø": return Math.round(v) + " bpm";
     case "Strecke": return fmtNum(v, 2) + " km";
+    case "Ø Watt": case "NP": return Math.round(v) + " W"; // Indoor-Achsen (RADAR_AXES_INDOOR_RIDE)
     case "Dauer": return fmtNum(v, 0) + " min";
     case "Negativer Split": return (v >= 0 ? "+" : "") + fmtNum(v, 1) + " %";
     default: return fmtNum(v, 1);
@@ -661,7 +680,7 @@ function renderWorkoutLoadRadar(w, host) {
     const [x, y] = pointAt(i, axis.own);
     const visDot = svgEl("circle", { cx: x, cy: y, r: 3.5, fill: "var(--accent)", class: "chart-bar", style: "cursor:pointer;" });
     const dot = svgEl("circle", { cx: x, cy: y, r: 9, fill: "transparent" });
-    dot.addEventListener("mousemove", e => { showTip(e, `<b>${axis.label}</b><br>Diese Einheit: ${fmtRadarValue(axis)}<br>Ø ${sportGroup(w.sport)}: ${fmtRadarValue(axis, true)}`, host); visDot.classList.add("chart-line-active"); visDot.setAttribute("r", "5"); });
+    dot.addEventListener("mousemove", e => { showTip(e, `<b>${axis.label}</b><br>Diese Einheit: ${fmtRadarValue(axis)}<br>Ø ${comparisonGroupLabel(w)}: ${fmtRadarValue(axis, true)}`, host); visDot.classList.add("chart-line-active"); visDot.setAttribute("r", "5"); });
     dot.addEventListener("mouseleave", () => { hideTip(); visDot.setAttribute("r", "3.5"); });
     svg.appendChild(visDot);
     svg.appendChild(dot);
@@ -670,7 +689,7 @@ function renderWorkoutLoadRadar(w, host) {
   host.innerHTML = ""; host.appendChild(svg);
   const legend = document.createElement("div");
   legend.className = "legend";
-  legend.innerHTML = `<span class="item"><span class="swatch line" style="background:var(--accent)"></span>Diese Einheit</span><span class="item"><span class="swatch line" style="background:var(--text-muted)"></span>Ø ${sportGroup(w.sport)}</span>`;
+  legend.innerHTML = `<span class="item"><span class="swatch line" style="background:var(--accent)"></span>Diese Einheit</span><span class="item"><span class="swatch line" style="background:var(--text-muted)"></span>Ø ${comparisonGroupLabel(w)}</span>`;
   host.appendChild(legend);
 }
 

@@ -97,11 +97,21 @@ function buildCompactContext(goal) {
     if (rec.laufen.pace) b.push(`Ø ${rec.laufen.pace}`);
     if (b.length) lines.push(`Bestzeiten Laufen: ${b.join(" | ")}`);
   }
-  if (rec.rad) {
+  if (rec.rad_outdoor) {
     const b = [];
-    ["10km", "20km", "40km"].forEach(k => { if (rec.rad[k]) b.push(`${k} ${rec.rad[k]}`); });
-    if (rec.rad.geschw) b.push(`Ø ${rec.rad.geschw}`);
-    if (b.length) lines.push(`Bestzeiten Rad: ${b.join(" | ")}`);
+    ["10km", "20km", "40km"].forEach(k => { if (rec.rad_outdoor[k]) b.push(`${k} ${rec.rad_outdoor[k]}`); });
+    if (rec.rad_outdoor.geschw) b.push(`Ø ${rec.rad_outdoor.geschw}`);
+    if (b.length) lines.push(`Bestzeiten Rad (Outdoor): ${b.join(" | ")}`);
+  }
+  // Indoor bewusst über die Leistung statt über Distanz/Tempo - die virtuellen
+  // Kilometer der Plattform taugen nicht als Bestwert (siehe computeCompactRecords).
+  if (rec.rad_indoor) {
+    const b = [];
+    if (rec.rad_indoor.watt_avg) b.push(`höchste Ø-Leistung ${rec.rad_indoor.watt_avg}`);
+    if (rec.rad_indoor.np) b.push(`höchste NP ${rec.rad_indoor.np}`);
+    if (rec.rad_indoor.w_pro_kg) b.push(`${rec.rad_indoor.w_pro_kg} W/kg`);
+    if (rec.rad_indoor.laengste_dauer) b.push(`längste Dauer ${rec.rad_indoor.laengste_dauer}`);
+    if (b.length) lines.push(`Bestwerte Rad (Indoor, Rolle/virtuell - Distanz & km/h simuliert, daher leistungsbasiert): ${b.join(" | ")}`);
   }
   if (rec.schwimmen && rec.schwimmen.pace) lines.push(`Bestzeit Schwimmen: Ø ${rec.schwimmen.pace}`);
 
@@ -110,6 +120,81 @@ function buildCompactContext(goal) {
   if (recoveryCheck.energy) recBits.push(`Energie ${RECOVERY_ENERGY_LABELS[recoveryCheck.energy]}`);
   if (recoveryCheck.injury === "yes") recBits.push(`Verletzung${recoveryCheck.injuryNote ? ": " + recoveryCheck.injuryNote : " (keine Details angegeben)"}`);
   if (recBits.length) lines.push(`Erholung heute: ${recBits.join(" | ")}`);
+
+  // Gemessene Erholungswerte aus Garmin Connect - bewusst ERGAENZEND zur
+  // subjektiven Abfrage oben, nicht als Ersatz: Gefuehl und Messwert fallen
+  // regelmaessig auseinander, und genau diese Diskrepanz ist fuer eine
+  // Empfehlung die interessanteste Information.
+  //
+  // HRV und Ruhepuls werden als Abweichung von der EIGENEN Basislinie
+  // ausgegeben, nicht als nackte Zahl: ein HRV-Wert von 62 ms ist ohne
+  // Vergleichsgroesse bedeutungslos, "12% unter dem eigenen 30-Tage-Mittel"
+  // dagegen eine Aussage. Fehlende Tage bleiben Luecken (nie 0).
+  const wellBits = [];
+  if (typeof latestWellness === "function") {
+    const hrv = wellnessDeviation("hrv_ms");
+    if (hrv) {
+      const d = Math.round(hrv.deltaPct);
+      wellBits.push(`HRV ${Math.round(hrv.value)} ms (${d >= 0 ? "+" : ""}${d}% ggue. 30-Tage-Mittel ${Math.round(hrv.baseline)} ms)`);
+    }
+    const hrvStatus = latestWellness("hrv_status");
+    if (hrvStatus) wellBits.push(`HRV-Status laut Garmin: ${hrvStatus.value}`);
+    const rhr = wellnessDeviation("resting_hr");
+    if (rhr) {
+      const d = Math.round(rhr.value - rhr.baseline);
+      wellBits.push(`Ruhepuls ${Math.round(rhr.value)} bpm (${d >= 0 ? "+" : ""}${d} ggue. Mittel ${Math.round(rhr.baseline)})`);
+    }
+    const sleep = latestWellness("sleep_min");
+    if (sleep) {
+      const base = wellnessBaseline("sleep_min");
+      const h = Math.floor(sleep.value / 60), m = Math.round(sleep.value % 60);
+      wellBits.push(`Schlaf ${h}:${String(m).padStart(2, "0")} h${base ? ` (Mittel ${fmtNum(base / 60, 1)} h)` : ""}`);
+    }
+    const score = latestWellness("sleep_score");
+    if (score) wellBits.push(`Schlafscore ${Math.round(score.value)}/100`);
+    // Schlafphasen: sagen mehr ueber die Erholungsqualitaet aus als die reine
+    // Dauer - 7 Stunden mit wenig Tiefschlaf erholen schlechter als 6,5 mit viel.
+    const deep = latestWellness("sleep_deep_min"), rem = latestWellness("sleep_rem_min");
+    if (deep || rem) {
+      const parts = [];
+      if (deep) parts.push(`Tiefschlaf ${Math.round(deep.value)} min`);
+      if (rem) parts.push(`REM ${Math.round(rem.value)} min`);
+      wellBits.push(parts.join(", "));
+    }
+    // Garmins eigener Normbereich - die Einordnung "innerhalb/ausserhalb" stammt
+    // damit von Garmin selbst und nicht aus unserer 30-Tage-Naeherung.
+    const bLow = latestWellness("hrv_baseline_low"), bHigh = latestWellness("hrv_baseline_high");
+    if (bLow && bHigh) wellBits.push(`HRV-Normbereich laut Garmin: ${Math.round(bLow.value)}-${Math.round(bHigh.value)} ms`);
+    const bb = latestWellness("body_battery_high"), bbLow = latestWellness("body_battery_low");
+    if (bb) {
+      // Tagestief mitgeben: ein Hoch von 90 sagt wenig, wenn der Wert auf 5 faellt.
+      wellBits.push(`Body Battery ${Math.round(bb.value)} max${bbLow ? ` / ${Math.round(bbLow.value)} min` : ""}`);
+    }
+    const steps = latestWellness("steps");
+    if (steps) wellBits.push(`Schritte ${Math.round(steps.value).toLocaleString("de-DE")}`);
+    const ts = latestWellness("training_status");
+    if (ts) wellBits.push(`Trainingszustand laut Garmin: ${ts.value}`);
+  }
+
+  // Koerperzusammensetzung als eigene Zeile mit Trend - fuer die Bewertung von
+  // Gewichtsveraenderungen ist entscheidend, OB Muskelmasse oder Fett schwankt.
+  if (typeof latestWellness === "function") {
+    const compBits = [];
+    const w = latestWellness("weight_kg", 30);
+    if (w) {
+      const base = wellnessBaseline("weight_kg", 60);
+      const d = base != null ? w.value - base : null;
+      compBits.push(`Gewicht ${fmtNum(w.value, 1)} kg${d != null && Math.abs(d) >= 0.1 ? ` (${d > 0 ? "+" : "−"}${fmtNum(Math.abs(d), 1)} kg ggue. 60-Tage-Mittel)` : ""}`);
+    }
+    const fat = latestWellness("body_fat_pct", 30);
+    if (fat) compBits.push(`Koerperfett ${fmtNum(fat.value, 1)}%`);
+    const muscle = latestWellness("muscle_mass_kg", 30);
+    if (muscle) compBits.push(`Muskelmasse ${fmtNum(muscle.value, 1)} kg`);
+    if (compBits.length) lines.push(`Koerperzusammensetzung (Garmin): ${compBits.join(" | ")}`);
+  }
+  if (wellBits.length) {
+    lines.push(`Gemessene Erholung (Garmin, zuletzt verfuegbare Werte): ${wellBits.join(" | ")}`);
+  }
 
   // Kompakte Zusammenfassung des Erholungs-Logbuchs der letzten 7 Tage, damit
   // die Empfehlung auch ein Muster erkennen kann (z.B. wiederkehrender
@@ -172,7 +257,7 @@ function buildCompactContext(goal) {
 }
 
 // Baut den kompakten Text-Kontext fuer die KI-Auswertung EINER Trainingseinheit
-// im Vergleich zu `comparable` (gleiche Sportart + ähnliche Distanz/Dauer,
+// im Vergleich zu `comparable` (gleiche Sportart + Umgebung + ähnliche Distanz/Dauer,
 // siehe findComparableWorkouts). Deltas werden hier fertig berechnet - das
 // Modell soll nur noch einordnen/interpretieren, nicht selbst rechnen.
 
@@ -301,33 +386,66 @@ function workoutFeedbackContextLines(comparable) {
 
 function buildWorkoutAnalysisContext(w, comparable) {
   const lines = [];
+  const indoor = isIndoorRide(w);
   const paceOrSpeed = w.pace_min_per_km ? `${w.pace_min_per_km} min/km`
     : w.pace_min_per_100m ? `${w.pace_min_per_100m} min/100m`
-    : w.speed_kmh != null ? `${fmtNum(w.speed_kmh, 1)} km/h` : null;
+    : w.speed_kmh != null ? `${fmtNum(w.speed_kmh, 1)} km/h${indoor ? " (virtuell)" : ""}` : null;
 
   const ownEntry = (typeof getWorkoutNote === "function") ? getWorkoutNote(w.file) : null;
 
-  const bits = [w.sport, w._date ? fmtDateFull(w._date) : null];
-  if (w.distance_km != null) bits.push(`${fmtNum(w.distance_km, 2)} km`);
+  // Bei Indoor-Einheiten stehen die Leistungswerte VORNE und die Distanz wird
+  // als virtuell markiert - das Modell soll die Einheit über Watt beurteilen,
+  // nicht über simulierte Kilometer.
+  const bits = [indoor ? `${w.sport} (Indoor/virtuell)` : w.sport, w._date ? fmtDateFull(w._date) : null];
+  if (indoor) {
+    if (w.avg_power_w != null) bits.push(`Ø ${Math.round(w.avg_power_w)} W`);
+    if (w.normalized_power_w != null) bits.push(`NP ${Math.round(w.normalized_power_w)} W`);
+    const kg = (typeof athleteProfile !== "undefined" && athleteProfile) ? athleteProfile.weightKg : null;
+    if (kg && w.avg_power_w != null) bits.push(`${fmtNum(w.avg_power_w / kg, 2)} W/kg`);
+    const ftp = (typeof athleteProfile !== "undefined" && athleteProfile) ? athleteProfile.ftpWatts : null;
+    const np = w.normalized_power_w ?? w.avg_power_w;
+    if (ftp && np != null) bits.push(`IF ${fmtNum(np / ftp, 2)} (${Math.round((np / ftp) * 100)}% FTP)`);
+  }
+  if (w.distance_km != null) bits.push(`${fmtNum(w.distance_km, 2)} km${indoor ? " (virtuell)" : ""}`);
   if (w.duration_min != null) bits.push(`${fmtNum(w.duration_min, 0)} min`);
   if (paceOrSpeed) bits.push(paceOrSpeed);
   if (w.avg_hr != null) bits.push(`Ø HF ${w.avg_hr}`);
   if (w.avg_cadence != null) bits.push(`Ø Kadenz ${Math.round(w.avg_cadence)}`);
   if (w.training_load != null) bits.push(`Load ${fmtNum(w.training_load, 0)}`);
   const effElev = (typeof effectiveElevationGainM === "function") ? effectiveElevationGainM(w) : w.elevation_gain_m;
-  if (effElev != null) bits.push(`${Math.round(effElev)} Hm${w.elevation_gain_m == null ? " (nachgetragen)" : ""}`);
+  if (effElev != null && !indoor) bits.push(`${Math.round(effElev)} Hm${w.elevation_gain_m == null ? " (nachgetragen)" : ""}`);
   if (ownEntry && ownEntry.rating != null) bits.push(`eigene Bewertung ${ownEntry.rating}/5`);
   lines.push(`Diese Einheit: ${bits.filter(Boolean).join(" | ")}`);
   if (ownEntry && ownEntry.note) lines.push(`Eigene Notiz des Athleten zu dieser Einheit: "${ownEntry.note}"`);
 
+  // Der Hinweis steht VOR der Vergleichsgruppe und den Kennzahlen, damit das
+  // Modell die folgenden Zahlen von Anfang an richtig einordnet: sonst liest es
+  // simulierte Kilometer/km-h als Leistungsfortschritt.
+  if (indoor) {
+    lines.push("Hinweis: Indoor-/virtuelle Radeinheit (Rollentrainer mit virtueller Plattform). Distanz, Geschwindigkeit und Höhenmeter werden von der Plattform simuliert und sind NICHT mit Outdoor-Werten vergleichbar - auf keinen Fall als Geschwindigkeits- oder Streckenfortschritt interpretieren. Belastbar sind ausschließlich Leistung (Ø Watt, NP, W/kg, % FTP), Herzfrequenz, Dauer und Trainingsbelastung. Beachte außerdem: auf der Rolle liegt der Puls bei gleicher Leistung wärmebedingt oft höher als draußen.");
+  }
+
   const dates = comparable.map(o => o._date).filter(Boolean);
   const spanBits = dates.length ? [`vom ${fmtDate(new Date(Math.min(...dates)))} bis ${fmtDate(new Date(Math.max(...dates)))}`] : [];
-  lines.push(`Vergleichsgruppe: ${comparable.length} ähnliche ${sportGroup(w.sport)}-Einheiten${spanBits.length ? " (" + spanBits.join("") + ")" : ""}`);
+  const groupNote = indoor
+    ? " - die Gruppe enthält ausschließlich Indoor-Einheiten, die Ähnlichkeit wurde über die DAUER (±20%) bestimmt, nicht über die Distanz"
+    : "";
+  lines.push(`Vergleichsgruppe: ${comparable.length} ähnliche ${comparisonGroupLabel(w)}-Einheiten${spanBits.length ? " (" + spanBits.join("") + ")" : ""}${groupNote}`);
 
   const avgPaceSec = averageComparisonStat(comparable.map(o => ({ v: paceOrSpeedSeconds(o) })), "v");
   const thisPaceSec = paceOrSpeedSeconds(w);
   const avgLines = [];
-  if (avgPaceSec != null && thisPaceSec != null) {
+  if (indoor) {
+    // Indoor: Leistungs-Delta statt Geschwindigkeits-Delta - das ist die
+    // eigentliche Anpassung der Auswertung, km/h wären hier bedeutungslos.
+    const npKey = comparable.some(o => o.normalized_power_w != null) && w.normalized_power_w != null ? "normalized_power_w" : "avg_power_w";
+    const avgPower = averageComparisonStat(comparable, npKey);
+    const ownPower = w[npKey];
+    if (avgPower != null && ownPower != null) {
+      const deltaPct = Math.round(((ownPower - avgPower) / avgPower) * 100);
+      avgLines.push(`Ø ${npKey === "normalized_power_w" ? "NP" : "Leistung"} ${Math.round(avgPower)} W (diese Einheit ${deltaPct >= 0 ? "+" : ""}${deltaPct}%)`);
+    }
+  } else if (avgPaceSec != null && thisPaceSec != null) {
     const deltaPct = Math.round(((thisPaceSec - avgPaceSec) / avgPaceSec) * -100); // positiv = schneller als Ø
     avgLines.push(`Ø Pace/Tempo ${secondsToPace(avgPaceSec)} (diese Einheit ${deltaPct >= 0 ? deltaPct + "% schneller" : Math.abs(deltaPct) + "% langsamer"})`);
   } else if (comparable.some(o => o.speed_kmh != null) && w.speed_kmh != null) {
@@ -344,7 +462,8 @@ function buildWorkoutAnalysisContext(w, comparable) {
   }
   const avgLoad = averageComparisonStat(comparable, "training_load");
   if (avgLoad != null && w.training_load != null) avgLines.push(`Ø Load ${fmtNum(avgLoad, 0)} (diese Einheit ${fmtNum(w.training_load, 0)})`);
-  const avgElev = averageComparisonStat(comparable, "elevation_gain_m");
+  // Höhenmeter indoor weglassen: simuliert, also kein verwertbarer Vergleich.
+  const avgElev = indoor ? null : averageComparisonStat(comparable, "elevation_gain_m");
   if (avgElev != null && effElev != null) avgLines.push(`Ø Höhenmeter ${Math.round(avgElev)} (diese Einheit ${Math.round(effElev)})`);
   const cadLine = cadenceComparisonLine(w, comparable);
   if (cadLine) avgLines.push(cadLine);
@@ -382,13 +501,13 @@ function buildLessonsContext(pw, comparable) {
   if (pw.description) lines.push(`Geplante Beschreibung: ${pw.description}`);
 
   if (!comparable.length) {
-    lines.push("Vergleichsgruppe: keine aehnlichen frueheren Einheiten gefunden (gleiche Sportart, Distanz/Dauer +/-20%).");
+    lines.push("Vergleichsgruppe: keine aehnlichen frueheren Einheiten gefunden (gleiche Sportart und Umgebung, Distanz/Dauer +/-20%).");
     return lines.join("\n");
   }
 
   const dates = comparable.map(o => o._date).filter(Boolean);
   const spanBits = dates.length ? [`vom ${fmtDate(new Date(Math.min(...dates)))} bis ${fmtDate(new Date(Math.max(...dates)))}`] : [];
-  lines.push(`Vergleichsgruppe: ${comparable.length} aehnliche ${sportGroup(pw.sport)}-Einheiten${spanBits.length ? " (" + spanBits.join("") + ")" : ""}`);
+  lines.push(`Vergleichsgruppe: ${comparable.length} aehnliche ${comparisonGroupLabel(pw)}-Einheiten${spanBits.length ? " (" + spanBits.join("") + ")" : ""}`);
 
   const avgPaceSec = averageComparisonStat(comparable.map(o => ({ v: paceOrSpeedSeconds(o) })), "v");
   if (avgPaceSec != null) lines.push(`Ø Pace/Tempo bisher: ${secondsToPace(avgPaceSec)}`);

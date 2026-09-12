@@ -947,17 +947,36 @@ function initIcalSettings() {
 
   const icalUrl = "http://localhost:5000/api/v1/ical/1.ics";
 
-  fetch("http://localhost:5000/api/v1/health", { signal: AbortSignal.timeout ? AbortSignal.timeout(2500) : undefined })
-    .then(r => r.ok ? r.json() : Promise.reject())
-    .then(() => {
-      hint.textContent = "Backend-Server erreichbar — diese Adresse in deiner Kalender-App als Internetkalender-Abo hinzufügen:";
-      urlInput.value = icalUrl;
-      row.hidden = false;
-    })
-    .catch(() => {
-      hint.textContent = "Backend-Server nicht erreichbar. Starte ihn mit \"python backend/app.py\" im Projektordner, dann erscheint hier die Abo-Adresse (siehe DEPLOYMENT.md).";
-      row.hidden = true;
-    });
+  // Die Prueffung laeuft NICHT mehr automatisch bei jedem Laden, sondern erst
+  // auf Klick. Grund: Der Kalender-Export ist optional und bei den meisten
+  // Nutzern gar nicht eingerichtet - der automatische Versuch erzeugte dann bei
+  // JEDEM Seitenaufruf eine rote Fehlermeldung in der Browser-Konsole, die wie
+  // ein echter Defekt aussieht, obwohl nur ein optionaler Dienst fehlt.
+  const pruefBtn = document.getElementById("ical-check-btn");
+  hint.textContent = "Optional: Trainingsplan als Kalender-Abo. Dafuer muss der Backend-Server laufen.";
+  row.hidden = true;
+  if (pruefBtn) pruefBtn.hidden = false;
+
+  function pruefeBackend() {
+    hint.textContent = "Pruefe ...";
+    fetch("http://localhost:5000/api/v1/health", { signal: AbortSignal.timeout ? AbortSignal.timeout(2500) : undefined })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(() => {
+        hint.textContent = "Backend-Server erreichbar — diese Adresse in deiner Kalender-App als Internetkalender-Abo hinzufügen:";
+        urlInput.value = icalUrl;
+        row.hidden = false;
+      })
+      .catch(() => {
+        // Haeufigste Ursache auf dem Mac: Port 5000 ist bereits vom
+        // AirPlay-Empfaenger belegt (Systemeinstellungen ▸ Allgemein ▸
+        // AirDrop & Handoff ▸ AirPlay-Empfaenger). Dann startet der Server
+        // zwar, ist aber nicht erreichbar.
+        hint.textContent = "Backend-Server nicht erreichbar. Starte ihn mit \"python3 backend/app.py\" im Projektordner. "
+          + "Falls das nicht hilft: Port 5000 ist auf dem Mac oft vom AirPlay-Empfaenger belegt — diesen in den Systemeinstellungen deaktivieren.";
+        row.hidden = true;
+      });
+  }
+  if (pruefBtn) pruefBtn.addEventListener("click", pruefeBackend);
 
   if (copyBtn) {
     copyBtn.addEventListener("click", async () => {

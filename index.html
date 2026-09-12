@@ -60,6 +60,9 @@
         </button>
         <div class="update-menu" id="update-menu">
           <div class="update-menu-meta" id="update-meta"></div>
+          <a class="update-menu-item" id="menu-item-garmin" href="tridash-sync://run"><span class="menu-item-icon">⌚</span> Mit Garmin Connect synchronisieren</a>
+          <div class="update-menu-sync" id="garmin-sync-status"></div>
+          <div class="update-menu-divider"></div>
           <button class="update-menu-item" id="menu-item-folder" type="button"><span class="menu-item-icon">📁</span> Aktualisieren</button>
           <button class="update-menu-item" id="menu-item-dnd" type="button"><span class="menu-item-icon">⬆️</span> Drag &amp; Drop zur Auswahl</button>
           <div class="update-menu-divider"></div>
@@ -179,6 +182,16 @@
         <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Nach Foster (1998): Ø Tagesbelastung ÷ Standardabweichung der Tagesbelastung über ein rollierendes 7-Tage-Fenster. Hohe Werte (&gt; 2,0) bedeuten sehr gleichmäßige Belastung ohne echte Erholungstage — das erhöht unabhängig von der absoluten Belastungshöhe das Übertrainingsrisiko.</div></span>
       </h2>
       <div class="chart-wrap" id="chart-monotony"></div>
+    </div>
+
+    <div class="card full" data-card-id="recovery" id="recovery-card" hidden>
+      <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+      <h2>Erholung &amp; Gesundheit
+        <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Gemessene Werte aus Garmin Connect. Entscheidend ist nicht der Einzelwert, sondern die Abweichung von deinem eigenen Mittel: eine deutlich niedrigere HRV oder ein erhöhter Ruhepuls deuten auf unvollständige Erholung hin. Tage ohne getragene Uhr bleiben Lücken und werden nicht als Null gewertet.</div></span>
+      </h2>
+      <p class="card-sub" id="recovery-sub">Zuletzt gemessene Werte im Vergleich zum eigenen Mittel</p>
+      <div class="stat-row" id="recovery-tiles"></div>
+      <div class="small-multiples" id="recovery-charts"></div>
     </div>
 
     <div class="card full" data-card-id="pace">
@@ -684,7 +697,8 @@
         <h2>Kalender-Abo (iCal)
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Geplante Einheiten als abonnierbaren Kalender-Feed (webcal), z.B. für Apple/Google Kalender. Braucht den lokalen Backend-Server (siehe DEPLOYMENT.md) - funktioniert nur, während "python backend/app.py" auf diesem Rechner läuft, noch nicht "online" von unterwegs.</div></span>
         </h2>
-        <p class="card-sub" id="ical-status-hint">Prüfe, ob der Backend-Server erreichbar ist …</p>
+        <p class="card-sub" id="ical-status-hint">Optional: Trainingsplan als Kalender-Abo.</p>
+        <button type="button" class="update-btn" id="ical-check-btn" hidden style="margin-bottom:8px;">Backend-Verbindung prüfen</button>
         <div class="goal-form-row goal-form-row-wide" id="ical-url-row" hidden>
           <label for="ical-url-input">Abo-Adresse (in Kalender-App als Internetkalender/webcal hinzufügen)</label>
           <div class="wd-rating-elevation-inputs">
@@ -832,6 +846,7 @@
      geladene Dateien zugreifen (siehe docs/PROJECT_MAP.md). -->
 <script src="js/data/api-client.js"></script>
 <script src="data/workouts-data.js"></script>
+<script src="data/wellness-data.js"></script>
 <script src="js/data/training-effects.js"></script>
 <script src="js/data/idb-store.js"></script>
 <script src="js/utils/dates.js"></script>
@@ -844,6 +859,7 @@
 <script src="js/data/gpx-parser.js"></script>
 <script src="js/data/athlete.js"></script>
 <script src="js/data/health.js"></script>
+<script src="js/data/garmin-wellness.js"></script>
 <script src="js/data/planned-workouts.js"></script>
 <script src="js/data/fit-workout-writer.js"></script>
 <script src="js/data/weight-log.js"></script>
@@ -870,6 +886,7 @@
 <script src="js/components/app-shell.js"></script>
 <script src="js/components/card-search.js"></script>
 <script src="js/components/dashboard.js"></script>
+<script src="js/components/recovery.js"></script>
 <script src="js/components/calendar.js"></script>
 <script src="js/components/records.js"></script>
 <script src="js/components/equipment.js"></script>

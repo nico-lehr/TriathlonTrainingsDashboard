@@ -241,7 +241,9 @@ function initFilterBar() {
     });
     sportEl.appendChild(btn);
   });
+
 }
+
 
 /* ======================================================================
    4) RENDER-FUNKTIONEN (parametrisiert über die gefilterten Daten)

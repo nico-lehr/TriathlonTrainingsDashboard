@@ -77,11 +77,13 @@ function computeWorkoutHrProfile(w, allData, binWidth = 3) {
   const ownVals = w.stream.hr.filter(v => v != null);
   if (ownVals.length < HR_PROFILE_MIN_SAMPLES) return null;
 
-  const grp = sportGroup(w.sport);
+  // Vergleichsmenge über sameComparisonGroup() - beim Rad trennt das Indoor
+  // von Outdoor: auf der Rolle liegt der Puls bei gleicher Leistung
+  // wärmebedingt höher, das ist eine eigene Verteilung.
   const compareVals = [];
   allData.forEach(o => {
     if (o.file === w.file || !o.stream || !o.stream.hr) return;
-    if (sportGroup(o.sport) !== grp) return;
+    if (!sameComparisonGroup(w, o)) return;
     o.stream.hr.forEach(v => { if (v != null) compareVals.push(v); });
   });
   const hasCompare = compareVals.length >= HR_PROFILE_MIN_SAMPLES;
@@ -165,12 +167,28 @@ const RADAR_AXES = [
   { label: "Negativer Split", get: computeNegSplitPercent },
 ];
 
+// Indoor/virtuell: "Ø-Schnitt" und "Strecke" sind von der Plattform simuliert
+// (Kurs, Windschatten) und taugen nicht als Leistungsachsen - stattdessen die
+// Leistung, die auf der Rolle immer gemessen wird. "Negativer Split" bleibt
+// aussagekräftig, weil er nur die Einheit mit sich selbst vergleicht.
+const RADAR_AXES_INDOOR_RIDE = [
+  { label: "Ø Watt", get: w => w.avg_power_w },
+  { label: "NP", get: w => w.normalized_power_w ?? w.avg_power_w },
+  { label: "kcal/Min.", get: w => (w.calories && w.duration_min) ? w.calories / w.duration_min : null },
+  { label: "HF Ø", get: w => w.avg_hr },
+  { label: "Dauer", get: w => w.duration_min },
+  { label: "Negativer Split", get: computeNegSplitPercent },
+];
+
 function computeLoadRadar(w, allData) {
-  const grp = sportGroup(w.sport);
-  const comparable = allData.filter(o => o.file !== w.file && !o.is_summary && sportGroup(o.sport) === grp);
+  // Vergleichsmenge und Achsen-Set hängen an derselben Umgebungs-Erkennung:
+  // RADAR_MIN_COMPARABLE gilt damit PRO Umgebung - bei wenigen Indoor-Einheiten
+  // fehlt die Karte anfangs, das ist gewollt (keine Normierung auf dünner Basis).
+  const comparable = allData.filter(o => o.file !== w.file && !o.is_summary && sameComparisonGroup(w, o));
   if (comparable.length < RADAR_MIN_COMPARABLE) return null;
 
-  const axes = RADAR_AXES.map(axis => {
+  const axesDef = isIndoorRide(w) ? RADAR_AXES_INDOOR_RIDE : RADAR_AXES;
+  const axes = axesDef.map(axis => {
     const ownVal = axis.get(w);
     const compVals = comparable.map(axis.get).filter(v => v != null);
     if (ownVal == null || compVals.length < RADAR_MIN_COMPARABLE) return null;

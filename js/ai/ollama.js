@@ -239,7 +239,9 @@ async function generateWorkoutAnalysis(file) {
   if (comparable.length < 3) {
     workoutAnalysisCache[file] = {
       analysis: null, analysisAt: null, loading: false,
-      error: `Noch nicht genug ähnliche Einheiten für einen Vergleich (aktuell ${comparable.length}, mindestens 3 nötig — gleiche Sportart, Distanz/Dauer ±20%).`,
+      // Nennt die konkrete Vergleichsgruppe, damit nachvollziehbar ist, warum
+      // z.B. Outdoor-Fahrten bei einer Indoor-Einheit absichtlich nicht zählen.
+      error: `Noch nicht genug ähnliche Einheiten für einen Vergleich (aktuell ${comparable.length}, mindestens 3 nötig — ${comparisonGroupLabel(w)}, ${isIndoorRide(w) ? "Dauer" : "Distanz/Dauer"} ±20%).`,
     };
     saveWorkoutAnalysisCache();
     renderWorkoutAnalysisBlock(file);

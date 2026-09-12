@@ -87,14 +87,21 @@ function renderCalendar() {
   if (typeof renderNutrition === "function") renderNutrition();
 }
 
+// Sportart-Filter im Kalender. Indoor/Outdoor wird bewusst NICHT unterschieden -
+// im Dashboard wird Rad durchgehend zusammen dargestellt; die Trennung existiert
+// nur noch in den Vergleichsgruppen (sameComparisonGroup in js/data/workouts.js).
+function calMatchesFilter(w) {
+  if (calSportFilter === "all") return true;
+  return sportGroup(w.sport) === calSportFilter;
+}
+
 function calWorkoutsOfDay(dayDate) {
   const key = localDateStr(dayDate);
-  return ALL.filter(w => w._date && localDateStr(w._date) === key
-    && (calSportFilter === "all" || sportGroup(w.sport) === calSportFilter));
+  return ALL.filter(w => w._date && localDateStr(w._date) === key && calMatchesFilter(w));
 }
 
 function calPlannedOfDay(dayDate) {
-  return plannedWorkoutsOfDay(dayDate).filter(p => calSportFilter === "all" || sportGroup(p.sport) === calSportFilter);
+  return plannedWorkoutsOfDay(dayDate).filter(calMatchesFilter);
 }
 
 /* Drag & Drop: eine geplante Einheit auf einen anderen Kalendertag ziehen,
@@ -145,7 +152,7 @@ function wireCalPlannedChips(rootEl) {
 function renderCalendarMonth() {
   const el = document.getElementById("calendar-grid");
 
-  const withDate = ALL.filter(w => w._date && (calSportFilter === "all" || sportGroup(w.sport) === calSportFilter));
+  const withDate = ALL.filter(w => w._date && calMatchesFilter(w));
   const byDay = new Map(); // "YYYY-MM-DD" -> Workouts
   withDate.forEach(w => {
     const key = localDateStr(w._date);
@@ -348,7 +355,7 @@ function renderCalendarDay() {
     <div class="cal-day-item" data-idx="${i}">
       <button type="button" class="cal-day-item-head">
         <span class="sport-dot" style="background:${sportColor(w.sport)}"></span>
-        <span class="cal-day-item-sport">${w.sport}</span>
+        <span class="cal-day-item-sport">${w.sport}</span>${rideEnvBadgeHtml(w)}
         <span class="cal-day-item-stat">${w.duration_min != null ? fmtNum(w.duration_min, 0) + " min" : "–"}</span>
         <span class="cal-day-item-stat">${w.distance_km != null ? fmtNum(w.distance_km, 2) + " km" : ""}</span>
         <span class="cal-day-item-stat">${w.avg_hr != null ? "Ø " + w.avg_hr + " bpm" : ""}</span>

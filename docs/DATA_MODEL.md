@@ -19,12 +19,17 @@ gehalten wird. Felder, wie sie aktuell tatsächlich befüllt werden:
   date: "2026-08-27T12:30:00",       // ISO-Zeitstempel, Trainingsbeginn
   sport: "Laufen",                    // "Laufen" | "Rad" | "Schwimmen" | "Sonstiges"
   sport_raw: "running",               // FIT-Enum-Rohwert (Debug/Referenz)
-  sub_sport: "indoor_running",        // z.B. "indoor_cycling", "open_water", …
+  sub_sport: "indoor_running",        // z.B. "Indoor", "Virtuell", "Straße", "open_water", …
                                        // bei Schwimmen: "Becken" | "Freiwasser" | "" (unbekannt) -
                                        // siehe "Becken/Freiwasser-Erkennung" unten, NICHT das
                                        // native FIT-sub_sport-Feld (bei HealthFit unzuverlässig).
+                                       // bei Rad: "Indoor"/"Virtuell" kennzeichnen Rolle bzw.
+                                       // virtuelle Plattform - siehe "Indoor/Outdoor-Erkennung".
   is_indoor: null,                    // true/false/null - aus einem Developer-Feld (s.u.), nicht
                                        // von jeder Quelle befüllt
+  has_gps: true,                      // true/false/null - enthält die Aufzeichnung echte GPS-Punkte?
+                                       // null bei Einheiten, die vor Einführung des Feldes
+                                       // eingelesen wurden. Enum-unabhängiges Indoor-Signal beim Rad.
 
   duration_s: 3120,
   duration_min: 52.0,
@@ -71,6 +76,7 @@ gehalten wird. Felder, wie sie aktuell tatsächlich befüllt werden:
   // "hochgestuft"; alles andere landet unverändert in dev_raw, damit
   // künftige/unbekannte Felder automatisch sichtbar werden, ohne Code-Änderung.
   is_indoor: null,                    // true/false/null - Developer-Feld, nicht von jeder Quelle befüllt
+  has_gps: true,                      // true/false/null - echte GPS-Punkte in der Aufzeichnung (kein Developer-Feld)
   rpe_estimated: null,                // geschätzte gefühlte Anstrengung (RPE) einer Quelle, falls vorhanden
   avg_mets: null,                     // Ø MET-Wert einer Quelle, falls vorhanden
   dev_raw: null,                      // { "Feldname aus der Datei": Wert, ... } - alle übrigen
@@ -123,7 +129,7 @@ FIT-Mechanismus, über den Exporteure (z.B. HealthFit, aber auch Garmin
 Connect selbst) benannte Zusatzfelder in eine .fit-Datei einbetten können,
 die im Standard-Profil nicht vorgesehen sind. Der Parser liest jetzt JEDES
 Developer-Feld generisch aus und legt es unter seinem Originalnamen in
-`dev_raw` ab; die vier aktuell bekannten, nützlichen Felder (`is_indoor`,
+`dev_raw` ab; die drei aktuell bekannten, nützlichen Felder (`is_indoor`,
 `rpe_estimated`, `avg_mets`) werden zusätzlich als eigene, typisierte
 Properties "hochgestuft". Taucht künftig (z.B. mit echten Garmin-Connect-
 Exporten) ein neues, bisher unbekanntes Developer-Feld auf, erscheint es
@@ -148,6 +154,161 @@ für die nativen Werte erfunden. Stattdessen, in dieser Reihenfolge:
    beim Vergleichen NICHT nach Becken/Freiwasser gefiltert (siehe
    `js/analytics/workout-comparison.js`), um ältere Einheiten ohne
    `sub_sport` nicht fälschlich auszuschließen.
+
+**Dubletten (`dedupeWorkouts()` in `js/data/workouts.js`).** Der übliche
+Dublettenschutz hängt am Dateinamen (`w.file`). Das reicht nicht, sobald
+dasselbe Training aus zwei Quellen kommt — ein MyWhoosh-Export heißt
+`MyNewActivity-6.1.0_2026-09-09_205100.fit`, dieselbe Einheit aus dem
+Garmin-Sync `2026-09-09-06-07-16.fit`. An echten Daten beobachtet: dieselbe
+Einheit mehrfach exportiert, und dieselbe Fahrt von zwei Geräten aufgezeichnet
+(Startzeiten bis zu ~3 Minuten auseinander, **Ende identisch**). Deshalb gilt
+als dieselbe Einheit: gleiche `sport_raw` **und** Start **und** Ende jeweils
+innerhalb von 180 s. Bewusst nicht allein über den Start — zwei echte, kurz
+aufeinanderfolgende Einheiten würden sonst fälschlich verschmelzen. Es gewinnt
+der reichhaltigere Datensatz (`workoutRichness()`: Sekundenkurven zählen am
+stärksten); fehlende Einzelwerte werden aus den schwächeren Dubletten ergänzt,
+damit z. B. eine Notiz nicht verloren geht. Läuft in `recomputeDerived()` und
+schreibt nach `RAW` zurück, damit sich Doppelungen nicht über die Zeit
+aufsummieren.
+
+**Indoor/Outdoor beim Rad: nur noch in den Vergleichsgruppen.** Die
+Umgebungs-Filterleiste und die getrennten Indoor-Anzeigen (eigene Kachel,
+zweite Rekorde-Karte, eigenes Watt-Chart, eigene HF-Zeile) wurden wieder
+entfernt — Rad wird im Dashboard durchgehend **zusammen** dargestellt. Erhalten
+bleibt die Trennung dort, wo sie fachlich nötig ist: in `sameComparisonGroup()`,
+damit simulierte Indoor-Kilometer nie gegen echte Straßenwerte verglichen
+werden, und bei den km-/km-h-Bestwerten der Rad-Rekorde-Karte.
+
+**Durchschnittsgeschwindigkeit: Rückfall auf Distanz/Zeit.** Garmin schreibt
+`avg_speed`/`enhanced_avg_speed` nicht in jede Session — an 64 echten
+Radeinheiten geprüft fehlte es bei 61, obwohl Distanz und Zeit vorhanden waren.
+Ohne Rückfall blieben Geschwindigkeit und die km/h-Bestwerte leer. Distanz
+geteilt durch Zeit **ist** die Durchschnittsgeschwindigkeit — kein Schätzwert,
+sondern dieselbe Größe anders berechnet. Umgesetzt in beiden Parsern.
+
+**Indoor/Outdoor-Erkennung beim Rad (`rideEnvironment()`).** Indoor- bzw.
+virtuelles Radtraining (Rollentrainer mit Plattform wie MyWhoosh, Zwift,
+Rouvy) bleibt bewusst eine **Unterkategorie** von `sport: "Rad"` und wird
+NICHT zu einer eigenen Sportart: `w.sport === "Rad"` trifft solche Einheiten
+weiter, alle Rad-Summen, -Farben und -Filter bleiben unverändert. Grund für
+die Trennung ist ein anderer: Distanz, Geschwindigkeit und Höhenmeter werden
+indoor von der Plattform **simuliert** (Kurs, Windschatten, Avatargewicht) und
+sind mit echten Straßenwerten nicht vergleichbar.
+
+`rideEnvironment(w)` in `js/data/workouts.js` liefert `"indoor" | "outdoor" |
+null` und wird in `recomputeDerived()` einmal pro Laden als `w._rideEnv`
+materialisiert (gleiche Konvention wie `_date`) - damit braucht es weder eine
+Schema-Migration noch einen Re-Import. Signale in dieser Reihenfolge:
+
+1. `sub_sport` ist ein bekanntes Indoor-Label ("Indoor", "Virtuell", bzw. die
+   englischen Rohwerte `indoor_cycling`/`virtual_activity`/`spin`) → "indoor".
+2. `is_indoor === true` (Developer-Feld "SESSION INDOOR", z.B. HealthFit) → "indoor".
+3. `sub_sport` ist ein bekanntes Outdoor-Label ("Straße", `road`, `gravel_cycling`, …)
+   bzw. `is_indoor === false` → "outdoor".
+4. `has_gps === true` → "outdoor", `has_gps === false` → "indoor". Das ist das
+   **verlässlichste enum-unabhängige** Signal: ein Rollentrainer hat nie GPS,
+   eine Straßenausfahrt immer. Es steht trotzdem hinten, weil `has_gps` nur bei
+   neu eingelesenen Dateien existiert.
+5. Sonst `null` (ehrlich unbekannt) - es wird nie geraten. Solche Einheiten
+   gelten in den Auswertungen als Outdoor, damit bestehende Rad-Bestzeiten und
+   -Charts unverändert bleiben.
+
+**Warum die Referenzgruppen beim Rad strikt und beim Schwimmen tolerant sind.**
+`sameComparisonGroup(ref, cand)` (ebenfalls `js/data/workouts.js`) ist die
+einzige Stelle, an der entschieden wird, wer in eine Vergleichsgruppe darf -
+genutzt von `findComparableWorkouts()`, dem HF-Profil, dem Belastungs-Radar
+und dem Vergleichs-Picker. Beim Rad muss die Umgebung übereinstimmen (sofern
+bekannt), beim Schwimmen bleibt die bisherige tolerante Regel. Der Unterschied
+ist beabsichtigt: bei Becken/Freiwasser ist die Pace nur *verzerrt*, bei
+Indoor-Kilometern ist sie *erfunden* - dort gilt "lieber keine Vergleichsgruppe
+als eine falsche".
+
+**Was sich indoor in der Auswertung ändert.** Statt Kilometern und km/h zählt
+die Leistung: die Vergleichsgruppe wird über die **Dauer** (±20 %) statt über
+die Distanz gebildet, das Radar nutzt Ø Watt/NP statt Ø-Schnitt/Strecke
+(`RADAR_AXES_INDOOR_RIDE`), die Rekorde-Karte "Rad (Indoor)" kennt keine
+km-Zeilen, die Erfolge-Bestzeiten (10/20/40 km) sind auf Outdoor beschränkt,
+und der KI-Kontext bekommt einen expliziten Hinweis plus ein Watt-Delta statt
+eines km/h-Deltas. In der HF-Verteilung ist Indoor eine **eigene Zeile**, weil
+der Puls auf der Rolle bei gleicher Leistung wärmebedingt höher liegt.
+
+**Bewusste Ausnahme: VO2max.** `bikeVo2SubmaxPoint()`
+(`js/analytics/performance.js`) rechnet `VO2 = 7 + 10.8 × Watt ÷ kg` - rein
+leistungsbasiert. Watt sind umgebungsunabhängig, deshalb fließen Indoor-
+Einheiten hier absichtlich mit ein; eine Trennung würde die Punktdichte der
+Regression halbieren und die Schätzung verschlechtern.
+
+## Gesundheitsdaten (`data/wellness-data.js` / `GARMIN_WELLNESS`)
+
+Erzeugt von `tools/garmin_sync.py`, gelesen über `js/data/garmin-wellness.js`.
+Bewusst eine generierte `.js`-Datei statt JSON - beim Doppelklick-Aufruf
+(`file://`) erlaubt der Browser kein `fetch()` auf lokale Dateien, ein
+`<script src>` lädt aber normal. Gleiche Mechanik wie `EMBEDDED_DATA`.
+
+```javascript
+const GARMIN_WELLNESS = {
+  generated_at: "2026-09-12T13:00:00+02:00",
+  sync: { at, von, bis, aktivitaeten: { neu, vorhanden, fehler, gesamt } },
+  daily: {
+    "2026-09-10": {
+      sleep_min: 450, sleep_deep_min: 90, sleep_rem_min: 105, sleep_score: 82,
+      hrv_ms: 68, hrv_status: "BALANCED",          // Garmins eigene Einordnung
+      hrv_baseline_low: 55, hrv_baseline_high: 78, // Garmins Normbereich
+      resting_hr: 48,
+      body_battery_high: 88, body_battery_low: 25,
+      weight_kg: 72.4, body_fat_pct: 18.2, muscle_mass_kg: 31.5,
+      steps: 11230,
+      vo2max: 52.3, vo2max_cycling: 49.1,
+      training_status: "PRODUCTIVE",
+    },
+    // ...
+  },
+};
+```
+
+**`null`-Semantik, wie überall im Projekt:** Fehlende Werte sind `null` bzw.
+fehlen ganz - ein Tag ohne getragene Uhr ist eine **Lücke, kein Nullwert**.
+`wellnessSeries()` lässt solche Tage aus, statt sie als 0 einzurechnen; ein
+Tag ohne einen einzigen Messwert taucht in `daily` gar nicht erst auf.
+Ausnahme: `steps: 0` ist ein echter Messwert (Tag ohne Bewegung) und bleibt.
+
+**Warum Abweichung statt Absolutwert.** HRV und Ruhepuls werden in der UI
+(`js/components/recovery.js`) und im KI-Kontext (`js/ai/context-builder.js`)
+als Abweichung vom eigenen 30-Tage-Mittel dargestellt. Ein HRV-Wert von 62 ms
+ist ohne Vergleichsgröße bedeutungslos - individuelle Normalwerte
+unterscheiden sich um ein Vielfaches. Erst "8% unter dem eigenen Mittel" ist
+eine Aussage. `wellnessBaseline()` verlangt dafür mindestens 3 Messwerte;
+darunter wird keine Basislinie gebildet, weil sie irreführend wäre.
+
+**Verhältnis zum subjektiven Erholungs-Check** (`js/data/health.js`): Die
+gemessenen Werte ERSETZEN die manuelle Abfrage nicht, sie stehen daneben -
+im Dashboard wie im KI-Kontext. Gefühl und Messwert fallen regelmäßig
+auseinander, und genau diese Diskrepanz ist die interessanteste Information
+für eine Trainingsempfehlung.
+
+**VO2max und Trainingszustand** stammen NICHT aus `get_max_metrics` (kam an
+echten Daten leer zurück), sondern aus `get_training_status` →
+`mostRecentVO2Max.generic` bzw. `.cycling`. Der `trainingStatus` dort ist ein
+undokumentierter Zahlencode und damit für eine Auswertung wertlos — genutzt
+wird stattdessen `trainingStatusFeedbackPhrase` (z. B. `MAINTAINING_1` →
+„Erhaltend"). Unbekannte Phrasen werden unverändert durchgereicht, statt eine
+Übersetzung zu erfinden.
+
+**Standard-Zeitraum: 300 Tage** (`DEFAULT_DAYS` in `tools/garmin_sync.py`).
+Bewusst gewählt: das längste analytische Fenster im Dashboard ist der
+VO2max-Trend mit 240 Tagen (120 aktuell + 120 davor, `sportVo2Regression()`),
+danach CTL/ATL/TSB mit 42 und ACWR mit 28 Tagen. Die KI-Vergleichsgruppe nimmt
+ohnehin nur die 12 ähnlichsten Einheiten. Nicht abgedeckt sind allein die
+**Allzeit-Bestwerte** (Rekorde-Tab, Bestzeit-Erfolge) und der Filter-Chip
+„1J" (365 Tage) — dafür einmalig mit größerem `--days` nachladen. Da
+`fit-files/` als Archiv dient und der Downloader vorhandene Dateien
+überspringt, ist das jederzeit nachholbar und verliert nichts.
+
+**Roh-Zwischenspeicher** `data/garmin-raw-cache.json` hält die unveränderten
+Garmin-Antworten je Tag. Zwei Gründe: der Sync wird dadurch inkrementell
+(bereits geholte Tage werden nie erneut abgefragt - schont das Rate-Limit),
+und bei einer Formatänderung auf Garmins Seite lässt sich die Aufbereitung
+wiederholen, ohne alles neu herunterzuladen.
 
 ## Roh-Container (`workouts.json` / `data/workouts-data.js`)
 
@@ -420,12 +581,31 @@ Reine Client-Seite: `Blob` + `URL.createObjectURL` + unsichtbarer
 (nicht Standard-CRC-16-CCITT) wird per fester Referenztabelle berechnet
 (`fitCrc16()`), sowohl für die Header- als auch die Datei-CRC.
 
-**Vorbereitung auf eine API-Anbindung:** Garmin Connect bietet (Stand
-dieser Analyse) keine offene Consumer-API zum direkten Hochladen einzelner
-Workouts von einer Drittanwendung aus - nur ein Partner-/Business-Zugang
-(Garmin Connect Developer Program) oder Reverse-Engineering des internen
-Uploads wären technisch möglich, beides bewusst nicht umgesetzt (keine
-Kontoanmeldedaten/Tokens speichern, kein Reverse-Engineering fremder APIs).
+**Vorbereitung auf eine API-Anbindung:** Garmin Connect bietet keine offene
+Consumer-API zum direkten Hochladen einzelner Workouts von einer
+Drittanwendung aus - nur ein Partner-/Business-Zugang (Garmin Connect
+Developer Program, für Privatpersonen nicht erhältlich) oder
+Reverse-Engineering des internen Uploads wären technisch möglich. Der
+**Upload** ist deshalb weiterhin bewusst nicht umgesetzt.
+
+> **Abgrenzung zum Garmin-Sync (Download).** Für den umgekehrten Weg - Daten
+> aus Garmin Connect HERUNTERLADEN - gibt es seit der Einführung von
+> `tools/garmin_sync.py` sehr wohl eine Anbindung, und sie nutzt zwangsläufig
+> die interne API und ein gespeichertes Token. Das ist kein Widerspruch zum
+> obigen Prinzip, sondern eine bewusste Trennung:
+>
+> - Das **Dashboard selbst** bleibt unverändert serverlos, loginfrei und
+>   offline. `index.html` kennt weder Zugangsdaten noch Netzwerkzugriff auf
+>   Garmin; es liest ausschließlich lokale Dateien.
+> - Der **Sync ist ein getrenntes, freiwillig gestartetes lokales Programm**.
+>   Wer es nicht benutzt, merkt nichts davon.
+> - Das **Passwort wird nirgends gespeichert** - es wird einmalig abgefragt,
+>   gegen ein Token getauscht und verworfen. Das Token liegt unter
+>   `~/.garminconnect` (Rechte 0600) und damit bewusst AUSSERHALB des
+>   Projektordners: der liegt in iCloud, und ein Token hat in der Cloud
+>   nichts zu suchen. `.gitignore` sperrt zusätzlich alle Token-Dateinamen.
+> - Für den **Upload** bleibt es beim Nein - dort gäbe es keinen
+>   vergleichbaren Nutzen, der das Risiko rechtfertigt.
 Damit ein solcher Weg später trotzdem ohne Umbau ergänzt werden kann, laufen
 - wie oben beschrieben - ausnahmslos ALLE Export-Buttons über die beiden
 Funktionen `exportPlannedWorkoutAsFit`/`exportPlannedWorkoutsAsFit`. Kommt

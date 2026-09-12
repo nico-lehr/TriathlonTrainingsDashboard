@@ -7,6 +7,21 @@ workouts.json
 # im Repo. index.html selbst ist reiner Code und bleibt im Repo.
 data/workouts-data.js
 
+# Garmin-Sync (tools/garmin_sync.py): persoenliche Gesundheitsdaten
+# (Schlaf, HRV, Ruhepuls, Gewicht) bzw. die heruntergeladenen Originaldateien.
+# Bleibt alles lokal, nichts davon gehoert ins Repo.
+data/wellness-data.js
+data/garmin-raw-cache.json
+fit-files/
+
+# Zugangsdaten/Token - duerfen NIE ins Repo. Der eigentliche Token liegt
+# ohnehin ausserhalb des Projekts (~/.garminconnect), diese Regeln sind die
+# Absicherung gegen ein versehentlich hier abgelegtes Exemplar.
+.garminconnect/
+garmin_tokens.json
+oauth1_token.json
+oauth2_token.json
+
 # Phase 1 Backend - lokale Entwicklung
 training.db
 backend/*.log

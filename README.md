@@ -1,36 +1,184 @@
 # Triathlon Trainings-Dashboard
 
-Ein komplett lokales, offline-fähiges Trainings-Dashboard für Triathleten, das
-Garmin-`.fit`-Dateien (z. B. über [HealthFit](https://www.healthfit.app/) nach
-iCloud Drive synchronisiert) einliest und daraus ein Jahresüberblick-Dashboard
-mit wissenschaftlich fundierten Kennzahlen baut — inspiriert von
+Ein komplett lokales, offline-fähiges Trainings-Dashboard für Triathleten.
+Es liest Garmin-`.fit`-Dateien ein und baut daraus einen Jahresüberblick mit
+sportwissenschaftlich fundierten Kennzahlen — inspiriert von
 [TrainingsPeaks](https://www.trainingpeaks.com/).
 
-Keine Server, kein Login, keine Cloud: `index.html` wird per Doppelklick im
-Browser geöffnet und funktioniert komplett offline — auch wenn die App
-technisch aus mehreren Dateien besteht (`css/`, `js/`, `data/`), lädt der
-Browser sie beim `file://`-Aufruf ganz normal mit, ganz ohne Server. Über
-ein Menü lassen sich neue `.fit`-Dateien direkt im Browser einlesen (über
-einen selbstgeschriebenen JavaScript-FIT-Parser) — nichts verlässt den
-eigenen Rechner.
+**Keine Cloud, kein Konto, kein Server.** Das Dashboard ist eine normale
+HTML-Datei, die du per Doppelklick öffnest. Deine Trainings- und
+Gesundheitsdaten bleiben auf deinem Rechner.
 
-Das Projekt ist modular aufgebaut (siehe `docs/PROJECT_MAP.md` für eine
-Datei-für-Datei-Übersicht und `AI_RULES.md` für die zugrundeliegenden
-Architektur-Prinzipien):
+> Diese Anleitung gilt für **macOS**. Unter Windows lässt sich das Dashboard
+> selbst öffnen und per Ordner-Import nutzen, für den Garmin-Sync gibt es dort
+> aber noch keine Start-Datei.
 
-```text
-index.html              Struktur (kein Inline-CSS/JS außer dem Theme-Bootstrap)
-css/                     variables.css, main.css, components.css, responsive.css
-js/
-  utils/                 Datum/Zeit, Formatierung, reine Berechnungen
-  data/                  Rohdaten laden/speichern (Workouts, Ziele, Profil, Erholung)
-  analytics/             Trainingsbelastung (CTL/ATL/TSB/ACWR), Bestzeiten
-  ai/                     Kontext-Builder, Prompts, Ollama-Anbindung
-  components/            UI je Tab (Übersicht, Kalender, Rekorde, Coach, …)
-  app.js                 Einstiegspunkt, startet die App
-data/workouts-data.js    generierte Trainingsdaten (siehe unten, nicht im Repo)
-docs/                    PROJECT_MAP.md, DATA_MODEL.md, AI_CONTEXT.md
+---
+
+# Installation
+
+## Schritt 1 — Projekt herunterladen
+
+**Empfohlen: per Terminal klonen.** Das ist der einfachste Weg, weil macOS
+heruntergeladene ZIP-Dateien blockiert (siehe Hinweis unten).
+
+```bash
+git clone https://github.com/wnd5qqmxqt-lgtm/TriathlonTrainingsDashboard.git Dashboard
+cd Dashboard
 ```
+
+*Alternativ als ZIP:* Auf GitHub „Code ▸ Download ZIP", dann entpacken.
+macOS markiert alle Dateien daraus als „aus dem Internet geladen" und
+verweigert zunächst den Doppelklick. Das Setup-Skript hebt diese Blockade
+für dich auf — du musst es nur **einmalig** an der Sperre vorbeistarten:
+**Rechtsklick auf `setup.command` ▸ Öffnen ▸ Öffnen**.
+
+## Schritt 2 — Setup ausführen
+
+Doppelklick auf **`setup.command`**.
+
+Das Skript erledigt alles Weitere und sagt bei jedem Schritt, was es tut:
+
+| Schritt | Was passiert |
+|---|---|
+| 1 | Prüft, ob Python 3 vorhanden ist |
+| 2 | Installiert die drei benötigten Python-Bibliotheken |
+| 3 | Legt die Arbeitsordner `fit-files/` und `data/` an |
+| 4 | Hebt die macOS-Blockade für die Start-Dateien auf |
+| 5 | Richtet den Sync-Knopf im Dashboard ein |
+| 6 | Öffnet das Dashboard |
+
+Fehlt Python, sagt das Skript Bescheid und bietet an, die Download-Seite zu
+öffnen. Danach das Setup einfach erneut starten.
+
+## Schritt 3 — Daten holen
+
+Jetzt fehlen nur noch deine Trainings. Zwei Wege:
+
+### Weg A: Garmin Connect (empfohlen)
+
+Doppelklick auf **`sync-garmin.command`** — oder im Dashboard oben rechts
+**Aktualisieren ▸ Mit Garmin Connect synchronisieren**.
+
+Beim ersten Mal wirst du nach E-Mail und Passwort gefragt, bei aktivierter
+Zwei-Faktor-Authentifizierung zusätzlich nach dem Code.
+
+> **Dein Passwort wird nicht gespeichert.** Es wird einmalig gegen ein Token
+> getauscht und sofort verworfen. Das Token liegt unter `~/.garminconnect`
+> und erneuert sich selbst — ab dem zweiten Mal brauchst du gar nichts mehr
+> einzugeben. Erfahrungsgemäß ist das Passwort etwa einmal im Jahr wieder
+> nötig.
+
+Der erste Lauf holt die letzten 300 Tage und dauert ein paar Minuten. Jeder
+weitere Lauf lädt nur noch Neues und ist in Sekunden fertig.
+
+### Weg B: Eigene `.fit`-Dateien
+
+Ohne Garmin-Konto: im Dashboard oben rechts auf **Aktualisieren** klicken und
+im Menü nochmals **📁 Aktualisieren** wählen — dann den Ordner mit deinen
+`.fit`-Dateien angeben (z. B. von
+[HealthFit](https://www.healthfit.app/) nach iCloud Drive synchronisiert).
+Alternativ **⬆️ Drag & Drop zur Auswahl**, um einzelne Dateien hineinzuziehen.
+Dafür wird kein Python gebraucht.
+
+---
+
+# Voraussetzungen im Detail
+
+| Wofür | Was du brauchst | Pflicht? |
+|---|---|---|
+| Dashboard ansehen, eigene `.fit`-Dateien einlesen | Nur ein Browser | **ja** |
+| Garmin-Sync | Python 3.9+ und drei Bibliotheken | nur für Weg A |
+| KI-Coach | Ollama (lokal) **oder** ein Anthropic-Schlüssel | optional |
+| Kalender-Export (iCal) | Das Flask-Backend in `backend/` | optional |
+
+Die Python-Bibliotheken installiert das Setup automatisch:
+`garminconnect`, `curl_cffi` und `fitdecode` (siehe `requirements.txt`).
+
+## KI-Coach einrichten (optional)
+
+Der Coach-Bereich analysiert einzelne Einheiten und erstellt Trainingspläne.
+Er braucht ein Sprachmodell — entweder lokal oder über eine Schnittstelle:
+
+- **Lokal mit Ollama** (kostenlos, Daten bleiben auf dem Rechner):
+  [ollama.com](https://ollama.com) installieren, dann `ollama pull llama3.1`.
+  Das Dashboard erwartet Ollama unter `http://localhost:11434`; die Adresse
+  lässt sich im Coach-Tab hinter dem Zahnrad ändern.
+- **Anthropic-Schlüssel**: ebenfalls im Coach-Tab hinterlegbar.
+
+Ohne beides funktioniert das Dashboard vollständig — nur der Coach-Bereich
+bleibt leer.
+
+---
+
+# Was mit deinen Daten passiert
+
+- Alles bleibt **lokal auf deinem Rechner**. Das Dashboard selbst hat keinen
+  Netzwerkzugriff und kennt keine Zugangsdaten.
+- Der Garmin-Sync ist ein **getrenntes Programm**, das du bewusst startest.
+  Es lädt herunter, nie hoch.
+- Passwörter werden nie gespeichert, Tokens liegen außerhalb des
+  Projektordners (`~/.garminconnect`, nur für dich lesbar).
+- Deine Trainingsdaten (`data/`, `fit-files/`, `workouts.json`) sind über
+  `.gitignore` vom Repository ausgeschlossen — ein versehentliches Hochladen
+  ist damit ausgeschlossen.
+- Nutzt du den Coach mit einem Anthropic-Schlüssel, werden die
+  zusammengefassten Kennzahlen an diese Schnittstelle geschickt. Mit Ollama
+  bleibt auch das lokal.
+
+---
+
+# Wenn etwas nicht funktioniert
+
+**„... kann nicht geöffnet werden, da es von einem nicht verifizierten
+Entwickler stammt"**
+Du hast das ZIP heruntergeladen. Einmalig Rechtsklick auf die Datei ▸
+**Öffnen** ▸ **Öffnen**. Nach dem ersten Setup-Lauf tritt das nicht mehr auf.
+
+**„Safari kann die Seite nicht öffnen, da die Adresse ungültig ist"**
+Der Sync-Knopf im Dashboard funktioniert erst, wenn `setup.command` gelaufen
+ist. Alternativ jederzeit `sync-garmin.command` direkt doppelklicken — das
+geht immer.
+
+**Der Sync bricht mit einem Anmeldefehler ab**
+Garmin ändert gelegentlich seine interne Schnittstelle. Meist hilft:
+
+```bash
+python3 -m pip install -U garminconnect curl_cffi
+```
+
+**Das Dashboard ist leer**
+Noch keine Daten eingelesen — siehe Schritt 3. Ob und wann zuletzt
+synchronisiert wurde, steht im Menü **Aktualisieren**.
+
+**Python wird nicht gefunden, obwohl es installiert ist**
+Das Setup sucht in den üblichen Pfaden. Hilft das nicht, einmal im Terminal
+`python3 -V` ausführen und prüfen, ob eine Version 3.9 oder neuer erscheint.
+
+---
+
+# Ordnerstruktur
+
+```
+index.html              Das Dashboard — per Doppelklick öffnen
+setup.command           Einmalige Einrichtung
+sync-garmin.command     Garmin-Sync starten
+
+css/  js/               Code des Dashboards
+tools/garmin_sync.py    Der Garmin-Downloader
+parse_fit.py            Liest .fit-Dateien ein  → workouts.json
+build_dashboard.py      Erzeugt daraus          → data/workouts-data.js
+docs/                   Datenmodell und Projektkarte
+
+fit-files/              Deine heruntergeladenen .fit-Dateien (lokal)
+data/                   Erzeugte Trainings- und Gesundheitsdaten (lokal)
+```
+
+Die Kette beim Sync ist immer dieselbe:
+**Garmin → `fit-files/` → `parse_fit.py` → `build_dashboard.py` → Dashboard.**
+`sync-garmin.command` führt sie komplett aus.
+
+---
 
 ## Funktionen
 
@@ -120,8 +268,10 @@ Dateien lokal aus den eigenen `.fit`-Dateien:
 
 ```bash
 pip install fitdecode
-python3 parse_fit.py        # erzeugt workouts.json aus den eigenen .fit-Dateien
+python3 parse_fit.py        # liest fit-files/ ein -> workouts.json
 python3 build_dashboard.py  # erzeugt data/workouts-data.js daraus
+
+# Beides zusammen mit dem Download erledigt sync-garmin.command automatisch.
 ```
 
 Danach `index.html` einfach im Browser öffnen. Über den
@@ -145,7 +295,7 @@ Reines Vanilla JavaScript/HTML/CSS, keine Frameworks, kein Build-Step für das
 Dashboard selbst (nur die Trainingsdaten werden einmalig mit
 `build_dashboard.py` generiert, siehe oben). Modular aufgeteilt nach
 Verantwortlichkeit (Struktur/Styling/Logik/Daten/Analytics/KI/Komponenten,
-siehe `docs/PROJECT_MAP.md` und `AI_RULES.md`) statt einer einzelnen
+siehe `docs/PROJECT_MAP.md`) statt einer einzelnen
 HTML-Datei. Der FIT-Binärparser (inkl. komprimierter Zeitstempel und
 Developer-Feldern) ist von Hand geschrieben, damit das Dashboard ganz ohne
 externe Abhängigkeiten offline läuft.

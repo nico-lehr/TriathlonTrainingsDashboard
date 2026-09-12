@@ -134,11 +134,18 @@ const SPORT_MAP_DE = { running: "Laufen", cycling: "Rad", swimming: "Schwimmen",
 // immer mit 0/generic, siehe buildWorkoutFromParsed) - ein geratener falscher
 // Wert wäre schlechter als gar keiner. Die Becken/Freiwasser-Erkennung läuft
 // stattdessen robust über Bahnen-Nachrichten + Dateiname (siehe dort).
-const SUB_SPORT_ENUM = { 0: "generic", 6: "indoor_cycling", 19: "flexibility_training", 20: "strength_training", 26: "cardio_training", 45: "indoor_running", 70: "hiit" };
+// 58 = virtual_activity (virtuelle Plattformen wie MyWhoosh/Zwift/Rouvy) ist aus
+// dem FIT-SDK-Profil übernommen und noch NICHT an einer echten Datei verifiziert -
+// anders als bei den Schwimm-Werten oben ist das hier vertretbar, weil die
+// Indoor-Erkennung nicht davon abhängt: rideEnvironment() in js/data/workouts.js
+// fällt sonst auf has_gps zurück (eine Rolle hat nie GPS). Sobald eine
+// MyWhoosh-Datei vorliegt: Rohwert von session.sub_sport prüfen und hier
+// korrigieren/bestätigen.
+const SUB_SPORT_ENUM = { 0: "generic", 5: "spin", 6: "indoor_cycling", 19: "flexibility_training", 20: "strength_training", 26: "cardio_training", 45: "indoor_running", 58: "virtual_activity", 70: "hiit" };
 
 const TRAINING_SUBSPORT_MAP_DE = { flexibility_training: "Flexibilität", strength_training: "Krafttraining", cardio_training: "Cardiotraining" };
 
-const SUBSPORT_MAP_DE = { generic: "", open_water: "Freiwasser", lap_swimming: "Bahnenschwimmen", road: "Straße", indoor_cycling: "Indoor", treadmill: "Laufband", indoor_running: "Indoor", hiit: "HIIT" };
+const SUBSPORT_MAP_DE = { generic: "", open_water: "Freiwasser", lap_swimming: "Bahnenschwimmen", road: "Straße", indoor_cycling: "Indoor", spin: "Indoor", virtual_activity: "Virtuell", treadmill: "Laufband", indoor_running: "Indoor", hiit: "HIIT" };
 
 /** Parsed eine .fit-ArrayBuffer -> { session: {...}, records: [{timestamp,heart_rate,enhanced_speed,distance}] } */
 
@@ -414,11 +421,20 @@ function buildWorkoutFromParsed(fname, parsed) {
   const avgSpeed = s.avg_speed ?? null;
   const maxSpeed = s.max_speed ?? null;
 
+  // Garmin schreibt avg_speed/enhanced_avg_speed NICHT in jede Session - bei
+  // den aktuellen Exporten fehlt es bei fast allen Radeinheiten, obwohl
+  // Distanz und Zeit vorhanden sind (an 64 echten Dateien geprueft: 61 ohne
+  // Feld). Ohne Fallback blieben Geschwindigkeit und die km/h-Bestwerte leer.
+  // Distanz/Zeit IST die Definition der Durchschnittsgeschwindigkeit - das ist
+  // kein Schaetzwert, sondern dieselbe Groesse anders berechnet.
+  const effAvgSpeed = avgSpeed ?? ((distanceM && durationS) ? distanceM / durationS : null);
+
   let paceStr = null, speedKmh = null, maxSpeedKmh = null;
-  if (avgSpeed) {
-    if (sportRaw === "running") paceStr = fmtPacePerKm(avgSpeed);
-    else if (sportRaw === "swimming") paceStr = fmtPacePer100m(avgSpeed);
-    else if (sportRaw === "cycling") speedKmh = Math.round(avgSpeed * 3.6 * 10) / 10;
+  const _avgSpeedForCalc = effAvgSpeed;
+  if (_avgSpeedForCalc) {
+    if (sportRaw === "running") paceStr = fmtPacePerKm(_avgSpeedForCalc);
+    else if (sportRaw === "swimming") paceStr = fmtPacePer100m(_avgSpeedForCalc);
+    else if (sportRaw === "cycling") speedKmh = Math.round(_avgSpeedForCalc * 3.6 * 10) / 10;
   }
   if (maxSpeed && sportRaw === "cycling") maxSpeedKmh = Math.round(maxSpeed * 3.6 * 10) / 10;
 
@@ -477,14 +493,16 @@ function buildWorkoutFromParsed(fname, parsed) {
   //      per GPS, ein Becken nie)
   //   3. Weder Bahnen noch GPS -> Becken (am wahrscheinlichsten: Becken ohne
   //      Bahnenerkennung, z.B. falsches Aktivitätsprofil auf der Uhr gewählt)
+  // Echter GPS-Track vorhanden? Wird zweifach gebraucht: für die
+  // Becken/Freiwasser-Erkennung unten UND als enum-unabhängiges Signal für die
+  // Indoor/Outdoor-Erkennung beim Rad (siehe rideEnvironment() in
+  // js/data/workouts.js) - ein Rollentrainer hat nie GPS, eine Straßenausfahrt
+  // immer. Deshalb hier einmal berechnet und als Feld mit ausgegeben.
+  const hasGps = parsed.records.some(r => r.position_lat != null && r.position_long != null);
+
   let subSportDe = SUBSPORT_MAP_DE[subSportRaw] ?? subSportRaw;
   if (sportRaw === "swimming") {
-    if (numActiveLengths) {
-      subSportDe = "Becken";
-    } else {
-      const hasGps = parsed.records.some(r => r.position_lat != null && r.position_long != null);
-      subSportDe = hasGps ? "Freiwasser" : "Becken";
-    }
+    subSportDe = numActiveLengths ? "Becken" : (hasGps ? "Freiwasser" : "Becken");
   }
 
   // ---- Developer-Felder (z.B. von HealthFit geschrieben) -------------------
@@ -540,6 +558,7 @@ function buildWorkoutFromParsed(fname, parsed) {
     avg_stroke_rate: avgStrokeRate,
     lengths: lengthsOut,
     is_indoor: isIndoor,
+    has_gps: hasGps,
     rpe_estimated: rpeEstimated,
     avg_mets: avgMets,
     dev_raw: Object.keys(devRaw).length ? devRaw : null,

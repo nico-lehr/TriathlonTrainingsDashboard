@@ -3,14 +3,25 @@
 Liest Garmin .fit-Dateien ein und extrahiert Trainingskennzahlen
 in eine zentrale, strukturierte JSON-Datei (workouts.json).
 """
+import argparse
 import fitdecode
 import glob
 import json
 import os
 from datetime import datetime, timezone
 
-SRC_DIR = "/mnt/user-data/uploads/Documents"
-OUT_PATH = "/home/claude/triathlon-dashboard/workouts.json"
+# Alle Pfade projekt-relativ (BASE = Ordner dieser Datei), damit das Skript
+# unabhaengig vom Arbeitsverzeichnis laeuft - dieselbe Konvention wie in
+# build_dashboard.py. Ueberschreibbar per CLI-Argument, siehe main().
+BASE = os.path.dirname(os.path.abspath(__file__))
+
+# Standard-Quelle: der Ordner, in den tools/garmin_sync.py die .fit-Dateien
+# herunterlaedt. Frueher standen hier Sandbox-Pfade, die lokal nicht existierten.
+DEFAULT_SRC_DIR = os.path.join(BASE, "fit-files")
+DEFAULT_OUT_PATH = os.path.join(BASE, "workouts.json")
+
+SRC_DIR = DEFAULT_SRC_DIR
+OUT_PATH = DEFAULT_OUT_PATH
 
 SPORT_MAP = {
     "running": "Laufen",
@@ -41,6 +52,8 @@ SUBSPORT_MAP = {
     "lap_swimming": "Bahnenschwimmen",
     "road": "Straße",
     "indoor_cycling": "Indoor",
+    "spin": "Indoor",
+    "virtual_activity": "Virtuell",  # virtuelle Plattformen (MyWhoosh, Zwift, Rouvy)
     "treadmill": "Laufband",
     "indoor_running": "Indoor",
     "hiit": "HIIT",
@@ -246,7 +259,21 @@ def fmt_pace_per_100m(avg_speed_ms):
 
 
 def main():
+    global SRC_DIR, OUT_PATH
+    ap = argparse.ArgumentParser(description="Liest .fit-Dateien ein und schreibt workouts.json")
+    ap.add_argument("src", nargs="?", default=DEFAULT_SRC_DIR,
+                    help=f"Ordner mit .fit-Dateien (Standard: {DEFAULT_SRC_DIR})")
+    ap.add_argument("-o", "--out", default=DEFAULT_OUT_PATH,
+                    help=f"Ziel-JSON (Standard: {DEFAULT_OUT_PATH})")
+    args = ap.parse_args()
+    SRC_DIR, OUT_PATH = args.src, args.out
+
+    if not os.path.isdir(SRC_DIR):
+        raise SystemExit(f"Quellordner nicht gefunden: {SRC_DIR}")
+
     files = sorted(glob.glob(os.path.join(SRC_DIR, "*.fit")))
+    if not files:
+        print(f"Hinweis: keine .fit-Dateien in {SRC_DIR}")
     workouts = []
     skipped = []
 
@@ -282,6 +309,16 @@ def main():
         #   3. Weder Bahnen noch GPS -> Becken (am wahrscheinlichsten: Becken
         #      ohne Bahnenerkennung, z.B. falsches Aktivitätsprofil gewählt).
         #      Dateiname bewusst NICHT mehr als Signal genutzt.
+        #
+        # GPS wird jetzt für JEDE Einheit ermittelt (nicht mehr nur lazy beim
+        # Schwimmen): beim Rad ist es das enum-unabhängige Indoor-Signal - eine
+        # Rolle hat nie GPS, eine Straßenausfahrt immer (siehe
+        # rideEnvironment() in js/data/workouts.js).
+        try:
+            has_gps = has_gps_track(path)
+        except Exception:
+            has_gps = None
+
         avg_swolf = best_swolf = num_active_lengths = avg_stroke_rate = dominant_stroke = swim_lengths_out = None
         if sport_raw == "swimming":
             try:
@@ -289,14 +326,7 @@ def main():
             except Exception:
                 raw_lengths = []
             avg_swolf, best_swolf, num_active_lengths, avg_stroke_rate, dominant_stroke, swim_lengths_out = summarize_swim_lengths(raw_lengths)
-            if num_active_lengths:
-                sub_sport_de = "Becken"
-            else:
-                try:
-                    gps = has_gps_track(path)
-                except Exception:
-                    gps = False
-                sub_sport_de = "Freiwasser" if gps else "Becken"
+            sub_sport_de = "Becken" if num_active_lengths else ("Freiwasser" if has_gps else "Becken")
 
         # Developer-Felder (z.B. von HealthFit geschrieben, siehe DATA_MODEL.md)
         # - bekannte Felder werden befördert, alles andere landet ungefiltert
@@ -320,6 +350,13 @@ def main():
         distance_m = fields.get("total_distance")
         avg_speed = fields.get("enhanced_avg_speed") or fields.get("avg_speed")
         max_speed = fields.get("enhanced_max_speed") or fields.get("max_speed")
+        # Garmin schreibt die Session-Geschwindigkeit NICHT in jede Datei (an 64
+        # echten Radeinheiten geprueft: bei 61 fehlt sie, obwohl Distanz und Zeit
+        # da sind). Distanz/Zeit IST die Durchschnittsgeschwindigkeit - kein
+        # Schaetzwert, sondern dieselbe Groesse anders berechnet. Muss exakt zur
+        # JS-Portierung passen (buildWorkoutFromParsed in js/data/fit-parser.js).
+        if not avg_speed and distance_m and duration_s:
+            avg_speed = distance_m / duration_s
 
         pace_str = None
         speed_kmh = None
@@ -384,6 +421,7 @@ def main():
             "dominant_stroke": dominant_stroke,
             "lengths": swim_lengths_out,
             "is_indoor": is_indoor,
+            "has_gps": has_gps,
             "rpe_estimated": rpe_estimated,
             "avg_mets": avg_mets,
             "dev_raw": dev_raw or None,

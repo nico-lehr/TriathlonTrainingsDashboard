@@ -5,18 +5,27 @@ Feld für Feld gegen die Python/fitdecode-Referenz (parse_fit.py-Logik),
 fuer den gesamten 2026er-Datensatz.
 """
 import json
+import os
 import sys
 from playwright.sync_api import sync_playwright
 
-DOCS_DIR = "/mnt/user-data/uploads/Documents"
-DASHBOARD = "/home/claude/triathlon-dashboard/index.html"
-REF_JSON = "/home/claude/triathlon-dashboard/workouts.json"
+# Projekt-relative Pfade (frueher Sandbox-Pfade, die lokal nicht existierten).
+# Ueberschreibbar per Argument: verify_parser.py [fit-ordner]
+BASE = os.path.dirname(os.path.abspath(__file__))
+DOCS_DIR = sys.argv[1] if len(sys.argv) > 1 else os.path.join(BASE, "fit-files")
+DASHBOARD = os.path.join(BASE, "index.html")
+REF_JSON = os.path.join(BASE, "workouts.json")
+
+if not os.path.exists(REF_JSON):
+    raise SystemExit(f"{REF_JSON} fehlt - zuerst parse_fit.py laufen lassen.")
 
 with open(REF_JSON, encoding="utf-8") as f:
     ref = {w["file"]: w for w in json.load(f)["workouts"]}
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(executable_path="/opt/pw-browsers/chromium")
+    # Ohne executable_path nutzt Playwright die lokal installierte Browser-
+    # Version (frueher stand hier ein fester Sandbox-Pfad).
+    browser = p.chromium.launch()
     page = browser.new_page()
     page.goto(f"file://{DASHBOARD}")
 
@@ -71,7 +80,7 @@ FIELDS = ["sport", "sport_raw", "sub_sport", "duration_min", "distance_km",
           # falls die (unverifizierten) length-Feldnummern im JS-Parser nicht
           # zur fitdecode-Referenz passen.
           "avg_swolf", "best_swolf", "num_active_lengths", "avg_stroke_rate",
-          "dominant_stroke", "is_indoor"]
+          "dominant_stroke", "is_indoor", "has_gps"]
 
 STREAM_FIELDS = ["hr", "speed", "dist", "alt", "power", "cad", "grade", "vo", "gct", "vr", "sl"]
 

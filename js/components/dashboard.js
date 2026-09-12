@@ -12,6 +12,42 @@ function renderMeta() {
     new Date(RAW.generated_at).toLocaleString("de-DE");
   document.getElementById("update-meta").textContent =
     "Stand: " + new Date(RAW.generated_at).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+  renderGarminSyncStatus();
+}
+
+// Zeigt im Update-Menue, wann zuletzt mit Garmin synchronisiert wurde und was
+// dabei herauskam. Wichtig, weil ein stillschweigend fehlgeschlagener Sync
+// sonst unbemerkt bliebe und alte Daten aktuell wirken wuerden.
+function renderGarminSyncStatus() {
+  const el = document.getElementById("garmin-sync-status");
+  if (!el) return;
+  const sync = (typeof lastGarminSync === "function") ? lastGarminSync() : null;
+  if (!sync || !sync.at) {
+    // Noch nie synchronisiert: hier steht der haeufigste Stolperstein. Eine
+    // Webseite kann nicht pruefen, ob macOS das URL-Schema kennt - passiert
+    // beim Klick nichts oder meldet der Browser "Adresse ungueltig", fehlt
+    // die einmalige Einrichtung. Der Hinweis steht deshalb von vornherein da,
+    // statt den Nutzer erst in eine unverstaendliche Browser-Fehlermeldung
+    // laufen zu lassen.
+    el.innerHTML = "Noch nie synchronisiert<br><span class=\"sync-hint\">Passiert beim Klick nichts? Einmalig "
+      + "<code>setup.command</code> starten &mdash; oder "
+      + "<code>sync-garmin.command</code> direkt doppelklicken.</span>";
+    el.className = "update-menu-sync";
+    return;
+  }
+  const d = new Date(sync.at);
+  const tageHer = Math.floor((Date.now() - d.getTime()) / 86400000);
+  const a = sync.aktivitaeten;
+  const bits = [d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })];
+  if (a) {
+    bits.push(a.neu ? `${a.neu} neu` : "keine neuen");
+    if (a.fehler) bits.push(`${a.fehler} Fehler`);
+  }
+  el.textContent = "Garmin: " + bits.join(" · ");
+  // Ab einer Woche ohne Sync sichtbar kennzeichnen - dann stimmt der
+  // Datenstand vermutlich nicht mehr.
+  el.className = "update-menu-sync" + ((tageHer >= 7 || (a && a.fehler)) ? " stale" : "");
 }
 
 
@@ -50,13 +86,22 @@ function renderStats(data) {
     });
   }
 
+  // Rad wird als EINE Kachel dargestellt: Indoor und Outdoor werden immer
+  // zusammengerechnet. Die Trennung existiert weiterhin, aber nur dort, wo sie
+  // fachlich noetig ist - in den Vergleichsgruppen (sameComparisonGroup() in
+  // js/data/workouts.js), damit simulierte Indoor-Kilometer nie gegen echte
+  // Strassenwerte verglichen werden.
+  const radList = data.filter(w => w.sport === "Rad");
+  const radTileSub = radList.length + " Einheiten";
+
   tiles.push(
     { label: "Trainingseinheiten", target: data.length, fmt: v => fmtNum(v, 0), sub: "im gewählten Zeitraum" },
     { label: "Gesamtzeit", target: totalMin, fmt: v => fmtH(v) + " h", sub: fmtNum(totalMin, 0) + " Minuten" },
-    { label: "Rad", target: kmBy("Rad"), fmt: v => fmtNum(v, 1) + " km", sub: data.filter(w => w.sport === "Rad").length + " Einheiten" },
+    { label: "Rad", target: kmBy("Rad"), fmt: v => fmtNum(v, 1) + " km", sub: radTileSub },
     { label: "Laufen", target: kmBy("Laufen"), fmt: v => fmtNum(v, 1) + " km", sub: data.filter(w => w.sport === "Laufen").length + " Einheiten" },
     { label: "Schwimmen", target: kmBy("Schwimmen"), fmt: v => fmtNum(v, 2) + " km", sub: data.filter(w => w.sport === "Schwimmen").length + " Einheiten" },
   );
+
   // VO2max nutzt immer die volle Historie (wie PMC/ACWR), nicht den oben
   // gewählten Zeitraum-Filter - es ist ein Fitness-Zustand, kein Zeitraum-Wert.
   // Laufen und Rad bewusst als zwei getrennte Kacheln (siehe performance.js) -
@@ -802,6 +847,11 @@ function renderMonotony() {
 
 function renderPace(data) {
   const container = document.getElementById("chart-pace");
+  // filter/valueOf sind optional: das Rad-Chart muss Indoor-Einheiten
+  // ausschließen, weil die simulierte Plattform-Geschwindigkeit die
+  // Geschwindigkeitsentwicklung sonst verrauscht (ein leichter virtueller Kurs
+  // sieht wie ein Formsprung aus). Indoor bekommt stattdessen ein eigenes
+  // Watt-Chart - dort ist die Entwicklung tatsächlich aussagekräftig.
   const configs = [
     { sport: "Laufen", title: "Laufen", unit: "min/km", key: "pace_min_per_km", invert: true, color: "var(--c-laufen)" },
     { sport: "Rad", title: "Rad", unit: "km/h", key: "speed_kmh", invert: false, color: "var(--c-rad)" },
@@ -809,9 +859,14 @@ function renderPace(data) {
   ];
   container.innerHTML = "";
   configs.forEach(cfg => {
-    const pts = data.filter(w => w.sport === cfg.sport && w._date && w[cfg.key] != null)
-      .map(w => ({ date: w._date, raw: w[cfg.key], val: cfg.invert ? paceToSeconds(w[cfg.key]) : w[cfg.key], distance: w.distance_km }))
+    const getValue = cfg.getValue || (w => w[cfg.key]);
+    const pts = data.filter(w => w.sport === cfg.sport && w._date && getValue(w) != null && (!cfg.filter || cfg.filter(w)))
+      .map(w => { const raw = getValue(w); return { date: w._date, raw: cfg.invert ? raw : fmtNum(raw, cfg.unit === "W" ? 0 : 1), val: cfg.invert ? paceToSeconds(raw) : raw, distance: cfg.unit === "W" ? null : w.distance_km }; })
       .sort((a, b) => a.date - b.date);
+
+    // Kacheln, die ohne passende Daten gar nicht erscheinen sollen (Indoor-Watt),
+    // vor dem Anlegen des Containers abbrechen - sonst bliebe eine leere stehen.
+    if (!pts.length && cfg.hideWhenEmpty) return;
 
     const wrap = document.createElement("div");
     wrap.className = "mini";

@@ -9,22 +9,23 @@ const COMPARISON_TOLERANCE = 0.2; // ±20% Distanz (oder Dauer, falls keine Dist
 const COMPARISON_MAX = 12; // mehr Vergleichswerte bringen dem Modell keinen Mehrwert, kosten nur Tokens/Tempo
 
 function findComparableWorkouts(w, all) {
-  const group = sportGroup(w.sport);
-  const useDistance = w.distance_km != null;
+  // Bei Indoor-/virtuellen Radeinheiten BEWUSST über die Dauer statt über die
+  // Distanz gruppieren: die virtuellen Kilometer hängen vom gewählten Kurs und
+  // vom Windschatten-Modell der Plattform ab, die Dauer nicht. "60 Minuten
+  // Rolle" ist die belastbare Vergleichsbasis, "34 virtuelle km" nicht.
+  const indoorRide = isIndoorRide(w);
+  const useDistance = w.distance_km != null && !indoorRide;
   const metric = useDistance ? "distance_km" : "duration_min";
   const target = w[metric];
   if (target == null) return [];
   const lo = target * (1 - COMPARISON_TOLERANCE), hi = target * (1 + COMPARISON_TOLERANCE);
-  // Beim Schwimmen zusätzlich nach Becken/Freiwasser trennen (sub_sport) -
-  // beides auf eine Pace zu vergleichen wäre irreführend (siehe DATA_MODEL.md).
-  // Nur wenn w.sub_sport unbekannt ist (leer), wird nicht gefiltert - sonst
-  // würden ältere, noch nicht neu eingelesene Einheiten ohne sub_sport
-  // fälschlich rausfallen.
-  const filterSubSport = group === "Schwimmen" && !!w.sub_sport;
+  // Welche Einheit überhaupt in die Gruppe darf, entscheidet allein
+  // sameComparisonGroup() in js/data/workouts.js - dort steckt die Trennung
+  // nach Sportart, nach Becken/Freiwasser beim Schwimmen UND nach
+  // Indoor/Outdoor beim Rad, damit alle Auswertungen dieselbe Definition nutzen.
   return all
-    .filter(o => o.file !== w.file && !o.is_summary && sportGroup(o.sport) === group && o[metric] != null)
+    .filter(o => o.file !== w.file && !o.is_summary && o[metric] != null && sameComparisonGroup(w, o))
     .filter(o => o[metric] >= lo && o[metric] <= hi)
-    .filter(o => !filterSubSport || !o.sub_sport || o.sub_sport === w.sub_sport)
     .sort((a, b) => (b._date || 0) - (a._date || 0))
     .slice(0, COMPARISON_MAX);
 }

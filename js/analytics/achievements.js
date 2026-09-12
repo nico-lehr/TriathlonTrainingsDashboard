@@ -13,9 +13,13 @@ const ACHIEVEMENT_PB_TARGETS = [
   { sport: "Laufen", meters: 1000, label: "1 km Laufen" },
   { sport: "Laufen", meters: 5000, label: "5 km Laufen" },
   { sport: "Laufen", meters: 10000, label: "10 km Laufen" },
-  { sport: "Rad", meters: 10000, label: "10 km Rad" },
-  { sport: "Rad", meters: 20000, label: "20 km Rad" },
-  { sport: "Rad", meters: 40000, label: "40 km Rad" },
+  // env: "outdoor" - Indoor-/virtuelle Fahrten sind hier ausgeschlossen, weil
+  // ihre Distanz von der Plattform simuliert wird: eine Bestzeit über
+  // "40 virtuelle km" wäre kein Leistungsfortschritt, würde aber den echten
+  // Outdoor-Rekord dauerhaft unerreichbar machen.
+  { sport: "Rad", meters: 10000, label: "10 km Rad", env: "outdoor" },
+  { sport: "Rad", meters: 20000, label: "20 km Rad", env: "outdoor" },
+  { sport: "Rad", meters: 40000, label: "40 km Rad", env: "outdoor" },
 ];
 
 function maybeUnlockAchievement(id, label, newlyList) {
@@ -45,10 +49,16 @@ function checkAndUnlockAchievements() {
   }
 
   ACHIEVEMENT_PB_TARGETS.forEach(t => {
-    const list = DATA.filter(w => w.sport === t.sport);
+    // Einheiten mit unbekannter Umgebung (Altdaten) gelten als Outdoor - so
+    // bleiben bestehende Rad-Bestzeiten erhalten.
+    const list = DATA.filter(w => w.sport === t.sport && (!t.env || (w._rideEnv ?? "outdoor") === t.env));
     const best = bestEffortForDistance(list, t.meters);
     if (!best) return;
-    const key = `pb_${t.sport}_${t.meters}`;
+    // env im Schlüssel: sonst würde ein alter, evtl. aus einer virtuellen Fahrt
+    // entstandener Wert den neuen Outdoor-Rekord dauerhaft blockieren. Der
+    // prevSec-Schutz unten verhindert, dass der erste Lauf nach dem
+    // Schlüsselwechsel fälschlich etwas feiert - er legt nur die Basislinie.
+    const key = `pb_${t.sport}_${t.env ?? "all"}_${t.meters}`;
     const prevSec = achievementsState.snapshot.pbSeconds[key];
     if (prevSec == null || best.seconds < prevSec) {
       achievementsState.snapshot.pbSeconds[key] = best.seconds;

@@ -1415,6 +1415,18 @@
   .pmc-substats .sub-tile .v small { font-size: 11px; font-weight: 500; color: var(--text-muted); }
 
   .pmc-substats .sub-tile .v small.delta-good { color: var(--c-good); }
+  /* Erholungs-Kacheln nutzen dieselbe Farbkonvention (js/components/recovery.js) */
+  #recovery-tiles .stat-tile .sub small.delta-good { color: var(--c-good); font-weight: 700; }
+  #recovery-tiles .stat-tile .sub small.delta-warn { color: var(--c-warn); font-weight: 700; }
+  #recovery-tiles .stat-tile .label small { color: var(--text-secondary); font-weight: 500; }
+
+  /* Garmin-Sync-Status im Update-Menue (js/components/dashboard.js) */
+  .update-menu-sync { padding: 2px 12px 8px; font-size: 11px; color: var(--text-secondary); }
+  .update-menu-sync.stale { color: var(--c-warn); font-weight: 600; }
+  #menu-item-garmin { text-decoration: none; }
+  .update-menu-sync .sync-hint { display: block; margin-top: 4px; line-height: 1.45; opacity: 0.85; }
+  .update-menu-sync .sync-hint code { font-size: 10px; padding: 1px 4px; border-radius: 4px;
+    background: var(--bg-subtle, rgba(127,127,127,0.15)); }
 
   .pmc-substats .sub-tile .v small.delta-warn { color: var(--c-warn); }
 
@@ -1486,6 +1498,26 @@
   table.workouts tbody tr { cursor: pointer; }
 
   table.workouts tbody tr:hover td { background: var(--page); }
+
+  /* Indoor-/Virtuell-Kennzeichnung bei Radeinheiten (rideEnvBadgeHtml() in
+     js/data/workouts.js). Bewusst nur für Indoor - Outdoor ist der Normalfall.
+     Farbe bleibt die Rad-Farbe, unterschieden wird über den Text. */
+  .env-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--c-rad) 16%, transparent);
+    color: var(--c-rad);
+    border: 1px solid color-mix(in srgb, var(--c-rad) 32%, transparent);
+    flex: none;
+    white-space: nowrap;
+  }
+
+  .modal-head .env-badge { margin-left: 8px; }
 
   table.workouts td.sport-cell { display: flex; align-items: center; gap: 8px; white-space: nowrap; font-variant-numeric: normal; }
 

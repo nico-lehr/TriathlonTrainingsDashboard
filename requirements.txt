@@ -1,0 +1,18 @@
+# Python-Abhaengigkeiten fuer die Datenkette:
+#   tools/garmin_sync.py  ->  parse_fit.py  ->  build_dashboard.py
+#
+# Installation:
+#   python3 -m pip install -r requirements.txt
+#
+# garminconnect spricht die INTERNE Garmin-Connect-API (es gibt keine offene
+# Consumer-API, siehe docs/DATA_MODEL.md). Garmin hat im Maerz 2026
+# Cloudflare-TLS-Fingerprinting aktiviert - deshalb ist curl_cffi zwingend
+# noetig (TLS-Impersonation); ohne das schlaegt bereits die Anmeldung fehl.
+# Wenn der Sync eines Tages mit Anmeldefehlern abbricht, ist ein Update die
+# erste Massnahme:  python3 -m pip install -U garminconnect curl_cffi
+garminconnect>=0.3.2
+curl_cffi>=0.13.0
+
+# Referenz-FIT-Parser fuer parse_fit.py (kennt das offizielle FIT-Profil und
+# liefert benannte Felder - Grundlage des Abgleichs in verify_parser.py).
+fitdecode>=0.10.0
