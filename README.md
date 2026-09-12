@@ -23,7 +23,7 @@ Gesundheitsdaten bleiben auf deinem Rechner.
 heruntergeladene ZIP-Dateien blockiert (siehe Hinweis unten).
 
 ```bash
-git clone https://github.com/wnd5qqmxqt-lgtm/TriathlonTrainingsDashboard.git Dashboard
+git clone https://github.com/nico-lehr/TriathlonTrainingsDashboard.git Dashboard
 cd Dashboard
 ```
 
