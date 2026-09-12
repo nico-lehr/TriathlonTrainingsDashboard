@@ -194,11 +194,12 @@ DEMO_BANNER = """
   background:linear-gradient(90deg,#2563eb,#7c3aed);color:#fff;font:600 14px/1.4
   -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;text-align:center;
   box-shadow:0 2px 12px rgba(0,0,0,.25)">
-  Demo-Version mit erfundenen Beispieldaten &mdash;
-  <a href="index.html" style="color:#fff;text-decoration:underline">zurück zur Startseite</a>
+  Das hier ist eine <strong>Demo mit erfundenen Beispieldaten</strong> &mdash; zum Ausprobieren, ohne etwas zu installieren.
+  <br>
+  <a href="https://github.com/nico-lehr/TriathlonTrainingsDashboard#einrichtung--schritt-f%C3%BCr-schritt"
+     style="color:#fff;text-decoration:underline;font-weight:800">Gefällt dir? So installierst du es kostenlos &rarr;</a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/nico-lehr/TriathlonTrainingsDashboard"
-     style="color:#fff;text-decoration:underline">Quellcode &amp; Installation</a>
+  <a href="index.html" style="color:#fff;text-decoration:underline;font-weight:500">zurück zur Startseite</a>
 </div>
 """
 
