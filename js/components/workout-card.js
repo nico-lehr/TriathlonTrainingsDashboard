@@ -260,6 +260,7 @@ function buildWorkoutDetailHtml(w) {
       <div><h4>Belastungsprofil</h4><div class="chart-wrap wd-radar-chart"></div></div>
     </div>
     ${buildWorkoutLoadStatsHtml(w)}
+    ${buildWorkoutEquipmentHtml(w)}
     ${buildWorkoutRatingHtml(w)}
     ${buildWorkoutAnalysisHtml(w)}`;
 }
@@ -546,6 +547,7 @@ function renderWorkoutDetailCharts(w, rootEl) {
 
   const analysisBtn = rootEl.querySelector(".wd-analysis-btn");
   if (analysisBtn) analysisBtn.addEventListener("click", () => generateWorkoutAnalysis(w.file));
+  wireWorkoutEquipmentBlock(rootEl, w.file);
   wireWorkoutRatingBlock(rootEl, w.file);
 }
 

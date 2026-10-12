@@ -67,6 +67,7 @@ function checkAutoReplan() {
     showApiError(`Daten konnten nicht geladen werden (${e.message}). Bitte die Seite neu laden.`);
     return;
   }
+  await loadEquipmentItems(); // nach der Ablage: übernimmt ggf. die alte Equipment-Liste daraus
   loadWorkoutNotes();
   loadWorkoutAnalysisCache();
   // Garmin-Waagedaten ins Gewichts-Log uebernehmen, bevor irgendetwas

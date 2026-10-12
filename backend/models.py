@@ -325,3 +325,57 @@ class IcalPlannedWorkout(Base):
     status = Column(String(50), default="geplant")
 
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Equipment(Base):
+    """Equipment je Person: Laufschuhe, Rad, Verschleissteile (Kette, Reifen ...)
+    und freie Items (Neoprenanzug ...) - frueher nur als JSON in athlete_store.
+
+    Die Spalten sind die festen Eckwerte (typ = Kategorie, max_km = Service-/
+    Austausch-Intervall, aktiv = nicht aussortiert). Alles, was das Dashboard
+    zusaetzlich pflegt und nicht abgefragt werden muss, steht unveraendert in
+    `details` (activeFrom, activeTo, resetAt, manualKm, note, createdAt),
+    damit nichts verloren geht. Die Kilometer rechnet das Dashboard aus den
+    Workouts - sie stehen nicht in der Datenbank.
+    """
+    __tablename__ = "equipment"
+    __table_args__ = (
+        Index("idx_equipment_athlete", "athlete_id"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    athlete_id = Column(Integer, ForeignKey("athletes.athlete_id"), nullable=False)
+
+    name = Column(String(255), nullable=False)
+    typ = Column(String(50), nullable=False, default="Sonstiges")  # Laufschuhe, Rad, Verschleißteil, Sonstiges
+    sport = Column(String(50))  # Laufen, Rad, Schwimmen - nur bei Schuhen/Rad (zaehlt Workouts dieser Sportart)
+    parent_id = Column(Integer, ForeignKey("equipment.id"))  # Verschleissteil -> zugehoeriges Rad
+    start_km = Column(Float, nullable=False, default=0)  # schon vor dem Anlegen gelaufene/gefahrene km
+    max_km = Column(Float)  # Warnung ab 90 %; leer = kein Limit
+    aktiv = Column(Boolean, nullable=False, default=True)  # False = aussortiert
+    details = Column(JSON)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class EquipmentWorkout(Base):
+    """Ausdrueckliche Zuordnung eines Trainings zu einem Equipment-Item.
+
+    Ohne Eintrag zaehlt ein Training wie bisher automatisch (Sportart +
+    Zeitfenster, in dem das Item "Standard" war). Mit Eintrag zaehlt es nur
+    fuer das hier genannte Item. Das Training steht als `file` (so
+    identifiziert es das Dashboard), ein Training hat hoechstens ein Item.
+    """
+    __tablename__ = "equipment_workouts"
+    __table_args__ = (
+        UniqueConstraint("athlete_id", "workout_file", name="uq_equipment_workout_file"),
+        Index("idx_equipment_workout_item", "equipment_id"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    athlete_id = Column(Integer, ForeignKey("athletes.athlete_id"), nullable=False)
+    equipment_id = Column(Integer, ForeignKey("equipment.id"), nullable=False)
+    workout_file = Column(String(255), nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)

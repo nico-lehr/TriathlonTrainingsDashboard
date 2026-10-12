@@ -219,8 +219,12 @@ DEMO_API = """
 function requireLogin() { return true; }
 async function loadUserStore() { userStore = {}; }
 function storeSet(key, value) { userStore[key] = value; }
-async function apiCall(endpoint) {
+let demoEquipmentId = 0;
+async function apiCall(endpoint, method, body) {
   if (endpoint.startsWith("workouts/full")) return { data: EMBEDDED_DATA.workouts };
+  // Equipment: nur die Ids vergeben, gemerkt wird nichts (Demo, bis zum Neuladen)
+  if (endpoint === "equipment" && method === "POST") return { data: { ...body, id: ++demoEquipmentId } };
+  if (endpoint.startsWith("equipment")) return { data: endpoint === "equipment" || endpoint === "equipment/assignments" ? [] : {} };
   if (endpoint === "wellness/daily") return { data: GARMIN_WELLNESS };
   if (endpoint === "auth/me") return { data: { username: "demo" } };
   throw new Error("In der Demo nicht verfügbar");
