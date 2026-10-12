@@ -5,18 +5,16 @@
 // ollama.js) - hier wird nur berechnet, WANN/WOFÜR geplant werden muss,
 // nie WAS konkret trainiert wird (siehe AI_RULES: Berechnung vs. Interpretation).
 
-// Grobe Trainings-Phasen nach Tagen bis zum Ziel-Event - dieselbe Idee wie
-// der "Phase"-Faktor im Race-Readiness-Score (race-readiness.js), hier als
-// eigenständiges Label für den KI-Kontext, da der Score dort etwas anders
-// gewichtet (Punkte statt Klartext-Phase).
+// Trainingsphase für ein Event in `daysUntil` Tagen (ab heute) als
+// { key, label }. Die Phasen selbst berechnet nur getPhase()
+// (js/analytics/periodization.js); hier kommen zwei Fälle ohne Phase dazu:
+// "unklar" (kein Zieldatum) und "nach-event" (Rennen samt Erholungswoche vorbei).
 function computeTrainingPhase(daysUntil) {
   if (daysUntil == null) return { key: "unklar", label: "kein Zieldatum" };
-  if (daysUntil < 0) return { key: "nach-event", label: "nach dem Ziel-Event" };
-  if (daysUntil > 84) return { key: "grundlage", label: "Grundlagenausdauer (Basis)" };
-  if (daysUntil > 28) return { key: "aufbau", label: "Aufbauphase" };
-  if (daysUntil > 14) return { key: "spezifisch", label: "spezifische Vorbereitung" };
-  if (daysUntil > 6) return { key: "taper-beginn", label: "beginnende Taper-Phase" };
-  return { key: "taper-final", label: "finale Taper-Phase / Wettkampfwoche" };
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const race = new Date(today); race.setDate(race.getDate() + daysUntil);
+  const key = getPhase(today, { date: localDateStr(race) });
+  return key ? { key, label: PERIOD_PHASES[key].label } : { key: "nach-event", label: "nach dem Ziel-Event" };
 }
 
 // Nächste 7 Tage, die für ein Ziel noch KEINEN geplanten Eintrag haben -

@@ -82,7 +82,7 @@ function renderTrainingPlanCard() {
   host.querySelector(".plan-generate-btn").addEventListener("click", () => generateTrainingPlan(goal.id));
   const replaceBtn = host.querySelector(".plan-replace-btn");
   if (replaceBtn) replaceBtn.addEventListener("click", () => generateTrainingPlan(goal.id, { replace: true }));
-  host.querySelector(".plan-add-btn").addEventListener("click", () => openPlanEdit(null, { goalId: goal.id, phase: phase.key }));
+  host.querySelector(".plan-add-btn").addEventListener("click", () => openPlanEdit(null, { goalId: goal.id }));
   host.querySelectorAll(".plan-item-edit").forEach(btn => btn.addEventListener("click", () => openPlanEdit(btn.dataset.id)));
   host.querySelectorAll(".plan-item-export").forEach(btn => btn.addEventListener("click", e => { e.stopPropagation(); exportPlannedWorkoutAsFit(btn.dataset.id); }));
   // Ganze Zeile klickbar (wie ein Trainings-Punkt im Kalender) - öffnet
@@ -117,7 +117,7 @@ function planCheckNotesHtml(goal) {
 
 /* ---------- Trainingsplan-Zeitleiste: grobe Periodisierungs-Übersicht ----------
    Zeigt als Balken die Trainingsphasen (Grundlage/Aufbau/Spezifisch/Taper,
-   siehe computeTrainingPhase in js/analytics/training-plan.js) von heute bis
+   siehe getPhaseTimeline in js/analytics/periodization.js) von heute bis
    zum Zieldatum, damit auf einen Blick klar wird, was in den nächsten
    Wochen/Monaten grob ansteht und in welcher Phase man sich gerade befindet
    - unabhängig davon, wie weit die konkrete Einheiten-Planung (rollierendes
@@ -126,20 +126,11 @@ function planCheckNotesHtml(goal) {
 // Dieselbe 5-stufige Zonen-Farbskala wie die Herzfrequenz-Zonen-Charts
 // (--c-z1..z5, css/variables.css) - dort schon als klar unterscheidbare
 // Eskalationsskala erprobt und passt inhaltlich gut (Grundlage = ruhig,
-// Wettkampfwoche = "heißeste" Zone). Vorher nutzten "Spezifisch" und
+// Taper vor dem Wettkampf = "heißeste" Zone). Vorher nutzten "Spezifisch" und
 // "Taper" beide --c-warn (dasselbe Orange) und waren nicht zu unterscheiden.
 const PLAN_PHASE_COLOR_VARS = {
-  grundlage: "--c-z1", aufbau: "--c-z2", spezifisch: "--c-z3",
-  "taper-beginn": "--c-z4", "taper-final": "--c-z5",
+  grundlage: "--c-z1", aufbau: "--c-z2", spezifisch: "--c-z3", taper: "--c-z5",
 };
-// Segment-Grenzen in "Tage bis Event" (absteigend) - dieselben Schwellen wie computeTrainingPhase.
-const PLAN_PHASE_SEGMENTS = [
-  { key: "grundlage", label: "Grundlage", untilMax: Infinity, untilMin: 85 },
-  { key: "aufbau", label: "Aufbau", untilMax: 84, untilMin: 29 },
-  { key: "spezifisch", label: "Spezifisch", untilMax: 28, untilMin: 15 },
-  { key: "taper-beginn", label: "Taper", untilMax: 14, untilMin: 7 },
-  { key: "taper-final", label: "Wettkampfwoche", untilMax: 6, untilMin: 0 },
-];
 
 function renderPlanTimeline(hostEl, goal, phase, daysUntil, upcoming) {
   if (!goal.date) {
@@ -152,25 +143,28 @@ function renderPlanTimeline(hostEl, goal, phase, daysUntil, upcoming) {
   }
   const totalDays = Math.max(daysUntil, 1);
 
-  // Sehr kurze Segmente (z.B. die 1-wöchige "Wettkampfwoche" bei einem noch
-  // weit entfernten Ziel) bekommen eine Mindestbreite, damit sie als eigene
-  // Farbe erkennbar/hoverbar bleiben - flex-shrink gleicht die Differenz bei
-  // den übrigen Segmenten wieder aus (siehe .plan-timeline-bar CSS), die
-  // Reihenfolge/Proportionen bleiben dabei erhalten.
+  // Abschnitte von heute bis zum Wettkampftag (die Erholung danach liegt
+  // hinter dem Ende der Leiste), als Tagesoffsets ab heute. Sehr kurze
+  // Segmente (z.B. der Taper bei einem noch weit entfernten Ziel) bekommen
+  // eine Mindestbreite, damit sie als eigene Farbe erkennbar/hoverbar
+  // bleiben - flex-shrink gleicht die Differenz bei den übrigen Segmenten
+  // wieder aus (siehe .plan-timeline-bar CSS), die Reihenfolge/Proportionen
+  // bleiben dabei erhalten.
   const MIN_SEG_PCT = 6;
-  const segments = PLAN_PHASE_SEGMENTS
-    .filter(seg => seg.untilMin <= totalDays)
+  const todayMid = new Date(); todayMid.setHours(0, 0, 0, 0);
+  const dayOffset = key => Math.round((new Date(key + "T00:00:00") - todayMid) / 86400000);
+  const segments = getPhaseTimeline(todayMid, goal)
+    .filter(seg => seg.phase !== "erholung")
     .map(seg => {
-      const offsetStart = totalDays - Math.min(totalDays, seg.untilMax);
-      const offsetEnd = totalDays - seg.untilMin;
-      return { ...seg, offsetStart, offsetEnd, widthPct: Math.max(MIN_SEG_PCT, ((offsetEnd - offsetStart) / totalDays) * 100) };
+      const offsetStart = dayOffset(seg.from);
+      const offsetEnd = Math.min(totalDays, dayOffset(seg.to) + 1);
+      return { ...seg, key: seg.phase, label: PERIOD_PHASES[seg.phase].label, offsetStart, offsetEnd, widthPct: Math.max(MIN_SEG_PCT, ((offsetEnd - offsetStart) / totalDays) * 100) };
     })
     .filter(seg => seg.offsetEnd > seg.offsetStart);
 
   // Kalenderwochen mit bereits geplanten Einheiten -> als Punkt auf der
   // Zeitleiste markieren (Tagesoffset ihres Montags, damit mehrere Einheiten
   // derselben Woche nicht mehrfach Punkte erzeugen).
-  const todayMid = new Date(); todayMid.setHours(0, 0, 0, 0);
   const plannedWeekOffsets = [...new Set(upcoming.map(p => {
     const d = Math.round((new Date(p.date + "T00:00:00") - todayMid) / 86400000);
     return Math.floor(d / 7) * 7;
@@ -202,9 +196,10 @@ function renderPlanTimeline(hostEl, goal, phase, daysUntil, upcoming) {
 
   hostEl.querySelectorAll(".plan-timeline-seg").forEach(el => {
     el.addEventListener("mousemove", e => {
-      const seg = PLAN_PHASE_SEGMENTS.find(s => s.key === el.dataset.seg);
+      const seg = segments.find(s => s.key === el.dataset.seg);
       const isCurrent = seg.key === phase.key;
-      showTip(e, `<b>${escapeHtml(seg.label)}</b>${isCurrent ? " · aktuell" : ""}`, hostEl);
+      const range = `${fmtDate(new Date(seg.from + "T00:00:00"))}–${fmtDate(new Date(seg.to + "T00:00:00"))}`;
+      showTip(e, `<b>${escapeHtml(seg.label)}</b> · ${range}${isCurrent ? " · aktuell" : ""}`, hostEl);
     });
     el.addEventListener("mouseleave", hideTip);
   });
@@ -241,7 +236,8 @@ function planEditNutritionHtml(p, isNew) {
 // `defaults` (nur bei Neuanlage relevant): { date, goalId, phase } - z.B.
 // vorbelegtes Datum aus dem Kalendertag, oder das Hauptevent-Ziel aus der
 // Trainingsplan-Kachel, damit die manuell angelegte Einheit dort genauso
-// erscheint wie eine von der KI erstellte.
+// erscheint wie eine von der KI erstellte. Ohne `phase` ergibt sie sich beim
+// Anlegen aus dem gewählten Datum (buildPlannedWorkout).
 // "Lessons Learned"-Block (Button + Ergebnis/Fehler/Lade-Zustand) fuer eine
 // bereits gespeicherte geplante Einheit - vorausschauende KI-Einordnung
 // basierend auf aehnlichen frueheren Einheiten (siehe generateLessons,

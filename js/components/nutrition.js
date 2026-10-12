@@ -150,8 +150,8 @@ function renderPreWorkoutTiming() {
 }
 
 // Ab wie vielen Tagen vor dem Event die Wettkampf-Verpflegungs-Kachel
-// ausführlich wird - dieselbe Schwelle wie der Beginn der Taper-Phase
-// (computeTrainingPhase "taper-beginn", js/analytics/training-plan.js), da
+// ausführlich wird - spätestens ab Beginn der Taper-Phase (Rennwoche + Woche
+// davor = 7-13 Tage, getPhase in js/analytics/periodization.js), da
 // sich Zielzeiten/Renneinteilung vorher noch ändern können und konkrete
 // Verpflegungsangaben so früh eher verwirren als helfen.
 const RACE_FUELING_TAPER_DAYS = 14;

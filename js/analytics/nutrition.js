@@ -73,7 +73,7 @@ function classifyCarbCategory(minutes, hasHart) {
 // - Aufbau/spezifische Vorbereitung: unverändert die Mitte des Bereichs.
 function carbBiasForPhase(phaseKey, catKey) {
   if (phaseKey === "grundlage" && (catKey === "rest" || catKey === "moderate")) return "low";
-  if (phaseKey === "taper-beginn" || phaseKey === "taper-final") return "high";
+  if (phaseKey === "taper") return "high";
   return "mid";
 }
 

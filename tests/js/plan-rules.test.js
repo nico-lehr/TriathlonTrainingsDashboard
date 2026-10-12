@@ -12,7 +12,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const ROOT = path.join(__dirname, "..", "..");
-const SCRIPTS = ["js/utils/dates.js", "js/utils/formatting.js", "js/analytics/training-load.js", "js/analytics/plan-rules.js"];
+const SCRIPTS = ["js/utils/dates.js", "js/utils/formatting.js", "js/analytics/training-load.js", "js/analytics/plan-rules.js", "js/analytics/periodization.js"];
 
 const app = vm.createContext({ DATA: [] });
 SCRIPTS.forEach(f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), "utf8"), app, { filename: f }));
@@ -313,4 +313,65 @@ test("Regel 6: Triathlon-Woche ohne lockeres Schwimmen -> warn mit add_easy_sess
 test("Regel 6: erst halb geplante Woche wird nicht bemängelt", () => {
   const plan = [...cleanWeek(), pw(day(7), "Rad", 60, "leicht")]; // nächste Woche nur Montag
   assert.strictEqual(byRule(validate(plan, { goal: TRIATHLON }), "goal_base").length, 0);
+});
+
+/* ---------- Periodisierung (js/analytics/periodization.js) ---------- */
+
+// Aktueller Wochenumfang aus HISTORY: Ø (400 + 260 + 370) / 3 = 343 min,
+// Startniveau = höchstens die letzte normale Woche, auf 5 abgerundet -> 340 min.
+const raceOn = n => ({ id: "g2", name: "Stadttriathlon", sport: "Triathlon", date: day(n), isPrimary: true });
+
+test("Periodisierung: Taper-Woche über dem Zielumfang -> ein Hinweis statt +10 %/Entlastung", () => {
+  const goal = raceOn(10); // Do 22.10.: diese Woche ist die Woche vor der Rennwoche
+  const plan = cleanWeek(); // 375 min
+  const result = validate(plan, { goal });
+  const v = byRule(result, "phase_volume");
+  assert.strictEqual(v.length, 1);
+  assert.strictEqual(v[0].severity, "warn");
+  assert.strictEqual(v[0].date, day(0));
+  assert.match(v[0].text, /Taper-Woche vor „Stadttriathlon“/);
+  assert.strictEqual(v[0].suggestion.action, "reduce_week_volume");
+  assert.strictEqual(v[0].suggestion.target_minutes, 235); // 340 * 0,7, auf 5 abgerundet
+  assert.strictEqual(byRule(result, "volume_increase").length + byRule(result, "deload").length, 0);
+
+  const fixed = validate(applySuggestion(plan, v[0].suggestion), { goal });
+  assert.strictEqual(byRule(fixed, "phase_volume").length, 0);
+});
+
+test("Periodisierung: Rennwoche - der Wettkampftag zählt nicht mit und wird nie gekürzt", () => {
+  const goal = raceOn(6); // So 18.10.
+  const plan = cleanWeek(); // So 60 min Laufen = Wettkampftag
+  const v = byRule(validate(plan, { goal }), "phase_volume");
+  assert.strictEqual(v.length, 1);
+  assert.match(v[0].text, /Rennwoche/);
+  assert.match(v[0].text, /315 Minuten/); // 375 - 60
+  assert.strictEqual(v[0].suggestion.target_minutes, 170); // 340 * 0,5
+  assert.ok(v[0].suggestion.workouts.every(w => w.workoutId !== plan[5].id), "Wettkampftag bleibt");
+});
+
+test("Periodisierung: Erholungswoche - nur locker (Regel 7) und weniger Umfang", () => {
+  const goal = raceOn(-1); // Rennen gestern
+  const plan = [
+    pw(day(2), "Laufen", 50, "hart"),
+    pw(day(4), "Rad", 150, "leicht"), // lang = hart
+    pw(day(5), "Schwimmen", 30, "leicht"),
+    pw(day(9), "Laufen", 50, "hart"), // 10 Tage nach dem Rennen: wieder erlaubt
+  ];
+  const result = validate(plan, { goal });
+  const easy = byRule(result, "recovery_week");
+  assert.deepStrictEqual(easy.map(v => v.workoutId), [plan[0].id, plan[1].id]);
+  assert.ok(easy.every(v => v.severity === "warn"));
+  assert.match(easy[0].text, /Erholungswoche nach „Stadttriathlon“/);
+  assert.deepStrictEqual([easy[0].suggestion.action, easy[0].suggestion.intensity], ["set_intensity", "leicht"]);
+  assert.deepStrictEqual([easy[1].suggestion.action, easy[1].suggestion.duration_min], ["reduce_duration", 120]);
+
+  const vol = byRule(result, "phase_volume");
+  assert.strictEqual(vol.length, 1);
+  assert.strictEqual(vol[0].suggestion.target_minutes, 135); // 340 * 0,4
+});
+
+test("Periodisierung: ohne Zieldatum oder weit vor dem Rennen keine neuen Hinweise", () => {
+  const rules = r => r.filter(v => v.rule === "phase_volume" || v.rule === "recovery_week");
+  assert.deepStrictEqual(rules(validate(cleanWeek(), { goal: TRIATHLON })), []);
+  assert.deepStrictEqual(rules(validate(cleanWeek(), { goal: { name: "Marathon", sport: "Laufen" } })), []);
 });

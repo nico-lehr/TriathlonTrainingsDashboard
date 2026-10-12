@@ -258,8 +258,8 @@ async function generateTrainingPlan(goalId, { replace = false } = {}) {
     // als feste Vorgabe; was sie trotzdem nicht einplant - oder was auf einem
     // schon verplanten Tag liegt -, ergänzt addOpenWishesToPlan() danach selbst.
     const wishes = openPlanWishes().filter(w => windowDates.includes(w.date));
-    const phase = computeTrainingPhase(Math.round((new Date(goal.date + "T00:00:00") - new Date(new Date().setHours(0, 0, 0, 0))) / 86400000));
-    const defaults = { goalId: goal.id, phase: phase.key, source: "ai" };
+    // Die Phase bekommt jede Einheit selbst aus ihrem Datum (buildPlannedWorkout).
+    const defaults = { goalId: goal.id, source: "ai" };
     const planUntil = windowDates[windowDates.length - 1];
     const result = await checkedPlanFromAi({
       ask: async violations => {

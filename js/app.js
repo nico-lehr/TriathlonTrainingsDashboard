@@ -19,6 +19,7 @@ function renderAll() {
   renderRecovery(); // Garmin-Erholungsdaten; blendet sich selbst aus, solange nichts synchronisiert wurde
   renderTable(filtered);
   renderCoachWorkoutsMini(filtered);
+  renderRaceCountdown(); // Ist-Minuten dieser Woche hängen an den Trainings (volle Historie)
   renderCalendar(); // nutzt immer die volle Historie
   renderEquipmentBanner(); // Hinweis in Kalender + Übersicht, falls Equipment fällig ist
   renderRecords(); // nutzt immer die volle Historie
