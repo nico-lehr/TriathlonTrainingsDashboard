@@ -1,6 +1,5 @@
 """Triathlon Dashboard Backend - Phase 1 (Local)."""
 from flask import Flask, request
-from flask_cors import CORS
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from .config import config
@@ -11,16 +10,14 @@ Session = None
 
 def create_app():
     """Create and configure Flask application."""
-    app = Flask(__name__)
+    # static_folder=None: Dateien liefert nur frontend.py aus (Erlaubt-Liste).
+    app = Flask(__name__, static_folder=None)
     app.config.from_object(config)
     if not app.config.get("SECRET_KEY"):
         raise RuntimeError(
             "SECRET_KEY fehlt. Lege im Projektordner eine Datei .env an "
             "(Vorlage: .env.example) und trage dort einen langen Zufallswert ein."
         )
-
-    # Enable CORS for localhost frontend
-    CORS(app, origins=["http://localhost:3000", "http://localhost:8000", "file://"])
 
     # Initialize database
     global db, Session
@@ -35,7 +32,10 @@ def create_app():
 
     # Register blueprints
     from .routes import api_bp
+    from .frontend import frontend_bp
     app.register_blueprint(api_bp, url_prefix="/api/v1")
+    # Dashboard unter derselben Adresse wie die API - deshalb kein CORS noetig.
+    app.register_blueprint(frontend_bp)
 
     return app, Session
 

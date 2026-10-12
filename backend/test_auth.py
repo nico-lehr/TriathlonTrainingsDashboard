@@ -16,8 +16,15 @@ from backend.models import AthleteLogin
 config.SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
 config.SECRET_KEY = "nur-fuer-tests"
 
-app, session_factory = create_app()
+app = session_factory = None
 PASSWORD = "richtig-langes-passwort"
+
+
+def setUpModule():
+    # Erst hier statt beim Import: laufen mehrere Testdateien zusammen, bekommt
+    # so jede ihre eigene frische Datenbank direkt vor ihren Tests.
+    global app, session_factory
+    app, session_factory = create_app()
 
 
 def make_user(name):

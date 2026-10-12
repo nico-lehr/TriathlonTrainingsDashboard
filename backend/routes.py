@@ -11,7 +11,7 @@ from datetime import datetime, date
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as SessionType
 
-from . import get_current_athlete_id, Session
+from . import get_current_athlete_id
 from .auth import check_login, make_token, note_failed_login, too_many_failed_logins
 from .models import Athlete, AthleteLogin, Workout, Wellness, PlannedWorkout, RecoveryCheck, Goal, IcalPlannedWorkout
 
@@ -49,7 +49,9 @@ def response_error(error, code, status=400):
 
 
 def get_session():
-    """Get database session."""
+    """Get database session - bei jedem Aufruf die aktuelle Fabrik aus
+    create_app(), nicht eine beim Import festgehaltene."""
+    from . import Session
     return Session()
 
 
@@ -618,7 +620,7 @@ def sync_ical_planned_workouts():
     if not isinstance(workouts, list):
         return response_error("'workouts' muss ein Array sein", "VALIDATION_ERROR", 400)
 
-    session: SessionType = Session()
+    session: SessionType = get_session()
     try:
         session.query(IcalPlannedWorkout).filter_by(athlete_id=athlete_id).delete()
         for w in workouts:
@@ -678,7 +680,7 @@ def get_ical_feed(athlete_id):
     ist abrufbar - fremde athlete_ids sehen aus wie nicht vorhanden."""
     if athlete_id != get_current_athlete_id():
         return response_error("Kalender nicht gefunden", "not_found", 404)
-    session: SessionType = Session()
+    session: SessionType = get_session()
     try:
         rows = session.query(IcalPlannedWorkout).filter_by(athlete_id=athlete_id).order_by(IcalPlannedWorkout.date).all()
         lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Triathlon Dashboard//iCal Export//DE", "CALSCALE:GREGORIAN"]
