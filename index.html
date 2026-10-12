@@ -285,6 +285,7 @@
           <button class="update-btn" id="cal-add-workout-btn" type="button" title="Workout manuell für den gerade fokussierten Tag anlegen">+ Workout</button>
         </div>
       </div>
+      <p class="card-sub cal-weather-note" id="cal-weather-note" hidden></p>
       <div class="cal-grid-scroll">
         <div class="cal-grid-month" id="calendar-grid"></div>
       </div>
@@ -840,6 +841,23 @@
       </div>
 
       <div class="card">
+        <h2>Wetter im Kalender
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">7-Tage-Vorhersage von Open-Meteo (kostenlos, ohne Konto) für deinen Heimatort. Sie steht im Kalender an Outdoor-Einheiten: Rad und Laufen, außer der Titel nennt Indoor, Rolle, Laufband, Halle o. Ä.; Schwimmen nur mit „Freiwasser“, „Open Water“, „See“ oder „Meer“ im Titel. Die Vorhersage holt der Dashboard-Server, gespeichert wird nur der Ort.</div></span>
+        </h2>
+        <p class="card-sub">Optional — Wetter an Outdoor-Einheiten der nächsten 7 Tage.</p>
+        <div class="coach-settings-row">
+          <label for="weather-location-input">Heimatort suchen</label>
+          <div class="weather-search-row">
+            <input type="text" id="weather-location-input" class="coach-input" maxlength="100" placeholder="z.B. Heidelberg">
+            <button type="button" class="cal-today-btn" id="weather-location-search-btn">Suchen</button>
+          </div>
+        </div>
+        <p class="coach-test-status weather-status" id="weather-location-status"></p>
+        <div class="weather-place-list" id="weather-place-list"></div>
+        <button type="button" class="reset-link weather-clear-btn" id="weather-location-clear-btn" hidden>Heimatort entfernen</button>
+      </div>
+
+      <div class="card">
         <h2>Equipment
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Kilometerstand von Laufschuhen/Rad wird automatisch aus deinen Trainings gezählt, solange ein Item als "Standard" für die Sportart markiert ist. Verschleißteile (Kette, Reifen, Bremsbeläge) teilen sich die Kilometer des zugehörigen Rads. Warnt hier, im Kalender und auf dem Dashboard, sobald ein Service-/Austausch-Intervall erreicht ist.</div></span>
         </h2>
@@ -985,6 +1003,7 @@
 <script src="js/data/goals.js"></script>
 <script src="js/data/gpx-parser.js"></script>
 <script src="js/data/athlete.js"></script>
+<script src="js/data/weather.js"></script>
 <script src="js/data/health.js"></script>
 <script src="js/data/garmin-wellness.js"></script>
 <script src="js/data/planned-workouts.js"></script>
@@ -1019,6 +1038,7 @@
 <script src="js/components/dashboard.js"></script>
 <script src="js/components/recovery.js"></script>
 <script src="js/components/calendar.js"></script>
+<script src="js/components/weather.js"></script>
 <script src="js/components/records.js"></script>
 <script src="js/components/equipment.js"></script>
 <script src="js/components/health-status.js"></script>

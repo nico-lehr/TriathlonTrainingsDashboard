@@ -990,6 +990,39 @@
 
   .cal-planned-list-day .cal-planned-chip { font-size: 12px; padding: 6px 10px; }
 
+  /* Wetter an Outdoor-Einheiten (calWeatherHtml, js/components/calendar.js) */
+  .cal-weather {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 1px 5px;
+    font-size: 10.5px; font-weight: 600; color: var(--text-secondary); font-variant-numeric: tabular-nums;
+  }
+
+  .cal-weather-sub { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 0 6px; font-weight: 500; color: var(--text-muted); }
+
+  .cal-weather-sub > span { white-space: nowrap; }
+
+  .cal-weather-day { font-size: 12.5px; margin-bottom: 8px; }
+
+  .cal-weather-day .cal-weather-sub { font-size: 11px; }
+
+  .card .card-sub.cal-weather-note { margin: -4px 0 12px; }
+
+  /* "Wetter im Kalender"-Karte in den Einstellungen (js/components/weather.js) */
+  .weather-search-row { display: flex; align-items: center; gap: 8px; }
+
+  .weather-search-row .cal-today-btn { flex: none; }
+
+  .weather-status { margin: 10px 0 0; }
+
+  .weather-place-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+  .weather-clear-btn { margin-top: 10px; }
+
+  .weather-place-list:empty { display: none; }
+
+  .weather-place-region { color: var(--text-muted); font-weight: 500; }
+
+  .weather-clear-btn[hidden] { display: none; }
+
   .goal-recommendation p { margin: 0 0 10px; }
 
   .goal-recommendation p:last-child { margin-bottom: 0; }

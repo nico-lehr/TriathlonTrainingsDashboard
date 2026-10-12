@@ -178,6 +178,25 @@ function sameComparisonGroup(ref, cand) {
 
 function isIndoorRide(w) { return (w._rideEnv !== undefined ? w._rideEnv : rideEnvironment(w)) === "indoor"; }
 
+// Findet eine GEPLANTE Einheit (js/data/planned-workouts.js) draußen statt?
+// Entscheidet, wo der Kalender das Wetter zeigt. Geplante Einheiten haben nur
+// Sportart und Titel (keine sub_sport/GPS-Signale wie oben), deshalb eine
+// einfache, feste Regel nur über den Titel:
+//  - Rad und Laufen: draußen, außer der Titel nennt ein Indoor-Stichwort
+//    (dieselben wie bei echten Radeinheiten + Laufband/Halle/Plattformen).
+//  - Schwimmen: nur mit "Freiwasser"/"Open Water"/"See"/"Meer" im Titel, sonst Becken.
+//  - Kraft, Mobility und alles andere: drinnen.
+// Ein Stichwort zählt nur am Wortanfang ("Rollentraining" ja, "Kontrolle" nein).
+const PLANNED_INDOOR_RE = new RegExp(`\\b(${[...RIDE_ENV_INDOOR_LABELS, "Laufband", "Halle", "Zwift", "MyWhoosh", "Rouvy"].join("|")})`, "i");
+const PLANNED_OPEN_WATER_RE = /\b(freiwasser|open ?water|see|meer)/i;
+
+function isOutdoorPlannedWorkout(p) {
+  const title = (p && p.title) || "";
+  if (p && (p.sport === "Rad" || p.sport === "Laufen")) return !PLANNED_INDOOR_RE.test(title);
+  if (p && p.sport === "Schwimmen") return PLANNED_OPEN_WATER_RE.test(title);
+  return false;
+}
+
 
 /* ======================================================================
    DUBLETTEN ZUSAMMENFUEHREN

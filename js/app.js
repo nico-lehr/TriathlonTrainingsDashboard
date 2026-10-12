@@ -83,6 +83,7 @@ function checkAutoReplan() {
   initInfoPopovers();
   initCardSearch();
   initAccount();
+  initWeatherSettings();
   initAnalysis();
   renderAll();
   checkAutoReplan();
