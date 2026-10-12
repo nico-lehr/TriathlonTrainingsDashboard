@@ -23,11 +23,11 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 
 | Aufgabe | Status | Erledigte Schritte | Prozent | Letzte Änderung |
 |---|---|---|---|---|
-| A Wettkampf-Countdown & Periodisierung | in Prüfung (3 Schritte gebaut) | 0 / 3 | 0 % | 2026-10-12 |
+| A Wettkampf-Countdown & Periodisierung | Prüfung nicht bestanden – Korrektur läuft (Wochenziel-Kurve sinkt ab, Rundung schluckt Wachstum, Einfrieren bei Tippfehler im Datum) | 0 / 3 | 0 % | 2026-10-12 |
 | B Triathlon-Auswertungen | fertig (geprüft: erst FAIL, nach Korrektur PASS) | 4 / 4 | 100 % | 2026-10-12 |
-| C Garmin-Workouts auf die Uhr | offen | 0 / 3 | 0 % | – |
+| C Garmin-Workouts auf die Uhr | läuft | 0 / 3 | 0 % | 2026-10-12 |
 | D Handy / iPhone | fertig (geprüft: PASS; kleine CSS-Nachbesserungen eingebaut) | 4 / 4 | 100 % | 2026-10-12 |
-| E Equipment, Wetter, Rennplan | offen | 0 / 3 | 0 % | – |
+| E Equipment, Wetter, Rennplan | läuft (E1 und E2+E3 parallel) | 0 / 3 | 0 % | 2026-10-12 |
 | F Abschluss-Check | offen | 0 / 4 | 0 % | – |
 
 **Gesamt: 38 % (8 von 21 Schritten)**
@@ -43,6 +43,10 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 - A: Die Phasen-Angaben (Taper 7–14 Tage, Spezifisch 4–6 Wochen, Aufbau 6–8 Wochen) überschneiden sich, wenn man sie als Abstand zum Rennen liest. Standard: als Phasen-LÄNGEN gelesen – Taper 2 Wochen (inkl. Rennwoche), Spezifisch 6, Aufbau 8, davor Grundlage; Wechsel immer montags. Änderbar über Konstanten in `js/analytics/periodization.js`.
 - A: Plan-Einheiten nutzen das vorhandene Feld `phase` (statt eines zweiten Felds `training_phase`). Neue Regel 7 „Erholungswoche nach dem Rennen“ ist eine Warnung, kein Block.
 - D: iPhone-Layout braucht iOS 16 oder neuer; Kalender-Monatsansicht scrollt auf dem Handy innerhalb der Karte; Kopieren-Knöpfe gehen auf dem iPhone nur über HTTPS (`tailscale serve`).
+- C1: Die Plan-Einheiten liegen in der Ablage pro Person, nicht in der alten Tabelle `planned_workouts` (die das Dashboard nicht nutzt). Standard: `steps` wird ein Feld der Plan-Einheit statt einer neuen Spalte – damit ist keine Datenbank-Änderung nötig.
+- C2: Hochgeladen wird mit dem Garmin-Token aus dem Garmin-Sync (`~/.triathlon/garmin_<Nummer>.token`). Ohne Token gibt es eine Anleitung statt einer Passwort-Abfrage.
+- E1: Equipment gab es schon im Browser. Es wird auf die neue Tabelle umgestellt; vorhandene Einträge werden einmalig übernommen.
+- Welle 2 startete auf einer gemeinsamen Basis (Arbeitsstand + A vor Korrektur), damit weniger Konflikte entstehen.
 - Reihenfolge: A startet erst nach Trainingsplaner 2/3 (gleiche Dateien), D erst nach dem Layout (gleiches CSS).
 - Passwort vergessen: zusätzlich `backend/create_user.py --reset` gebaut (sonst gäbe es keinen Weg zurück).
 - Altes Doppelklick-Dashboard: Daten lassen sich mit `tools/export-browser-data.html` exportieren und mit `backend/import_workouts_json.py --browser-export` übernehmen.
