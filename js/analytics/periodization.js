@@ -32,25 +32,40 @@ const PERIOD_PHASES = {
 
 /* ---------- Zielumfang je Woche ---------- */
 
-// "Aktueller Wochenumfang" = Ø der Minuten der letzten 4 abgeschlossenen
-// Kalenderwochen (nur Wochen ab dem ersten erfassten Training). Alle Ziele
-// sind Prozent davon.
+// Anker = "aktueller Wochenumfang": die letzte normale Woche aus Regel 4 von
+// plan-rules.js (planVolumeStreak) - Entlastungs-, Taper- und Krankheits-
+// wochen verschieben ihn nicht, so sinkt das Ziel nicht von selbst. Nur ohne
+// normale Woche der Ø der letzten 4 abgeschlossenen Wochen (ab dem ersten
+// erfassten Training), ohne beides nur Prozent. Alle Ziele sind Anteile davon.
 const PERIOD_BASELINE_WEEKS = 4;
 
-// Steigerung je Belastungswoche - bewusst unter der +10-%-Grenze von
-// plan-rules.js (PLAN_MAX_WEEKLY_INCREASE): Grundlage langsam, Aufbau etwas
-// mehr, in der spezifischen Phase wird das erreichte Niveau gehalten.
+// Steigerung je Belastungswoche (schon in der aktuellen Woche) - bewusst unter
+// der +10-%-Grenze von plan-rules.js (PLAN_MAX_WEEKLY_INCREASE): Grundlage
+// langsam, Aufbau etwas mehr, in der spezifischen Phase wird gehalten.
 const PERIOD_GROWTH = { grundlage: 0.03, aufbau: 0.05, spezifisch: 0 };
 
-// Taper: Anteil des zuletzt erreichten Niveaus - [Rennwoche, Woche davor]
-// (ein Eintrag je PERIOD_TAPER_WEEKS). Erholungswoche nach dem Rennen.
+// Die Vorausschau steigt höchstens 30 % über den Anker. Der Anker wandert
+// jeden Montag mit dem tatsächlich Trainierten mit - die echte Steigerung
+// bestimmt also das Training; die Grenze verhindert nur absurde Spitzen bei
+// einem Rennen in weiter Ferne (sonst z. B. 925 statt 370 Minuten in einem Jahr).
+const PERIOD_MAX_GROWTH = 0.3;
+
+// Taper: Anteil der letzten Belastungswoche - [Rennwoche, Woche davor] (ein
+// Eintrag je PERIOD_TAPER_WEEKS). Erholungswoche nach dem Rennen.
 const PERIOD_TAPER_FACTORS = [0.5, 0.7];
 const PERIOD_RECOVERY_FACTOR = 0.4;
 
 // Entlastungswochen kommen aus Regel 4 von plan-rules.js: dieselbe Zählweise
 // (planVolumeStreak), derselbe Takt (PLAN_DELOAD_EVERY_WEEKS) und dieselbe
-// Absenkung (PLAN_DELOAD_REDUCTION) - Zielkurve und Regelprüfung können sich
-// so nicht widersprechen.
+// Absenkung (PLAN_DELOAD_REDUCTION). Entlastung, Taper und Erholung werden aus
+// dem angezeigten Wert der letzten Belastungswoche berechnet und zählen damit
+// für Regel 4 immer als "leichtere Woche". Fiele eine Entlastungswoche genau
+// auf die letzte Woche vor dem Taper, entfällt sie (sonst drei leichte Wochen
+// in Folge) - Regel 4 macht dort dieselbe Ausnahme.
+//
+// Die Zielkurve reicht höchstens 104 Wochen voraus (auch Schutz vor
+// Tippfehlern wie 9999-12-31).
+const PERIOD_HORIZON_WEEKS = 104;
 
 const PERIOD_WEEK_LABELS = {
   belastung: "Belastungswoche", entlastung: "Entlastungswoche", taper: "Taper-Woche",
@@ -88,34 +103,51 @@ function getPhase(date, goal) {
   return "grundlage";
 }
 
+// Ziel, das `daysUntil` Tage nach heute stattfindet - für Aufrufer, die nur
+// die Tage kennen (computeTrainingPhase, Race-Readiness).
+function periodRaceInDays(daysUntil) {
+  const race = periodDay(new Date());
+  race.setDate(race.getDate() + daysUntil);
+  return { date: localDateStr(race) };
+}
+
 // Die Phasen von `date` bis zum Ende der Erholung als zusammenhängende
 // Abschnitte: [{ phase, from, to }] ("YYYY-MM-DD", jeweils einschließlich).
 // Der erste Abschnitt ist die aktuelle Phase, der zweite der nächste Wechsel.
+// Direkt aus den Grenzen berechnet (Montage vor der Rennwoche), ohne Tag für Tag.
 function getPhaseTimeline(date, goal) {
-  const out = [];
-  if (!getPhase(date, goal)) return out;
-  for (let d = periodDay(date); ; d.setDate(d.getDate() + 1)) {
-    const phase = getPhase(d, goal);
-    if (!phase) return out;
-    const key = localDateStr(d);
-    const last = out[out.length - 1];
-    if (last && last.phase === phase) last.to = key;
-    else out.push({ phase, from: key, to: key });
-  }
+  if (!getPhase(date, goal)) return [];
+  const day = periodDay(date), race = periodDay(goal.date);
+  const shift = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const firstMonday = weeks => shift(weekStart(race), -7 * (weeks - 1)); // erste Woche mit k = weeks - 1
+  const taper = firstMonday(PERIOD_TAPER_WEEKS);
+  const specific = firstMonday(PERIOD_TAPER_WEEKS + PERIOD_SPECIFIC_WEEKS);
+  const build = firstMonday(PERIOD_TAPER_WEEKS + PERIOD_SPECIFIC_WEEKS + PERIOD_BUILD_WEEKS);
+  return [
+    { phase: "grundlage", from: null, to: shift(build, -1) },
+    { phase: "aufbau", from: build, to: shift(specific, -1) },
+    { phase: "spezifisch", from: specific, to: shift(taper, -1) },
+    { phase: "taper", from: taper, to: race },
+    { phase: "erholung", from: shift(race, 1), to: shift(race, PERIOD_RECOVERY_DAYS) },
+  ].filter(seg => seg.to >= day)
+    .map(seg => ({ phase: seg.phase, from: localDateStr(!seg.from || seg.from < day ? day : seg.from), to: localDateStr(seg.to) }));
 }
 
 /* ---------- Zielumfang ---------- */
 
 // Zielumfang je Kalenderwoche von der aktuellen Woche bis zum Ende der
-// Erholungswoche. plannedWorkouts/history wie bei validatePlan() - gezählt
-// wird genauso (planSessions: absolviert + noch offen geplant), nur der
-// Wettkampftag selbst nicht (das Rennen ist kein Trainingsumfang).
-// Liefert null ohne Ziel/Datum, sonst:
-//   { baselineMin, baselineWeeks, weeks: [{ weekStart, phase, type,
-//     targetPct, targetMin, doneMin, plannedMin }] }
-// baselineMin/targetMin sind null, solange es keinen aktuellen Wochenumfang
-// gibt (kein Training in den letzten Wochen) - targetPct gibt es trotzdem.
-// Annahme für spätere Wochen: der Plan folgt der Kurve.
+// Erholungswoche (höchstens PERIOD_HORIZON_WEEKS). plannedWorkouts/history
+// wie bei validatePlan() - gezählt wird genauso (planSessions: absolviert +
+// noch offen geplant), nur der Wettkampftag selbst nicht (das Rennen ist kein
+// Trainingsumfang). Liefert null ohne Ziel/Datum, sonst:
+//   { baselineMin, baselineWeek, baselineWeeks, weeks: [{ weekStart, phase,
+//     type, targetPct, targetMin, doneMin, plannedMin }] }
+// baselineMin = Anker in Minuten: die letzte normale Woche (baselineWeek =
+// ihr Montag) oder, ohne sie, der Ø über baselineWeeks Wochen. null, wenn es
+// keinen Umfang gibt (kein Training in den letzten Wochen) - dann sind auch
+// alle targetMin null, targetPct gibt es trotzdem. Minuten ganzzahlig
+// abgerundet. Annahme für spätere Wochen: der Plan folgt der Kurve - dann
+// liefert die Neuberechnung am nächsten Montag dieselben Ziele.
 function getWeeklyTargets(goal, plannedWorkouts, history, today = new Date()) {
   if (!goal || !goal.date) return null;
   const todayKey = localDateStr(periodDay(today));
@@ -130,48 +162,50 @@ function getWeeklyTargets(goal, plannedWorkouts, history, today = new Date()) {
   const weekMin = wk => { const e = byWeek.get(wk); return e ? e.done + e.planned : 0; };
 
   const wk0 = planWeekKey(todayKey);
+  const { ref, refWeek, streak: streak0 } = planVolumeStreak(weekMin, wk0);
   const firstDone = sessions.filter(s => !s.planned).map(s => s.date).sort()[0];
   const pastWeeks = [];
   for (let i = 1; i <= PERIOD_BASELINE_WEEKS; i++) {
     const wk = planShiftDay(wk0, -7 * i);
     if (firstDone && planShiftDay(wk, 6) >= firstDone) pastWeeks.push(wk);
   }
-  const baselineMin = pastWeeks.length ? Math.round(pastWeeks.reduce((sum, wk) => sum + weekMin(wk), 0) / pastWeeks.length) : null;
-  const base = baselineMin > 0 ? baselineMin : null;
+  const average = pastWeeks.length ? Math.round(pastWeeks.reduce((sum, wk) => sum + weekMin(wk), 0) / pastWeeks.length) : 0;
+  const baselineMin = ref != null ? planFloorMin(ref) : (average > 0 ? average : null);
 
-  // Startniveau: der aktuelle Umfang, aber nie über der letzten normalen Woche
-  // (sonst läge schon die erste Steigerung über der +10-%-Grenze). Mit Umfang
-  // wird in Minuten gerechnet (auf 5 abgerundet), ohne nur in Prozent.
-  const { ref, streak: streak0 } = planVolumeStreak(weekMin, wk0);
-  const unit = base != null ? x => Math.floor(x / 5) * 5 : x => x;
-  let level = base != null ? unit(ref != null ? Math.min(base, ref) : base) : 100;
-  let streak = streak0, firstLoad = true;
+  // In Minuten mit ganzzahlig abgerundeten Werten; ohne Umfang in Prozent
+  // (Anker 100, ungerundet). `last` = angezeigter Wert der letzten
+  // Belastungswoche - daraus wachsen die nächsten Wochen und daraus ergeben
+  // sich Entlastung, Taper und Erholung.
+  const start = baselineMin != null ? baselineMin : 100;
+  const show = baselineMin != null ? planFloorMin : x => x;
+  const cap = start * (1 + PERIOD_MAX_GROWTH);
+  let last = start, streak = streak0;
 
   const weeks = [];
-  for (let wk = wk0; ; wk = planShiftDay(wk, 7)) {
+  for (let i = 0, wk = wk0; i < PERIOD_HORIZON_WEEKS; i++, wk = planShiftDay(wk, 7)) {
     const phase = getPhase(wk, goal);
     if (!phase) break;
+    const k = periodWeeksToRace(wk, goal);
     let type, value;
     if (PERIOD_GROWTH[phase] != null) {
-      if (streak >= PLAN_DELOAD_EVERY_WEEKS - 1) {
-        type = "entlastung"; value = unit(level * (1 - PLAN_DELOAD_REDUCTION)); streak = 0;
+      if (streak >= PLAN_DELOAD_EVERY_WEEKS - 1 && k !== PERIOD_TAPER_WEEKS) {
+        type = "entlastung"; value = show(last * (1 - PLAN_DELOAD_REDUCTION)); streak = 0;
       } else {
-        if (!firstLoad) level = unit(level * (1 + PERIOD_GROWTH[phase]));
-        type = "belastung"; value = level; streak++; firstLoad = false;
+        last = show(Math.min(cap, last * (1 + PERIOD_GROWTH[phase])));
+        type = "belastung"; value = last; streak++;
       }
     } else if (phase === "taper") {
-      const k = periodWeeksToRace(wk, goal);
-      type = k === 0 ? "rennwoche" : "taper"; value = unit(level * PERIOD_TAPER_FACTORS[k]); streak = 0;
+      type = k === 0 ? "rennwoche" : "taper"; value = show(last * PERIOD_TAPER_FACTORS[k]); streak = 0;
     } else {
-      type = "erholung"; value = unit(level * PERIOD_RECOVERY_FACTOR); streak = 0;
+      type = "erholung"; value = show(last * PERIOD_RECOVERY_FACTOR); streak = 0;
     }
     const e = byWeek.get(wk) || { done: 0, planned: 0 };
     weeks.push({
       weekStart: wk, phase, type,
-      targetPct: value / (base != null ? base : 100),
-      targetMin: base != null ? value : null,
+      targetPct: value / start,
+      targetMin: baselineMin != null ? value : null,
       doneMin: Math.round(e.done), plannedMin: Math.round(e.planned),
     });
   }
-  return { baselineMin, baselineWeeks: pastWeeks.length, weeks };
+  return { baselineMin, baselineWeek: ref != null ? refWeek : null, baselineWeeks: ref != null ? 0 : pastWeeks.length, weeks };
 }
