@@ -89,11 +89,12 @@ function raceCountdownWeekHtml(w, plan) {
     <div class="csc-sub">${status} · Ziel = ${Math.round(w.targetPct * 100)} % ${raceCountdownBaselineText(plan)}</div>`;
 }
 
-// Bezugswert der Prozentangabe: die letzte normale Woche, sonst der Ø.
+// Bezugswert der Prozentangabe: die letzte normale Woche, beim
+// Wiedereinstieg nach leichteren Wochen der Ausgangswert aus Regel 4.
 function raceCountdownBaselineText(plan) {
-  return plan.baselineWeek
-    ? `deiner letzten normalen Trainingswoche (ab ${fmtDate(new Date(plan.baselineWeek + "T00:00:00"))}: ${plan.baselineMin} min)`
-    : `deines Wochenschnitts (Ø ${plan.baselineMin} min der letzten ${plan.baselineWeeks} ${plan.baselineWeeks === 1 ? "Woche" : "Wochen"})`;
+  return plan.returnAfterWeeks
+    ? `deines Wiedereinstiegs-Werts (${plan.baselineMin} min nach ${plan.returnAfterWeeks} leichteren Wochen in Folge)`
+    : `deiner letzten normalen Trainingswoche (ab ${fmtDate(new Date(plan.baselineWeek + "T00:00:00"))}: ${plan.baselineMin} min)`;
 }
 
 // Balken: erledigt + noch geplant, Strich = Ziel. Gestreckt auf volle Breite

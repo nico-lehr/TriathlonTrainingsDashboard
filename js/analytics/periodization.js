@@ -33,11 +33,13 @@ const PERIOD_PHASES = {
 /* ---------- Zielumfang je Woche ---------- */
 
 // Anker = "aktueller Wochenumfang": die letzte normale Woche aus Regel 4 von
-// plan-rules.js (planVolumeStreak) - Entlastungs-, Taper- und Krankheits-
-// wochen verschieben ihn nicht, so sinkt das Ziel nicht von selbst. Nur ohne
-// normale Woche der Ø der letzten 4 abgeschlossenen Wochen (ab dem ersten
-// erfassten Training), ohne beides nur Prozent. Alle Ziele sind Anteile davon.
-const PERIOD_BASELINE_WEEKS = 4;
+// plan-rules.js (planVolumeStreak) - eine Entlastungs-, Taper- oder
+// Erholungswoche verschiebt ihn nicht, so sinkt das Ziel nicht von selbst.
+// Beginnt die aktuelle Woche eine Belastungsphase nach mind. 2 leichteren
+// Wochen (Krankheit, Urlaub), gilt stattdessen der Wiedereinstiegs-Wert von
+// Regel 4 (`base`, PLAN_RETURN_LIGHT_WEEKS) - in Taper, Rennwoche und
+// Erholung nicht, dort sind die leichten Wochen ja gewollt. Ohne jedes
+// Training in den letzten 8 Wochen nur Prozent. Alle Ziele sind Anteile davon.
 
 // Steigerung je Belastungswoche (schon in der aktuellen Woche) - bewusst unter
 // der +10-%-Grenze von plan-rules.js (PLAN_MAX_WEEKLY_INCREASE): Grundlage
@@ -140,13 +142,14 @@ function getPhaseTimeline(date, goal) {
 // wie bei validatePlan() - gezählt wird genauso (planSessions: absolviert +
 // noch offen geplant), nur der Wettkampftag selbst nicht (das Rennen ist kein
 // Trainingsumfang). Liefert null ohne Ziel/Datum, sonst:
-//   { baselineMin, baselineWeek, baselineWeeks, weeks: [{ weekStart, phase,
+//   { baselineMin, baselineWeek, returnAfterWeeks, weeks: [{ weekStart, phase,
 //     type, targetPct, targetMin, doneMin, plannedMin }] }
 // baselineMin = Anker in Minuten: die letzte normale Woche (baselineWeek =
-// ihr Montag) oder, ohne sie, der Ø über baselineWeeks Wochen. null, wenn es
-// keinen Umfang gibt (kein Training in den letzten Wochen) - dann sind auch
-// alle targetMin null, targetPct gibt es trotzdem. Minuten ganzzahlig
-// abgerundet. Annahme für spätere Wochen: der Plan folgt der Kurve - dann
+// ihr Montag) oder beim Wiedereinstieg nach returnAfterWeeks leichteren
+// Wochen der Wert aus Regel 4 (baselineWeek dann null, sonst ist
+// returnAfterWeeks 0). null ohne Training in den letzten 8 Wochen - dann
+// sind auch alle targetMin null, targetPct gibt es trotzdem. Minuten
+// ganzzahlig abgerundet. Annahme für spätere Wochen: der Plan folgt der Kurve - dann
 // liefert die Neuberechnung am nächsten Montag dieselben Ziele.
 function getWeeklyTargets(goal, plannedWorkouts, history, today = new Date()) {
   if (!goal || !goal.date) return null;
@@ -162,15 +165,10 @@ function getWeeklyTargets(goal, plannedWorkouts, history, today = new Date()) {
   const weekMin = wk => { const e = byWeek.get(wk); return e ? e.done + e.planned : 0; };
 
   const wk0 = planWeekKey(todayKey);
-  const { ref, refWeek, streak: streak0 } = planVolumeStreak(weekMin, wk0);
-  const firstDone = sessions.filter(s => !s.planned).map(s => s.date).sort()[0];
-  const pastWeeks = [];
-  for (let i = 1; i <= PERIOD_BASELINE_WEEKS; i++) {
-    const wk = planShiftDay(wk0, -7 * i);
-    if (firstDone && planShiftDay(wk, 6) >= firstDone) pastWeeks.push(wk);
-  }
-  const average = pastWeeks.length ? Math.round(pastWeeks.reduce((sum, wk) => sum + weekMin(wk), 0) / pastWeeks.length) : 0;
-  const baselineMin = ref != null ? planFloorMin(ref) : (average > 0 ? average : null);
+  const { ref, refWeek, streak: streak0, light, base } = planVolumeStreak(weekMin, wk0);
+  const returning = base !== ref && PERIOD_GROWTH[getPhase(wk0, goal)] != null;
+  const anchor = returning ? base : ref;
+  const baselineMin = anchor != null ? planFloorMin(anchor) : null;
 
   // In Minuten mit ganzzahlig abgerundeten Werten; ohne Umfang in Prozent
   // (Anker 100, ungerundet). `last` = angezeigter Wert der letzten
@@ -207,5 +205,5 @@ function getWeeklyTargets(goal, plannedWorkouts, history, today = new Date()) {
       doneMin: Math.round(e.done), plannedMin: Math.round(e.planned),
     });
   }
-  return { baselineMin, baselineWeek: ref != null ? refWeek : null, baselineWeeks: ref != null ? 0 : pastWeeks.length, weeks };
+  return { baselineMin, baselineWeek: returning ? null : refWeek, returnAfterWeeks: returning ? light : 0, weeks };
 }

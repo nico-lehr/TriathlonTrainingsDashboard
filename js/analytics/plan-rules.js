@@ -54,6 +54,16 @@ const PLAN_DELOAD_EVERY_WEEKS = 4;
 const PLAN_DELOAD_REDUCTION = 0.30;
 const PLAN_VOLUME_LOOKBACK_WEEKS = 8;
 
+// Wiedereinstieg: nach mind. 2 leichteren Wochen in Folge (Krankheit, Urlaub,
+// Entlastung + Pause) ist die letzte normale Woche als Maßstab für die +10 %
+// zu hoch - der Körper hat sich an weniger gewöhnt, und der ACWR (Regel 5)
+// schlägt nach einer Pause nicht an. Dann zählt die stärkste dieser leichteren
+// Wochen, mindestens aber die Hälfte der letzten normalen Woche (sonst käme
+// man nach einer Totalpause nie wieder hoch). Eine einzelne Entlastungswoche
+// ändert nichts.
+const PLAN_RETURN_LIGHT_WEEKS = 2;
+const PLAN_RETURN_MIN_SHARE = 0.5;
+
 // Beim Kürzen einer Woche wird keine Einheit um mehr als die Hälfte gekürzt.
 const PLAN_MAX_SHORTEN = 0.5;
 
@@ -305,19 +315,22 @@ function planShortenWeek(ctx, wk, cur, target, skipDate = null) {
 // Umfang = absolvierte Minuten (Historie) + offene Planeinheiten der Woche.
 // Als eigene Funktion, weil die Periodisierung (getWeeklyTargets,
 // periodization.js) ihre Entlastungswochen genau so zählt.
-// weekMin: "YYYY-MM-DD" (Montag) -> Minuten der Woche.
+// weekMin: "YYYY-MM-DD" (Montag) -> Minuten der Woche. Liefert zusätzlich
+// `light` (leichtere Wochen direkt vor wk) und `base`, den Ausgangswert für
+// die +10 %: sonst ref, beim Wiedereinstieg (PLAN_RETURN_LIGHT_WEEKS) weniger.
 const planDeloadMax = ref => planFloorMin(ref * (1 - PLAN_DELOAD_REDUCTION));
 const planIsLighterWeek = (min, ref) => min === 0 || (ref != null && min <= planDeloadMax(ref));
 
 function planVolumeStreak(weekMin, wk) {
-  let ref = null, refWeek = null, streak = 0;
+  let ref = null, refWeek = null, streak = 0, light = 0, lightMax = 0;
   for (let i = PLAN_VOLUME_LOOKBACK_WEEKS; i >= 1; i--) {
     const prevWk = planShiftDay(wk, -7 * i);
     const min = weekMin(prevWk);
-    if (planIsLighterWeek(min, ref)) streak = 0;
-    else { streak++; ref = min; refWeek = prevWk; }
+    if (planIsLighterWeek(min, ref)) { streak = 0; light++; lightMax = Math.max(lightMax, min); }
+    else { streak++; ref = min; refWeek = prevWk; light = 0; lightMax = 0; }
   }
-  return { ref, refWeek, streak };
+  const base = ref != null && light >= PLAN_RETURN_LIGHT_WEEKS ? Math.max(lightMax, planFloorMin(ref * PLAN_RETURN_MIN_SHARE)) : ref;
+  return { ref, refWeek, streak, light, base };
 }
 
 // Taper-, Renn- und Erholungswochen: hier gilt der Zielumfang der
@@ -355,7 +368,7 @@ function checkPlanVolume(ctx) {
   const out = [];
   const weekMin = wk => planMinutes(planWeekSessions(ctx, wk));
   ctx.weeks.forEach(wk => {
-    const { ref, refWeek, streak } = planVolumeStreak(weekMin, wk);
+    const { ref, refWeek, streak, light, base } = planVolumeStreak(weekMin, wk);
     const week = ctx.periodWeeks.get(wk);
     if (week && week.targetMin != null && PLAN_PHASE_REDUCED_WEEKS.includes(week.type)) {
       out.push(...planPhaseVolume(ctx, wk, week, ref, streak));
@@ -364,12 +377,15 @@ function checkPlanVolume(ctx) {
     if (ref == null) return; // keine Vergleichswoche vorhanden
     const cur = weekMin(wk);
 
-    const increaseMax = planFloorMin(ref * (1 + PLAN_MAX_WEEKLY_INCREASE));
+    const increaseMax = planFloorMin(base * (1 + PLAN_MAX_WEEKLY_INCREASE));
     if (cur > increaseMax) {
       const suggestion = planShortenWeek(ctx, wk, cur, increaseMax);
+      const compared = base === ref
+        ? `${Math.round((cur / ref - 1) * 100)} % mehr als in der ${planWeekLabel(refWeek)} (${Math.round(ref)} Minuten)`
+        : `nach ${light} leichteren Wochen in Folge zu viel auf einmal: Für den Wiedereinstieg zählen ${Math.round(base)} Minuten als Ausgangswert (die stärkste dieser Wochen, mindestens die Hälfte der letzten normalen Woche), das wären ${Math.round((cur / base - 1) * 100)} % mehr`;
       if (suggestion) out.push({
         rule: "volume_increase", severity: "warn", date: wk, workoutId: null,
-        text: `In der ${planWeekLabel(wk)} kommen ${Math.round(cur)} Minuten Training zusammen – ${Math.round((cur / ref - 1) * 100)} % mehr als in der ${planWeekLabel(refWeek)} (${Math.round(ref)} Minuten). Mehr als ${Math.round(PLAN_MAX_WEEKLY_INCREASE * 100)} % Steigerung pro Woche erhöht das Verletzungsrisiko.`,
+        text: `In der ${planWeekLabel(wk)} kommen ${Math.round(cur)} Minuten Training zusammen – ${compared}. Mehr als ${Math.round(PLAN_MAX_WEEKLY_INCREASE * 100)} % Steigerung pro Woche erhöht das Verletzungsrisiko.`,
         suggestion,
       });
     }
@@ -547,6 +563,7 @@ function planRulesText(goal) {
     `Etwa ${pct(PLAN_EASY_SHARE_TARGET)} % der Trainingsminuten einer Woche "leicht".`,
     `Mindestens ${PLAN_MIN_FREE_DAYS} komplett freier Tag pro Woche (Montag bis Sonntag).`,
     `Der Wochenumfang (Minuten) steigt höchstens um ${pct(PLAN_MAX_WEEKLY_INCREASE)} % gegenüber der letzten normalen Woche.`,
+    `Nach ${PLAN_RETURN_LIGHT_WEEKS} oder mehr leichteren Wochen in Folge (z. B. Krankheit, Urlaub) gilt die stärkste dieser Wochen als Ausgangswert für die ${pct(PLAN_MAX_WEEKLY_INCREASE)} %, mindestens ${pct(PLAN_RETURN_MIN_SHARE)} % der letzten normalen Woche.`,
     `Nach ${PLAN_DELOAD_EVERY_WEEKS - 1} Aufbauwochen in Folge kommt eine Entlastungswoche mit mindestens ${pct(PLAN_DELOAD_REDUCTION)} % weniger Minuten.`,
     `Die nächste Einheit nur "leicht", wenn der ACWR über ${fmtNum(PLAN_ACWR_LIMIT, 1)} liegt oder heute Erschöpfung, starker Muskelkater oder eine Verletzung gemeldet ist - bei einer Verletzung stattdessen ein Ruhetag.`,
     `Die nächste Einheit besser "leicht", wenn die HRV mindestens ${PLAN_HRV_DROP_PCT} % unter dem eigenen Durchschnitt oder der Ruhepuls mindestens ${PLAN_RHR_RISE_BPM} Schläge darüber liegt.`,
