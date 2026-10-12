@@ -62,6 +62,8 @@ test("getPhase: ohne Ziel oder ohne Datum -> null", () => {
   assert.strictEqual(app.getPhase(TODAY, null), null);
   assert.strictEqual(app.getPhase(TODAY, { name: "Marathon", sport: "Laufen" }), null);
   assert.strictEqual(app.getPhase(TODAY, { name: "Marathon", date: null }), null);
+  assert.strictEqual(app.getPhase(null, goalOn(day(35))), null);
+  assert.strictEqual(app.getPhase("kein-datum", goalOn(day(35))), null);
 });
 
 test("getPhase: nimmt Date und \"YYYY-MM-DD\" gleich", () => {

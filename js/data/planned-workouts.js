@@ -38,10 +38,15 @@ function newPlannedWorkoutId() {
   return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ("pw" + Date.now() + Math.random().toString(16).slice(2));
 }
 
-// Neuer, noch nicht gespeicherter Eintrag - gemeinsame Form für
-// addPlannedWorkout() und applyPlanSuggestion() (add_easy_session).
+// Neuer, noch nicht gespeicherter Eintrag - gemeinsame Form für ALLE Wege,
+// auf denen Einheiten entstehen: addPlannedWorkout() (manuell),
+// applyPlanSuggestion() (add_easy_session), addOpenWishesToPlan() (Wünsche)
+// und die KI-Planung (generateTrainingPlan).
 // entry: { date, sport, title, duration_min, intensity, description, exercises, goalId, phase, source }
+// `phase` ergibt sich ohne Angabe aus Datum + Ziel (getPhase,
+// js/analytics/periodization.js) - die Phase am Tag der Einheit, nicht die von heute.
 function buildPlannedWorkout(entry) {
+  const goal = entry.goalId ? goals.find(g => g.id === entry.goalId) : null;
   return {
     id: newPlannedWorkoutId(),
     date: entry.date,
@@ -53,7 +58,7 @@ function buildPlannedWorkout(entry) {
     exercises: Array.isArray(entry.exercises) && entry.exercises.length ? entry.exercises : null, // nur Kraft/Mobility: [{name, sets, reps, note}]
     status: "geplant", // "geplant" | "erledigt" | "uebersprungen"
     goalId: entry.goalId || null,
-    phase: entry.phase || null,
+    phase: entry.phase || getPhase(entry.date, goal),
     source: entry.source || "manual", // "ai" | "manual"
     createdAt: new Date().toISOString(),
   };

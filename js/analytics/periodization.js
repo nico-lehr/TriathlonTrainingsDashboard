@@ -77,8 +77,9 @@ function periodWeeksToRace(date, goal) {
 // (kein Ziel, kein Datum, Rennen länger als die Erholungswoche vorbei).
 // Der Wettkampftag selbst gehört noch zum Taper.
 function getPhase(date, goal) {
-  if (!goal || !goal.date) return null;
+  if (!goal || !goal.date || !date) return null;
   const daysAfter = Math.round((periodDay(date) - periodDay(goal.date)) / 86400000);
+  if (isNaN(daysAfter)) return null; // ungültiges Datum - nie raten
   if (daysAfter > 0) return daysAfter <= PERIOD_RECOVERY_DAYS ? "erholung" : null;
   const k = periodWeeksToRace(date, goal);
   if (k < PERIOD_TAPER_WEEKS) return "taper";

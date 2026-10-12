@@ -16,6 +16,10 @@
 //   make_rest_day      { date, workoutIds }
 //   reduce_week_volume { weekStart, target_minutes, workouts: [{ workoutId, duration_min }] }
 //   add_easy_session   { sport, weekStart, date, duration_min }
+//
+// Mit options.goal (Hauptevent mit Datum) kommt die Periodisierung dazu
+// (js/analytics/periodization.js): Taper-/Renn-/Erholungswochen haben einen
+// Zielumfang (Regel 4), nach dem Wettkampf nur lockere Einheiten (Regel 7).
 
 /* ---------- Schwellenwerte ---------- */
 
@@ -272,9 +276,10 @@ function checkPlanRestDay(ctx) {
 
 // Kürzt alle noch offenen Einheiten der Woche gleichmäßig (auf 5 Minuten
 // abgerundet) Richtung Zielwert, je Einheit aber höchstens um die Hälfte.
-// Bereits absolvierte Minuten bleiben, wie sie sind.
-function planShortenWeek(ctx, wk, cur, target) {
-  const open = planWeekSessions(ctx, wk).filter(s => s.planned && s.duration_min > 0);
+// Bereits absolvierte Minuten bleiben, wie sie sind; Einheiten am Tag
+// `skipDate` (der Wettkampftag) auch.
+function planShortenWeek(ctx, wk, cur, target, skipDate = null) {
+  const open = planWeekSessions(ctx, wk).filter(s => s.planned && s.duration_min > 0 && s.date !== skipDate);
   const openMin = planMinutes(open);
   if (!openMin) return null;
   const factor = Math.max(PLAN_MAX_SHORTEN, (openMin - (cur - target)) / openMin);
@@ -315,11 +320,47 @@ function planVolumeStreak(weekMin, wk) {
   return { ref, refWeek, streak };
 }
 
+// Taper-, Renn- und Erholungswochen: hier gilt der Zielumfang der
+// Periodisierung (getWeeklyTargets) - als EIN Limit, das niedrigste aus
+// Zielumfang, +10 % und (falls fällig) Entlastungswoche. So bekommt die
+// Woche keine drei ähnlichen Hinweise, und die beiden Regeln oben werden nie
+// aufgeweicht. Der Wettkampftag zählt nicht mit und wird nie gekürzt.
+const PLAN_PHASE_REDUCED_WEEKS = ["taper", "rennwoche", "erholung"];
+
+function planPhaseVolume(ctx, wk, week, ref, streak) {
+  const limits = [week.targetMin];
+  if (ref != null) {
+    limits.push(planFloorMin(ref * (1 + PLAN_MAX_WEEKLY_INCREASE)));
+    if (streak >= PLAN_DELOAD_EVERY_WEEKS - 1) limits.push(planDeloadMax(ref));
+  }
+  const target = Math.min(...limits);
+  const cur = week.doneMin + week.plannedMin;
+  if (cur <= target) return [];
+  const suggestion = planShortenWeek(ctx, wk, cur, target, ctx.goal.date);
+  if (!suggestion) return [];
+  const name = `„${ctx.goal.name}“`;
+  const what = {
+    taper: [`eine Taper-Woche vor ${name}`, "Im Taper sinkt der Umfang, damit du ausgeruht an den Start gehst."],
+    rennwoche: [`die Rennwoche von ${name}`, "So kurz vor dem Rennen bringt mehr Training keine Form mehr, nur Müdigkeit."],
+    erholung: [`die Erholungswoche nach ${name}`, "Nach dem Wettkampf braucht der Körper Ruhe, um sich zu erholen."],
+  }[week.type];
+  return [{
+    rule: "phase_volume", severity: "warn", date: wk, workoutId: null,
+    text: `Die ${planWeekLabel(wk)} ist ${what[0]}: ${Math.round(cur)} Minuten Training, sinnvoll sind höchstens ${target} Minuten (ohne den Wettkampf selbst). ${what[1]}`,
+    suggestion,
+  }];
+}
+
 function checkPlanVolume(ctx) {
   const out = [];
   const weekMin = wk => planMinutes(planWeekSessions(ctx, wk));
   ctx.weeks.forEach(wk => {
     const { ref, refWeek, streak } = planVolumeStreak(weekMin, wk);
+    const week = ctx.periodWeeks.get(wk);
+    if (week && week.targetMin != null && PLAN_PHASE_REDUCED_WEEKS.includes(week.type)) {
+      out.push(...planPhaseVolume(ctx, wk, week, ref, streak));
+      return;
+    }
     if (ref == null) return; // keine Vergleichswoche vorhanden
     const cur = weekMin(wk);
 
@@ -427,6 +468,23 @@ function checkPlanGoalSports(ctx, goal) {
   return out;
 }
 
+/* ---------- Regel 7: nach dem Wettkampf nur locker (warn) ---------- */
+
+// In den Erholungstagen nach dem Hauptevent (getPhase "erholung") nur
+// lockere Einheiten: "mittel"/"hart" oder länger als 120 Minuten -> Hinweis.
+// Einheiten ohne Intensitätsangabe (z. B. ein Terminwunsch) bleiben
+// unbewertet - nie raten.
+function checkPlanRecoveryWeek(ctx) {
+  if (!ctx.goal) return [];
+  return ctx.open
+    .filter(s => getPhase(s.date, ctx.goal) === "erholung" && ((s.intensity && s.intensity !== "leicht") || planIsHard(s)))
+    .map(s => ({
+      rule: "recovery_week", severity: "warn", date: s.date, workoutId: s.id,
+      text: `„${s.title}“ am ${planDayLabel(s.date)} liegt in der Erholungswoche nach „${ctx.goal.name}“. Nach einem Wettkampf braucht der Körper ein paar Tage nur lockere Bewegung, bevor wieder hart oder lang trainiert wird.`,
+      suggestion: planEasySuggestion(s),
+    }));
+}
+
 /* ---------- Einstieg ---------- */
 
 // plannedWorkouts: Einträge wie in js/data/planned-workouts.js - geprüft
@@ -434,7 +492,7 @@ function checkPlanGoalSports(ctx, goal) {
 // history: echte Workouts (DATA, js/data/workouts.js).
 // wellness: { hrv_ms, resting_hr } aus wellnessDeviation(), optional.
 // recovery: recoveryCheck (js/data/health.js), optional.
-// options: { goal (Hauptevent, für Regel 6), today (Date, Standard jetzt),
+// options: { goal (Hauptevent, für Regel 6 und die Periodisierung), today (Date, Standard jetzt),
 //   acwr (vorberechnet, sonst computePerformanceState()), planUntil
 //   ("YYYY-MM-DD", bis wohin der Plan reicht, Standard: letzte Einheit) }
 function validatePlan(plannedWorkouts, history, wellness, recovery, options = {}) {
@@ -448,8 +506,11 @@ function validatePlan(plannedWorkouts, history, wellness, recovery, options = {}
   const acwr = typeof options.acwr === "number" ? options.acwr : planCurrentAcwr();
   const gate = planRecoveryGate(acwr, recovery, todayKey);
   const goal = options.goal || null;
+  const period = getWeeklyTargets(goal, plannedWorkouts, history, new Date(options.today || Date.now()));
   const ctx = {
     todayKey, byDay, open,
+    goal: goal && goal.date ? goal : null,
+    periodWeeks: new Map(period ? period.weeks.map(w => [w.weekStart, w]) : []), // Zielumfang je Woche
     weeks: [...new Set(open.map(s => planWeekKey(s.date)))],
     planUntil: options.planUntil || open[open.length - 1].date,
     goalSports: (goal && PLAN_GOAL_SPORTS[goal.sport]) || [],
@@ -464,13 +525,15 @@ function validatePlan(plannedWorkouts, history, wellness, recovery, options = {}
     ...checkPlanVolume(ctx),
     ...checkPlanReadiness(ctx, gate, wellness),
     ...checkPlanGoalSports(ctx, goal),
+    ...checkPlanRecoveryWeek(ctx),
   ].sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999") || severityOrder[a.severity] - severityOrder[b.severity]);
 }
 
 // Die Regeln als kurze Sätze für den KI-Trainingsplan-Prompt
 // (buildPlanRulesPrompt, js/ai/prompts.js) - direkt aus den Schwellenwerten
 // oben erzeugt, damit die KI nie andere Zahlen bekommt als die Prüfung danach.
-// Mit `goal` kommt Regel 6 (lockere Einheit je Ziel-Sportart) dazu.
+// Mit `goal` kommt Regel 6 (lockere Einheit je Ziel-Sportart) dazu, mit
+// Zieldatum auch Taper/Erholung aus der Periodisierung.
 function planRulesText(goal) {
   const pct = x => Math.round(x * 100);
   const sports = (goal && PLAN_GOAL_SPORTS[goal.sport]) || [];
@@ -484,6 +547,10 @@ function planRulesText(goal) {
     `Die nächste Einheit nur "leicht", wenn der ACWR über ${fmtNum(PLAN_ACWR_LIMIT, 1)} liegt oder heute Erschöpfung, starker Muskelkater oder eine Verletzung gemeldet ist - bei einer Verletzung stattdessen ein Ruhetag.`,
     `Die nächste Einheit besser "leicht", wenn die HRV mindestens ${PLAN_HRV_DROP_PCT} % unter dem eigenen Durchschnitt oder der Ruhepuls mindestens ${PLAN_RHR_RISE_BPM} Schläge darüber liegt.`,
     ...(sports.length ? [`Jede Woche mindestens eine lockere ("leicht") Einheit in jeder Sportart des Ziels: ${sports.join(", ")}.`] : []),
+    ...(goal && goal.date ? [
+      `Taper-Wochen (die Rennwoche und die Woche davor) und die Erholungswoche nach dem Wettkampf höchstens mit dem Zielumfang der Periodisierung planen (etwa ${pct(PERIOD_TAPER_FACTORS[1])} %, ${pct(PERIOD_TAPER_FACTORS[0])} % und ${pct(PERIOD_RECOVERY_FACTOR)} % des zuletzt erreichten Wochenumfangs); der Wettkampf selbst zählt nicht mit.`,
+      `In den ${PERIOD_RECOVERY_DAYS} Tagen nach dem Wettkampf nur "leicht" und höchstens ${PLAN_HARD_MIN_DURATION} Minuten pro Einheit.`,
+    ] : []),
   ].map(s => "- " + s).join("\n");
 }
 

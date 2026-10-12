@@ -11,12 +11,13 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const ROOT = path.join(__dirname, "..", "..");
-const SCRIPTS = ["js/utils/dates.js", "js/utils/formatting.js", "js/analytics/training-load.js", "js/analytics/plan-rules.js",
+const SCRIPTS = ["js/utils/dates.js", "js/utils/formatting.js", "js/analytics/training-load.js", "js/analytics/plan-rules.js", "js/analytics/periodization.js",
   "js/data/planned-workouts.js", "js/ai/ollama.js"];
 
 const app = vm.createContext({
   DATA: [], window: {}, setTimeout: () => 0, clearTimeout: () => {},
   apiCall: () => Promise.resolve({}), storeGet: () => null, storeSet: () => {},
+  goals: [], // sonst js/data/goals.js
 });
 SCRIPTS.forEach(f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), "utf8"), app, { filename: f }));
 const run = code => vm.runInContext(code, app);
@@ -126,6 +127,11 @@ test("planRulesText: Zahlen kommen aus den Konstanten des Regelwerks", () => {
     `über ${String(c.acwr).replace(".", ",")}`, `${c.hrv} % unter`, `${c.rhr} Schläge`, "Schwimmen, Rad, Laufen"]
     .forEach(part => assert.ok(text.includes(part), `fehlt: ${part}\n${text}`));
   assert.ok(!app.planRulesText(null).includes("Sportart des Ziels"), "ohne Ziel keine Ziel-Sportarten-Regel");
+  // Periodisierung: Zahlen aus periodization.js, nur mit Zieldatum
+  const p = run(`({ t1: PERIOD_TAPER_FACTORS[1], t0: PERIOD_TAPER_FACTORS[0], rec: PERIOD_RECOVERY_FACTOR, days: PERIOD_RECOVERY_DAYS })`);
+  [`${Math.round(p.t1 * 100)} %, ${Math.round(p.t0 * 100)} % und ${Math.round(p.rec * 100)} %`, `In den ${p.days} Tagen nach dem Wettkampf nur "leicht"`]
+    .forEach(part => assert.ok(text.includes(part), `fehlt: ${part}\n${text}`));
+  assert.ok(!app.planRulesText({ ...TRIATHLON, date: null }).includes("Taper"), "ohne Zieldatum keine Taper-Regel");
 });
 
 /* ---------- Empfehlungen: Zahlen nur aus dem Prompt ---------- */

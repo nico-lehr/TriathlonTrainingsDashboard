@@ -82,7 +82,7 @@ function renderTrainingPlanCard() {
   host.querySelector(".plan-generate-btn").addEventListener("click", () => generateTrainingPlan(goal.id));
   const replaceBtn = host.querySelector(".plan-replace-btn");
   if (replaceBtn) replaceBtn.addEventListener("click", () => generateTrainingPlan(goal.id, { replace: true }));
-  host.querySelector(".plan-add-btn").addEventListener("click", () => openPlanEdit(null, { goalId: goal.id, phase: phase.key }));
+  host.querySelector(".plan-add-btn").addEventListener("click", () => openPlanEdit(null, { goalId: goal.id }));
   host.querySelectorAll(".plan-item-edit").forEach(btn => btn.addEventListener("click", () => openPlanEdit(btn.dataset.id)));
   host.querySelectorAll(".plan-item-export").forEach(btn => btn.addEventListener("click", e => { e.stopPropagation(); exportPlannedWorkoutAsFit(btn.dataset.id); }));
   // Ganze Zeile klickbar (wie ein Trainings-Punkt im Kalender) - öffnet
@@ -236,7 +236,8 @@ function planEditNutritionHtml(p, isNew) {
 // `defaults` (nur bei Neuanlage relevant): { date, goalId, phase } - z.B.
 // vorbelegtes Datum aus dem Kalendertag, oder das Hauptevent-Ziel aus der
 // Trainingsplan-Kachel, damit die manuell angelegte Einheit dort genauso
-// erscheint wie eine von der KI erstellte.
+// erscheint wie eine von der KI erstellte. Ohne `phase` ergibt sie sich beim
+// Anlegen aus dem gewählten Datum (buildPlannedWorkout).
 // "Lessons Learned"-Block (Button + Ergebnis/Fehler/Lade-Zustand) fuer eine
 // bereits gespeicherte geplante Einheit - vorausschauende KI-Einordnung
 // basierend auf aehnlichen frueheren Einheiten (siehe generateLessons,
