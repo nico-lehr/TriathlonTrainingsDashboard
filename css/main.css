@@ -29,20 +29,28 @@
      Zeitraum-Zusammenfassung) sichtbar durchscheinen, nicht erst weiter unten.
      Positionierung relativ zur Mitte (calc(50% ± px)) statt an den reinen
      Viewport-Rändern - sonst driften die Flecken auf breiten Bildschirmen
-     (großer Monitor, wo .page mit max-width:1240px zentriert viel schmaler
-     als der Viewport ist) seitlich aus dem sichtbaren Inhalt heraus. */
-  .glow-1 { width: 520px; height: 520px; background: var(--c-schwimmen); top: -60px; left: calc(50% - 780px); }
+     (großer Monitor, wo .page mit max-width:1680px (ab 2000px: 1920px)
+     zentriert schmaler als der Viewport ist) seitlich aus dem sichtbaren
+     Inhalt heraus. */
+  .glow-1 { width: 520px; height: 520px; background: var(--c-schwimmen); top: -60px; left: calc(50% - 900px); }
 
-  .glow-2 { width: 560px; height: 560px; background: var(--c-rad); top: -20px; left: calc(50% + 260px); }
+  .glow-2 { width: 560px; height: 560px; background: var(--c-rad); top: -20px; left: calc(50% + 340px); }
 
   .glow-3 { width: 500px; height: 500px; background: var(--c-laufen); bottom: -140px; left: calc(50% - 250px); }
 
+  /* Breite Seite: nutzt große Monitore besser aus (Karten-Grids passen sich per
+     auto-fit an, siehe components.css); ab 2000px Viewport-Breite noch etwas
+     breiter, siehe responsive.css. overflow-x:clip (kein Scroll-Container,
+     die sticky Topnav bleibt intakt): unsichtbare Info-Popover der rechten
+     Spalte ragen sonst über den Viewport hinaus und erzeugen einen
+     horizontalen Seiten-Scrollbalken. */
   .page {
-    max-width: 1240px;
+    max-width: 1680px;
     margin: 0 auto;
     padding: 48px 32px 96px;
     position: relative;
     z-index: 1;
+    overflow-x: clip;
   }
 
   /* Logo/Marke (angelehnt an die Landingpage): drei Sportart-Punkte + Titel
