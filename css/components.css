@@ -877,7 +877,7 @@
   .plan-item-list { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
 
   .plan-item {
-    display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 10px 12px;
     background: var(--page); border-radius: 12px;
   }
 
@@ -925,6 +925,16 @@
   }
 
   .plan-item-export:hover { background: var(--grid); color: var(--text-primary); }
+
+  /* "An Garmin senden" (Liste + Bearbeiten-Overlay); Fehler mit .fit-Download als eigene Zeile */
+  .plan-item-garmin { flex-shrink: 0; }
+  .plan-garmin-sent { font-size: 12px; font-weight: 600; color: var(--c-good-text); }
+  .plan-item-garmin .plan-garmin-sent { white-space: nowrap; }
+  .plan-garmin-error { flex-basis: 100%; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+  .plan-garmin-error .goal-error { margin: 0; flex: 1 1 220px; }
+  .pe-garmin-note { margin-top: 12px; }
+  .pe-garmin-note:empty { display: none; }
+  .pe-garmin-note .plan-garmin-sent { margin: 0; font-weight: 500; line-height: 1.5; }
 
   /* Bearbeiten-Overlay für eine einzelne geplante Einheit */
   .plan-edit-card { max-width: 640px; }

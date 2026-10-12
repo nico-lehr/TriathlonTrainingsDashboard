@@ -129,6 +129,12 @@ async function sendStoreKey(key) {
   storeSending.delete(key);
 }
 
+// Wartet, bis die letzte Aenderung dieses Schluessels beim Server angekommen
+// ist - fuer Server-Funktionen, die selbst aus der Ablage lesen (An Garmin senden).
+async function storeSaved(key) {
+  while (storeSending.has(key)) await new Promise(resolve => setTimeout(resolve, 100));
+}
+
 // Warnen, wenn die Seite geschlossen wird, waehrend noch gespeichert wird.
 window.addEventListener("beforeunload", (e) => {
   if (storeSending.size) { e.preventDefault(); e.returnValue = ""; }

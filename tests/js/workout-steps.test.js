@@ -19,7 +19,7 @@ const SCRIPTS = ["js/utils/dates.js", "js/utils/formatting.js", "js/analytics/pe
 
 const app = vm.createContext({
   DATA: [], window: {}, TextEncoder, setTimeout: () => 0, clearTimeout: () => {},
-  apiCall: () => Promise.resolve({}), storeGet: () => null, storeSet: () => {},
+  apiCall: () => Promise.resolve({}), storeGet: () => null, storeSet: () => {}, storeSaved: () => Promise.resolve(),
   goals: [], athleteProfile: { runThresholdPace: null, swimCss: null },
 });
 SCRIPTS.forEach(f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), "utf8"), app, { filename: f }));
@@ -158,4 +158,35 @@ test(".fit: eine Einheit ohne eigene Schritte heißt wie bisher nach ihrem Titel
   assert.strictEqual(String.fromCharCode(...bytes.slice(8, 12)), ".FIT");
   const crc = app.fitCrc16(bytes.slice(0, bytes.length - 2));
   assert.strictEqual(bytes[bytes.length - 2] | (bytes[bytes.length - 1] << 8), crc);
+});
+
+/* ---------- An Garmin senden ---------- */
+
+test("resolvedWorkoutSteps: Pace-Zone bekommt den Tempobereich, alles andere bleibt", () => {
+  app.athleteProfile.runThresholdPace = "5:00";
+  const out = plain(app.resolvedWorkoutSteps({ sport: "Laufen", steps: INTERVALS }));
+  const pace = out[1].steps[0].target;
+  assert.deepStrictEqual([pace.kind, pace.zone], ["pace_zone", 4]);
+  assert.ok(Math.abs(pace.low_mps - 1000 / 315) < 1e-9 && Math.abs(pace.high_mps - 1000 / 294) < 1e-9);
+  assert.deepStrictEqual(out[0], validate(INTERVALS).steps[0]);
+  // Rad kennt keine Pace -> ohne Tempobereich (der Server sendet dann "kein Ziel")
+  assert.strictEqual(plain(app.resolvedWorkoutSteps({ sport: "Rad", steps: INTERVALS }))[1].steps[0].target.low_mps, undefined);
+  app.athleteProfile.runThresholdPace = null;
+});
+
+test("sendPlannedWorkoutToGarmin: schickt die Schritte an den Endpunkt und vermerkt das Senden", async () => {
+  const calls = [];
+  app.apiCall = (endpoint, method, body) => {
+    calls.push({ endpoint, method, body: plain(body) });
+    return Promise.resolve({ data: { garmin_workout_id: 4711, scheduled_date: "2026-10-14" } });
+  };
+  const pw = { id: "a b", date: "2026-10-14", sport: "Laufen", duration_min: 50, intensity: "leicht" };
+  app.replacePlannedWorkouts([pw]);
+  assert.deepStrictEqual(plain(await app.sendPlannedWorkoutToGarmin("a b")), { garmin_workout_id: 4711, scheduled_date: "2026-10-14" });
+  assert.deepStrictEqual(calls, [{ endpoint: "planned-workouts/a%20b/send-to-garmin", method: "POST", body: { steps: defaults(pw) } }]);
+  const saved = plain(vm.runInContext("plannedWorkouts", app))[0];
+  assert.strictEqual(saved.garminWorkoutId, 4711);
+  assert.ok(!Number.isNaN(Date.parse(saved.garminSentAt)));
+  assert.strictEqual(app.canSendToGarmin({ sport: "Kraft" }), false);
+  assert.strictEqual(app.canSendToGarmin({ sport: "Schwimmen" }), true);
 });

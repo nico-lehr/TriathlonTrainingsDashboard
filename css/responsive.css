@@ -112,6 +112,9 @@
      winzige Symbole, damit sich das Aussehen nicht ändert. */
   @media (max-width: 600px) {
     .modal-head { padding-right: 36px; }
+    /* Trainingsplan-Liste: "An Garmin senden" als eigene Zeile unter dem Titel */
+    .plan-item-garmin { order: 1; flex-basis: 100%; padding-left: 42px; }
+    .plan-garmin-error { order: 2; }
   }
 
   @media (pointer: coarse), (max-width: 600px) {

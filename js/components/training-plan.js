@@ -53,8 +53,10 @@ function renderTrainingPlanCard() {
           </div>
           <div class="plan-item-meta">${p.duration_min != null ? Math.round(p.duration_min) + " min" : ""}${p.status !== "geplant" ? " · " + PLAN_STATUS_LABELS[p.status] : ""}</div>
         </div>
+        ${planItemGarminHtml(p)}
         <button type="button" class="plan-item-export" data-id="${p.id}" title="Als .fit für Garmin exportieren">⬇</button>
         <button type="button" class="plan-item-edit" data-id="${p.id}" title="Bearbeiten">✎</button>
+        ${garminSendErrorHtml(p)}
       </div>`;
   }).join("") : `<p class="empty-note">Noch kein Trainingsplan erstellt.</p>`;
 
@@ -93,13 +95,91 @@ function renderTrainingPlanCard() {
       openPlanEdit(row.dataset.id);
     });
     row.addEventListener("keydown", e => {
+      if (e.target.closest("button")) return; // Knöpfe in der Zeile behalten ihre eigene Tastatur-Bedienung
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPlanEdit(row.dataset.id); }
     });
   });
   const exportAllBtn = host.querySelector(".plan-export-all-btn");
   if (exportAllBtn) exportAllBtn.addEventListener("click", () => exportPlannedWorkoutsAsFit(upcoming));
+  wireGarminSend(host);
 
   if (typeof renderCoachSummary === "function") renderCoachSummary();
+}
+
+/* ---------- "An Garmin senden" (Trainingsplan-Liste + Bearbeiten-Overlay) ----------
+   Versand: sendPlannedWorkoutToGarmin (js/data/fit-workout-writer.js). Der
+   Zustand während/nach dem Senden lebt nur hier im Speicher; gespeichert
+   wird nur garminSentAt/garminWorkoutId am Eintrag. Scheitert der Versand,
+   gibt es direkt daneben den .fit-Download (Plan B). */
+const garminSendState = new Map(); // id -> { loading } | { error } | { scheduled }
+
+function planItemGarminHtml(p) {
+  if (!canSendToGarmin(p)) return "";
+  const st = garminSendState.get(p.id) || {};
+  const inner = p.garminSentAt && !st.loading && !st.error
+    ? `<span class="plan-garmin-sent" title="An Garmin gesendet am ${fmtDateFull(new Date(p.garminSentAt))}">✓ gesendet ${fmtDate(new Date(p.garminSentAt))}</span>`
+    : `<button type="button" class="cal-today-btn plan-garmin-send" data-id="${p.id}"${st.loading ? " disabled" : ""}>${st.loading ? "Sende …" : "An Garmin senden"}</button>`;
+  return `<div class="plan-item-garmin">${inner}</div>`;
+}
+
+function garminSendErrorHtml(p) {
+  const st = garminSendState.get(p.id);
+  if (!st || !st.error) return "";
+  return `
+    <div class="plan-garmin-error">
+      <p class="goal-error">${escapeHtml(st.error)}</p>
+      <button type="button" class="cal-today-btn plan-garmin-fit" data-id="${p.id}">Stattdessen als .fit herunterladen</button>
+    </div>`;
+}
+
+// Hinweis unter den Knöpfen im Bearbeiten-Overlay.
+function planEditGarminNoteHtml(p) {
+  const st = garminSendState.get(p.id) || {};
+  if (st.error) return garminSendErrorHtml(p);
+  if (st.loading || !p.garminSentAt) return "";
+  const when = new Date(p.garminSentAt);
+  const where = !("scheduled" in st) ? ""
+    : st.scheduled ? ` Es liegt im Garmin-Kalender am ${fmtDateWeekday(new Date(st.scheduled + "T00:00:00"))} und ist nach dem nächsten Sync auf der Uhr.`
+      : " Es liegt in Garmin Connect unter „Workouts“ (der Kalender-Eintrag hat nicht geklappt).";
+  return `<p class="plan-garmin-sent">✓ An Garmin gesendet am ${fmtDateFull(when)}, ${when.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr.${where}</p>`;
+}
+
+function garminSendLabel(p) {
+  const st = garminSendState.get(p.id) || {};
+  return st.loading ? "Sende …" : (p.garminSentAt ? "Erneut an Garmin senden" : "An Garmin senden");
+}
+
+function wireGarminSend(rootEl) {
+  rootEl.querySelectorAll(".plan-garmin-send").forEach(btn => btn.addEventListener("click", e => { e.stopPropagation(); sendToGarminFromUi(btn.dataset.id); }));
+  rootEl.querySelectorAll(".plan-garmin-fit").forEach(btn => btn.addEventListener("click", e => { e.stopPropagation(); exportPlannedWorkoutAsFit(btn.dataset.id); }));
+}
+
+// Kachel neu zeichnen und im offenen Overlay nur Knopf + Hinweis anpassen
+// (ein Neuaufbau würde ungespeicherte Eingaben verwerfen).
+function refreshGarminSendUi(id) {
+  renderTrainingPlanCard();
+  const p = plannedWorkouts.find(x => x.id === id);
+  const note = document.querySelector(`.pe-garmin-note[data-id="${id}"]`);
+  if (!p || !note) return;
+  const btn = document.querySelector(`.plan-edit-actions .plan-garmin-send[data-id="${id}"]`);
+  if (btn) { btn.textContent = garminSendLabel(p); btn.disabled = !!(garminSendState.get(id) || {}).loading; }
+  note.innerHTML = planEditGarminNoteHtml(p);
+  wireGarminSend(note);
+}
+
+async function sendToGarminFromUi(id) {
+  const p = plannedWorkouts.find(x => x.id === id);
+  if (!p || (garminSendState.get(id) || {}).loading) return;
+  if (p.garminSentAt && !(await confirmDialog(`Diese Einheit wurde am ${fmtDateFull(new Date(p.garminSentAt))} schon an Garmin gesendet. Nochmal senden? In Garmin Connect steht sie dann zweimal.`, { okLabel: "Nochmal senden", danger: false }))) return;
+  garminSendState.set(id, { loading: true });
+  refreshGarminSendUi(id);
+  try {
+    const result = await sendPlannedWorkoutToGarmin(id);
+    garminSendState.set(id, { scheduled: result.scheduled_date });
+  } catch (e) {
+    garminSendState.set(id, { error: e.message });
+  }
+  refreshGarminSendUi(id);
 }
 
 // Was die Regelprüfung nach der letzten KI-Planung automatisch angepasst hat
@@ -426,9 +506,11 @@ function openPlanEdit(id, defaults) {
         ${isNew ? "" : `<button type="button" class="chip plan-edit-delete" style="color:var(--c-crit);">Löschen</button>`}
         <div class="plan-edit-actions-right">
           ${isNew ? "" : `<button type="button" class="chip plan-edit-export">Als .fit exportieren</button>`}
+          ${!isNew && canSendToGarmin(p) ? `<button type="button" class="cal-today-btn plan-garmin-send" data-id="${p.id}"${(garminSendState.get(p.id) || {}).loading ? " disabled" : ""}>${garminSendLabel(p)}</button>` : ""}
           <button type="button" class="update-btn plan-edit-save">${isNew ? "Anlegen" : "Speichern"}</button>
         </div>
       </div>
+      ${isNew ? "" : `<div class="pe-garmin-note" data-id="${p.id}">${planEditGarminNoteHtml(p)}</div>`}
     </div>`;
 
   // Ernährungsvorschau live nachziehen, sobald Sportart/Dauer/Intensität im
@@ -551,6 +633,7 @@ function openPlanEdit(id, defaults) {
 
   const exportBtn = host.querySelector(".plan-edit-export");
   if (exportBtn) exportBtn.addEventListener("click", () => exportPlannedWorkoutAsFit(id));
+  wireGarminSend(host);
 
   const lessonsBtn = host.querySelector(".pe-lessons-btn");
   if (lessonsBtn) lessonsBtn.addEventListener("click", () => generateLessons(id));

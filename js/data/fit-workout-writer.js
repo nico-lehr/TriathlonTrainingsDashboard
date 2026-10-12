@@ -93,6 +93,17 @@ function paceZoneMps(sport, zone) {
   return { low: meters / paceToSeconds(z.slowPace), high: meters / paceToSeconds(z.fastPace) };
 }
 
+// Die Schritte für .fit-Datei UND Garmin-Versand: plannedWorkoutSteps(), dazu
+// je Pace-Zone der Tempobereich (low_mps/high_mps), sofern berechenbar.
+function resolvedWorkoutSteps(pw) {
+  const withPace = s => {
+    if (s.type === "repeat") return { ...s, steps: s.steps.map(withPace) };
+    const range = s.target && s.target.kind === "pace_zone" ? paceZoneMps(pw.sport, s.target.zone) : null;
+    return range ? { ...s, target: { ...s.target, low_mps: range.low, high_mps: range.high } } : s;
+  };
+  return plannedWorkoutSteps(pw).map(withPace);
+}
+
 // FIT-Werte je Schritt-Art (intensity: 0 active, 1 rest, 2 warmup, 3 cooldown,
 // 4 recovery) und Ziel (target_type: 0 speed, 1 heart_rate, 2 open, 4 power).
 const FIT_STEP_INTENSITY = { warmup: 2, interval: 0, recovery: 4, cooldown: 3, rest: 1 };
@@ -103,7 +114,7 @@ const FIT_TARGET_TYPE = { hr_zone: 1, power_zone: 4 };
 // erledigt"), duration_value = Index des ersten wiederholten Schritts,
 // target_value = Anzahl Durchgänge.
 function fitWorkoutStepRecords(pw) {
-  const steps = plannedWorkoutSteps(pw);
+  const steps = resolvedWorkoutSteps(pw);
   const single = steps.length === 1 && steps[0].type !== "repeat";
   const out = [];
   const add = s => {
@@ -111,8 +122,7 @@ function fitWorkoutStepRecords(pw) {
     if (s.duration_min) { rec.durationType = 0; rec.durationValue = Math.round(s.duration_min * 60000); } // ms
     else if (s.distance_km) { rec.durationType = 1; rec.durationValue = Math.round(s.distance_km * 100000); } // cm
     const t = s.target || {};
-    const range = t.kind === "pace_zone" ? paceZoneMps(pw.sport, t.zone) : null;
-    if (range) Object.assign(rec, { targetType: 0, low: Math.round(range.low * 1000), high: Math.round(range.high * 1000) }); // mm/s
+    if (t.low_mps) Object.assign(rec, { targetType: 0, low: Math.round(t.low_mps * 1000), high: Math.round(t.high_mps * 1000) }); // mm/s
     else if (FIT_TARGET_TYPE[t.kind]) Object.assign(rec, { targetType: FIT_TARGET_TYPE[t.kind], targetValue: t.zone });
     out.push(rec);
   };
@@ -229,11 +239,9 @@ function downloadFitBytes(bytes, filename) {
 // denen eine geplante Einheit tatsächlich "nach Garmin exportiert" wird -
 // alle Buttons (Coach-Tab, Kalender-Tages-/Wochenansicht, Bearbeiten-Overlay)
 // rufen ausschließlich diese beiden Funktionen auf, nie direkt
-// downloadFitBytes()/buildFitWorkoutFile(). Sobald es einmal eine direkte
-// Garmin-Connect-API-Anbindung gibt (Hochladen statt Datei-Download), muss
-// nur HIER der Versandweg ausgetauscht/ergänzt werden (z. B. downloadFitBytes
-// durch einen fetch()-Aufruf ersetzen) - keine der aufrufenden Stellen
-// müsste sich ändern.
+// downloadFitBytes()/buildFitWorkoutFile(). Der direkte Versand an Garmin
+// Connect ist sendPlannedWorkoutToGarmin() ganz unten; der .fit-Download
+// bleibt als Plan B, wenn der Versand scheitert.
 
 // Exportiert eine einzelne geplante Einheit als .fit-Datei (Download-Klick).
 function exportPlannedWorkoutAsFit(id) {
@@ -249,4 +257,24 @@ function exportPlannedWorkoutsAsFit(list) {
   list.forEach((pw, i) => {
     setTimeout(() => downloadFitBytes(buildFitWorkoutFile(pw), fitExportFilename(pw)), i * 350);
   });
+}
+
+// Garmin nimmt per Versand nur Ausdauer-Workouts an (Kraft braucht Übungen
+// aus Garmins eigenem Katalog) - dort bleibt der .fit-Download.
+function canSendToGarmin(pw) {
+  return ["Laufen", "Rad", "Schwimmen"].includes(pw.sport);
+}
+
+// Schickt eine geplante Einheit direkt an Garmin Connect (backend/
+// garmin_workouts.py: Upload + Eintrag in den Garmin-Kalender am geplanten
+// Tag) und vermerkt am Eintrag, wann. Ergebnis { garmin_workout_id,
+// scheduled_date }; Fehler kommen als Error mit verständlicher Meldung.
+async function sendPlannedWorkoutToGarmin(id) {
+  const pw = plannedWorkouts.find(p => p.id === id);
+  if (!pw) throw new Error("Diese Einheit gibt es nicht mehr.");
+  await storeSaved(PLANNED_WORKOUTS_KEY); // der Server liest die Einheit aus der Ablage
+  const res = await apiCall(`planned-workouts/${encodeURIComponent(id)}/send-to-garmin`, "POST",
+    { steps: resolvedWorkoutSteps(pw) }, { timeoutMs: 60000 });
+  updatePlannedWorkout(id, { garminSentAt: new Date().toISOString(), garminWorkoutId: res.data.garmin_workout_id });
+  return res.data;
 }
