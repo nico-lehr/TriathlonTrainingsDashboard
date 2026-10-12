@@ -5,16 +5,25 @@ mit aktualisieren (siehe AI_RULES.md, Abschnitt 26).
 
 ## Einstieg
 
-`index.html` öffnen (Doppelklick oder im Browser). Enthält nur Struktur
-(Header, Tabs, Karten-Container, Modals, Formulare) — keine Business-Logik,
-kein Inline-CSS. Lädt `css/*.css` und `js/**/*.js` über normale `<link>`-
-und `<script>`-Tags, was auch beim direkten Öffnen als `file://`-URL
-funktioniert (kein Server nötig).
+Der Server (`start.bat` / `start.sh` → `backend/app.py`, waitress) liefert
+unter http://localhost:5000 bzw. http://\<PC-Name\>:5000 (Tailscale) sowohl
+die Webseite als auch die API aus – gleiche Adresse, daher kein CORS.
+Betrieb: `docs/DEPLOYMENT.md`.
 
-Eine Ausnahme: ein kleines Inline-`<script>` im `<head>` setzt das
-gespeicherte Theme, BEVOR irgendetwas gerendert wird (verhindert kurzes
-Aufblitzen im falschen Theme). Das ist die einzige absichtlich verbleibende
-Inline-Logik.
+- `login.html` + `js/login.js` — Anmeldung (Benutzer legt nur
+  `backend/create_user.py` an). Ohne Login springt `index.html` hierher.
+- `index.html` — das Dashboard. Enthält nur Struktur (Header, Tabs,
+  Karten-Container, Modals, Formulare) — keine Business-Logik, kein
+  Inline-CSS. Lädt `css/*.css` und `js/**/*.js` über normale Tags.
+
+Eine Ausnahme: ein kleines Inline-`<script>` im `<head>` (in `index.html`
+und `login.html`) setzt das gespeicherte Theme, BEVOR irgendetwas gerendert
+wird (verhindert kurzes Aufblitzen im falschen Theme). Das ist die einzige
+absichtlich verbleibende Inline-Logik.
+
+Doppelklick auf `index.html` funktioniert nicht mehr (die Daten kommen vom
+Server). Die Einzeldatei-Demo von `build-demo.py` läuft weiterhin ohne
+Server (sie ersetzt `apiCall()` durch eingebettete Demodaten).
 
 ## Reihenfolge der `<script>`-Tags (wichtig!)
 
@@ -26,13 +35,14 @@ geladen ist) — kritisch ist nur Code, der direkt beim Laden ausgeführt wird
 Ende). Deshalb diese Ladereihenfolge in `index.html`:
 
 ```
-data/workouts-data.js      (generierte Trainingsdaten, siehe unten)
+js/data/api-client.js      (apiCall(), Login-Token, Ablage pro Person)
 js/utils/*.js
 js/data/*.js
 js/analytics/*.js
 js/ai/*.js
 js/components/*.js
-js/app.js                  (muss zuletzt laden: ruft am Ende alle initXyz()
+js/app.js                  (muss zuletzt laden: prüft den Login, lädt alle
+                             Daten vom Server, ruft dann alle initXyz()
                              + renderAll() auf)
 ```
 
@@ -57,9 +67,17 @@ Gelegenheit weiter in eigene Dateien (z. B. `coach.css`) aufgeteilt werden.
 - `calculations.js` — reine, DOM-freie Berechnungen (`niceMax`, Bestleistungen).
 
 ### `js/data/` — Datenhaltung (Laden/Speichern/Ableiten), keine UI
+
+Alle persönlichen Daten liegen auf dem Server, je Person getrennt. Die
+Module lesen synchron per `storeGet()` aus einem beim Start geladenen Stand
+und speichern per `storeSet()` (beides `api-client.js`); localStorage hält
+nur noch Login-Token, Theme und Geräte-Einstellungen (Ollama-Modell,
+Claude-API-Key, Kartenreihenfolge).
+
+- `api-client.js` — `apiCall()` (relative Adresse `api/v1/…`, Bearer-Token, bei 401 → `login.html`), `requireLogin()`, `logout()` (leert den Browser bis aufs Theme), `showApiError()` (Hinweisbanner), Ablage pro Person `loadUserStore()`/`storeGet()`/`storeSet()` (GET/PUT `/api/v1/store`; mehrere schnelle Änderungen werden zu einer Anfrage zusammengefasst), dazu die älteren `TriathlonApiClient`-Komfortmethoden.
 - `fit-parser.js` — Binärparser für Garmin `.fit`-Dateien (kein Netzwerk, keine Abhängigkeiten). Liest auch Bahnen-Nachrichten (Schwimmen, SWOLF) und generische Developer-Felder mit ein — Fundament für künftige Garmin-Connect-/Strava-Daten, siehe `docs/DATA_MODEL.md`.
-- `garmin-wellness.js` — Zugriffsschicht auf die Garmin-Gesundheitsdaten (`GARMIN_WELLNESS` aus `data/wellness-data.js`): `latestWellness()`, `wellnessSeries()`, `wellnessBaseline()`, `wellnessDeviation()` (Abweichung vom eigenen 30-Tage-Mittel — nur so ist ein HRV-Wert interpretierbar) und `syncGarminWeightIntoLog()`. Startet mit leerem Bestand, wenn nie synchronisiert wurde.
-- `workouts.js` — Rohdaten (`ALL`/`DATA`), localStorage-Persistenz, Zeitraum-/Sportart-Filter. Braucht `EMBEDDED_DATA` aus `data/workouts-data.js`. Enthält außerdem die zentralen Gruppierungs-Primitive, an denen JEDE Referenzgruppe hängt: `sportGroup()`, `rideEnvironment()` (Indoor/Outdoor beim Rad, als `_rideEnv` materialisiert), `comparisonGroupLabel()`, `isIndoorRide()`, `rideEnvBadgeHtml()` und vor allem `sameComparisonGroup()` — wer mit wem verglichen werden darf, wird nur dort entschieden (siehe `docs/DATA_MODEL.md`, Abschnitt "Indoor/Outdoor-Erkennung beim Rad").
+- `garmin-wellness.js` — Zugriffsschicht auf die Garmin-Gesundheitsdaten (`loadWellness()` → `GET /api/v1/wellness/daily`, je Benutzer vom Garmin-Sync in die Datenbank geschrieben): `latestWellness()`, `wellnessSeries()`, `wellnessBaseline()`, `wellnessDeviation()` (Abweichung vom eigenen 30-Tage-Mittel — nur so ist ein HRV-Wert interpretierbar) und `syncGarminWeightIntoLog()`. Startet mit leerem Bestand, wenn nie synchronisiert wurde.
+- `workouts.js` — Rohdaten (`ALL`/`DATA`), Laden vom Server (`loadPersistedWorkouts()` → `GET /api/v1/workouts/full`), Speichern neu eingelesener Workouts (`saveImportedWorkouts()` → `POST /api/v1/workouts`, Doppelte ignoriert der Server), Zeitraum-/Sportart-Filter. Enthält außerdem die zentralen Gruppierungs-Primitive, an denen JEDE Referenzgruppe hängt: `sportGroup()`, `rideEnvironment()` (Indoor/Outdoor beim Rad, als `_rideEnv` materialisiert), `comparisonGroupLabel()`, `isIndoorRide()`, `rideEnvBadgeHtml()` und vor allem `sameComparisonGroup()` — wer mit wem verglichen werden darf, wird nur dort entschieden (siehe `docs/DATA_MODEL.md`, Abschnitt "Indoor/Outdoor-Erkennung beim Rad").
 - `goals.js` — Ziel-Events (Laden/Speichern/Anlegen/Löschen).
 - `athlete.js` — Athletenprofil (Laden/Speichern), Trainingstage-Konstanten.
 - `health.js` — Erholungs-Check-Zustand inkl. täglichem Reset + Logbuch-Archivierung.
@@ -90,7 +108,7 @@ Bedarf schrittweise weiter aufgeteilt werden, sobald es sich lohnt.
 ### `js/ai/` — KI-Anbindung
 - `context-builder.js` — baut den kompakten Text-Kontext für das LLM (siehe `docs/AI_CONTEXT.md`).
 - `prompts.js` — baut den fertigen Prompt-Text aus dem Kontext.
-- `ollama.js` — Ollama-Einstellungen, Verbindungstest, Empfehlung generieren.
+- `ollama.js` — Ollama-Einstellungen, Verbindungstest, Empfehlung generieren. Fragt nie Ollama direkt, sondern den eigenen Server (`POST /api/v1/ai/chat`, `GET /api/v1/ai/models`); die Ollama-Adresse steht in `.env` (`OLLAMA_URL`).
 
 ### `js/components/` — UI-Komponenten (Rendering + Interaktion)
 - `chart.js` — wiederverwendbare SVG-Bausteine (Tooltip, `svgEl`, Mini-Liniencharts, Animationen).
@@ -105,48 +123,71 @@ Bedarf schrittweise weiter aufgeteilt werden, sobald es sich lohnt.
 - `training-plan.js` — Trainingsplan-Kachel im Coach-Tab (nächste geplante Einheiten + manuelles Nachplanen + Garmin-Export einzeln/gesammelt) und das Bearbeiten-/Neuanlage-Overlay für eine geplante Einheit (`openPlanEdit(id, defaults)`, `id === null` = manuelle Neuanlage; auch aus `calendar.js` aufrufbar), siehe `docs/DATA_MODEL.md`.
 - `nutrition.js` — Ernährung-Tab: Gewichtsverlauf-Eingabe, Tagesziel-Makros, Pre-Workout-Timing, Wettkampf-Verpflegungsplan (reines Rendering, Berechnung in `js/analytics/nutrition.js`), siehe `docs/DATA_MODEL.md`.
 - `workout-card.js` — Workout-Tabelle + Detailansicht-Modal. Detail-Markup/Charts sind in `buildWorkoutDetailHtml(w)` (HTML-String, Chart-Container per Klasse `.wd-*` statt fixer ID) und `renderWorkoutDetailCharts(w, rootEl)` (zeichnet gescoped auf `rootEl`) ausgelagert — so lässt sich dieselbe Detailansicht in mehreren Containern gleichzeitig zeigen (Modal + Kalender-Tagesansicht), ohne ID-Kollisionen. Enthält außerdem die "Trainingsbelastung"-Kachel sowie die Herzfrequenzprofil-/Belastungsprofil-Diagramme je Einheit (Berechnung in `js/analytics/workout-profile.js`).
-- `data-import.js` — neue `.fit`-Dateien einlesen (Ordner-Scan-Menü + Drag & Drop).
+- `data-import.js` — neue `.fit`-Dateien einlesen (Ordner-Scan-Menü + Drag & Drop) und auf dem Server speichern.
+- `account.js` — „Konto“-Karte in den Einstellungen: angemeldeter Benutzer, Abmelden.
 
 ### `js/app.js` — Einstiegspunkt
 Definiert `renderAll()` (ruft die Render-Funktionen aller Tabs auf) und
 startet am Ende die App: `initTopNav(); initFilterBar(); initCalendarControls();
 initCoach(); renderAll();`. Muss als letztes Skript laden.
 
-## Daten (`data/`)
+## Daten (Server, `training.db`)
 
-`data/workouts-data.js` wird von `build_dashboard.py` aus `workouts.json`
-generiert (`const EMBEDDED_DATA = [...]`) und enthält die echten,
-persönlichen Trainingsdaten — deshalb über `.gitignore` vom Repository
-ausgeschlossen. Ein `<script src="data/workouts-data.js">`-Tag lädt sie
-ganz normal auch bei `file://`-Aufruf (im Unterschied zu `fetch()`, das
-Chrome/Safari für lokale Dateien blockiert — deshalb kein direktes
-`fetch("workouts.json")`).
+Alle Daten liegen in der SQLite-Datenbank `training.db` (per `.gitignore`
+ausgeschlossen), jede Zeile mit `athlete_id`:
 
-`data/wellness-data.js` (`const GARMIN_WELLNESS = {...}`) wird von
-`tools/garmin_sync.py` erzeugt und enthält die Gesundheitsdaten aus Garmin
-Connect — gleiche Mechanik und gleicher Grund wie oben, ebenfalls in
-`.gitignore`. `data/garmin-raw-cache.json` hält die Garmin-Rohantworten, damit
-der Sync inkrementell bleibt. Beide sind optional: fehlen sie, startet das
-Dashboard mit leerem Bestand (`EMPTY_WELLNESS`), und die Erholungs-Karte
-blendet sich selbst aus.
+- `workouts` — Trainings. Das komplette Parser-Ergebnis (inkl. Kurven) steht in
+  `fit_data`; Doppelte verhindert `backend/workout_store.py` (gleicher Tag +
+  Startzeit + Sportart) bzw. `UNIQUE(athlete_id, garmin_activity_id)`.
+- `wellness` — Garmin-Gesundheitsdaten je Tag (alle Werte in `garmin_wellness_data`).
+- `athlete_store` — Ablage pro Person: Profil, Ziele, Plan, Erholung, Gewicht,
+  Material, Notizen, Erfolge, KI-Auswertungen – genau das JSON, das der Browser
+  kennt (Schlüssel wie früher in localStorage).
+- `athlete_logins` — Benutzername + Passwort-Hash.
+- Die älteren Tabellen (`goals`, `planned_workouts`, `recovery_checks`) und ihre
+  Endpunkte bestehen unverändert weiter, das Dashboard nutzt sie nicht.
 
-## Garmin-Connect-Sync (`tools/`)
+`data/workouts-data.js` und `data/wellness-data.js` lädt das Dashboard nicht
+mehr (der Server liefert `data/` bewusst nicht aus). Bisherige Daten übernimmt
+einmalig `backend/import_workouts_json.py`, siehe `docs/DEPLOYMENT.md`.
 
-Getrenntes, freiwillig gestartetes lokales Werkzeug — **nicht Teil der App**.
-Das Dashboard selbst bleibt serverlos, loginfrei und offline; es liest nur die
-erzeugten lokalen Dateien. Siehe `docs/DATA_MODEL.md`, Abschnitt
-„Abgrenzung zum Garmin-Sync".
+## Backend (`backend/`)
 
 | Datei | Zweck |
 |---|---|
-| `tools/garmin_sync.py` | Lädt Original-`.fit`-Dateien nach `fit-files/` und Gesundheitsdaten nach `data/wellness-data.js`. Anmeldung per Token unter `~/.garminconnect` (außerhalb des Projekts, da dieses in iCloud liegt); das Passwort wird nie gespeichert. |
-| `sync-garmin.command` | Doppelklick-Start der kompletten Kette: Download → `parse_fit.py` → `build_dashboard.py` → Dashboard öffnen. |
-| `tools/install-url-scheme.command` | Einmalige Einrichtung des URL-Schemas `tridash-sync://`, damit der Knopf im Update-Menü den Sync auslösen kann (eine Webseite darf kein Programm starten — macOS übernimmt das über das registrierte Schema). |
+| `app.py` | Start mit waitress (Host 0.0.0.0, Port 5000, änderbar in `.env`); sichert vorher `training.db` (`backup.py`). |
+| `__init__.py` | `create_app()` (verweigert den Start ohne `SECRET_KEY`), `get_current_athlete_id()` liest den Bearer-Token. |
+| `config.py` | Einstellungen, lädt `.env` (`SECRET_KEY`, `OLLAMA_URL`). |
+| `auth.py` | Passwort-Hash, signierte Token (30 Tage), geheimer Kalender-Schlüssel, Bremse 5 Fehlversuche/Minute/IP. |
+| `routes.py` | Bestehende Endpunkte + `require_login()` (401 außer `/health`, `/auth/login`) + `/auth/login`, `/auth/me`. |
+| `dashboard_routes.py` | `/store`, `/workouts/full`, `/wellness/daily`, `/ical-link`. |
+| `ai_routes.py` | `/ai/chat`, `/ai/models` – Weiterleitung an Ollama. |
+| `frontend.py` | Liefert nur die Erlaubt-Liste aus (`index.html`, `login.html`, `manifest.json`, `css/`, `js/`, `icons/`). |
+| `workout_store.py` | Gemeinsame Duplikat-Regel + Workout-Zeile aus Parser-Ergebnis (POST, Import, Garmin-Sync). |
+| `models.py` | Tabellen. |
+| `create_user.py` | Benutzer anlegen / `--reset` Passwort neu. |
+| `import_workouts_json.py` | Einmal-Import `workouts.json` und Browser-Export für einen Benutzer. |
+| `setup_env.py` | Legt beim ersten Start `.env` mit Zufallsschlüssel an. |
+| `test_*.py` | Tests: `python -m unittest discover -s backend -t .` |
+
+## Garmin-Connect-Sync (`tools/`)
+
+Getrennt gestartetes Werkzeug, schreibt für jeden Benutzer mit Garmin-Token
+Trainings und Gesundheitsdaten in die Datenbank. Anleitung:
+`docs/GARMIN_SYNC_GUIDE.md`.
+
+| Datei | Zweck |
+|---|---|
+| `tools/garmin_sync.py` | `--athlete <id>` / alle mit Token; `--login --athlete <id>` meldet bei Garmin an (Token unter `~/.triathlon/garmin_<id>.token`, Passwort wird nie gespeichert). Original-.fit-Archiv je Benutzer unter `fit-files/athlete_<id>/`. Eine Log-Zeile je Benutzer in `~/.triathlon/garmin-sync.log`. |
+| `tools/export-browser-data.html` | Einmal-Export der Daten des alten Doppelklick-Dashboards aus dem Browser (nur per Doppelklick, wird nicht ausgeliefert). |
+| `sync-garmin.command`, `tools/install-url-scheme.command` | Alter Mac-Einzelplatz-Ablauf (Sync → `parse_fit.py` → `build_dashboard.py`); bringt keine Daten mehr ins Server-Dashboard. |
 
 ## Build/Entwicklungs-Skripte (nicht Teil der App selbst)
 
 | Datei | Zweck |
 |---|---|
+| `start.bat` / `start.sh` | Startet den Server (installiert beim ersten Mal die Bibliotheken, legt `.env` an). |
+| `backup.py` / `backup.bat` | Sichert `training.db` nach `backups/` (eine Datei pro Tag, die letzten 14). |
 | `parse_fit.py` | Python-Referenzimplementierung, liest `.fit`-Dateien (Standard: `fit-files/`) in `workouts.json`. Quellordner/Ziel per Argument überschreibbar. |
 | `build_dashboard.py` | Erzeugt `data/workouts-data.js` aus `workouts.json`. |
 | `verify_parser.py` | Vergleicht den JS-FIT-Parser Feld für Feld gegen die Python-Referenz. |

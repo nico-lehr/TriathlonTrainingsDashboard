@@ -15,8 +15,8 @@ class Config:
     SQLALCHEMY_DATABASE_URI = f"sqlite:///{BASE_DIR}/training.db"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    # Flask
-    DEBUG = True
+    # Flask - DEBUG aus: der Server ist ueber das Netz erreichbar (keine Fehlerdetails nach aussen)
+    DEBUG = False
     TESTING = False
     # Signiert die Login-Token. Pflicht: create_app() verweigert ohne ihn den Start.
     SECRET_KEY = os.getenv("SECRET_KEY")

@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from backup import backup_db
 from backend import create_app
 from backend.auth import normalize_username
 from backend.models import AthleteLogin, AthleteStore
@@ -86,6 +87,9 @@ def main():
                     help="vorhandene Profil-/Ziel-/Plan-Daten auf dem Server durch den Export ersetzen")
     args = ap.parse_args()
 
+    saved = backup_db()  # vor dem Import sichern
+    if saved:
+        print(f"Vorher gesichert: {saved}")
     _, session_factory = create_app()
     session = session_factory()
     try:

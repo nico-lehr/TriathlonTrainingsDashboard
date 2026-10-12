@@ -106,6 +106,20 @@ class AuthTest(unittest.TestCase):
         finally:
             session.close()
 
+    def test_passwort_zuruecksetzen(self):
+        make_user("vergesslich")
+        session = session_factory()
+        try:
+            with self.assertRaises(ValueError):
+                auth.reset_password(session, "gibtsnicht", "neues-passwort-1")
+            with self.assertRaises(ValueError):
+                auth.reset_password(session, "vergesslich", "kurz")
+            auth.reset_password(session, "Vergesslich", "neues-passwort-1")
+        finally:
+            session.close()
+        self.assertEqual(self.login("vergesslich").status_code, 401)
+        self.assertEqual(self.login("vergesslich", "neues-passwort-1").status_code, 200)
+
     def test_bremse_nach_5_fehlversuchen(self):
         make_user("bremse")
         for _ in range(5):

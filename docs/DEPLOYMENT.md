@@ -1,0 +1,153 @@
+# Betrieb: Dashboard auf dem eigenen PC, Freunde über Tailscale
+
+Das Dashboard läuft auf **einem** PC (deinem). Dieser PC ist gleichzeitig
+Webseite und Datenbank. Bis zu ein paar Freunde erreichen ihn über
+**Tailscale** – ein privates Netz nur für eure Geräte, verschlüsselt, ohne
+dass etwas im Internet offen steht. Jede Person meldet sich mit eigenem
+Benutzernamen an und sieht nur ihre eigenen Daten.
+
+Befehle stehen hier mit `python`. Unter Windows geht auch `py`, auf dem Mac
+heißt es meist `python3`. Alle Befehle im Projektordner ausführen.
+
+---
+
+## 1. Einmalig auf deinem PC einrichten
+
+1. **Python 3** von python.org installieren. Unter Windows im Installer
+   „Add python.exe to PATH“ ankreuzen.
+2. **Projekt** auf den PC holen (z. B. `git clone …`, siehe README).
+3. **Starten:** Windows: Doppelklick auf `start.bat`; Mac: `./start.sh`.
+   Beim ersten Start passiert automatisch:
+   - die nötigen Bibliotheken werden installiert,
+   - die Datei `.env` mit einem geheimen Schlüssel wird angelegt.
+
+   Das Fenster muss offen bleiben, solange das Dashboard erreichbar sein soll.
+4. **Benutzer anlegen** (in einem zweiten Fenster), für dich und jeden Freund:
+   ```
+   python backend/create_user.py
+   ```
+   Passwort mindestens 10 Zeichen. Die angezeigte Nummer (`athlete_id`) ist
+   die Benutzer-Nummer, die z. B. der Garmin-Sync braucht.
+   Passwort vergessen: `python backend/create_user.py --reset`.
+5. **Im Browser öffnen:** http://localhost:5000 → Anmelden.
+
+### Deine bisherigen Daten übernehmen (einmalig)
+
+- **Trainings aus `workouts.json`** (von `parse_fit.py`):
+  ```
+  python backend/import_workouts_json.py --user <dein-name>
+  ```
+- **Profil, Ziele, Trainingsplan, Erholung, Gewicht, Material, Notizen**
+  aus dem alten Doppelklick-Dashboard:
+  1. `tools/export-browser-data.html` per Doppelklick **im selben Browser**
+     öffnen, in dem du das alte Dashboard benutzt hast (Chrome/Edge empfohlen)
+     → „dashboard-export.json speichern“.
+  2. Die Datei in den Projektordner legen, dann:
+     ```
+     python backend/import_workouts_json.py --user <dein-name> --browser-export dashboard-export.json
+     ```
+     Was auf dem Server schon existiert, wird nicht überschrieben (sonst
+     `--overwrite` anhängen). Doppelte Trainings werden übersprungen – der
+     Import darf mehrfach laufen. Vorher wird automatisch ein Backup gemacht.
+  3. `dashboard-export.json` danach löschen (enthält persönliche Daten).
+
+### Garmin und KI (optional)
+
+- **Garmin-Sync** für alle Benutzer: siehe `docs/GARMIN_SYNC_GUIDE.md`.
+- **KI-Coach:** [Ollama](https://ollama.com/download) auf diesem PC installieren
+  und ein Modell laden (`ollama pull llama3.1`). Die Freunde brauchen kein
+  eigenes Ollama – ihr Browser fragt den Dashboard-Server, der fragt Ollama.
+  Läuft Ollama auf einem anderen Rechner: in `.env` die Zeile
+  `OLLAMA_URL=http://…:11434` eintragen und neu starten.
+
+---
+
+## 2. Tailscale: Freunde dazuholen
+
+1. **Tailscale** auf deinem PC installieren (tailscale.com/download) und anmelden.
+2. Jeder Freund installiert Tailscale auf Handy/Laptop und meldet sich an.
+3. Freunde ins Netz holen – eine der beiden Varianten:
+   - **Gerät teilen** (empfohlen, Freunde sehen nur diesen einen PC): in der
+     Tailscale-Verwaltung (login.tailscale.com) beim PC „Share…“ wählen und
+     die Einladung an den Freund schicken.
+   - oder den Freund als Mitglied in dein Tailscale-Netz einladen.
+4. Adresse für die Freunde: **http://\<PC-Name\>:5000** (der Name steht beim
+   Start im Fenster, z. B. `http://nico-pc:5000`). Klappt der Name nicht,
+   geht die Tailscale-IP: `tailscale ip -4` → `http://100.x.y.z:5000`.
+5. **Windows-Firewall:** Beim ersten Start fragt Windows, ob Python im Netz
+   erreichbar sein darf → für **private Netzwerke** erlauben. Später ändern:
+   Windows-Sicherheit → Firewall → „App durch die Firewall zulassen“ → Python.
+
+Über Tailscale ist die Verbindung bereits verschlüsselt, auch wenn die
+Adresse mit `http://` beginnt.
+
+---
+
+## 3. Täglicher Betrieb
+
+| Was | Wie |
+|---|---|
+| Starten | `start.bat` (Windows) / `./start.sh` (Mac) |
+| Beenden | Fenster schließen oder Strg+C |
+| Benutzer anlegen / Passwort neu | `python backend/create_user.py` / `… --reset` |
+| Garmin-Daten holen | `python tools/garmin_sync.py` (alle Benutzer) |
+| Backup jetzt | `backup.bat` (Windows) / `python backup.py` |
+
+### Backups
+
+- `backup.py` kopiert `training.db` nach `backups/training-JJJJ-MM-TT.db`
+  (eine Datei pro Tag, die **letzten 14** bleiben). Das geht auch, während
+  der Server läuft.
+- Automatisch: vor **jedem Serverstart** und vor jedem Import.
+- **Täglich automatisch (Windows):** Aufgabenplanung öffnen → „Einfache
+  Aufgabe erstellen“ → Name „Dashboard-Backup“ → Täglich, z. B. 3:00 Uhr →
+  „Programm starten“ → `backup.bat` im Projektordner auswählen → Fertig.
+- **Täglich automatisch (Mac):** `crontab -e` und diese Zeile eintragen
+  (Pfad anpassen): `0 3 * * * cd /Pfad/zum/Projekt && /usr/bin/python3 backup.py`
+- **Wiederherstellen:** Server beenden, `training.db` umbenennen (z. B.
+  `training-kaputt.db`), gewünschte Sicherung aus `backups/` in den
+  Projektordner kopieren und in `training.db` umbenennen, Server starten.
+- Tipp: `backups/` ab und zu zusätzlich auf einen USB-Stick kopieren.
+
+### Updates
+
+Server beenden → `git pull` → wieder starten. Beim Start wird vorher
+automatisch gesichert; neue Tabellen legt der Server selbst an, vorhandene
+Daten bleiben erhalten.
+
+---
+
+## 4. Sicherheit – was geschützt ist
+
+- Ohne Anmeldung ist nur die Login-Seite erreichbar. Jede Anfrage prüft den
+  Login und liefert nur die Daten der angemeldeten Person.
+- Passwörter werden nur als Hash gespeichert. Nach 5 Fehlversuchen pro
+  Minute sperrt der Server die Adresse kurz.
+- Der Server liefert nur die Webseite aus (`index.html`, `login.html`,
+  `css/`, `js/` …) – `.env`, `training.db`, `backups/`, `data/`, `backend/`
+  und Garmin-Token sind von außen nicht abrufbar.
+- Der Login gilt 30 Tage pro Gerät. **An fremden/geteilten Geräten immer
+  abmelden** (Einstellungen → Konto → Abmelden) – das löscht auch alles
+  Persönliche aus dem Browser.
+- **Erreichbar ist der Server im ganzen Heimnetz** (WLAN) und über Tailscale.
+  Daten sind durch den Login geschützt. Wer ihn nur über Tailscale
+  erreichbar machen will: in `.env` `DASHBOARD_HOST=100.x.y.z` (deine
+  Tailscale-IP) eintragen und neu starten.
+- Der **Kalender-Abo-Link** enthält einen geheimen Schlüssel – nicht
+  weitergeben. Ungültig machen lässt er sich nur zusammen mit allen Logins,
+  indem man `SECRET_KEY` in `.env` ändert.
+- `.env`, `training.db`, `backups/`, Token-Dateien und Trainingsdaten sind
+  per `.gitignore` vom Repository ausgeschlossen.
+
+---
+
+## 5. Probleme und Lösungen
+
+| Problem | Lösung |
+|---|---|
+| „SECRET_KEY fehlt“ | `start.bat`/`start.sh` benutzen (legt `.env` an) oder `.env.example` nach `.env` kopieren und einen Schlüssel eintragen. |
+| Freunde kommen nicht drauf | Läuft das Fenster? Tailscale bei beiden an? Windows-Firewall (siehe oben)? Mit der Tailscale-IP statt des Namens probieren. |
+| Mac: Port 5000 belegt | Systemeinstellungen → Allgemein → AirDrop & Handoff → „AirPlay-Empfänger“ aus, oder in `.env` `DASHBOARD_PORT=5050` setzen. |
+| Rote Meldung „Speichern fehlgeschlagen“ im Dashboard | Der Server war kurz nicht erreichbar. Server prüfen, Seite neu laden und die letzte Änderung wiederholen. |
+| KI: „Ollama ist … nicht erreichbar“ | Ollama auf dem Dashboard-PC starten; Modell geladen (`ollama list`)? |
+| Passwort vergessen | `python backend/create_user.py --reset` |

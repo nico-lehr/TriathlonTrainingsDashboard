@@ -33,6 +33,12 @@ dashboard-demo.html
 
 # Phase 1 Backend - lokale Entwicklung
 training.db
+# Sicherungen der Datenbank (backup.py) - persoenliche Daten
+backups/
+# Generierte Trainingsdaten, egal wo sie liegen
+workouts-data.js
+# Arbeitskopien von Claude-Code-Helfern
+.claude/worktrees/
 backend/*.log
 *.token
 .env

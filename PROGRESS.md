@@ -11,8 +11,8 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 | Tailscale Etappe 2 – Frontend ausliefern | fertig | 2026-10-12 |
 | Tailscale Etappe 3 – Frontend auf API | fertig | 2026-10-12 |
 | Tailscale Etappe 4 – Import | fertig | 2026-10-12 |
-| Tailscale Etappe 5 – KI über Backend | läuft | 2026-10-12 |
-| Tailscale Etappe 6 – Betrieb | offen | – |
+| Tailscale Etappe 5 – KI über Backend | fertig | 2026-10-12 |
+| Tailscale Etappe 6 – Betrieb | fertig | 2026-10-12 |
 | Tailscale Etappe 7 – Garmin mehrere Nutzer | fertig | 2026-10-12 |
 | Layout (breitere Seite) | läuft | 2026-10-12 |
 | Trainingsplaner 1 – Regelwerk plan-rules.js | läuft | 2026-10-12 |
@@ -35,6 +35,7 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 ## Offene Fragen
 
 - `.btn-primary` / `.btn-secondary` gibt es im CSS nicht. Standard: Hauptknopf = `.update-btn`, Nebenknopf = `.cal-today-btn` (beide vorhanden).
+- Passwort vergessen: zusätzlich `backend/create_user.py --reset` gebaut (sonst gäbe es keinen Weg zurück).
 - Altes Doppelklick-Dashboard: Daten lassen sich mit `tools/export-browser-data.html` exportieren und mit `backend/import_workouts_json.py --browser-export` übernehmen.
 
 - Die Regeldateien AI_RULES.md, DESIGN_GUIDE.md und docs/TECH_DESIGN_2026.md gibt es nicht. Entscheidung (mit dir abgestimmt): Regeln aus deinen Nachrichten; Farben, Radien und Schatten aus `css/variables.css`.

@@ -100,6 +100,19 @@ def create_login(session, username, password):
     return athlete.athlete_id
 
 
+def reset_password(session, username, password):
+    """Neues Passwort fuer einen vorhandenen Benutzer (backend/create_user.py --reset).
+    Alte Token bleiben bis zu ihrem Ablauf gueltig. Wirft ValueError."""
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise ValueError(f"Das Passwort muss mindestens {MIN_PASSWORD_LENGTH} Zeichen lang sein.")
+    login = session.query(AthleteLogin).filter_by(username=normalize_username(username)).first()
+    if not login:
+        raise ValueError(f"Den Benutzernamen '{normalize_username(username)}' gibt es nicht.")
+    login.password_hash = generate_password_hash(password)
+    session.commit()
+    return login.athlete_id
+
+
 # Fehlversuche je IP, nur im Arbeitsspeicher (nach einem Neustart wieder leer).
 _failed_logins = defaultdict(deque)
 _failed_logins_lock = threading.Lock()
