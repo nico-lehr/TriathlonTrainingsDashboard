@@ -3,7 +3,8 @@
 //
 // Die Browser-Skripte werden wie in index.html der Reihe nach in einen
 // gemeinsamen vm-Kontext geladen (utils -> data -> analytics). workouts.js
-// liefert sportGroup()/sameComparisonGroup(), zones.js die Leistungszonen.
+// liefert sportGroup()/sameComparisonGroup(), zones.js die Leistungszonen,
+// calculations.js bestBy().
 
 const test = require("node:test");
 const assert = require("node:assert");
@@ -12,7 +13,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const ROOT = path.join(__dirname, "..", "..");
-const SCRIPTS = ["js/utils/dates.js", "js/utils/formatting.js", "js/data/workouts.js", "js/analytics/zones.js", "js/analytics/triathlon.js"];
+const SCRIPTS = ["js/utils/dates.js", "js/utils/formatting.js", "js/utils/calculations.js", "js/data/workouts.js", "js/analytics/zones.js", "js/analytics/triathlon.js"];
 
 const app = vm.createContext({});
 SCRIPTS.forEach(f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), "utf8"), app, { filename: f }));
@@ -126,6 +127,15 @@ test("CSS aus 400-m- und 200-m-Test (Standardformel)", () => {
   assert.match(app.computeSwimCss("430", "205").error, /m:ss/);
   assert.match(app.computeSwimCss("3:25", "7:10").error, /vertauscht/);
   assert.match(app.computeSwimCss("6:00", "3:00").error, /vertauscht/); // 400er nicht langsamer je 100 m
+});
+
+test("CSS: unrealistische Testzeiten werden nicht gespeichert", () => {
+  assert.match(app.computeSwimCss("0:30", "0:00").error, /unrealistisch/);   // 200 m in 0 s
+  assert.match(app.computeSwimCss("59:59", "0:01").error, /unrealistisch/);  // ergäbe 29:59 je 100 m
+  assert.match(app.computeSwimCss("20:00", "1:05").error, /unrealistisch/);  // ergäbe 9:28 je 100 m
+  assert.match(app.computeSwimCss("2:40", "1:15").error, /unrealistisch/);   // ergäbe 0:42 je 100 m
+  assert.strictEqual(app.computeSwimCss("4:20", "2:05").error, null);         // sehr schnell, aber möglich (1:08)
+  assert.strictEqual(app.computeSwimCss("12:00", "5:10").error, null);        // langsam, aber möglich (3:25)
 });
 
 function swim(y, m, d, pace, extra = {}) {
@@ -244,6 +254,30 @@ test("Rad: FTP aus dem Profil hat Vorrang, ohne Leistungsdaten keine Schätzung"
   assert.strictEqual(manualOnly.distribution, null);
 });
 
+test("Rad: Leistungsdaten, aber kein 20-min-Stück und keine FTP im Profil -> keine Zonen, Verlauf bleibt", () => {
+  const data = [
+    ride(2026, 10, 5, [[15, 250]]),          // zu kurz für eine Schätzung
+    ride(2026, 5, 5, [[30, 240]]),           // älter als 90 Tage: nur im Verlauf
+  ];
+  const r = plain(app.computeBikeAnalysis(data, null, TODAY));
+  assert.strictEqual(r.hasPower, true);
+  assert.strictEqual(r.estimate, null);
+  assert.strictEqual(r.ftp, null);
+  assert.strictEqual(r.ftpSource, null);
+  assert.strictEqual(r.zones, null);
+  assert.strictEqual(r.distribution, null);
+  assert.deepStrictEqual(r.trend.map(p => p.ftp), [228]); // 0,95 x 240
+});
+
+test("Rad: eine Leistungskurve aus lauter Nullen zählt nicht als Leistungsdaten", () => {
+  const zeros = ride(2026, 10, 5, [[60, 0]]);
+  const r = plain(app.computeBikeAnalysis([zeros], null, TODAY));
+  assert.deepStrictEqual(r, { hasPower: false, estimate: null, trend: [], ftp: null, ftpSource: null, zones: null, distribution: null });
+  // auch neben echten Fahrten wird daraus keine Schätzung (0 W)
+  const mixed = plain(app.computeBikeAnalysis([zeros, ride(2026, 10, 6, [[25, 200]])], null, TODAY));
+  assert.strictEqual(mixed.estimate.best20, 200);
+});
+
 /* ---------- Koppeltraining ---------- */
 
 // Einheit mit Startzeit (lokal) und Dauer; Lauf-Kurve: Punkt alle 10 s,
@@ -327,6 +361,15 @@ test("Koppeltraining: Vergleich mit normalen Läufen der 90 Tage davor", () => {
   assert.strictEqual(r.summary.hr.value, 10);
   assert.strictEqual(r.summary.hr.count, 1);
   assert.ok(Math.abs(r.summary.paceSec.value - (1000 / 3 - 312.5)) < 1e-9);
+});
+
+test("Koppeltraining: Lauf kürzer als 10 min wird als solcher markiert", () => {
+  const r = app.computeBrickAnalysis([session("Rad", 2026, 10, 3, 7, 0, 60), run(2026, 10, 3, 8, 5, 3.0, 150, 8)]);
+  assert.strictEqual(r.sessions.length, 1);
+  assert.strictEqual(r.sessions[0].own, null);
+  assert.strictEqual(r.sessions[0].tooShort, true);
+  const noStream = app.computeBrickAnalysis([session("Rad", 2026, 10, 3, 7, 0, 60), session("Laufen", 2026, 10, 3, 8, 5, 30)]);
+  assert.strictEqual(noStream.sessions[0].tooShort, false); // 30 min, nur ohne Sekundendaten
 });
 
 test("Koppeltraining: keine Koppeleinheit -> leere Liste, keine Zusammenfassung", () => {

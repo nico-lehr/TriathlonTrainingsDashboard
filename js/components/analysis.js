@@ -190,6 +190,7 @@ function renderSwimCard() {
   const cssTile = anaTile("CSS", athleteProfile.swimCss ? `${escapeHtml(athleteProfile.swimCss)} <small>/100 m</small>` : "–");
   chart.innerHTML = "";
   if (!res) {
+    document.getElementById("analysis-swim-sub").textContent = "Pace je 100 m, SWOLF und Critical Swim Speed (CSS)";
     body.innerHTML = `<div class="pmc-substats ana-tiles">${cssTile}</div><p class="ana-note">CSS ${swimCssSourceText()}.</p>
       <p class="empty-note">Noch keine Schwimmeinheit mit Pace-Angabe.</p>`;
     return;
@@ -199,7 +200,7 @@ function renderSwimCard() {
   tiles.push(anaTile(`Letzte Einheit (${fmtDate(new Date(latest.date))})`, `${secondsToPace(latest.paceSec)} <small>/100 m</small>`));
   if (res.paceTrend) {
     const d = swimDelta(res.paceTrend.delta, 0, " s");
-    tiles.push(anaTile(`Ø Pace ${SWIM_TREND_WINDOW_DAYS / 7} Wochen`, secondsToPace(res.paceTrend.recent), d.text, d.cls));
+    tiles.push(anaTile(`Ø Pace ${SWIM_TREND_WINDOW_DAYS / 7} Wochen`, `${secondsToPace(res.paceTrend.recent)} <small>/100 m</small>`, d.text, d.cls));
   } else {
     tiles.push(anaTile("Pace-Trend", "–", "zu wenig Einheiten"));
   }
@@ -277,6 +278,35 @@ function renderBikeCard() {
     return;
   }
 
+  if (res.zones) {
+    renderBikeZones(host, res, settingsLink);
+  } else {
+    // Leistungsdaten da, aber keine FTP: weder im Profil noch geschätzt (kein 20-min-Stück).
+    host.insertAdjacentHTML("beforeend", `<p class="ana-hint">Für die Zonen fehlt eine FTP – trag sie in den Einstellungen ein oder fahre mindestens 20 min am Stück mit Leistungsmesser.<br>${settingsLink}</p>`);
+  }
+
+  if (!res.hasPower) {
+    host.insertAdjacentHTML("beforeend", `<p class="ana-hint">Noch keine Leistungsdaten vorhanden. FTP-Schätzung, Zeit in den Zonen und FTP-Verlauf brauchen Radeinheiten mit Leistungsmesser (Powermeter oder Smart-Trainer).</p>`);
+    return;
+  }
+  host.insertAdjacentHTML("beforeend", `<h3 class="ana-subhead">FTP-Verlauf</h3>
+    <p class="card-sub">Geschätzte FTP je Monat (95&nbsp;% der besten 20 Minuten), letzte ${FTP_TREND_MONTHS} Monate</p>`);
+  if (!res.trend.length) {
+    host.insertAdjacentHTML("beforeend", `<p class="empty-note">Noch kein Monat mit 20 Minuten am Stück Leistungsdaten.</p>`);
+    return;
+  }
+  const chart = document.createElement("div");
+  chart.className = "chart-wrap";
+  host.appendChild(chart);
+  drawMiniLine(chart, res.trend.map(p => {
+    const month = p.start.toLocaleDateString("de-DE", { month: "short", year: "2-digit" });
+    return { y: p.ftp, xLabel: month, tooltip: `<b>${month}</b><br>FTP ≈ ${p.ftp} W · beste 20 min ${p.best20} W am ${fmtDate(p.workout._date)}` };
+  }), { color: "var(--c-rad)", fmtAxis: v => fmtNum(v, 0), width: 440, height: 180 });
+}
+
+// Leistungszonen mit Wattbereichen und (falls Leistungsdaten der letzten
+// Wochen da sind) der Zeit je Zone.
+function renderBikeZones(host, res, settingsLink) {
   const ftpText = res.ftpSource === "manual" ? `FTP ${res.ftp} W (Einstellungen)` : `geschätzter FTP ${res.ftp} W`;
   const dist = res.distribution;
   const distText = dist
@@ -304,24 +334,6 @@ function renderBikeCard() {
     rows.appendChild(row);
   });
   host.appendChild(rows);
-
-  if (!res.hasPower) {
-    host.insertAdjacentHTML("beforeend", `<p class="ana-hint">Noch keine Leistungsdaten vorhanden. FTP-Schätzung, Zeit in den Zonen und FTP-Verlauf brauchen Radeinheiten mit Leistungsmesser (Powermeter oder Smart-Trainer).</p>`);
-    return;
-  }
-  host.insertAdjacentHTML("beforeend", `<h3 class="ana-subhead">FTP-Verlauf</h3>
-    <p class="card-sub">Geschätzte FTP je Monat (95&nbsp;% der besten 20 Minuten), letzte ${FTP_TREND_MONTHS} Monate</p>`);
-  if (!res.trend.length) {
-    host.insertAdjacentHTML("beforeend", `<p class="empty-note">Noch kein Monat mit 20 Minuten am Stück Leistungsdaten.</p>`);
-    return;
-  }
-  const chart = document.createElement("div");
-  chart.className = "chart-wrap";
-  host.appendChild(chart);
-  drawMiniLine(chart, res.trend.map(p => {
-    const month = p.start.toLocaleDateString("de-DE", { month: "short", year: "2-digit" });
-    return { y: p.ftp, xLabel: month, tooltip: `<b>${month}</b><br>FTP ≈ ${p.ftp} W · beste 20 min ${p.best20} W am ${fmtDate(p.workout._date)}` };
-  }), { color: "var(--c-rad)", fmtAxis: v => fmtNum(v, 0), width: 440, height: 180 });
 }
 
 /* ---------- Koppeltraining ---------- */
@@ -355,7 +367,7 @@ function brickSummaryHtml(summary) {
 }
 
 function brickCompareText(s) {
-  if (!s.own) return "keine Sekundendaten";
+  if (!s.own) return s.tooShort ? `Lauf kürzer als ${BRICK_START_WINDOW_S / 60} min` : "keine Sekundendaten";
   if (s.compare.paceSec == null && s.compare.hr == null) return `zu wenig normale Läufe (${s.compareCount})`;
   const bits = [];
   if (s.compare.paceSec != null) bits.push(`${secondsToPace(s.compare.paceSec)} /km`);

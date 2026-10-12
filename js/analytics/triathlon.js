@@ -5,6 +5,8 @@
 
 const TRI_SPORTS = ["Schwimmen", "Rad", "Laufen"];
 
+const triMean = list => list.reduce((a, b) => a + b, 0) / list.length; // Mittelwert (Liste nicht leer)
+
 /* ======================================================================
    SPORT-BALANCE: Anteil von Schwimmen/Rad/Laufen an der Trainingszeit je
    Woche bzw. Monat im Vergleich zu einer Zielverteilung.
@@ -103,6 +105,9 @@ function computeSportBalance(workouts, mode, target, today = new Date()) {
 
 const SWIM_TREND_WINDOW_DAYS = 42; // Trend: Ø der letzten 6 Wochen gegen die 6 Wochen davor
 const SWIM_TREND_MIN_SWIMS = 2;    // je Fenster mindestens so viele Einheiten, sonst kein Trend
+const SWIM_CSS_MIN_T200_S = 60;    // schneller als 1:00 auf 200 m schwimmt niemand - Tippfehler
+const SWIM_CSS_MIN_PACE_S = 50;    // plausible CSS: zwischen 0:50 ...
+const SWIM_CSS_MAX_PACE_S = 300;   // ... und 5:00 je 100 m
 
 // Testzeit "m:ss" (auch "mm:ss" oder mit Zehnteln "6:40.5") in Sekunden, sonst null.
 function parseSwimTestTime(str) {
@@ -117,10 +122,13 @@ function parseSwimTestTime(str) {
 function computeSwimCss(t400Str, t200Str) {
   const t400 = parseSwimTestTime(t400Str), t200 = parseSwimTestTime(t200Str);
   if (t400 == null || t200 == null) return { error: "Bitte beide Testzeiten im Format m:ss eintragen, z.B. 7:10 und 3:25." };
+  const unrealistic = { error: "Die Zeiten wirken unrealistisch – bitte prüfen." };
+  if (t200 < SWIM_CSS_MIN_T200_S) return unrealistic;
   // Auf 400 m ist man je 100 m langsamer als auf 200 m - sonst sind die
   // Zeiten vertauscht oder vertippt, und die Formel ergäbe Unsinn.
   if (t400 <= 2 * t200) return { error: "Die 400-m-Zeit muss mehr als doppelt so lang sein wie die 200-m-Zeit – sind die Zeiten vertauscht?" };
   const secPer100 = (t400 - t200) / 2;
+  if (secPer100 < SWIM_CSS_MIN_PACE_S || secPer100 > SWIM_CSS_MAX_PACE_S) return unrealistic;
   return { mps: 200 / (t400 - t200), secPer100, pace: secondsToPace(secPer100), error: null };
 }
 
@@ -134,8 +142,7 @@ function swimWindowTrend(points, key, today) {
   const vals = (from, to) => points.filter(p => p[key] != null && p.date >= from && p.date < to).map(p => p[key]);
   const recent = vals(recentFrom, today.getTime() + 1), prior = vals(priorFrom, recentFrom);
   if (recent.length < SWIM_TREND_MIN_SWIMS || prior.length < SWIM_TREND_MIN_SWIMS) return null;
-  const avg = list => list.reduce((a, b) => a + b, 0) / list.length;
-  return { recent: avg(recent), prior: avg(prior), delta: avg(recent) - avg(prior), recentCount: recent.length, priorCount: prior.length };
+  return { recent: triMean(recent), prior: triMean(prior), delta: triMean(recent) - triMean(prior), recentCount: recent.length, priorCount: prior.length };
 }
 
 // Schwimm-Auswertung über die Vergleichsgruppe der letzten Einheit
@@ -214,7 +221,8 @@ function bestAveragePower(stream, seconds) {
   return best;
 }
 
-const hasPowerStream = w => !!(w.stream && Array.isArray(w.stream.power) && w.stream.power.some(v => v != null));
+// Nur echte Leistungswerte zählen - eine Kurve aus lauter Nullen (z.B. Rolle ohne Leistungsmesser) ist keine Leistungsmessung.
+const hasPowerStream = w => !!(w.stream && Array.isArray(w.stream.power) && w.stream.power.some(v => v > 0));
 
 // Index (0-4) der Leistungszone für einen Anteil der FTP - Zonengrenzen aus
 // POWER_ZONE_FTP_BOUNDS (js/analytics/zones.js), oberhalb von Z5 bleibt es Z5.
@@ -231,7 +239,7 @@ function computeBikeAnalysis(workouts, manualFtp, today = new Date()) {
   const dayMs = 86400000;
   const rides = workouts.filter(w => w._date && !w.is_summary && sportGroup(w.sport) === "Rad" && hasPowerStream(w));
   const best20 = new Map(rides.map(w => [w, bestAveragePower(w.stream, FTP_BEST_EFFORT_S)]));
-  const bestOf = list => list.reduce((b, w) => (best20.get(w) != null && (!b || best20.get(w) > best20.get(b)) ? w : b), null);
+  const bestOf = list => bestBy(list, w => (best20.get(w) > 0 ? best20.get(w) : null)); // 0 W ist keine Schätzgrundlage
   const estimateOf = w => (w ? { ftp: Math.round(best20.get(w) * FTP_FROM_20MIN_FACTOR), best20: Math.round(best20.get(w)), workout: w } : null);
 
   const estimate = estimateOf(bestOf(rides.filter(w => w._date >= today - FTP_ESTIMATE_WINDOW_DAYS * dayMs && w._date <= today)));
@@ -275,14 +283,21 @@ const BRICK_COMPARE_WINDOW_DAYS = 90;  // Vergleich: normale Läufe aus den 90 T
 const BRICK_MIN_COMPARE_RUNS = 3;      // weniger Vergleichsläufe -> kein Vergleich
 const BRICK_MIN_POINTS = 3;            // so viele Messpunkte braucht ein Wert in den ersten 10 Minuten
 
+// Ist der Lauf kürzer als das Vergleichsfenster? Aus der Sekundenkurve, sonst aus der Dauer.
+function runShorterThanStartWindow(w) {
+  const t = w.stream && w.stream.t;
+  if (Array.isArray(t) && t.length) return t[t.length - 1] < BRICK_START_WINDOW_S;
+  return w.duration_min != null && w.duration_min * 60 < BRICK_START_WINDOW_S;
+}
+
 // Pace (s/km, aus der Ø-Geschwindigkeit in Bewegung - Stillstand zählt nicht)
 // und Ø-Puls der ersten BRICK_START_WINDOW_S Sekunden aus der Sekundenkurve
 // (stream). Der Lauf muss mindestens so lang aufgezeichnet sein. null, wenn beides fehlt.
 function runStartMetrics(w) {
   const s = w.stream;
-  if (!s || !Array.isArray(s.t) || !s.t.length || s.t[s.t.length - 1] < BRICK_START_WINDOW_S) return null;
+  if (!s || !Array.isArray(s.t) || !s.t.length || runShorterThanStartWindow(w)) return null;
   const inWindow = key => (Array.isArray(s[key]) ? s.t.map((t, i) => (t < BRICK_START_WINDOW_S ? s[key][i] : null)).filter(v => v != null && v > 0) : []);
-  const mean = list => (list.length >= BRICK_MIN_POINTS ? list.reduce((a, b) => a + b, 0) / list.length : null);
+  const mean = list => (list.length >= BRICK_MIN_POINTS ? triMean(list) : null);
   const speed = mean(inWindow("speed")), hr = mean(inWindow("hr"));
   if (speed == null && hr == null) return null;
   return { paceSec: speed != null ? 1000 / speed : null, hr };
@@ -316,7 +331,6 @@ function computeBrickAnalysis(workouts) {
   const brickRuns = new Set(bricks.map(b => b.run));
   const normal = workouts.filter(w => w._date && !w.is_summary && sportGroup(w.sport) === "Laufen" && !brickRuns.has(w));
   const metrics = new Map(normal.map(w => [w, runStartMetrics(w)]));
-  const avg = list => list.reduce((a, b) => a + b, 0) / list.length;
 
   const sessions = bricks.map(b => {
     const own = runStartMetrics(b.run);
@@ -325,15 +339,18 @@ function computeBrickAnalysis(workouts) {
     const compare = {};
     ["paceSec", "hr"].forEach(key => {
       const vals = group.map(o => metrics.get(o)[key]).filter(v => v != null);
-      compare[key] = vals.length >= BRICK_MIN_COMPARE_RUNS ? avg(vals) : null;
+      compare[key] = vals.length >= BRICK_MIN_COMPARE_RUNS ? triMean(vals) : null;
     });
     const delta = key => (own && own[key] != null && compare[key] != null ? own[key] - compare[key] : null);
-    return { ride: b.ride, run: b.run, gapMin: b.gapMin, own, compare, compareCount: group.length, delta: { paceSec: delta("paceSec"), hr: delta("hr") } };
+    return {
+      ride: b.ride, run: b.run, gapMin: b.gapMin, own, tooShort: !own && runShorterThanStartWindow(b.run),
+      compare, compareCount: group.length, delta: { paceSec: delta("paceSec"), hr: delta("hr") },
+    };
   });
 
   const summaryOf = key => {
     const vals = sessions.map(s => s.delta[key]).filter(v => v != null);
-    return vals.length ? { value: avg(vals), count: vals.length } : null;
+    return vals.length ? { value: triMean(vals), count: vals.length } : null;
   };
   return { sessions, summary: { paceSec: summaryOf("paceSec"), hr: summaryOf("hr") } };
 }
