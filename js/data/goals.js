@@ -12,7 +12,7 @@ function loadGoals() {
 
 function saveGoals() {
   // transiente Lade-/Fehlerzustände nicht mit persistieren
-  const clean = goals.map(({ _loading, _error, _planLoading, _planError, _detailsOpen, _advOpen, _gpxError, ...rest }) => rest);
+  const clean = goals.map(({ _loading, _error, _planLoading, _planError, _detailsOpen, _advOpen, _racePlanOpen, _gpxError, ...rest }) => rest);
   storeSet(GOALS_KEY, clean);
 }
 
@@ -61,6 +61,7 @@ function addGoal(e) {
     courseElevationM: null, // Höhenmeter der Strecke, manuell ODER aus GPX
     courseProfileSource: null, // "manual"|"gpx" - nur zur Anzeige, welche Quelle
     courseProfileLabel: null, // z.B. "1240 Hm über 92 km (13 Hm/km, hügelig)" - nur bei GPX-Quelle gesetzt (gpxProfileLabel())
+    racePlan: null, // Rennplan-Checklisten (js/analytics/race-plan.js) - null = Standard-Listen, bis etwas geändert wird
   });
   saveGoals();
   e.target.reset();
@@ -145,3 +146,12 @@ function setGoalCourseElevation(id, elevationM, source, label) {
   renderGoals();
 }
 
+// Rennplan (Checklisten Wechselzone/Ausrüstung, Verpflegung, Rennwoche - siehe
+// js/analytics/race-plan.js) als Ganzes ersetzen; null = wieder Standard-Listen.
+function setGoalRacePlan(id, racePlan) {
+  const goal = goals.find(g => g.id === id);
+  if (!goal) return;
+  goal.racePlan = racePlan || null;
+  saveGoals();
+  renderGoals();
+}

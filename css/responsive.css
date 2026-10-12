@@ -143,6 +143,8 @@
     .record-row { padding-top: 11px; padding-bottom: 11px; }
     .compare-picker-item { padding-top: 11px; padding-bottom: 11px; }
     .onb-weekday-chip { flex: 1 0 var(--touch-min); width: auto; }
+    .race-plan-item input[type="checkbox"] { width: 24px; height: 24px; }
+    .race-plan-text { font-size: 16px; } /* wie Eingabefelder: sonst zoomt iOS beim Antippen */
   }
 
   /* Touch kennt kein Hovern: ohne diese Regeln bliebe eine angetippte Karte

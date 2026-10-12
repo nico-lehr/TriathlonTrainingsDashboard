@@ -89,6 +89,8 @@ function renderCalendar() {
   // Empfehlungen. Hier zentral mit auffrischen, statt an jeder einzelnen
   // Aufrufstelle einzeln daran denken zu müssen.
   if (typeof renderNutrition === "function") renderNutrition();
+  // Aus demselben Grund: die Rennwoche im Rennplan zeigt geplante Einheiten.
+  if (typeof refreshOpenRacePlans === "function") refreshOpenRacePlans();
 }
 
 // Sportart-Filter im Kalender. Indoor/Outdoor wird bewusst NICHT unterschieden -
