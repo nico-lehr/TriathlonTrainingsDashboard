@@ -21,14 +21,14 @@ function renderRaceCountdown() {
   }
 
   const raceDate = new Date(goal.date + "T00:00:00");
-  const daysUntil = Math.round((raceDate - today) / 86400000);
+  const daysUntil = daysUntilGoal(goal);
   const phase = PERIOD_PHASES[timeline[0].phase];
   const week = getWeeklyTargets(goal, plannedWorkouts, DATA, today);
   const thisWeek = week.weeks[0];
   const next = timeline[1];
   const dayWord = n => (n === 1 ? "Tag" : "Tage");
   const dateLabel = key => fmtDateWeekday(new Date(key + "T00:00:00"));
-  const daysTo = key => Math.round((new Date(key + "T00:00:00") - today) / 86400000);
+  const daysTo = key => daysUntilGoal({ date: key }); // Tage ab heute, wie beim Rennen
 
   const hero = daysUntil > 0
     ? { value: daysUntil, sub: `${dayWord(daysUntil)} bis „${escapeHtml(goal.name)}“ am ${fmtDateWeekday(raceDate)}` }
@@ -86,7 +86,14 @@ function raceCountdownWeekHtml(w, plan) {
       <span class="item"><span class="swatch rc-swatch-planned"></span>noch geplant ${w.plannedMin} min</span>
       <span class="item"><span class="swatch line rc-swatch-target"></span>Ziel ${w.targetMin} min</span>
     </div>
-    <div class="csc-sub">${status} · Ziel = ${Math.round(w.targetPct * 100)} % deines aktuellen Wochenumfangs (Ø ${plan.baselineMin} min der letzten ${plan.baselineWeeks} ${plan.baselineWeeks === 1 ? "Woche" : "Wochen"})</div>`;
+    <div class="csc-sub">${status} · Ziel = ${Math.round(w.targetPct * 100)} % ${raceCountdownBaselineText(plan)}</div>`;
+}
+
+// Bezugswert der Prozentangabe: die letzte normale Woche, sonst der Ø.
+function raceCountdownBaselineText(plan) {
+  return plan.baselineWeek
+    ? `deiner letzten normalen Trainingswoche (ab ${fmtDate(new Date(plan.baselineWeek + "T00:00:00"))}: ${plan.baselineMin} min)`
+    : `deines Wochenschnitts (Ø ${plan.baselineMin} min der letzten ${plan.baselineWeeks} ${plan.baselineWeeks === 1 ? "Woche" : "Wochen"})`;
 }
 
 // Balken: erledigt + noch geplant, Strich = Ziel. Gestreckt auf volle Breite

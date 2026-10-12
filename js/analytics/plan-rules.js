@@ -374,7 +374,11 @@ function checkPlanVolume(ctx) {
       });
     }
 
-    if (streak >= PLAN_DELOAD_EVERY_WEEKS - 1 && !planIsLighterWeek(cur, ref)) {
+    // In der letzten Woche vor dem Taper keine Entlastung - der Taper ist sie
+    // (sonst drei leichte Wochen in Folge; getWeeklyTargets macht es genauso).
+    const next = ctx.periodWeeks.get(planShiftDay(wk, 7));
+    const beforeTaper = next && next.type === "taper";
+    if (!beforeTaper && streak >= PLAN_DELOAD_EVERY_WEEKS - 1 && !planIsLighterWeek(cur, ref)) {
       const suggestion = planShortenWeek(ctx, wk, cur, planDeloadMax(ref));
       if (suggestion) out.push({
         rule: "deload", severity: "warn", date: wk, workoutId: null,
@@ -548,7 +552,7 @@ function planRulesText(goal) {
     `Die nächste Einheit besser "leicht", wenn die HRV mindestens ${PLAN_HRV_DROP_PCT} % unter dem eigenen Durchschnitt oder der Ruhepuls mindestens ${PLAN_RHR_RISE_BPM} Schläge darüber liegt.`,
     ...(sports.length ? [`Jede Woche mindestens eine lockere ("leicht") Einheit in jeder Sportart des Ziels: ${sports.join(", ")}.`] : []),
     ...(goal && goal.date ? [
-      `Taper-Wochen (die Rennwoche und die Woche davor) und die Erholungswoche nach dem Wettkampf höchstens mit dem Zielumfang der Periodisierung planen (etwa ${pct(PERIOD_TAPER_FACTORS[1])} %, ${pct(PERIOD_TAPER_FACTORS[0])} % und ${pct(PERIOD_RECOVERY_FACTOR)} % des zuletzt erreichten Wochenumfangs); der Wettkampf selbst zählt nicht mit.`,
+      `Taper-Wochen (die Rennwoche und die Woche davor) und die Erholungswoche nach dem Wettkampf höchstens mit dem Zielumfang der Periodisierung planen (etwa ${pct(PERIOD_TAPER_FACTORS[1])} %, ${pct(PERIOD_TAPER_FACTORS[0])} % und ${pct(PERIOD_RECOVERY_FACTOR)} % der letzten normalen Woche); der Wettkampf selbst zählt nicht mit. In der letzten Woche vor dem Taper keine Entlastungswoche - der Taper übernimmt sie.`,
       `In den ${PERIOD_RECOVERY_DAYS} Tagen nach dem Wettkampf nur "leicht" und höchstens ${PLAN_HARD_MIN_DURATION} Minuten pro Einheit.`,
     ] : []),
   ].map(s => "- " + s).join("\n");

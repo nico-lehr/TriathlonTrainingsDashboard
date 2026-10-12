@@ -250,7 +250,7 @@ function buildCompactContext(goal) {
     if (targets && targets.weeks.length) {
       const w = targets.weeks[0];
       lines.push(`Diese Woche: ${periodWeekText(w)}; bisher absolviert ${w.doneMin} min, noch geplant ${w.plannedMin} min`);
-      if (targets.baselineMin != null) lines.push(`Aktueller Wochenumfang: Ø ${targets.baselineMin} min (letzte ${targets.baselineWeeks} Wochen)`);
+      if (targets.baselineMin != null) lines.push(`Aktueller Wochenumfang: ${targets.baselineMin} min (${targets.baselineWeek ? `letzte normale Woche ab ${targets.baselineWeek}` : `Ø der letzten ${targets.baselineWeeks} Wochen`})`);
     }
     if (goal.subDisciplines && goal.subDisciplines.length) {
       const subBits = goal.subDisciplines.map(s => {

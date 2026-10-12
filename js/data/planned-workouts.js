@@ -43,10 +43,9 @@ function newPlannedWorkoutId() {
 // applyPlanSuggestion() (add_easy_session), addOpenWishesToPlan() (Wünsche)
 // und die KI-Planung (generateTrainingPlan).
 // entry: { date, sport, title, duration_min, intensity, description, exercises, goalId, phase, source }
-// `phase` ergibt sich ohne Angabe aus Datum + Ziel (getPhase,
-// js/analytics/periodization.js) - die Phase am Tag der Einheit, nicht die von heute.
+// `phase` ergibt sich ohne Angabe aus Datum + Ziel - die Phase am Tag der
+// Einheit, nicht die von heute.
 function buildPlannedWorkout(entry) {
-  const goal = entry.goalId ? goals.find(g => g.id === entry.goalId) : null;
   return {
     id: newPlannedWorkoutId(),
     date: entry.date,
@@ -58,10 +57,25 @@ function buildPlannedWorkout(entry) {
     exercises: Array.isArray(entry.exercises) && entry.exercises.length ? entry.exercises : null, // nur Kraft/Mobility: [{name, sets, reps, note}]
     status: "geplant", // "geplant" | "erledigt" | "uebersprungen"
     goalId: entry.goalId || null,
-    phase: entry.phase || getPhase(entry.date, goal),
+    phase: entry.phase || plannedWorkoutPhase(entry),
     source: entry.source || "manual", // "ai" | "manual"
     createdAt: new Date().toISOString(),
   };
+}
+
+// Trainingsphase einer Einheit an ihrem Datum für ihr Ziel (getPhase,
+// js/analytics/periodization.js) - ohne Ziel null.
+function plannedWorkoutPhase(entry) {
+  const goal = entry.goalId ? goals.find(g => g.id === entry.goalId) : null;
+  return getPhase(entry.date, goal);
+}
+
+// Einheit mit Änderungen; bei neuem Datum auch neue Phase (außer der
+// Aufrufer setzt sie selbst).
+function withPlannedPatch(pw, patch) {
+  const next = { ...pw, ...patch };
+  if (patch.date && patch.date !== pw.date && !("phase" in patch)) next.phase = plannedWorkoutPhase(next);
+  return next;
 }
 
 function addPlannedWorkout(entry) {
@@ -74,7 +88,7 @@ function addPlannedWorkout(entry) {
 function updatePlannedWorkout(id, patch) {
   const pw = plannedWorkouts.find(p => p.id === id);
   if (!pw) return null;
-  Object.assign(pw, patch);
+  Object.assign(pw, withPlannedPatch(pw, patch));
   savePlannedWorkouts();
   return pw;
 }
@@ -137,7 +151,7 @@ function planRuleViolations(list, options = {}) {
 // Kopie der Liste mit geänderter Einheit - die Vorschau, die erst geprüft
 // und dann mit replacePlannedWorkouts() übernommen wird.
 function patchedPlannedWorkouts(list, id, patch) {
-  return list.map(p => (p.id === id ? { ...p, ...patch } : p));
+  return list.map(p => (p.id === id ? withPlannedPatch(p, patch) : p));
 }
 
 // Wendet einen Vorschlag des Regelwerks (suggestion aus validatePlan()) auf
@@ -152,7 +166,7 @@ function applyPlanSuggestion(list, suggestion, defaults = {}) {
   switch (s.action) {
     case "move":
       if (!target || !s.toDate) return null;
-      target.date = s.toDate;
+      Object.assign(target, withPlannedPatch(target, { date: s.toDate }));
       return copy;
     case "set_intensity":
       if (!target || !s.intensity) return null;

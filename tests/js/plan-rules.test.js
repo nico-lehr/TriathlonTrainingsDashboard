@@ -317,8 +317,7 @@ test("Regel 6: erst halb geplante Woche wird nicht bemängelt", () => {
 
 /* ---------- Periodisierung (js/analytics/periodization.js) ---------- */
 
-// Aktueller Wochenumfang aus HISTORY: Ø (400 + 260 + 370) / 3 = 343 min,
-// Startniveau = höchstens die letzte normale Woche, auf 5 abgerundet -> 340 min.
+// Anker aus HISTORY: die letzte normale Woche (05.10., 370 min).
 const raceOn = n => ({ id: "g2", name: "Stadttriathlon", sport: "Triathlon", date: day(n), isPrimary: true });
 
 test("Periodisierung: Taper-Woche über dem Zielumfang -> ein Hinweis statt +10 %/Entlastung", () => {
@@ -331,7 +330,7 @@ test("Periodisierung: Taper-Woche über dem Zielumfang -> ein Hinweis statt +10 
   assert.strictEqual(v[0].date, day(0));
   assert.match(v[0].text, /Taper-Woche vor „Stadttriathlon“/);
   assert.strictEqual(v[0].suggestion.action, "reduce_week_volume");
-  assert.strictEqual(v[0].suggestion.target_minutes, 235); // 340 * 0,7, auf 5 abgerundet
+  assert.strictEqual(v[0].suggestion.target_minutes, 259); // 370 * 0,7
   assert.strictEqual(byRule(result, "volume_increase").length + byRule(result, "deload").length, 0);
 
   const fixed = validate(applySuggestion(plan, v[0].suggestion), { goal });
@@ -345,7 +344,7 @@ test("Periodisierung: Rennwoche - der Wettkampftag zählt nicht mit und wird nie
   assert.strictEqual(v.length, 1);
   assert.match(v[0].text, /Rennwoche/);
   assert.match(v[0].text, /315 Minuten/); // 375 - 60
-  assert.strictEqual(v[0].suggestion.target_minutes, 170); // 340 * 0,5
+  assert.strictEqual(v[0].suggestion.target_minutes, 185); // 370 * 0,5
   assert.ok(v[0].suggestion.workouts.every(w => w.workoutId !== plan[5].id), "Wettkampftag bleibt");
 });
 
@@ -367,7 +366,7 @@ test("Periodisierung: Erholungswoche - nur locker (Regel 7) und weniger Umfang",
 
   const vol = byRule(result, "phase_volume");
   assert.strictEqual(vol.length, 1);
-  assert.strictEqual(vol[0].suggestion.target_minutes, 135); // 340 * 0,4
+  assert.strictEqual(vol[0].suggestion.target_minutes, 148); // 370 * 0,4
 });
 
 test("Periodisierung: ohne Zieldatum oder weit vor dem Rennen keine neuen Hinweise", () => {
