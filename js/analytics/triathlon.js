@@ -262,3 +262,78 @@ function computeBikeAnalysis(workouts, manualFtp, today = new Date()) {
     distribution,
   };
 }
+
+/* ======================================================================
+   KOPPELTRAINING: Lauf direkt nach dem Rad, die ersten 10 Minuten im
+   Vergleich zu normalen Läufen
+   ====================================================================== */
+
+const BRICK_MAX_GAP_MIN = 30;          // Lauf beginnt höchstens 30 min nach dem Radende = Koppeltraining
+const BRICK_CLOCK_TOLERANCE_S = 60;    // Uhr-/Rundungsabweichung: der Lauf darf bis zu 1 min "vor" dem Radende beginnen
+const BRICK_START_WINDOW_S = 600;      // verglichen werden die ersten 10 Minuten des Laufs
+const BRICK_COMPARE_WINDOW_DAYS = 90;  // Vergleich: normale Läufe aus den 90 Tagen vor der Koppeleinheit
+const BRICK_MIN_COMPARE_RUNS = 3;      // weniger Vergleichsläufe -> kein Vergleich
+const BRICK_MIN_POINTS = 3;            // so viele Messpunkte braucht ein Wert in den ersten 10 Minuten
+
+// Pace (s/km, aus der Ø-Geschwindigkeit in Bewegung - Stillstand zählt nicht)
+// und Ø-Puls der ersten BRICK_START_WINDOW_S Sekunden aus der Sekundenkurve
+// (stream). Der Lauf muss mindestens so lang aufgezeichnet sein. null, wenn beides fehlt.
+function runStartMetrics(w) {
+  const s = w.stream;
+  if (!s || !Array.isArray(s.t) || !s.t.length || s.t[s.t.length - 1] < BRICK_START_WINDOW_S) return null;
+  const inWindow = key => (Array.isArray(s[key]) ? s.t.map((t, i) => (t < BRICK_START_WINDOW_S ? s[key][i] : null)).filter(v => v != null && v > 0) : []);
+  const mean = list => (list.length >= BRICK_MIN_POINTS ? list.reduce((a, b) => a + b, 0) / list.length : null);
+  const speed = mean(inWindow("speed")), hr = mean(inWindow("hr"));
+  if (speed == null && hr == null) return null;
+  return { paceSec: speed != null ? 1000 / speed : null, hr };
+}
+
+// Koppeleinheiten, neueste zuerst: Lauf, der höchstens BRICK_MAX_GAP_MIN nach
+// dem Ende einer Radeinheit beginnt (Start/Ende über workoutStartEndMs() aus
+// js/data/workouts.js). Je Lauf zählt die zuletzt davor beendete Radeinheit.
+function findBrickSessions(workouts) {
+  const timed = workouts.filter(w => !w.is_summary && workoutStartEndMs(w));
+  const rides = timed.filter(w => sportGroup(w.sport) === "Rad");
+  const bricks = [];
+  timed.filter(w => sportGroup(w.sport) === "Laufen").forEach(run => {
+    const start = workoutStartEndMs(run).start;
+    let best = null;
+    rides.forEach(ride => {
+      const end = workoutStartEndMs(ride).end, gapS = (start - end) / 1000;
+      if (gapS >= -BRICK_CLOCK_TOLERANCE_S && gapS <= BRICK_MAX_GAP_MIN * 60 && (!best || end > best.end)) best = { ride, end, gapS };
+    });
+    if (best) bricks.push({ ride: best.ride, run, start, gapMin: Math.max(0, best.gapS) / 60 });
+  });
+  return bricks.sort((a, b) => b.start - a.start);
+}
+
+// Je Koppeleinheit: erste 10 Minuten des Laufs gegen dieselben 10 Minuten
+// normaler Läufe (kein Rad davor) der BRICK_COMPARE_WINDOW_DAYS Tage davor -
+// wer in die Vergleichsgruppe darf, entscheidet sameComparisonGroup().
+// delta > 0 = langsamer bzw. höherer Puls als sonst.
+function computeBrickAnalysis(workouts) {
+  const bricks = findBrickSessions(workouts);
+  const brickRuns = new Set(bricks.map(b => b.run));
+  const normal = workouts.filter(w => w._date && !w.is_summary && sportGroup(w.sport) === "Laufen" && !brickRuns.has(w));
+  const metrics = new Map(normal.map(w => [w, runStartMetrics(w)]));
+  const avg = list => list.reduce((a, b) => a + b, 0) / list.length;
+
+  const sessions = bricks.map(b => {
+    const own = runStartMetrics(b.run);
+    const from = b.start - BRICK_COMPARE_WINDOW_DAYS * 86400000;
+    const group = normal.filter(o => metrics.get(o) && o._date >= from && o._date < b.start && sameComparisonGroup(b.run, o));
+    const compare = {};
+    ["paceSec", "hr"].forEach(key => {
+      const vals = group.map(o => metrics.get(o)[key]).filter(v => v != null);
+      compare[key] = vals.length >= BRICK_MIN_COMPARE_RUNS ? avg(vals) : null;
+    });
+    const delta = key => (own && own[key] != null && compare[key] != null ? own[key] - compare[key] : null);
+    return { ride: b.ride, run: b.run, gapMin: b.gapMin, own, compare, compareCount: group.length, delta: { paceSec: delta("paceSec"), hr: delta("hr") } };
+  });
+
+  const summaryOf = key => {
+    const vals = sessions.map(s => s.delta[key]).filter(v => v != null);
+    return vals.length ? { value: avg(vals), count: vals.length } : null;
+  };
+  return { sessions, summary: { paceSec: summaryOf("paceSec"), hr: summaryOf("hr") } };
+}

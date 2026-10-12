@@ -22,6 +22,7 @@ function renderAnalysis() {
   renderSportBalanceCard();
   renderSwimCard();
   renderBikeCard();
+  renderBrickCard();
 }
 
 function initAnalysis() {
@@ -321,4 +322,79 @@ function renderBikeCard() {
     const month = p.start.toLocaleDateString("de-DE", { month: "short", year: "2-digit" });
     return { y: p.ftp, xLabel: month, tooltip: `<b>${month}</b><br>FTP ≈ ${p.ftp} W · beste 20 min ${p.best20} W am ${fmtDate(p.workout._date)}` };
   }), { color: "var(--c-rad)", fmtAxis: v => fmtNum(v, 0), width: 440, height: 180 });
+}
+
+/* ---------- Koppeltraining ---------- */
+
+const ANALYSIS_BRICK_MAX_ROWS = 12; // die Tabelle zeigt die neuesten Koppeleinheiten, die Zusammenfassung zählt alle
+
+// "+12 s" / "−3 s": Abweichung zum normalen Lauf, ohne Wertung per Farbe -
+// langsamer nach dem Rad ist normal, die Zahl soll nur zeigen, wie viel.
+function brickDeltaText(v, unit) {
+  const r = Math.round(v);
+  return r === 0 ? `±0${unit}` : `${r > 0 ? "+" : "−"}${Math.abs(r)}${unit}`;
+}
+
+function brickSummaryHtml(summary) {
+  const { paceSec, hr } = summary;
+  if (!paceSec && !hr) {
+    return `<p class="ana-hint">Für einen Vergleich fehlen noch normale Läufe mit Sekundendaten (mindestens ${BRICK_MIN_COMPARE_RUNS} in den ${BRICK_COMPARE_WINDOW_DAYS} Tagen vor einer Koppeleinheit).</p>`;
+  }
+  const units = n => `${n} ${n === 1 ? "Koppeleinheit" : "Koppeleinheiten"} mit Vergleich`;
+  const sameCount = paceSec && hr && paceSec.count === hr.count;
+  const parts = [];
+  if (paceSec) {
+    const v = Math.round(paceSec.value);
+    parts.push((v === 0 ? "gleich schnell" : `${Math.abs(v)} s/km ${v > 0 ? "langsamer" : "schneller"}`) + (sameCount ? "" : ` (${units(paceSec.count)})`));
+  }
+  if (hr) {
+    const v = Math.round(hr.value);
+    parts.push(`Puls ${v === 0 ? "gleich" : `${Math.abs(v)} bpm ${v > 0 ? "höher" : "niedriger"}`}` + (sameCount ? "" : ` (${units(hr.count)})`));
+  }
+  return `<p class="ana-hint"><b>Im Schnitt nach dem Rad:</b> in den ersten ${BRICK_START_WINDOW_S / 60} Minuten ${parts.join(" und ")} als bei deinen normalen Läufen${sameCount ? ` (${units(paceSec.count)})` : ""}.</p>`;
+}
+
+function brickCompareText(s) {
+  if (!s.own) return "keine Sekundendaten";
+  if (s.compare.paceSec == null && s.compare.hr == null) return `zu wenig normale Läufe (${s.compareCount})`;
+  const bits = [];
+  if (s.compare.paceSec != null) bits.push(`${secondsToPace(s.compare.paceSec)} /km`);
+  if (s.compare.hr != null) bits.push(`${Math.round(s.compare.hr)} bpm`);
+  return `Ø ${bits.join(" · ")} <small>(${s.compareCount} Läufe)</small>`;
+}
+
+function renderBrickCard() {
+  const host = document.getElementById("analysis-brick-body");
+  if (!host) return;
+  const res = computeBrickAnalysis(DATA);
+  if (!res.sessions.length) {
+    host.innerHTML = `<p class="empty-note">Noch keine Koppeleinheit erkannt. Als Koppeltraining zählt ein Lauf, der höchstens ${BRICK_MAX_GAP_MIN} Minuten nach dem Ende einer Radeinheit beginnt.</p>`;
+    return;
+  }
+  const shown = res.sessions.slice(0, ANALYSIS_BRICK_MAX_ROWS);
+  const rows = shown.map(s => {
+    const own = s.own || {};
+    const pace = own.paceSec != null
+      ? `${secondsToPace(own.paceSec)} /km${s.delta.paceSec != null ? ` <small>${brickDeltaText(s.delta.paceSec, " s")}</small>` : ""}` : "–";
+    const hr = own.hr != null
+      ? `${Math.round(own.hr)} bpm${s.delta.hr != null ? ` <small>${brickDeltaText(s.delta.hr, "")}</small>` : ""}` : "–";
+    return `<tr>
+      <td>${fmtDateFull(s.run._date)}</td>
+      <td class="ana-brick-ride">${fmtNum(s.ride.duration_min, 0)} min ${rideEnvBadgeHtml(s.ride)}</td>
+      <td class="num">${fmtNum(s.gapMin, 0)} min</td>
+      <td class="num">${fmtNum(s.run.duration_min, 0)} min</td>
+      <td class="num">${pace}</td>
+      <td class="num">${hr}</td>
+      <td>${brickCompareText(s)}</td>
+    </tr>`;
+  }).join("");
+  const more = res.sessions.length > shown.length
+    ? `<p class="ana-note">Die neuesten ${shown.length} von ${res.sessions.length} Koppeleinheiten.</p>` : "";
+  host.innerHTML = `${brickSummaryHtml(res.summary)}
+    <div class="table-scroll"><table class="workouts workouts-compact ana-brick-table">
+      <thead><tr><th>Datum</th><th>Rad</th><th class="num">Wechsel</th><th class="num">Lauf</th>
+        <th class="num">Pace 10 min</th><th class="num">Puls 10 min</th><th>Normale Läufe</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>${more}`;
+  host.querySelectorAll("tbody tr").forEach((tr, i) => tr.addEventListener("click", () => openDetail(shown[i].run)));
 }

@@ -1933,3 +1933,9 @@
   .ana-z3 { fill: var(--c-z3); }
   .ana-z4 { fill: var(--c-z4); }
   .ana-z5 { fill: var(--c-z5); }
+
+  .ana-brick-table { margin-top: 14px; }
+
+  .ana-brick-table td small { color: var(--text-muted); font-size: 11px; margin-left: 2px; }
+
+  .ana-brick-ride .env-badge { margin-left: 6px; }

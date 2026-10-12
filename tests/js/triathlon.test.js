@@ -243,3 +243,93 @@ test("Rad: FTP aus dem Profil hat Vorrang, ohne Leistungsdaten keine Schätzung"
   assert.strictEqual(manualOnly.zones[3].lowW, 228);
   assert.strictEqual(manualOnly.distribution, null);
 });
+
+/* ---------- Koppeltraining ---------- */
+
+// Einheit mit Startzeit (lokal) und Dauer; Lauf-Kurve: Punkt alle 10 s,
+// in den ersten 10 Minuten `speed`/`hr`, danach etwas schneller.
+function session(sport, y, m, d, h, min, durationMin, extra = {}) {
+  const date = new Date(y, m - 1, d, h, min);
+  return { sport, date: date.toISOString(), _date: date, duration_min: durationMin, duration_s: durationMin * 60, ...extra };
+}
+
+function runStream(durationMin, speed, hr) {
+  const t = [], sp = [], hrs = [];
+  for (let sec = 0; sec < durationMin * 60; sec += 10) {
+    t.push(sec);
+    sp.push(sec < 600 ? speed : speed + 0.3);
+    hrs.push(hr == null ? null : (sec < 600 ? hr : hr + 8));
+  }
+  return { t, speed: sp, hr: hrs };
+}
+
+const run = (y, m, d, h, min, speed, hr, durationMin = 30) =>
+  session("Laufen", y, m, d, h, min, durationMin, { stream: runStream(durationMin, speed, hr) });
+
+test("Koppeltraining: Pace und Puls der ersten 10 Minuten", () => {
+  const r = plain(app.runStartMetrics(run(2026, 10, 1, 7, 0, 3.2, 140)));
+  assert.ok(Math.abs(r.paceSec - 312.5) < 1e-9); // 1000 m / 3,2 m/s = 5:12,5 /km
+  assert.strictEqual(r.hr, 140);
+  assert.strictEqual(app.runStartMetrics(run(2026, 10, 1, 7, 0, 3.2, 140, 8)), null); // kürzer als 10 min
+  const noHr = plain(app.runStartMetrics(run(2026, 10, 1, 7, 0, 3.2, null)));
+  assert.ok(Math.abs(noHr.paceSec - 312.5) < 1e-9);
+  assert.strictEqual(noHr.hr, null);
+  assert.strictEqual(app.runStartMetrics(session("Laufen", 2026, 10, 1, 7, 0, 30)), null); // ohne Kurve
+});
+
+test("Koppeltraining: Lauf höchstens 30 min nach dem Radende", () => {
+  const rideA = session("Rad", 2026, 10, 3, 6, 0, 60);   // 6:00-7:00
+  const rideB = session("Rad", 2026, 10, 3, 7, 5, 55);   // 7:05-8:00
+  const brick = run(2026, 10, 3, 8, 12, 3.0, 150);       // 12 min nach rideB
+  const tooLate = run(2026, 10, 4, 9, 0, 3.0, 150);
+  const rideC = session("Rad", 2026, 10, 4, 7, 0, 90);   // 7:00-8:30 -> Lauf 9:00 = 30 min: zählt noch
+  const late = run(2026, 10, 5, 9, 1, 3.0, 150);
+  const rideD = session("Rad", 2026, 10, 5, 7, 0, 90);   // 7:00-8:30 -> Lauf 9:01 = 31 min: zählt nicht
+  const early = run(2026, 10, 6, 7, 59, 3.0, 150);
+  const rideE = session("Rad", 2026, 10, 6, 7, 0, 59.5); // Ende 7:59:30, Lauf 30 s "davor": Uhr-Toleranz
+  const summary = session("Rad", 2026, 10, 3, 6, 0, 140, { is_summary: true });
+  const bricks = app.findBrickSessions([rideA, rideB, brick, tooLate, rideC, late, rideD, early, rideE, summary]);
+  assert.strictEqual(bricks.length, 3);
+  assert.deepStrictEqual(plain(bricks.map(b => b.run.date)), [early.date, tooLate.date, brick.date]); // neueste zuerst
+  assert.strictEqual(bricks[2].ride, rideB); // die zuletzt beendete Radeinheit davor
+  assert.strictEqual(bricks[2].gapMin, 12);
+  assert.strictEqual(bricks[1].gapMin, 30);
+  assert.strictEqual(bricks[0].gapMin, 0);
+});
+
+test("Koppeltraining: Vergleich mit normalen Läufen der 90 Tage davor", () => {
+  const brickRun = run(2026, 10, 3, 9, 5, 3.0, 150); // 3,0 m/s = 5:33,3 /km, Puls 150
+  const earlyRun = run(2026, 9, 2, 8, 10, 3.0, 155);
+  const data = [
+    // normale Läufe: erste 10 min mit 3,2 m/s (5:12,5 /km), Puls im Schnitt 140
+    run(2026, 8, 20, 18, 0, 3.2, 140), run(2026, 9, 8, 18, 0, 3.2, 138), run(2026, 9, 15, 18, 0, 3.2, 142),
+    run(2026, 6, 1, 18, 0, 2.5, 170),   // älter als 90 Tage: zählt nicht
+    run(2026, 10, 12, 18, 0, 2.5, 170), // nach der Koppeleinheit: zählt nicht
+    run(2026, 9, 20, 18, 0, 3.2, 140, 8), // kürzer als 10 min: zählt nicht
+    session("Rad", 2026, 10, 3, 7, 0, 120), brickRun,
+    // frühe Koppeleinheit: davor nur 1 normaler Lauf -> kein Vergleich (Koppelläufe zählen nie als normal)
+    session("Rad", 2026, 9, 2, 7, 0, 60), earlyRun,
+  ];
+  const r = app.computeBrickAnalysis(data);
+  assert.strictEqual(r.sessions.length, 2);
+  const [latest, first] = r.sessions;
+  assert.strictEqual(latest.run, brickRun);
+  assert.strictEqual(latest.gapMin, 5);
+  assert.strictEqual(latest.compareCount, 3);
+  assert.ok(Math.abs(latest.compare.paceSec - 312.5) < 1e-9);
+  assert.strictEqual(latest.compare.hr, 140);
+  assert.ok(Math.abs(latest.delta.paceSec - (1000 / 3 - 312.5)) < 1e-9); // ~21 s/km langsamer
+  assert.strictEqual(latest.delta.hr, 10);
+  assert.strictEqual(first.run, earlyRun);
+  assert.strictEqual(first.compareCount, 1);
+  assert.deepStrictEqual(plain(first.delta), { paceSec: null, hr: null });
+  // Zusammenfassung nur über Einheiten mit Vergleich
+  assert.strictEqual(r.summary.hr.value, 10);
+  assert.strictEqual(r.summary.hr.count, 1);
+  assert.ok(Math.abs(r.summary.paceSec.value - (1000 / 3 - 312.5)) < 1e-9);
+});
+
+test("Koppeltraining: keine Koppeleinheit -> leere Liste, keine Zusammenfassung", () => {
+  const r = plain(app.computeBrickAnalysis([session("Rad", 2026, 10, 3, 7, 0, 60), run(2026, 10, 3, 12, 0, 3.0, 150)]));
+  assert.deepStrictEqual(r, { sessions: [], summary: { paceSec: null, hr: null } });
+});
