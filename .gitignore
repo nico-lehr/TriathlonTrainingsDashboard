@@ -7,6 +7,10 @@ workouts.json
 # im Repo. index.html selbst ist reiner Code und bleibt im Repo.
 data/workouts-data.js
 
+# Export des alten Doppelklick-Dashboards (tools/export-browser-data.html) -
+# enthaelt Profil, Ziele, Plan und Workouts, gehoert nie ins Repo.
+dashboard-export.json
+
 # Garmin-Sync (tools/garmin_sync.py): persoenliche Gesundheitsdaten
 # (Schlaf, HRV, Ruhepuls, Gewicht) bzw. die heruntergeladenen Originaldateien.
 # Bleibt alles lokal, nichts davon gehoert ins Repo.

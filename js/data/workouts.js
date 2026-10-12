@@ -34,6 +34,32 @@ async function loadPersistedWorkouts() {
   recomputeDerived();
 }
 
+// Speichert neu eingelesene Workouts (Browser-Import, js/components/
+// data-import.js) auf dem Server: POST /api/v1/workouts mit dem kompletten
+// Parser-Ergebnis in fit_data. Doppelte (gleicher Tag + Startzeit + Sportart)
+// erkennt der Server und ignoriert sie. Wirft beim ersten Fehler.
+async function saveImportedWorkouts(workouts) {
+  let duplicates = 0;
+  for (const w of workouts) {
+    const start = w.date ? new Date(w.date) : null;
+    if (!start || isNaN(start)) continue;
+    const res = await apiCall("workouts", "POST", {
+      date: localDateStr(start),
+      sport: w.sport,
+      sub_sport: w.sub_sport || null,
+      duration_min: w.duration_min || 0,
+      distance_km: w.distance_km ?? null,
+      avg_hr: w.avg_hr ?? null,
+      max_hr: w.max_hr ?? null,
+      calories: w.calories ?? null,
+      source: "browser-import",
+      fit_data: w,
+    });
+    if (res.meta && res.meta.duplicate) duplicates++;
+  }
+  return { duplicates };
+}
+
 /* ======================================================================
    Hell/Dunkel-Schalter: übersteuert die automatische Betriebssystem-
    Einstellung, sobald der Nutzer aktiv umschaltet; Wahl wird gemerkt.

@@ -259,7 +259,7 @@ def store_workouts(session, athlete_id, fit_dir, fetched, stats):
     speichert sie unter der athlete_id dieses Benutzers."""
     if not fetched:
         return
-    from backend.models import Workout
+    from backend.workout_store import find_same_workout, workout_from_parsed
     from sqlalchemy.exc import IntegrityError
 
     # parse_fit.py liest einen ganzen Ordner - deshalb nur die neuen Dateien
@@ -281,33 +281,15 @@ def store_workouts(session, athlete_id, fit_dir, fetched, stats):
         # Dieselbe Einheit kann schon OHNE Garmin-Nummer da sein (z.B. frueher
         # aus workouts.json importiert). Dann nur die Nummer nachtragen - sonst
         # gaebe es sie doppelt, und jeder Lauf wuerde sie erneut herunterladen.
-        twin = next((r for r in session.query(Workout).filter_by(athlete_id=athlete_id, date=day, garmin_activity_id=None)
-                     if (r.fit_data or {}).get("date") == w.get("date")
-                     and (r.fit_data or {}).get("sport_raw") == w.get("sport_raw")), None)
+        twin = find_same_workout(session, athlete_id, day, w, only_without_garmin_id=True)
         if twin:
             twin.garmin_activity_id = act["activityId"]
             session.commit()
             stats["vorhanden"] += 1
             continue
 
-        session.add(Workout(
-            athlete_id=athlete_id,
-            garmin_activity_id=act["activityId"],
-            date=day,
-            sport=w.get("sport") or "Sonstiges",
-            sub_sport=w.get("sub_sport") or None,
-            duration_min=w.get("duration_min") or 0,
-            distance_km=w.get("distance_km"),
-            elevation_m=w.get("elevation_gain_m"),
-            calories=w.get("calories"),
-            avg_hr=w.get("avg_hr"),
-            max_hr=w.get("max_hr"),
-            avg_power_watts=w.get("avg_power_w"),
-            avg_cadence=w.get("avg_cadence"),
-            training_load_score=w.get("training_load"),
-            source="garmin",
-            fit_data=w,  # komplettes Parser-Ergebnis inkl. Kurven - das liest das Dashboard
-        ))
+        # fit_data = komplettes Parser-Ergebnis inkl. Kurven - das liest das Dashboard
+        session.add(workout_from_parsed(athlete_id, w, day, "garmin", garmin_activity_id=act["activityId"]))
         try:
             session.commit()
             stats["neu"] += 1

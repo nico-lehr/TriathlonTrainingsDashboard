@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session as SessionType
 from . import get_current_athlete_id
 from .auth import athlete_id_from_ical_key, check_login, make_token, note_failed_login, too_many_failed_logins
 from .models import Athlete, AthleteLogin, Workout, Wellness, PlannedWorkout, RecoveryCheck, Goal, IcalPlannedWorkout
+from .workout_store import find_same_workout
 
 api_bp = Blueprint("api", __name__)
 
@@ -294,11 +295,23 @@ def get_workouts():
 
 @api_bp.route("/workouts", methods=["POST"])
 def create_workout():
-    """POST /api/v1/workouts - Create or update workout."""
+    """POST /api/v1/workouts - Create or update workout.
+
+    Optional fit_data = komplettes Parser-Ergebnis (Browser-Import). Ohne
+    garmin_activity_id wird dieselbe Einheit (Datum + Startzeit + Sportart)
+    nicht doppelt angelegt: Antwort 200 mit dem vorhandenen Eintrag und
+    meta.duplicate = true."""
     session = get_session()
     try:
         athlete_id = get_current_athlete_id()
         data = request.get_json()
+        fit_data = data.get("fit_data") if isinstance(data.get("fit_data"), dict) else None
+        workout_date = datetime.fromisoformat(data["date"]).date() if isinstance(data["date"], str) else data["date"]
+
+        if fit_data and not data.get("garmin_activity_id"):
+            same = find_same_workout(session, athlete_id, workout_date, fit_data)
+            if same:
+                return response_success(serialize_workout(same), meta={"duplicate": True})
 
         # Check for UNIQUE constraint (athlete_id, garmin_activity_id)
         if data.get("garmin_activity_id"):
@@ -320,7 +333,7 @@ def create_workout():
         # Create new
         workout = Workout(
             athlete_id=athlete_id,
-            date=datetime.fromisoformat(data["date"]).date() if isinstance(data["date"], str) else data["date"],
+            date=workout_date,
             sport=data.get("sport", "running"),
             sub_sport=data.get("sub_sport"),
             duration_min=data.get("duration_min", 0),
@@ -336,6 +349,7 @@ def create_workout():
             source=data.get("source", "manual"),
             garmin_activity_id=data.get("garmin_activity_id"),
             notes=data.get("notes"),
+            fit_data=fit_data,
         )
         session.add(workout)
         session.commit()

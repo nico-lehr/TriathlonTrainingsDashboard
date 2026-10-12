@@ -212,6 +212,22 @@ DEMO_CSS = """
 """
 
 
+# Die echte App holt alles vom Server (js/data/api-client.js). Die Demo laeuft
+# ohne Server per Doppelklick: kein Login, Daten aus den eingebetteten
+# Demodaten, Aenderungen bleiben nur bis zum Neuladen erhalten.
+DEMO_API = """
+function requireLogin() { return true; }
+async function loadUserStore() { userStore = {}; }
+function storeSet(key, value) { userStore[key] = value; }
+async function apiCall(endpoint) {
+  if (endpoint.startsWith("workouts/full")) return { data: EMBEDDED_DATA.workouts };
+  if (endpoint === "wellness/daily") return { data: GARMIN_WELLNESS };
+  if (endpoint === "auth/me") return { data: { username: "demo" } };
+  throw new Error("In der Demo nicht verfügbar");
+}
+"""
+
+
 def inline(html):
     """Ersetzt <link>/<script src> durch den tatsaechlichen Dateiinhalt."""
     def css_ersetzen(m):
@@ -230,7 +246,10 @@ def inline(html):
         if not os.path.exists(pfad):
             return ""
         with open(pfad, encoding="utf-8") as f:
-            return "<script>\n" + f.read() + "\n</script>"
+            inhalt = f.read()
+        if rel == "js/data/api-client.js":
+            inhalt += DEMO_API
+        return "<script>\n" + inhalt + "\n</script>"
 
     html = re.sub(r'<link[^>]*href="(css/[^"]+)"[^>]*>', css_ersetzen, html)
     html = re.sub(r'<script src="([^"]+)"></script>', js_ersetzen, html)

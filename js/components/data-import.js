@@ -93,37 +93,15 @@ async function processFitFiles(files, onProgress) {
     workouts: allWorkouts,
   };
 
-  // Gespeichert wird in IndexedDB statt localStorage (js/data/idb-store.js,
-  // idbSaveRaw) - localStorage war pro Seite hart auf ca. 5-10MB gedeckelt
-  // und ist bei Nicos 1000+ Workouts (auch mit dem 200-Punkte-Downsampling
-  // der Kurven, buildStream() in fit-parser.js) übergelaufen. Ein Fehler
-  // hier (z.B. wenn wirklich der gesamte Plattenplatz voll ist) wird
-  // sichtbar in der Update-Meldung gemeldet statt lautlos verschluckt zu
-  // werden - sonst wären neu eingelesene Workouts nur bis zum nächsten
-  // Neuladen sichtbar gewesen, ohne dass Nico das gemerkt hätte.
+  // Gespeichert wird auf dem Server (saveImportedWorkouts, js/data/workouts.js),
+  // je Person getrennt; Doppelte ignoriert der Server. Ein Fehler hier wird
+  // sichtbar in der Update-Meldung gemeldet statt lautlos verschluckt - sonst
+  // wären neu eingelesene Workouts nur bis zum nächsten Neuladen sichtbar.
   let persistError = null;
   try {
-    const result = await idbSaveRawFiltered(RAW, 185); // 185 = dein max HR (anpassen!)
-
-    let message = `✓ Gespeichert: ${RAW.count} Workouts (letzte 2 Jahre)`;
-    if (result.removed > 0) {
-      message += `\n⚠️  ${result.removed} Workouts gelöscht (älter als 2 Jahre)`;
-    }
-    message += `\n✨ Training Effects berechnet`;
-
-    console.log(message);
-
-    const statusEl = document.getElementById('import-status');
-    if (statusEl) {
-      statusEl.innerHTML = message.replace(/\n/g, '<br>');
-      statusEl.style.color = result.removed > 0 ? '#ff9800' : '#4caf50';
-    }
+    await saveImportedWorkouts(newWorkouts);
   } catch (e) {
-    if (e.name === 'QuotaExceededError') {
-      persistError = "Browser-Speicher voll! Zu viele Workouts.";
-    } else {
-      persistError = `Konnte nicht dauerhaft gespeichert werden (${(e && e.message) || e}) - die Workouts unten sind nur für diese Sitzung sichtbar.`;
-    }
+    persistError = `Konnte nicht auf dem Server gespeichert werden (${(e && e.message) || e}) - die Workouts unten sind nur für diese Sitzung sichtbar.`;
   }
 
   recomputeDerived();
@@ -140,15 +118,16 @@ async function processFitFiles(files, onProgress) {
   return { ok: true, isErr: !!persistError, message: msg, addedCount, refreshedCount, total: allWorkouts.length, errors, persistError };
 }
 
-// Setzt den im Browser gespeicherten Update-Stand zurück auf den zuletzt von
-// Claude gebauten, vollständigen Datenstand - als Ausweg, falls im
-// gespeicherten Stand mal etwas durcheinandergerät.
+// Lädt den auf dem Server gespeicherten Stand neu - als Ausweg, falls in der
+// Anzeige mal etwas durcheinandergerät.
 resetBtn.addEventListener("click", async () => {
-  try { await idbClearRaw(); } catch (e) { /* ignorieren */ }
-  try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* falls noch ein alter Stand von vor der IndexedDB-Umstellung da ist */ }
-  RAW = (typeof EMBEDDED_DATA !== "undefined") ? EMBEDDED_DATA : EMPTY_EMBEDDED_DATA;
+  try {
+    await loadPersistedWorkouts();
+  } catch (e) {
+    showUpdateStatus(`Neu laden fehlgeschlagen: ${e.message}`, true);
+    return;
+  }
   justAddedFiles = new Set();
-  recomputeDerived();
   renderAll();
   showUpdateStatus(`Zurückgesetzt auf den gespeicherten Stand (${RAW.count} Workouts).`, false);
   setTimeout(() => { updateStatusEl.style.display = "none"; }, 6000);

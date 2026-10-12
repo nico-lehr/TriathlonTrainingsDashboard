@@ -67,7 +67,7 @@
           <button class="update-menu-item" id="menu-item-folder" type="button"><span class="menu-item-icon">📁</span> Aktualisieren</button>
           <button class="update-menu-item" id="menu-item-dnd" type="button"><span class="menu-item-icon">⬆️</span> Drag &amp; Drop zur Auswahl</button>
           <div class="update-menu-divider"></div>
-          <button class="update-menu-item update-menu-item-muted" id="reset-btn" type="button" title="Setzt den im Browser gespeicherten Update-Stand zurück auf den zuletzt von Claude gebauten, vollständigen Datenstand"><span class="menu-item-icon">↺</span> Datenstand zurücksetzen</button>
+          <button class="update-menu-item update-menu-item-muted" id="reset-btn" type="button" title="Lädt den auf dem Server gespeicherten Datenstand neu"><span class="menu-item-icon">↺</span> Datenstand zurücksetzen</button>
         </div>
       </div>
     </div>
@@ -852,8 +852,6 @@
 <!-- Reihenfolge ist wichtig: jede Datei darf beim Laden nur auf bereits
      geladene Dateien zugreifen (siehe docs/PROJECT_MAP.md). -->
 <script src="js/data/api-client.js"></script>
-<script src="js/data/training-effects.js"></script>
-<script src="js/data/idb-store.js"></script>
 <script src="js/utils/dates.js"></script>
 <script src="js/utils/formatting.js"></script>
 <script src="js/utils/calculations.js"></script>
