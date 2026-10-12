@@ -1756,9 +1756,9 @@
   /* Eigene Bewertung + Notiz je Einheit (buildWorkoutRatingHtml,
      js/components/workout-card.js) - eigener Abschnitt VOR der
      KI-Auswertung, dieselbe Trennlinien-Optik wie .wd-analysis/.wd-loadstats. */
-  .wd-rating { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+  .wd-rating, .wd-equipment { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
 
-  .wd-rating h4 { font-size: 13px; font-weight: 650; margin: 0 0 8px; }
+  .wd-rating h4, .wd-equipment h4 { font-size: 13px; font-weight: 650; margin: 0 0 8px; }
 
   .wd-rating-stars { display: flex; gap: 4px; margin-bottom: 10px; }
 
