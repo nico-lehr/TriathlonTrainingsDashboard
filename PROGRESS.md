@@ -14,7 +14,7 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 | Tailscale Etappe 5 – KI über Backend | fertig | 2026-10-12 |
 | Tailscale Etappe 6 – Betrieb | fertig | 2026-10-12 |
 | Tailscale Etappe 7 – Garmin mehrere Nutzer | fertig | 2026-10-12 |
-| Layout (breitere Seite) | läuft | 2026-10-12 |
+| Layout (breitere Seite) | fertig | 2026-10-12 |
 | Trainingsplaner 1 – Regelwerk plan-rules.js | fertig | 2026-10-12 |
 | Trainingsplaner 2 – Verschieben & Wünsche | läuft | 2026-10-12 |
 | Trainingsplaner 3 – KI-Empfehlungen | läuft | 2026-10-12 |
@@ -26,7 +26,7 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 | A Wettkampf-Countdown & Periodisierung | offen | 0 / 3 | 0 % | – |
 | B Triathlon-Auswertungen | läuft | 0 / 4 | 0 % | 2026-10-12 |
 | C Garmin-Workouts auf die Uhr | offen | 0 / 3 | 0 % | – |
-| D Handy / iPhone | offen | 0 / 4 | 0 % | – |
+| D Handy / iPhone | läuft | 0 / 4 | 0 % | 2026-10-12 |
 | E Equipment, Wetter, Rennplan | offen | 0 / 3 | 0 % | – |
 | F Abschluss-Check | offen | 0 / 4 | 0 % | – |
 
@@ -36,6 +36,8 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 
 - `.btn-primary` / `.btn-secondary` gibt es im CSS nicht. Standard: Hauptknopf = `.update-btn`, Nebenknopf = `.cal-today-btn` (beide vorhanden).
 - Einen „Analyse“-Tab gab es nicht. Standard: Aufgabe B legt ihn neu an (ein Tab-Knopf + eine Ansicht).
+- Layout: Mit der gewünschten Mindestbreite 420 px stehen bei 1680 px drei Karten nebeneinander; weil die Übersicht-Karten in Zweier-/Vierergruppen kommen, bleiben in manchen Reihen Lücken. Wer keine Lücken will: Mindestbreite in `.dash-grid` auf ca. 540 px setzen (dann 2 Spalten bis ca. 2000 px). Vorerst wie gewünscht 420 px.
+- Layout: Diagramm-Beschriftungen wachsen auf sehr breiten Karten mit (SVG wird skaliert); Eingabefelder in den Einstellungen werden sehr breit. Optional später.
 - Reihenfolge: A startet erst nach Trainingsplaner 2/3 (gleiche Dateien), D erst nach dem Layout (gleiches CSS).
 - Passwort vergessen: zusätzlich `backend/create_user.py --reset` gebaut (sonst gäbe es keinen Weg zurück).
 - Altes Doppelklick-Dashboard: Daten lassen sich mit `tools/export-browser-data.html` exportieren und mit `backend/import_workouts_json.py --browser-export` übernehmen.
