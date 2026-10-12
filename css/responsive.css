@@ -110,6 +110,10 @@
      (--touch-min), Eingabefelder 16px (kleinere Schrift lässt iOS beim
      Antippen ins Feld hineinzoomen). Unsichtbare Tipp-Flächen (::after) für
      winzige Symbole, damit sich das Aussehen nicht ändert. */
+  @media (max-width: 600px) {
+    .modal-head { padding-right: 36px; }
+  }
+
   @media (pointer: coarse), (max-width: 600px) {
     input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px; }
     .chip, .update-btn, .cal-today-btn, .cal-view-btn, .onb-radio-chip, .coach-input, .cal-select,
@@ -135,7 +139,7 @@
     .cal-dot { width: 10px; height: 10px; }
     .cal-dot::after { content: ""; position: absolute; inset: -7px; }
     table.workouts td { padding-top: 13px; padding-bottom: 13px; }
-    table.workouts.workouts-compact td { padding-top: 11px; padding-bottom: 11px; }
+    table.workouts.workouts-compact td { padding-top: 12px; padding-bottom: 12px; }
     .record-row { padding-top: 11px; padding-bottom: 11px; }
     .compare-picker-item { padding-top: 11px; padding-bottom: 11px; }
     .onb-weekday-chip { flex: 1 0 var(--touch-min); width: auto; }
