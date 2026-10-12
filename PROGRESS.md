@@ -24,7 +24,7 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 | Aufgabe | Status | Erledigte Schritte | Prozent | Letzte Änderung |
 |---|---|---|---|---|
 | A Wettkampf-Countdown & Periodisierung | läuft | 0 / 3 | 0 % | 2026-10-12 |
-| B Triathlon-Auswertungen | in Prüfung (4 Schritte gebaut) | 0 / 4 | 0 % | 2026-10-12 |
+| B Triathlon-Auswertungen | Prüfung nicht bestanden – Korrektur läuft (Absturz Rad-Karte ohne FTP, unrealistische CSS-Zeiten, doppelte Hilfsfunktion) | 0 / 4 | 0 % | 2026-10-12 |
 | C Garmin-Workouts auf die Uhr | offen | 0 / 3 | 0 % | – |
 | D Handy / iPhone | läuft | 0 / 4 | 0 % | 2026-10-12 |
 | E Equipment, Wetter, Rennplan | offen | 0 / 3 | 0 % | – |
