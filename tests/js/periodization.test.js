@@ -224,9 +224,9 @@ test("Wiedereinstieg nach 3 Krankheitswochen: Ziel 210 statt 105 % der Woche vor
   // Stärkste leichte Woche über der Hälfte: sie ist der Ausgangswert (400, Entlastung 280, Pause).
   const t2 = targets([...histWeek(-21, 400), ...histWeek(-14, 280)], [], goal);
   assert.deepStrictEqual([t2.baselineMin, t2.returnAfterWeeks], [280, 2]);
-  // Im Taper bleibt die letzte normale Woche der Anker (die leichten Wochen sind dort gewollt).
+  // Krank in den Taper: auch dort zählt der Wiedereinstiegs-Wert, kein Sprung zurück auf 400.
   const taper = targets(SICK, [], goalOn(day(10)));
-  assert.deepStrictEqual([taper.baselineMin, taper.baselineWeek, taper.weeks[0].targetMin], [400, day(-28), 280]);
+  assert.deepStrictEqual([taper.baselineMin, taper.baselineWeek, taper.weeks[0].targetMin], [200, null, 140]);
 });
 
 test("eine einzelne Entlastungswoche ist kein Wiedereinstieg", () => {

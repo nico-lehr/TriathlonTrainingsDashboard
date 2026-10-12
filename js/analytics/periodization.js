@@ -166,7 +166,11 @@ function getWeeklyTargets(goal, plannedWorkouts, history, today = new Date()) {
 
   const wk0 = planWeekKey(todayKey);
   const { ref, refWeek, streak: streak0, light, base } = planVolumeStreak(weekMin, wk0);
-  const returning = base !== ref && PERIOD_GROWTH[getPhase(wk0, goal)] != null;
+  // Wiedereinstieg nur, wenn die leichten Wochen schon VOR dem Taper begannen:
+  // die Taper-Wochen selbst sind gewollt leicht (dann bleibt ref der Anker), wer
+  // aber krank in den Taper geht, darf dort nicht wieder auf den alten Umfang springen.
+  const taperWeeksBehind = Math.max(0, PERIOD_TAPER_WEEKS - 1 - periodWeeksToRace(wk0, goal));
+  const returning = base !== ref && light - taperWeeksBehind >= PLAN_RETURN_LIGHT_WEEKS;
   const anchor = returning ? base : ref;
   const baselineMin = anchor != null ? planFloorMin(anchor) : null;
 
