@@ -27,16 +27,14 @@ const RECOVERY_SORENESS_LABELS = Object.fromEntries(RECOVERY_SORENESS_OPTIONS.ma
 const RECOVERY_ENERGY_LABELS = Object.fromEntries(RECOVERY_ENERGY_OPTIONS.map(o => [o.value, o.label.toLowerCase()]));
 
 
+// Gespeichert in der Ablage pro Person auf dem Server (js/data/api-client.js).
 function loadRecoveryLog() {
-  try {
-    const raw = localStorage.getItem(RECOVERY_LOG_KEY);
-    recoveryLog = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(recoveryLog)) recoveryLog = [];
-  } catch (e) { recoveryLog = []; }
+  recoveryLog = storeGet(RECOVERY_LOG_KEY) || [];
+  if (!Array.isArray(recoveryLog)) recoveryLog = [];
 }
 
 function saveRecoveryLog() {
-  try { localStorage.setItem(RECOVERY_LOG_KEY, JSON.stringify(recoveryLog.slice(-RECOVERY_LOG_MAX_DAYS))); } catch (e) {}
+  storeSet(RECOVERY_LOG_KEY, recoveryLog.slice(-RECOVERY_LOG_MAX_DAYS));
 }
 
 function isRecoveryCheckEmpty(c) {
@@ -49,10 +47,8 @@ function isRecoveryCheckEmpty(c) {
 function loadRecoveryCheck() {
   loadRecoveryLog();
   const today = todayStr();
-  try {
-    const raw = localStorage.getItem(RECOVERY_KEY);
-    if (raw) recoveryCheck = { ...recoveryCheck, ...JSON.parse(raw) };
-  } catch (e) { /* Default beibehalten */ }
+  const saved = storeGet(RECOVERY_KEY);
+  if (saved) recoveryCheck = { ...recoveryCheck, ...saved };
   if (recoveryCheck.date && recoveryCheck.date !== today) {
     if (!isRecoveryCheckEmpty(recoveryCheck)) {
       recoveryLog.push({
@@ -74,6 +70,6 @@ function loadRecoveryCheck() {
 
 function saveRecoveryCheck() {
   recoveryCheck.date = todayStr();
-  try { localStorage.setItem(RECOVERY_KEY, JSON.stringify(recoveryCheck)); } catch (e) {}
+  storeSet(RECOVERY_KEY, recoveryCheck);
 }
 

@@ -27,6 +27,7 @@
   <div class="glow-orb glow-3" id="glow3"></div>
 </div>
 <div class="page">
+<div class="api-error-banner" id="api-error-banner" role="alert" hidden></div>
 
   <header class="top">
     <h1>
@@ -524,10 +525,16 @@
     <section class="card full settings-page-head">
       <button type="button" class="reset-link settings-back-btn" id="settings-back-btn">← Zurück</button>
       <h2>Einstellungen</h2>
-      <p class="card-sub">Gelten für das ganze Dashboard, nicht nur den Coach-Tab. Bleiben nur lokal auf diesem Gerät gespeichert.</p>
+      <p class="card-sub">Gelten für das ganze Dashboard, nicht nur den Coach-Tab. Profil und Trainingsdaten liegen auf dem Dashboard-Server (nur für dich sichtbar), die Verbindungs-Einstellungen nur auf diesem Gerät.</p>
     </section>
 
     <div class="dash-grid">
+      <div class="card full">
+        <h2>Konto</h2>
+        <p class="card-sub">Angemeldet als <b id="account-username">…</b>. Beim Abmelden wird alles Persönliche aus diesem Browser entfernt.</p>
+        <button type="button" class="cal-today-btn" id="logout-btn">Abmelden</button>
+      </div>
+
       <div class="card full">
         <h2>Ollama-Verbindung</h2>
         <p class="card-sub">Für den KI-Coach (Trainingsempfehlungen, Auswertungen). Läuft lokal, deine Daten bleiben auf deinem Rechner.</p>
@@ -698,7 +705,7 @@
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Geplante Einheiten als abonnierbaren Kalender-Feed (webcal), z.B. für Apple/Google Kalender. Braucht den lokalen Backend-Server (siehe DEPLOYMENT.md) - funktioniert nur, während "python backend/app.py" auf diesem Rechner läuft, noch nicht "online" von unterwegs.</div></span>
         </h2>
         <p class="card-sub" id="ical-status-hint">Optional: Trainingsplan als Kalender-Abo.</p>
-        <button type="button" class="update-btn" id="ical-check-btn" hidden style="margin-bottom:8px;">Backend-Verbindung prüfen</button>
+        <button type="button" class="update-btn" id="ical-check-btn" hidden style="margin-bottom:8px;">Abo-Adresse anzeigen</button>
         <div class="goal-form-row goal-form-row-wide" id="ical-url-row" hidden>
           <label for="ical-url-input">Abo-Adresse (in Kalender-App als Internetkalender/webcal hinzufügen)</label>
           <div class="wd-rating-elevation-inputs">
@@ -845,8 +852,6 @@
 <!-- Reihenfolge ist wichtig: jede Datei darf beim Laden nur auf bereits
      geladene Dateien zugreifen (siehe docs/PROJECT_MAP.md). -->
 <script src="js/data/api-client.js"></script>
-<script src="data/workouts-data.js"></script>
-<script src="data/wellness-data.js"></script>
 <script src="js/data/training-effects.js"></script>
 <script src="js/data/idb-store.js"></script>
 <script src="js/utils/dates.js"></script>
@@ -900,6 +905,7 @@
 <script src="js/components/workout-card.js"></script>
 <script src="js/components/compare.js"></script>
 <script src="js/components/data-import.js"></script>
+<script src="js/components/account.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

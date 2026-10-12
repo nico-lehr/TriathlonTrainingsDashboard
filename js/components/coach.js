@@ -934,10 +934,11 @@ function initCoach() {
   }
 }
 
-// "Kalender-Abo (iCal)"-Karte in den Einstellungen: zeigt die Abo-Adresse
-// nur an, wenn der lokale Backend-Server tatsächlich erreichbar ist (sonst
-// wäre die URL nutzlos/irreführend) - prüft per /api/v1/health, demselben
-// Endpoint wie TriathlonApiClient.checkAvailability() (js/data/api-client.js).
+// "Kalender-Abo (iCal)"-Karte in den Einstellungen: zeigt auf Klick die
+// persoenliche Abo-Adresse (GET /api/v1/ical-link). Sie enthaelt einen
+// geheimen Schluessel statt eines Logins, weil Kalender-Apps sich nicht
+// anmelden koennen - und nutzt die Adresse, unter der das Dashboard gerade
+// laeuft (localhost, PC-Name oder Tailscale).
 function initIcalSettings() {
   const hint = document.getElementById("ical-status-hint");
   const row = document.getElementById("ical-url-row");
@@ -945,38 +946,25 @@ function initIcalSettings() {
   const copyBtn = document.getElementById("ical-copy-btn");
   if (!hint || !row || !urlInput) return;
 
-  const icalUrl = "http://localhost:5000/api/v1/ical/1.ics";
-
-  // Die Prueffung laeuft NICHT mehr automatisch bei jedem Laden, sondern erst
-  // auf Klick. Grund: Der Kalender-Export ist optional und bei den meisten
-  // Nutzern gar nicht eingerichtet - der automatische Versuch erzeugte dann bei
-  // JEDEM Seitenaufruf eine rote Fehlermeldung in der Browser-Konsole, die wie
-  // ein echter Defekt aussieht, obwohl nur ein optionaler Dienst fehlt.
   const pruefBtn = document.getElementById("ical-check-btn");
-  hint.textContent = "Optional: Trainingsplan als Kalender-Abo. Dafuer muss der Backend-Server laufen.";
+  hint.textContent = "Optional: dein Trainingsplan als Kalender-Abo.";
   row.hidden = true;
   if (pruefBtn) pruefBtn.hidden = false;
 
-  function pruefeBackend() {
-    hint.textContent = "Pruefe ...";
-    fetch("http://localhost:5000/api/v1/health", { signal: AbortSignal.timeout ? AbortSignal.timeout(2500) : undefined })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(() => {
-        hint.textContent = "Backend-Server erreichbar — diese Adresse in deiner Kalender-App als Internetkalender-Abo hinzufügen:";
-        urlInput.value = icalUrl;
+  function zeigeAboAdresse() {
+    hint.textContent = "Lade ...";
+    apiCall("ical-link")
+      .then(r => {
+        hint.textContent = "Diese persönliche Adresse in deiner Kalender-App als Internetkalender-Abo hinzufügen. Nicht weitergeben – wer sie kennt, sieht deinen Plan.";
+        urlInput.value = new URL(r.data.path, window.location.href).href;
         row.hidden = false;
       })
-      .catch(() => {
-        // Haeufigste Ursache auf dem Mac: Port 5000 ist bereits vom
-        // AirPlay-Empfaenger belegt (Systemeinstellungen ▸ Allgemein ▸
-        // AirDrop & Handoff ▸ AirPlay-Empfaenger). Dann startet der Server
-        // zwar, ist aber nicht erreichbar.
-        hint.textContent = "Backend-Server nicht erreichbar. Starte ihn mit \"python3 backend/app.py\" im Projektordner. "
-          + "Falls das nicht hilft: Port 5000 ist auf dem Mac oft vom AirPlay-Empfaenger belegt — diesen in den Systemeinstellungen deaktivieren.";
+      .catch(e => {
+        hint.textContent = e.message;
         row.hidden = true;
       });
   }
-  if (pruefBtn) pruefBtn.addEventListener("click", pruefeBackend);
+  if (pruefBtn) pruefBtn.addEventListener("click", zeigeAboAdresse);
 
   if (copyBtn) {
     copyBtn.addEventListener("click", async () => {

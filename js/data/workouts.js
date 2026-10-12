@@ -1,73 +1,36 @@
 // Workout-Rohdaten: Laden, Speichern, Ableiten (ALL/DATA), Filterzustand.
-// Haengt von data/workouts-data.js (EMBEDDED_DATA) ab, das vor dieser Datei geladen werden muss.
+// Die Daten kommen vom Server (loadPersistedWorkouts, js/data/api-client.js).
 
 const STORAGE_KEY = "triathlon_dashboard_data_v1";
 
 // Wie weit "Aktualisieren" beim Ordner-Scan zurückschaut. War kurzzeitig auf
 // 2 Jahre (730) reduziert, weil 10 Jahre bei Nicos 1000+ .fit-Dateien das
-// localStorage-Limit gesprengt haben - das war aber nur eine Notlösung, der
-// eigentliche Speicherplatz-Engpass ist jetzt behoben (Umstellung von
-// localStorage auf IndexedDB, siehe js/data/idb-store.js und
-// loadPersistedWorkouts() unten). Deshalb wieder auf 10 Jahre erhöht.
+// localStorage-Limit gesprengt haben. Die Workouts liegen inzwischen in der
+// Datenbank auf dem Server - deshalb wieder 10 Jahre.
 const SCAN_WINDOW_DAYS = 3650;
 
 
-// EMBEDDED_DATA kommt aus data/workouts-data.js - diese Datei enthält echte
-// Trainingsdaten und wird bewusst NICHT mit ausgeliefert/versioniert (siehe
-// .gitignore). Ohne lokal per build_dashboard.py erzeugte Datei existiert die
-// Variable also nicht - dann mit einem leeren Datenbestand starten, statt
-// dass das komplette Dashboard mit einem ReferenceError abstürzt.
+// Leerer Startbestand, bis loadPersistedWorkouts() die Daten vom Server hat.
+// EMBEDDED_DATA (data/workouts-data.js) gibt es nur noch für build-demo.py -
+// der Server liefert data/ bewusst nicht aus.
 const EMPTY_EMBEDDED_DATA = { generated_at: null, source_folder: null, count: 0, skipped: [], workouts: [] };
 let RAW = (typeof EMBEDDED_DATA !== "undefined") ? EMBEDDED_DATA : EMPTY_EMBEDDED_DATA;
 
-// Lädt den zuletzt gespeicherten Workout-Stand aus IndexedDB (js/data/idb-store.js)
-// und führt ihn wie bisher mit den eingebetteten Daten zusammen. War früher
-// ein synchroner localStorage-Read direkt hier an dieser Stelle (Skript-Ladezeit) -
-// IndexedDB ist aber grundsätzlich asynchron, deshalb jetzt eine eigene
-// Funktion, die app.js VOR dem ersten renderAll() abwartet (siehe dort).
-// Grund für den Wechsel: localStorage ist pro Seite hart auf ca. 5-10MB
-// gedeckelt - bei Nicos 1000+ Workouts (auch mit dem bereits vorhandenen
-// 200-Punkte-Downsampling der Kurven in fit-parser.js) reicht das nicht mehr.
+// Lädt alle Workouts des angemeldeten Benutzers vom Server
+// (GET /api/v1/workouts/full, js/data/api-client.js) - dort landen der
+// Browser-Import (data-import.js), der Garmin-Sync und der Einmal-Import aus
+// workouts.json. app.js wartet darauf VOR dem ersten renderAll(). Früher kam
+// der Stand aus data/workouts-data.js + IndexedDB, das galt aber nur für
+// einen Browser und eine Person.
 async function loadPersistedWorkouts() {
-  try {
-    let saved = await idbGetRaw();
-
-    // Einmalige Migration: falls noch ein alter Stand aus localStorage von
-    // VOR dieser Umstellung existiert (und IndexedDB noch leer ist), diesen
-    // übernehmen statt ihn kommentarlos zu verlieren.
-    if (!saved) {
-      try {
-        const legacy = localStorage.getItem(STORAGE_KEY);
-        if (legacy) {
-          const parsedLegacy = JSON.parse(legacy);
-          if (parsedLegacy && Array.isArray(parsedLegacy.workouts) && parsedLegacy.workouts.length) {
-            saved = parsedLegacy;
-            await idbSaveRaw(saved);
-          }
-          localStorage.removeItem(STORAGE_KEY);
-        }
-      } catch (e) { /* kein verwertbarer alter Stand - ignorieren */ }
-    }
-
-    if (saved && Array.isArray(saved.workouts) && saved.workouts.length) {
-      // Den gespeicherten Stand NIE blind übernehmen, sondern immer mit den
-      // eingebetteten Daten (dem bei der letzten Erstellung aktuellen,
-      // vollständigen Stand) zusammenführen. So kann ein älterer oder
-      // unvollständiger Stand (z.B. von einem früheren, fehlerhaften
-      // "Aktualisieren"-Versuch) nie dazu führen, dass Trainings beim Öffnen
-      // des Dashboards "verschwinden" - er kann nur ergänzen.
-      const base = (typeof EMBEDDED_DATA !== "undefined") ? EMBEDDED_DATA : EMPTY_EMBEDDED_DATA;
-      const merged = new Map(base.workouts.map(w => [w.file, w]));
-      saved.workouts.forEach(w => { if (w && w.file) merged.set(w.file, w); });
-      // Dubletten zusammenfuehren, BEVOR die Multisport-/Wechsel-Erkennung
-      // laeuft - die gruppiert nach Tag und wuerde sich von doppelten
-      // Einheiten in die Irre fuehren lassen.
-      const allWorkouts = dedupeWorkouts([...merged.values()]);
-      postProcessWorkouts(allWorkouts);
-      allWorkouts.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-      RAW = { ...base, ...saved, workouts: allWorkouts, count: allWorkouts.length };
-    }
-  } catch (e) { /* IndexedDB evtl. nicht verfügbar (z.B. privater Modus) - eingebettete Daten nutzen */ }
+  const workouts = (await apiCall("workouts/full", "GET", null, { timeoutMs: 120000 })).data || [];
+  // Dubletten zusammenfuehren, BEVOR die Multisport-/Wechsel-Erkennung
+  // laeuft - die gruppiert nach Tag und wuerde sich von doppelten
+  // Einheiten in die Irre fuehren lassen.
+  const allWorkouts = dedupeWorkouts(workouts);
+  postProcessWorkouts(allWorkouts);
+  allWorkouts.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  RAW = { ...EMPTY_EMBEDDED_DATA, source_folder: "Server", workouts: allWorkouts, count: allWorkouts.length };
   recomputeDerived();
 }
 

@@ -8,39 +8,29 @@ const PLANNED_WORKOUTS_KEY = "triathlon_dashboard_planned_workouts_v1";
 
 let plannedWorkouts = [];
 
+// Gespeichert in der Ablage pro Person auf dem Server (js/data/api-client.js).
 function loadPlannedWorkouts() {
-  try {
-    const raw = localStorage.getItem(PLANNED_WORKOUTS_KEY);
-    plannedWorkouts = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(plannedWorkouts)) plannedWorkouts = [];
-  } catch (e) { plannedWorkouts = []; }
+  plannedWorkouts = storeGet(PLANNED_WORKOUTS_KEY) || [];
+  if (!Array.isArray(plannedWorkouts)) plannedWorkouts = [];
 }
 
 function savePlannedWorkouts() {
-  try { localStorage.setItem(PLANNED_WORKOUTS_KEY, JSON.stringify(plannedWorkouts)); } catch (e) { /* Speicher evtl. voll/deaktiviert */ }
+  storeSet(PLANNED_WORKOUTS_KEY, plannedWorkouts);
   scheduleIcalSync();
 }
 
-// Kalender-Abo (iCal) - Quelle der Wahrheit bleibt IMMER localStorage/dieser
-// Browser (s.o.), der Flask-Backend-Server bekommt hier nur eine Kopie zum
-// Generieren des .ics-Feeds (siehe backend/routes.py: /api/v1/ical-sync,
-// CHANGE_REQUESTS.md). Rein "best effort" - läuft der Server nicht lokal
-// (Standardfall, muss manuell gestartet werden), schlägt der Request
-// einfach fehl und wird ignoriert, ohne den Nutzer zu stören. Debounced statt
-// bei jedem einzelnen savePlannedWorkouts()-Aufruf sofort zu senden, da z.B.
-// eine mehrtägige KI-Trainingsplan-Erstellung mehrfach hintereinander
-// speichert.
-const ICAL_SYNC_URL = "http://localhost:5000/api/v1/ical-sync";
+// Kalender-Abo (iCal) - der Server bekommt eine Kopie der geplanten Einheiten
+// zum Erzeugen des .ics-Feeds (siehe backend/routes.py: /api/v1/ical-sync,
+// CHANGE_REQUESTS.md). Rein "best effort": schlägt es fehl, zeigt das Abo
+// einfach den letzten erfolgreichen Stand. Debounced statt bei jedem
+// einzelnen savePlannedWorkouts()-Aufruf sofort zu senden, da z.B. eine
+// mehrtägige KI-Trainingsplan-Erstellung mehrfach hintereinander speichert.
 let icalSyncTimer = null;
 
 function scheduleIcalSync() {
   clearTimeout(icalSyncTimer);
   icalSyncTimer = setTimeout(() => {
-    fetch(ICAL_SYNC_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workouts: plannedWorkouts }),
-    }).catch(() => { /* Backend nicht erreichbar - iCal-Abo zeigt dann einfach den letzten erfolgreichen Stand */ });
+    apiCall("ical-sync", "POST", { workouts: plannedWorkouts }).catch(() => { /* letzter Stand bleibt */ });
   }, 1200);
 }
 

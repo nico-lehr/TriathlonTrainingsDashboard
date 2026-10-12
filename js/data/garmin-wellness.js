@@ -1,18 +1,18 @@
 // Gesundheitsdaten aus Garmin Connect (Schlaf, HRV, Ruhepuls, Body Battery,
 // Gewicht, VO2max, Trainingszustand).
 //
-// Die Daten kommen aus data/wellness-data.js, das von tools/garmin_sync.py
-// erzeugt wird (const GARMIN_WELLNESS). Dieselbe Mechanik wie EMBEDDED_DATA in
-// data/workouts-data.js: eine generierte .js-Datei statt JSON, weil der Browser
-// beim Doppelklick-Aufruf (file://) kein fetch() auf lokale Dateien erlaubt.
-//
-// Fehlt die Datei (noch nie synchronisiert), wird mit leerem Bestand
-// gestartet, statt dass das Dashboard mit einem ReferenceError abstuerzt -
-// dieselbe Absicherung wie bei EMPTY_EMBEDDED_DATA in js/data/workouts.js.
+// Die Daten schreibt tools/garmin_sync.py je Benutzer in die Datenbank;
+// loadWellness() holt sie fuer den angemeldeten Benutzer
+// (GET /api/v1/wellness/daily, gleiche Form wie frueher data/wellness-data.js).
+// Noch nie synchronisiert: leerer Bestand, die Erholungs-Karte blendet sich aus.
 
 const EMPTY_WELLNESS = { generated_at: null, sync: null, daily: {} };
 
-const WELLNESS = (typeof GARMIN_WELLNESS !== "undefined" && GARMIN_WELLNESS) ? GARMIN_WELLNESS : EMPTY_WELLNESS;
+let WELLNESS = EMPTY_WELLNESS;
+
+async function loadWellness() {
+  WELLNESS = (await apiCall("wellness/daily")).data || EMPTY_WELLNESS;
+}
 
 function wellnessDaily() { return WELLNESS.daily || {}; }
 

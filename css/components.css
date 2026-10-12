@@ -1803,3 +1803,27 @@
   .equipment-banner-item.due { color: var(--c-crit, #d03b3b); font-weight: 620; }
   .equipment-banner-link { border: none; background: transparent; color: var(--accent); font-weight: 620; cursor: pointer; font-size: 12.5px; padding: 2px 4px; flex: none; }
   .equipment-banner-link:hover { text-decoration: underline; }
+
+  /* Login-Seite (login.html): eine schmale Karte in der Bildschirmmitte. */
+  .login-page {
+    min-height: 100vh; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .login-card { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 14px; }
+
+  .login-card .card-sub { margin-bottom: 4px; }
+
+  .login-card .update-btn { justify-content: center; padding: 10px 16px; font-size: 13.5px; }
+
+  .login-card .update-btn:disabled { opacity: 0.6; cursor: default; }
+
+  .login-error { margin: 0; font-size: 12.5px; color: var(--c-crit); }
+
+  /* Hinweis oben im Dashboard, wenn Laden/Speichern beim Server scheitert
+     (showApiError, js/data/api-client.js). */
+  .api-error-banner {
+    margin: 0 0 16px; padding: 10px 14px; border-radius: 12px;
+    border: 1px solid var(--c-crit); background: var(--surface-1);
+    color: var(--text-primary); font-size: 12.5px;
+  }

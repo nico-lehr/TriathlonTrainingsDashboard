@@ -35,15 +35,14 @@ const WEEKDAY_LABELS = Object.fromEntries(WEEKDAYS);
 
 const ONB_EXP_LABELS = { "<1": "< 1 Jahr", "1-3": "1–3 Jahre", ">3": "> 3 Jahre" };
 
+// Gespeichert in der Ablage pro Person auf dem Server (js/data/api-client.js).
 function loadAthleteProfile() {
-  try {
-    const raw = localStorage.getItem(ATHLETE_PROFILE_KEY);
-    if (raw) athleteProfile = { ...athleteProfile, ...JSON.parse(raw) };
-  } catch (e) { /* Default beibehalten */ }
+  const saved = storeGet(ATHLETE_PROFILE_KEY);
+  if (saved) athleteProfile = { ...athleteProfile, ...saved };
 }
 
 function saveAthleteProfile() {
-  try { localStorage.setItem(ATHLETE_PROFILE_KEY, JSON.stringify(athleteProfile)); } catch (e) {}
+  storeSet(ATHLETE_PROFILE_KEY, athleteProfile);
 }
 
 // Prüft nur Monat+Tag (nicht das Jahr) gegen das hinterlegte Geburtsdatum -

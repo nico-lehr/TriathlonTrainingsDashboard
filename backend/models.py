@@ -62,6 +62,28 @@ class AthleteLogin(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class AthleteStore(Base):
+    """Ablage pro Person fuer die Dashboard-Daten, die der Browser frueher in
+    localStorage hielt (Profil, Ziele, Plan, Erholung, Gewicht, Material, ...).
+
+    Ein Eintrag je Schluessel; der Wert ist genau das JSON, das der Browser
+    kennt - so geht nichts verloren und das Frontend behaelt seine
+    Datenstrukturen. Die bestehenden Tabellen (Goal, PlannedWorkout, ...)
+    bilden diese Strukturen nur teilweise ab und bleiben unveraendert.
+    """
+    __tablename__ = "athlete_store"
+    __table_args__ = (
+        UniqueConstraint("athlete_id", "key", name="uq_athlete_store_key"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    athlete_id = Column(Integer, ForeignKey("athletes.athlete_id"), nullable=False)
+    key = Column(String(64), nullable=False)  # z.B. "triathlon_dashboard_goals_v1"
+    value = Column(JSON)
+
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class Workout(Base):
     """Completed workout/activity."""
     __tablename__ = "workouts"

@@ -58,10 +58,15 @@ class AuthTest(unittest.TestCase):
             ("get", "/api/v1/planned-workouts"), ("post", "/api/v1/planned-workouts"),
             ("get", "/api/v1/recovery-checks"), ("post", "/api/v1/recovery-checks"),
             ("get", "/api/v1/goals"), ("post", "/api/v1/goals"),
-            ("post", "/api/v1/ical-sync"), ("get", "/api/v1/ical/1.ics"),
+            ("post", "/api/v1/ical-sync"), ("get", "/api/v1/ical-link"),
+            ("get", "/api/v1/store"), ("put", "/api/v1/store/triathlon_dashboard_goals_v1"),
+            ("get", "/api/v1/workouts/full"), ("get", "/api/v1/wellness/daily"),
         ]:
             with self.subTest(url=url, method=method):
                 self.assertEqual(getattr(self.client, method)(url, json={}).status_code, 401)
+        # Der Kalender-Feed prueft selbst (Token oder geheimer Schluessel) und
+        # verraet ohne beides nicht einmal, ob es den Athleten gibt.
+        self.assertEqual(self.client.get("/api/v1/ical/1.ics").status_code, 404)
 
     def test_falscher_oder_fremd_signierter_token_401(self):
         make_user("tokentest")
@@ -127,8 +132,17 @@ class AuthTest(unittest.TestCase):
         self.client.post("/api/v1/ical-sync", headers=a,
                          json={"workouts": [{"id": "a-1", "date": "2026-10-02", "title": "Geheim", "status": "geplant"}]})
 
+        r = self.client.put("/api/v1/store/triathlon_dashboard_goals_v1", headers=a,
+                            json={"value": [{"id": "g1", "name": "Geheimes Ziel"}]})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(self.client.get("/api/v1/store", headers=a).get_json()["data"],
+                         {"triathlon_dashboard_goals_v1": [{"id": "g1", "name": "Geheimes Ziel"}]})
+        self.assertEqual(self.client.get("/api/v1/store", headers=b).get_json()["data"], {})
+        self.assertNotEqual(self.client.put("/api/v1/store/../x", headers=a, json={"value": 1}).status_code, 200)
+        self.assertEqual(self.client.put("/api/v1/store/GROSS", headers=a, json={"value": 1}).status_code, 400)
+
         lists = ["/api/v1/workouts", "/api/v1/wellness", "/api/v1/recovery-checks",
-                 "/api/v1/goals", "/api/v1/planned-workouts"]
+                 "/api/v1/goals", "/api/v1/planned-workouts", "/api/v1/workouts/full"]
         for url in lists:
             with self.subTest(url=url):
                 self.assertEqual(len(self.client.get(url, headers=a).get_json()["data"]), 1)  # A sieht seins
@@ -136,8 +150,17 @@ class AuthTest(unittest.TestCase):
 
         self.assertNotEqual(self.client.get("/api/v1/athlete", headers=b).get_json()["data"]["id"],
                             self.client.get("/api/v1/athlete", headers=a).get_json()["data"]["id"])
+        self.assertEqual(len(self.client.get("/api/v1/wellness/daily", headers=a).get_json()["data"]["daily"]), 1)
+        self.assertEqual(self.client.get("/api/v1/wellness/daily", headers=b).get_json()["data"]["daily"], {})
+
         self.assertIn(b"Geheim", self.client.get(f"/api/v1/ical/{a_id}.ics", headers=a).data)
         self.assertEqual(self.client.get(f"/api/v1/ical/{a_id}.ics", headers=b).status_code, 404)
+        # Kalender-Apps: geheimer Link ohne Login funktioniert - aber nur der eigene.
+        link_a = self.client.get("/api/v1/ical-link", headers=a).get_json()["data"]["path"]
+        link_b = self.client.get("/api/v1/ical-link", headers=b).get_json()["data"]["path"]
+        self.assertIn(b"Geheim", self.client.get("/" + link_a).data)
+        self.assertEqual(self.client.get(f"/api/v1/ical/{a_id}.ics?key=geraten").status_code, 404)
+        self.assertEqual(self.client.get(f"/api/v1/ical/{a_id}.ics?key=" + link_b.split("key=")[1]).status_code, 404)
         # B darf keinen Plan an das Ziel von A haengen.
         r = self.client.post("/api/v1/planned-workouts", json={"date": "2026-10-02", "goal_id": goal_id}, headers=b)
         self.assertEqual(r.status_code, 404)

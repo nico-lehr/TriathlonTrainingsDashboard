@@ -1,7 +1,7 @@
 // Equipment-Tracking (Laufschuhe, Rad + Verschleißteile, freie Items) mit
 // Kilometer-basierter Warnung vor Service/Aussortieren - siehe
-// CHANGE_REQUESTS.md. Rein clientseitig in localStorage, gleiches Muster wie
-// athleteProfile (js/data/athlete.js) bzw. hybridSettings (js/ai/provider.js).
+// CHANGE_REQUESTS.md. Gespeichert in der Ablage pro Person auf dem Server,
+// gleiches Muster wie athleteProfile (js/data/athlete.js).
 // UI + Kalender-/Dashboard-Banner: js/components/equipment.js.
 //
 // Drei Item-"Arten" - kein eigenes "type"-Feld nötig, ergibt sich aus der
@@ -28,15 +28,14 @@ const EQUIPMENT_ITEMS_KEY = "triathlon_dashboard_equipment_items_v1";
 
 let equipmentItems = [];
 
+// Gespeichert in der Ablage pro Person auf dem Server (js/data/api-client.js).
 function loadEquipmentItems() {
-  try {
-    const raw = localStorage.getItem(EQUIPMENT_ITEMS_KEY);
-    if (raw) equipmentItems = JSON.parse(raw);
-  } catch (e) { /* Default (leer) beibehalten */ }
+  const saved = storeGet(EQUIPMENT_ITEMS_KEY);
+  if (Array.isArray(saved)) equipmentItems = saved;
 }
 
 function saveEquipmentItems() {
-  try { localStorage.setItem(EQUIPMENT_ITEMS_KEY, JSON.stringify(equipmentItems)); } catch (e) { /* ignorieren */ }
+  storeSet(EQUIPMENT_ITEMS_KEY, equipmentItems);
 }
 
 function genEquipmentId() {

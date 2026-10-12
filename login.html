@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anmelden · TriDashboard</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23101010'/%3E%3Ccircle cx='24' cy='23' r='15' fill='%231baf7a' fill-opacity='0.92'/%3E%3Ccircle cx='40' cy='23' r='15' fill='%232a78d6' fill-opacity='0.92'/%3E%3Ccircle cx='32' cy='41' r='15' fill='%23eb6834' fill-opacity='0.92'/%3E%3C/svg%3E">
+<script>
+// Manuellen Theme-Wunsch (falls gespeichert) VOR dem ersten Rendern setzen,
+// damit die Seite nicht kurz im falschen Theme aufblitzt (wie in index.html).
+(function () {
+  try {
+    var t = localStorage.getItem("triathlon_dashboard_theme_v1");
+    if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+  } catch (e) { /* localStorage evtl. nicht verfügbar */ }
+})();
+</script>
+<link rel="stylesheet" href="css/variables.css">
+<link rel="stylesheet" href="css/main.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div class="parallax-bg">
+  <div class="glow-orb glow-1"></div>
+  <div class="glow-orb glow-2"></div>
+  <div class="glow-orb glow-3"></div>
+</div>
+<main class="page login-page">
+  <form class="card login-card" id="login-form">
+    <h2>Anmelden</h2>
+    <p class="card-sub">TriDashboard – jede Person sieht nur ihre eigenen Trainingsdaten.</p>
+    <div class="coach-settings-row">
+      <label for="login-username">Benutzername</label>
+      <input type="text" id="login-username" class="coach-input" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+    </div>
+    <div class="coach-settings-row">
+      <label for="login-password">Passwort</label>
+      <input type="password" id="login-password" class="coach-input" autocomplete="current-password" required>
+    </div>
+    <p class="login-error" id="login-error" role="alert" hidden></p>
+    <button type="submit" class="update-btn" id="login-submit">Anmelden</button>
+  </form>
+</main>
+<script src="js/data/api-client.js"></script>
+<script src="js/login.js"></script>
+</body>
+</html>

@@ -12,13 +12,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as SessionType
 
 from . import get_current_athlete_id
-from .auth import check_login, make_token, note_failed_login, too_many_failed_logins
+from .auth import athlete_id_from_ical_key, check_login, make_token, note_failed_login, too_many_failed_logins
 from .models import Athlete, AthleteLogin, Workout, Wellness, PlannedWorkout, RecoveryCheck, Goal, IcalPlannedWorkout
 
 api_bp = Blueprint("api", __name__)
 
-# Die einzigen Endpunkte, die ohne Login erreichbar sind.
-PUBLIC_ENDPOINTS = {"api.health_check", "api.login"}
+# Die einzigen Endpunkte, die ohne Login erreichbar sind. Der Kalender-Feed
+# prueft selbst: Login-Token ODER geheimer Kalender-Schluessel (?key=...).
+PUBLIC_ENDPOINTS = {"api.health_check", "api.login", "api.get_ical_feed"}
 
 
 @api_bp.before_request
@@ -677,8 +678,9 @@ def get_ical_feed(athlete_id):
     (webcal://.../api/v1/ical/1.ics bzw. http:// als Fallback) mit allen noch
     geplanten Einheiten. Ganztaegige Termine (VALUE=DATE), da geplante
     Einheiten keine Uhrzeit haben (siehe DATA_MODEL.md). Nur der eigene Feed
-    ist abrufbar - fremde athlete_ids sehen aus wie nicht vorhanden."""
-    if athlete_id != get_current_athlete_id():
+    ist abrufbar - mit Login-Token oder mit dem geheimen Schluessel aus
+    GET /api/v1/ical-link; fremde athlete_ids sehen aus wie nicht vorhanden."""
+    if athlete_id not in (get_current_athlete_id(), athlete_id_from_ical_key(request.args.get("key"))):
         return response_error("Kalender nicht gefunden", "not_found", 404)
     session: SessionType = get_session()
     try:

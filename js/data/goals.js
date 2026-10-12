@@ -4,20 +4,16 @@ const GOALS_KEY = "triathlon_dashboard_goals_v1";
 
 let goals = [];
 
+// Gespeichert in der Ablage pro Person auf dem Server (js/data/api-client.js).
 function loadGoals() {
-  try {
-    const raw = localStorage.getItem(GOALS_KEY);
-    goals = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(goals)) goals = [];
-  } catch (e) { goals = []; }
+  goals = storeGet(GOALS_KEY) || [];
+  if (!Array.isArray(goals)) goals = [];
 }
 
 function saveGoals() {
-  try {
-    // transiente Lade-/Fehlerzustände nicht mit persistieren
-    const clean = goals.map(({ _loading, _error, _planLoading, _planError, _detailsOpen, _advOpen, _gpxError, ...rest }) => rest);
-    localStorage.setItem(GOALS_KEY, JSON.stringify(clean));
-  } catch (e) { /* Speicher evtl. voll/deaktiviert */ }
+  // transiente Lade-/Fehlerzustände nicht mit persistieren
+  const clean = goals.map(({ _loading, _error, _planLoading, _planError, _detailsOpen, _advOpen, _gpxError, ...rest }) => rest);
+  storeSet(GOALS_KEY, clean);
 }
 
 // Liest die drei Unterdisziplin-Felder (Schwimmen/Rad/Laufen) aus dem

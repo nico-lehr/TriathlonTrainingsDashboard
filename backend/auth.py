@@ -12,7 +12,7 @@ import time
 from collections import defaultdict, deque
 
 from flask import current_app
-from itsdangerous import BadSignature, URLSafeTimedSerializer
+from itsdangerous import BadSignature, URLSafeSerializer, URLSafeTimedSerializer
 from sqlalchemy import func
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -37,6 +37,20 @@ def athlete_id_from_token(token):
     try:
         return _serializer().loads(token, max_age=TOKEN_MAX_AGE_S)["athlete_id"]
     except (BadSignature, KeyError, TypeError):  # BadSignature deckt auch "abgelaufen" ab
+        return None
+
+
+def make_ical_key(athlete_id):
+    """Geheimer Schluessel fuer das Kalender-Abo (Kalender-Apps koennen sich
+    nicht anmelden). Bewusst OHNE Ablaufdatum, damit das Abo dauerhaft laeuft;
+    ungueltig wird er nur, wenn SECRET_KEY geaendert wird."""
+    return URLSafeSerializer(current_app.config["SECRET_KEY"], salt="ical-feed").dumps(athlete_id)
+
+
+def athlete_id_from_ical_key(key):
+    try:
+        return URLSafeSerializer(current_app.config["SECRET_KEY"], salt="ical-feed").loads(key or "")
+    except BadSignature:
         return None
 
 
