@@ -25,12 +25,12 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 |---|---|---|---|---|
 | A Wettkampf-Countdown & Periodisierung | fertig (geprüft in 3 Runden, zuletzt PASS) | 3 / 3 | 100 % | 2026-10-12 |
 | B Triathlon-Auswertungen | fertig (geprüft: erst FAIL, nach Korrektur PASS) | 4 / 4 | 100 % | 2026-10-12 |
-| C Garmin-Workouts auf die Uhr | in Prüfung (3 Schritte gebaut) | 0 / 3 | 0 % | 2026-10-12 |
+| C Garmin-Workouts auf die Uhr | fertig (geprüft: PASS; kleine Nachbesserungen) | 3 / 3 | 100 % | 2026-10-12 |
 | D Handy / iPhone | fertig (geprüft: PASS; kleine CSS-Nachbesserungen eingebaut) | 4 / 4 | 100 % | 2026-10-12 |
 | E Equipment, Wetter, Rennplan | E1 fertig (geprüft: erst FAIL, dann PASS); E2 geprüft PASS; E3 Korrektur läuft (zwei Zeit-Leser widersprechen sich, verlorener Klick) | 1 / 3 | 33 % | 2026-10-12 |
 | F Abschluss-Check | offen | 0 / 4 | 0 % | – |
 
-**Gesamt: 57 % (12 von 21 Schritten)**
+**Gesamt: 71 % (15 von 21 Schritten)**
 
 ## Offene Fragen
 
@@ -46,6 +46,7 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 - A: Wochenziel = letzte normale Trainingswoche × Wachstum (Grundlage +3 %, Aufbau +5 %, max. +30 %); nach 2+ leichten Wochen (z. B. krank) startet die Kurve vorsichtig bei höchstens der Hälfte des alten Umfangs. Taper 70 %, Rennwoche 50 %, Erholung 40 %.
 - E1: Die „Fällig“-Banner in Übersicht/Kalender hattest du im September entfernt; die 90-%-Warnung erscheint deshalb nur als Hinweis „bald fällig“ in den Einstellungen. Banner wieder einbauen? (zwei Zeilen)
 - C: Mit einem echten Garmin-Konto ist „An Garmin senden“ noch NICHT getestet (nur mit nachgebautem Garmin) – bitte selbst ausprobieren. Schwimm-Workouts könnte Garmin ablehnen; dann bietet das Dashboard den .fit-Download an. Erneutes Senden legt in Garmin ein zweites Workout an.
+- C: „An Garmin senden“ braucht auf dem Dashboard-PC die Garmin-Bibliotheken (`python -m pip install -r requirements.txt`) und eine einmalige Garmin-Anmeldung je Person (`tools/garmin_sync.py --login --athlete <Nummer>`). Ohne sie erklärt das Dashboard, was fehlt, und bietet den .fit-Download an.
 - E3: Ziele lassen sich nach dem Anlegen nicht bearbeiten – fehlt die Zielzeit, steht im Rennplan „fehlt“, bis das Ziel neu angelegt wird. Ziele bearbeitbar machen?
 - C1: Die Plan-Einheiten liegen in der Ablage pro Person, nicht in der alten Tabelle `planned_workouts` (die das Dashboard nicht nutzt). Standard: `steps` wird ein Feld der Plan-Einheit statt einer neuen Spalte – damit ist keine Datenbank-Änderung nötig.
 - C2: Hochgeladen wird mit dem Garmin-Token aus dem Garmin-Sync (`~/.triathlon/garmin_<Nummer>.token`). Ohne Token gibt es eine Anleitung statt einer Passwort-Abfrage.
