@@ -631,8 +631,8 @@ function buildOutlookFacts() {
   const nextWeek = openPlan(shift(wk, 7), shift(wk, 13));
   facts.nextWeek.push(nextWeek.length ? `Nächste Woche geplant: ${planSummary(nextWeek)}` : "Nächste Woche ist noch nichts geplant");
   if (daysUntil != null && daysUntil >= 0) {
-    const fromNextMonday = Math.round((new Date(goal.date + "T00:00:00") - new Date(shift(wk, 7) + "T00:00:00")) / 86400000);
-    if (fromNextMonday >= 0) facts.nextWeek.push(`Phase nächste Woche: ${computeTrainingPhase(fromNextMonday).label}`);
+    const nextPhase = getPhase(shift(wk, 7), goal);
+    if (nextPhase) facts.nextWeek.push(`Phase nächste Woche: ${PERIOD_PHASES[nextPhase].label}`);
   }
   if (state) facts.nextWeek.push(`Fitness (CTL) ${fmtNum(state.ctl, 1)}, ${signed(state.ctlDelta, 1)} in den letzten 4 Wochen (${state.verdict})`);
 

@@ -298,19 +298,28 @@ function planShortenWeek(ctx, wk, cur, target) {
 // also die Woche davor. Sonst würde der normale Wiedereinstieg als Sprung
 // gewertet, und die Regel stünde im Widerspruch zur Entlastungsregel.
 // Umfang = absolvierte Minuten (Historie) + offene Planeinheiten der Woche.
+// Als eigene Funktion, weil die Periodisierung (getWeeklyTargets,
+// periodization.js) ihre Entlastungswochen genau so zählt.
+// weekMin: "YYYY-MM-DD" (Montag) -> Minuten der Woche.
+const planDeloadMax = ref => planFloorMin(ref * (1 - PLAN_DELOAD_REDUCTION));
+const planIsLighterWeek = (min, ref) => min === 0 || (ref != null && min <= planDeloadMax(ref));
+
+function planVolumeStreak(weekMin, wk) {
+  let ref = null, refWeek = null, streak = 0;
+  for (let i = PLAN_VOLUME_LOOKBACK_WEEKS; i >= 1; i--) {
+    const prevWk = planShiftDay(wk, -7 * i);
+    const min = weekMin(prevWk);
+    if (planIsLighterWeek(min, ref)) streak = 0;
+    else { streak++; ref = min; refWeek = prevWk; }
+  }
+  return { ref, refWeek, streak };
+}
+
 function checkPlanVolume(ctx) {
   const out = [];
   const weekMin = wk => planMinutes(planWeekSessions(ctx, wk));
-  const deloadMax = ref => planFloorMin(ref * (1 - PLAN_DELOAD_REDUCTION));
-  const isLighter = (min, ref) => min === 0 || (ref != null && min <= deloadMax(ref));
   ctx.weeks.forEach(wk => {
-    let ref = null, refWeek = null, streak = 0;
-    for (let i = PLAN_VOLUME_LOOKBACK_WEEKS; i >= 1; i--) {
-      const prevWk = planShiftDay(wk, -7 * i);
-      const min = weekMin(prevWk);
-      if (isLighter(min, ref)) streak = 0;
-      else { streak++; ref = min; refWeek = prevWk; }
-    }
+    const { ref, refWeek, streak } = planVolumeStreak(weekMin, wk);
     if (ref == null) return; // keine Vergleichswoche vorhanden
     const cur = weekMin(wk);
 
@@ -324,8 +333,8 @@ function checkPlanVolume(ctx) {
       });
     }
 
-    if (streak >= PLAN_DELOAD_EVERY_WEEKS - 1 && !isLighter(cur, ref)) {
-      const suggestion = planShortenWeek(ctx, wk, cur, deloadMax(ref));
+    if (streak >= PLAN_DELOAD_EVERY_WEEKS - 1 && !planIsLighterWeek(cur, ref)) {
+      const suggestion = planShortenWeek(ctx, wk, cur, planDeloadMax(ref));
       if (suggestion) out.push({
         rule: "deload", severity: "warn", date: wk, workoutId: null,
         text: `Die ${planWeekLabel(wk)} wäre die ${streak + 1}. Aufbauwoche in Folge. Nach ${PLAN_DELOAD_EVERY_WEEKS - 1} Wochen Aufbau braucht der Körper eine leichtere Woche (Entlastungswoche) mit etwa ${Math.round(PLAN_DELOAD_REDUCTION * 100)} % weniger Training, damit das Training wirken kann.`,

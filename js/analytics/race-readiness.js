@@ -48,10 +48,11 @@ function scoreConsistencyFactor() {
 }
 
 // Faktor 4: Zeit bis zum Event / Taper-Phase - je näher das Event, desto
-// mehr zählt eine steigende Form (TSB) statt weiterem Aufbau.
+// mehr zählt eine steigende Form (TSB) statt weiterem Aufbau. Ob schon
+// Taper ist, entscheidet die Periodisierung (computeTrainingPhase).
 function scorePhaseFactor(daysUntil, tsb) {
   if (daysUntil == null) return { points: READINESS_MAX.phase, note: "kein Datum" };
-  if (daysUntil > 14) return { points: READINESS_MAX.phase, note: `${daysUntil} Tage bis Event — noch keine Taper-Phase` };
+  if (computeTrainingPhase(daysUntil).key !== "taper") return { points: READINESS_MAX.phase, note: `${daysUntil} Tage bis Event — noch keine Taper-Phase` };
   const weeksLabel = daysUntil >= 7 ? "beginnende Taper-Phase" : "finale Taper-Phase";
   let points;
   if (daysUntil < 7) points = tsb != null && tsb > 5 ? READINESS_MAX.phase : tsb != null && tsb > 0 ? READINESS_MAX.phase * 0.6 : READINESS_MAX.phase * 0.25;
