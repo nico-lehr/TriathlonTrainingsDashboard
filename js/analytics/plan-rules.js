@@ -192,7 +192,7 @@ function checkPlanHardDays(ctx) {
         rule: "hard_in_row", severity: "block", date: s.date, workoutId: s.id,
         text: `Zwei harte Tage hintereinander: „${s.title}“ am ${planDayLabel(s.date)} kommt direkt nach einem harten Tag. Dazwischen braucht der Körper einen lockeren Tag, um sich zu erholen.`,
         suggestion: toDate
-          ? { text: `Verschiebe „${s.title}“ auf ${planDayLabel(toDate)}.`, action: "move", workoutId: s.id, toDate }
+          ? { text: `Verschiebe „${s.title}“ auf ${planDayLabel(toDate)}`, action: "move", workoutId: s.id, toDate }
           : planEasySuggestion(s),
       };
     });

@@ -235,14 +235,19 @@ let planCheckNotes = null;
 // neu ab heute, statt wie sonst nur die Lücke nach dem letzten bereits
 // geplanten Tag aufzufüllen (rollierendes Fenster, s.o.).
 // Gespeichert wird erst nach der Regelprüfung (checkedPlanFromAi, s.o.).
+// Kommt kein Plan zustande (KI-Fehler oder Regelverstoß), werden die vorher
+// entfernten Einheiten wiederhergestellt - sonst stünde man ohne Plan da.
 async function generateTrainingPlan(goalId, { replace = false } = {}) {
   const goal = goals.find(g => g.id === goalId);
   if (!goal) return;
+  const before = plannedWorkouts;
   if (replace) deleteFuturePlannedWorkoutsForGoal(goal.id);
   // Ein Plan gehört immer nur zu EINEM (dem aktuellen Haupt-)Ziel - ein noch
   // bevorstehender Plan eines früheren Hauptevents würde sonst weiterhin im
   // Kalender stehen und sich mit dem neuen Plan widersprechen.
   deleteFuturePlannedWorkoutsForOtherGoals(goal.id);
+  const removed = before.filter(p => !plannedWorkouts.includes(p));
+  const restoreRemoved = () => { if (removed.length) replacePlannedWorkouts([...plannedWorkouts, ...removed]); };
   const windowDates = computePlanningWindow(goal.id);
   goal._planLoading = true; goal._planError = null;
   renderTrainingPlanCard();
@@ -276,9 +281,11 @@ async function generateTrainingPlan(goalId, { replace = false } = {}) {
       planCheckNotes = { goalId: goal.id, corrected: result.corrected, hints: result.violations.map(v => v.text) };
     } else {
       goal._planError = `Der KI-Vorschlag verstößt auch nach ${PLAN_AI_MAX_ATTEMPTS} Versuchen gegen Trainingsregeln und wurde deshalb nicht gespeichert: ${result.violations.map(v => v.text).join(" ")}`;
+      restoreRemoved();
     }
   } catch (e) {
     goal._planError = describeAiError(e, "plan");
+    restoreRemoved();
   } finally {
     goal._planLoading = false;
     saveGoals();
