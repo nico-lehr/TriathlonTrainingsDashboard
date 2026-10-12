@@ -27,10 +27,10 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 | B Triathlon-Auswertungen | fertig (geprüft: erst FAIL, nach Korrektur PASS) | 4 / 4 | 100 % | 2026-10-12 |
 | C Garmin-Workouts auf die Uhr | fertig (geprüft: PASS; kleine Nachbesserungen) | 3 / 3 | 100 % | 2026-10-12 |
 | D Handy / iPhone | fertig (geprüft: PASS; kleine CSS-Nachbesserungen eingebaut) | 4 / 4 | 100 % | 2026-10-12 |
-| E Equipment, Wetter, Rennplan | E1 fertig (geprüft: erst FAIL, dann PASS); E2 geprüft PASS; E3 Korrektur läuft (zwei Zeit-Leser widersprechen sich, verlorener Klick) | 1 / 3 | 33 % | 2026-10-12 |
-| F Abschluss-Check | offen | 0 / 4 | 0 % | – |
+| E Equipment, Wetter, Rennplan | fertig (E1 erst FAIL dann PASS; E2 PASS; E3 erst FAIL dann PASS) | 3 / 3 | 100 % | 2026-10-12 |
+| F Abschluss-Check | läuft | 0 / 4 | 0 % | 2026-10-12 |
 
-**Gesamt: 71 % (15 von 21 Schritten)**
+**Gesamt: 86 % (18 von 21 Schritten)**
 
 ## Offene Fragen
 
@@ -47,6 +47,8 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 - E1: Die „Fällig“-Banner in Übersicht/Kalender hattest du im September entfernt; die 90-%-Warnung erscheint deshalb nur als Hinweis „bald fällig“ in den Einstellungen. Banner wieder einbauen? (zwei Zeilen)
 - C: Mit einem echten Garmin-Konto ist „An Garmin senden“ noch NICHT getestet (nur mit nachgebautem Garmin) – bitte selbst ausprobieren. Schwimm-Workouts könnte Garmin ablehnen; dann bietet das Dashboard den .fit-Download an. Erneutes Senden legt in Garmin ein zweites Workout an.
 - C: „An Garmin senden“ braucht auf dem Dashboard-PC die Garmin-Bibliotheken (`python -m pip install -r requirements.txt`) und eine einmalige Garmin-Anmeldung je Person (`tools/garmin_sync.py --login --athlete <Nummer>`). Ohne sie erklärt das Dashboard, was fehlt, und bietet den .fit-Download an.
+- E3: Zielzeiten werden überall als Std:Min(:Sek) gelesen („3:30“ = 3 h 30 min) – so geben es die Eingabefelder vor. Der Ernährungs-Tab las „3:30“ vorher als 3 min 30 s (alter Fehler, jetzt behoben).
+- E2: „See“/„Meer“ zählen nur als eigenes Wort als Freiwasser („Seeschwimmen“ zählt deshalb als Becken). Wetter gibt es nur an Tagen mit Draußen-Einheit innerhalb der 7-Tage-Vorhersage.
 - E3: Ziele lassen sich nach dem Anlegen nicht bearbeiten – fehlt die Zielzeit, steht im Rennplan „fehlt“, bis das Ziel neu angelegt wird. Ziele bearbeitbar machen?
 - C1: Die Plan-Einheiten liegen in der Ablage pro Person, nicht in der alten Tabelle `planned_workouts` (die das Dashboard nicht nutzt). Standard: `steps` wird ein Feld der Plan-Einheit statt einer neuen Spalte – damit ist keine Datenbank-Änderung nötig.
 - C2: Hochgeladen wird mit dem Garmin-Token aus dem Garmin-Sync (`~/.triathlon/garmin_<Nummer>.token`). Ohne Token gibt es eine Anleitung statt einer Passwort-Abfrage.
