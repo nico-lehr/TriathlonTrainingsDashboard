@@ -190,3 +190,24 @@ test("sendPlannedWorkoutToGarmin: schickt die Schritte an den Endpunkt und verme
   assert.strictEqual(app.canSendToGarmin({ sport: "Kraft" }), false);
   assert.strictEqual(app.canSendToGarmin({ sport: "Schwimmen" }), true);
 });
+
+test("sendPlannedWorkoutToGarmin: nach Zeitüberschreitung eigener Hinweis, nichts als gesendet vermerkt", async () => {
+  app.apiCall = () => Promise.reject(Object.assign(new Error("Server nicht erreichbar"), { timeout: true }));
+  app.replacePlannedWorkouts([{ id: "t1", date: "2026-10-14", sport: "Rad", duration_min: 60, intensity: "leicht" }]);
+  await assert.rejects(app.sendPlannedWorkoutToGarmin("t1"), /nicht rechtzeitig.*in Garmin Connect nachsehen/);
+  assert.strictEqual(plain(vm.runInContext("plannedWorkouts", app))[0].garminSentAt, undefined);
+  app.apiCall = () => Promise.reject(new Error("Server nicht erreichbar - läuft das Dashboard auf dem PC?"));
+  await assert.rejects(app.sendPlannedWorkoutToGarmin("t1"), /Server nicht erreichbar/);
+});
+
+test("apiCall markiert eine Zeitüberschreitung (timeout), andere Netzfehler nicht", async () => {
+  const fail = { name: "TypeError" };
+  const ctx = vm.createContext({
+    window: { addEventListener: () => {} }, localStorage: { getItem: () => null },
+    AbortSignal: { timeout: () => undefined }, fetch: () => Promise.reject(fail),
+  });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, "js/data/api-client.js"), "utf8"), ctx);
+  await assert.rejects(ctx.apiCall("x"), e => e.timeout === false);
+  fail.name = "TimeoutError";
+  await assert.rejects(ctx.apiCall("x"), e => e.timeout === true && /Server nicht erreichbar/.test(e.message));
+});

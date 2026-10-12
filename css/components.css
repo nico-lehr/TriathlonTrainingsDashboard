@@ -928,6 +928,7 @@
 
   /* "An Garmin senden" (Liste + Bearbeiten-Overlay); Fehler mit .fit-Download als eigene Zeile */
   .plan-item-garmin { flex-shrink: 0; }
+  .plan-item-garmin :disabled, .plan-edit-actions-right :disabled { opacity: 0.5; cursor: default; }
   .plan-garmin-sent { font-size: 12px; font-weight: 600; color: var(--c-good-text); }
   .plan-item-garmin .plan-garmin-sent { white-space: nowrap; }
   .plan-garmin-error { flex-basis: 100%; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }

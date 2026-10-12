@@ -15,6 +15,7 @@ Die Ablage schreibt der Server NICHT: "gesendet am" traegt der Browser ein,
 sonst wuerde ein neuerer Stand im Browser ueberschrieben.
 """
 import importlib.util
+import math
 import os
 import re
 
@@ -49,6 +50,20 @@ def positive(value, maximum):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and 0 < value <= maximum
 
 
+def whole(value, low, high):
+    """Ganze Zahl im Bereich - true/false zaehlen nicht (bool ist in Python ein int)."""
+    return isinstance(value, int) and not isinstance(value, bool) and low <= value <= high
+
+
+def minutes_or_zero(value):
+    """Geplante Dauer als Zahl, auch wenn in der Ablage Text steht ("50"); sonst 0."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return number if math.isfinite(number) and number > 0 else 0.0
+
+
 def garmin_target(step):
     target = step.get("target") or {"kind": "none"}
     if not isinstance(target, dict):
@@ -56,7 +71,7 @@ def garmin_target(step):
     kind = target.get("kind", "none")
     if kind == "none":
         return {"targetType": NO_TARGET}
-    if kind not in TARGETS:
+    if not isinstance(kind, str) or kind not in TARGETS:
         raise ValueError("unbekanntes Ziel")
     type_id, key = TARGETS[kind]
     target_type = {"workoutTargetTypeId": type_id, "workoutTargetTypeKey": key, "displayOrder": 1}
@@ -67,7 +82,7 @@ def garmin_target(step):
             return {"targetType": NO_TARGET}
         return {"targetType": target_type, "targetValueOne": low, "targetValueTwo": high}
     zone = target.get("zone")
-    if not (isinstance(zone, int) and 1 <= zone <= 5):
+    if not whole(zone, 1, 5):
         raise ValueError("Zone 1-5 angeben")
     return {"targetType": target_type, "zoneNumber": zone}
 
@@ -94,7 +109,7 @@ def garmin_steps(steps, counter, nested=False):
         raise ValueError("keine Schritte")
     out = []
     for step in steps:
-        if not isinstance(step, dict) or step.get("type") not in STEP_TYPES:
+        if not isinstance(step, dict) or not isinstance(step.get("type"), str) or step["type"] not in STEP_TYPES:
             raise ValueError("unbekannte Schritt-Art")
         counter[0] += 1
         if counter[0] > MAX_STEPS:
@@ -103,7 +118,7 @@ def garmin_steps(steps, counter, nested=False):
         base = {"stepOrder": counter[0], "stepType": {"stepTypeId": type_id, "stepTypeKey": step["type"], "displayOrder": type_id}}
         if step["type"] == "repeat":
             count = step.get("count")
-            if nested or not (isinstance(count, int) and 1 <= count <= 50):
+            if nested or not whole(count, 1, 50):
                 raise ValueError("Wiederholung ungültig")
             out.append({"type": "RepeatGroupDTO", **base, "numberOfIterations": count,
                         "workoutSteps": garmin_steps(step.get("steps"), counter, nested=True),
@@ -133,7 +148,7 @@ def garmin_workout(entry, steps):
     payload = {
         "workoutName": str(entry.get("title") or entry["sport"])[:80],
         "sportType": sport,
-        "estimatedDurationInSecs": int(timed_seconds(workout_steps) or (entry.get("duration_min") or 0) * 60),
+        "estimatedDurationInSecs": int(timed_seconds(workout_steps) or minutes_or_zero(entry.get("duration_min")) * 60),
         "workoutSegments": [{"segmentOrder": 1, "sportType": sport, "workoutSteps": workout_steps}],
     }
     if entry.get("description"):
@@ -177,11 +192,12 @@ def send_planned_workout_to_garmin(workout_id):
     if entry is None:
         return response_error("Diese geplante Einheit gibt es nicht (mehr). Seite neu laden und erneut versuchen.",
                               "not_found", 404)
-    if entry.get("sport") not in SPORTS:
+    if not isinstance(entry.get("sport"), str) or entry["sport"] not in SPORTS:
         return response_error(f"{entry.get('sport') or 'Diese'}-Einheiten kann Garmin nicht als Workout übernehmen "
                               "(nur Laufen, Rad, Schwimmen). Lade die Einheit stattdessen als .fit-Datei herunter.",
                               "unsupported_sport", 422)
-    body = request.get_json(silent=True) or {}
+    body = request.get_json(silent=True)
+    body = body if isinstance(body, dict) else {}  # z. B. [1, 2] oder "x" -> wie ohne Body
     steps = body.get("steps") or entry.get("steps") or [{"type": "interval", "duration_min": entry.get("duration_min")}]
     try:
         payload = garmin_workout(entry, steps)

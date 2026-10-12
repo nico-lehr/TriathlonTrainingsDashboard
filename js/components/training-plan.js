@@ -162,7 +162,7 @@ function refreshGarminSendUi(id) {
   const note = document.querySelector(`.pe-garmin-note[data-id="${id}"]`);
   if (!p || !note) return;
   const btn = document.querySelector(`.plan-edit-actions .plan-garmin-send[data-id="${id}"]`);
-  if (btn) { btn.textContent = garminSendLabel(p); btn.disabled = !!(garminSendState.get(id) || {}).loading; }
+  if (btn) { btn.textContent = garminSendLabel(p); btn.disabled = !!(garminSendState.get(id) || {}).loading || btn.dataset.unsaved === "1"; }
   note.innerHTML = planEditGarminNoteHtml(p);
   wireGarminSend(note);
 }
@@ -505,6 +505,7 @@ function openPlanEdit(id, defaults) {
       <div class="plan-edit-actions">
         ${isNew ? "" : `<button type="button" class="chip plan-edit-delete" style="color:var(--c-crit);">Löschen</button>`}
         <div class="plan-edit-actions-right">
+          ${isNew ? "" : `<span class="wd-analysis-hint pe-unsaved-hint" hidden>Erst speichern</span>`}
           ${isNew ? "" : `<button type="button" class="chip plan-edit-export">Als .fit exportieren</button>`}
           ${!isNew && canSendToGarmin(p) ? `<button type="button" class="cal-today-btn plan-garmin-send" data-id="${p.id}"${(garminSendState.get(p.id) || {}).loading ? " disabled" : ""}>${garminSendLabel(p)}</button>` : ""}
           <button type="button" class="update-btn plan-edit-save">${isNew ? "Anlegen" : "Speichern"}</button>
@@ -562,6 +563,28 @@ function openPlanEdit(id, defaults) {
   });
   host.querySelector("#plan-edit-duration").addEventListener("input", () => { refreshPlanEditNutrition(); refreshPlanEditSteps(); });
   host.querySelector("#plan-edit-intensity").addEventListener("change", () => { refreshPlanEditNutrition(); refreshPlanEditSteps(); });
+
+  // .fit-Export und "An Garmin senden" nehmen die GESPEICHERTE Einheit -
+  // solange das Formular davon abweicht, sind beide gesperrt ("Erst speichern").
+  const exportBtn = host.querySelector(".plan-edit-export");
+  const garminBtn = host.querySelector(".plan-edit-actions .plan-garmin-send");
+  const formState = () => JSON.stringify([
+    ...["#plan-edit-date", "#plan-edit-sport", "#plan-edit-title", "#plan-edit-duration", "#plan-edit-intensity", "#plan-edit-desc"].map(sel => host.querySelector(sel).value),
+    stepsCustom ? readStepsEditor(stepsHost.querySelector(".pe-steps-list")) : null,
+  ]);
+  const savedState = formState();
+  const refreshUnsaved = () => {
+    if (isNew) return;
+    const dirty = formState() !== savedState;
+    host.querySelector(".pe-unsaved-hint").hidden = !dirty;
+    exportBtn.disabled = dirty;
+    if (garminBtn) {
+      garminBtn.dataset.unsaved = dirty ? "1" : "";
+      garminBtn.disabled = dirty || !!(garminSendState.get(id) || {}).loading;
+    }
+  };
+  const formRoot = host.querySelector(".onb-step");
+  ["input", "change", "click"].forEach(type => formRoot.addEventListener(type, refreshUnsaved)); // click: Schritt-Zeilen hinzufügen/entfernen
 
   let statusVal = p.status;
   host.querySelectorAll("#plan-edit-status .onb-radio-chip").forEach(btn => {
@@ -622,6 +645,8 @@ function openPlanEdit(id, defaults) {
         wireExerciseRemove();
       }
       refreshPlanEditNutrition();
+      refreshPlanEditSteps();
+      refreshUnsaved();
     } catch (e) {
       regenError.textContent = describeAiError(e, "plan");
       regenError.style.display = "";
@@ -631,7 +656,6 @@ function openPlanEdit(id, defaults) {
     }
   });
 
-  const exportBtn = host.querySelector(".plan-edit-export");
   if (exportBtn) exportBtn.addEventListener("click", () => exportPlannedWorkoutAsFit(id));
   wireGarminSend(host);
 

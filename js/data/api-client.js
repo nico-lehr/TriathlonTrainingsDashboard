@@ -45,7 +45,9 @@ async function apiCall(endpoint, method = "GET", body = null, { timeoutMs = 2000
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (e) {
-    throw new Error("Server nicht erreichbar - läuft das Dashboard auf dem PC?");
+    const err = new Error("Server nicht erreichbar - läuft das Dashboard auf dem PC?");
+    err.timeout = !!e && e.name === "TimeoutError"; // Anfrage evtl. trotzdem ausgeführt (z. B. An Garmin senden)
+    throw err;
   }
 
   if (response.status === 401 && redirectOn401) {

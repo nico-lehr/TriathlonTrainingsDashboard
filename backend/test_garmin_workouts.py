@@ -4,6 +4,8 @@ garminconnect.Garmin ist durch einen Mock ersetzt, die Token-Ordner liegen in
 einem Temp-Ordner.
 
 Aufruf im Projektordner:  python -m unittest backend.test_garmin_workouts -v
+Ohne garminconnect (nur backend/requirements.txt installiert) werden diese
+Tests uebersprungen.
 """
 import os
 import shutil
@@ -11,8 +13,12 @@ import tempfile
 import unittest
 from unittest import mock
 
-from garminconnect import (GarminConnectAuthenticationError, GarminConnectConnectionError,
-                           GarminConnectTooManyRequestsError)
+try:
+    from garminconnect import (GarminConnectAuthenticationError, GarminConnectConnectionError,
+                               GarminConnectTooManyRequestsError)
+    HAVE_GARMINCONNECT = True
+except ImportError:
+    HAVE_GARMINCONNECT = False
 
 import tools.garmin_sync
 from backend import auth, create_app
@@ -26,6 +32,7 @@ KEY = "triathlon_dashboard_planned_workouts_v1"
 RUN_ID = "0f6f7c1e-1111-4a8e-9a51-2f1d1b6c0001"
 STRENGTH_ID = "0f6f7c1e-2222-4a8e-9a51-2f1d1b6c0002"
 OTHER_ID = "0f6f7c1e-3333-4a8e-9a51-2f1d1b6c0003"
+TEXT_DURATION_ID = "0f6f7c1e-4444-4a8e-9a51-2f1d1b6c0004"
 RUN = {"id": RUN_ID, "date": "2026-10-14", "sport": "Laufen", "title": "6x400m", "duration_min": 50,
        "intensity": "hart", "description": "Bahn", "status": "geplant"}
 STEPS = [
@@ -38,6 +45,7 @@ STEPS = [
 ]
 
 
+@unittest.skipUnless(HAVE_GARMINCONNECT, "garminconnect nicht installiert (requirements.txt)")
 class GarminWorkoutTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -45,7 +53,8 @@ class GarminWorkoutTest(unittest.TestCase):
         session = session_factory()
         cls.ids = {name: auth.create_login(session, name, "langes-passwort-1") for name in ("anna", "ben")}
         session.add(AthleteStore(athlete_id=cls.ids["anna"], key=KEY, value=[
-            RUN, {"id": STRENGTH_ID, "date": "2026-10-15", "sport": "Kraft", "title": "Rumpf", "duration_min": 30}]))
+            RUN, {"id": STRENGTH_ID, "date": "2026-10-15", "sport": "Kraft", "title": "Rumpf", "duration_min": 30},
+            {**RUN, "id": TEXT_DURATION_ID, "duration_min": "50"}]))
         session.add(AthleteStore(athlete_id=cls.ids["ben"], key=KEY, value=[{**RUN, "id": OTHER_ID}]))
         session.commit()
         session.close()
@@ -153,10 +162,29 @@ class GarminWorkoutTest(unittest.TestCase):
         self.connect_garmin()
         for steps in ([{"type": "sprint"}], [{"type": "interval", "duration_min": -1}],
                       [{"type": "repeat", "count": 2, "steps": [{"type": "repeat", "count": 2, "steps": [{"type": "rest"}]}]}],
-                      [{"type": "interval", "target": {"kind": "hr_zone", "zone": 9}}], "kaputt"):
+                      [{"type": "interval", "target": {"kind": "hr_zone", "zone": 9}}], "kaputt",
+                      # true/false sind keine Zahlen (bool ist in Python ein int)
+                      [{"type": "interval", "target": {"kind": "hr_zone", "zone": True}}],
+                      [{"type": "repeat", "count": True, "steps": [{"type": "rest"}]}],
+                      [{"type": "interval", "duration_min": True}],
+                      [{"type": ["interval"]}], [{"type": "interval", "target": {"kind": ["hr_zone"], "zone": 2}}]):
             r = self.send(body={"steps": steps})
             self.assertEqual(r.status_code, 400, steps)
         self.garmin.return_value.upload_workout.assert_not_called()
+
+    def test_body_ohne_json_objekt_wie_ohne_body(self):
+        self.connect_garmin()
+        for body in ([1, 2], "x", 5):
+            self.assertEqual(self.send(body=body).status_code, 200, body)
+        r = self.client.post(f"/api/v1/planned-workouts/{RUN_ID}/send-to-garmin", headers=self.headers,
+                             data="kein json", content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+
+    def test_dauer_als_text_in_der_ablage(self):
+        self.connect_garmin()
+        r = self.send(TEXT_DURATION_ID, body={"steps": [{"type": "interval", "distance_km": 10}]})
+        self.assertEqual(r.status_code, 200, r.get_json())
+        self.assertEqual(self.garmin.return_value.upload_workout.call_args.args[0]["estimatedDurationInSecs"], 3000)
 
 
 if __name__ == "__main__":

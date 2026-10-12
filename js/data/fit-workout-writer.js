@@ -273,8 +273,15 @@ async function sendPlannedWorkoutToGarmin(id) {
   const pw = plannedWorkouts.find(p => p.id === id);
   if (!pw) throw new Error("Diese Einheit gibt es nicht mehr.");
   await storeSaved(PLANNED_WORKOUTS_KEY); // der Server liest die Einheit aus der Ablage
-  const res = await apiCall(`planned-workouts/${encodeURIComponent(id)}/send-to-garmin`, "POST",
-    { steps: resolvedWorkoutSteps(pw) }, { timeoutMs: 60000 });
+  let res;
+  try {
+    res = await apiCall(`planned-workouts/${encodeURIComponent(id)}/send-to-garmin`, "POST",
+      { steps: resolvedWorkoutSteps(pw) }, { timeoutMs: 60000 });
+  } catch (e) {
+    // Zeitüberschreitung: der Server kann trotzdem hochgeladen haben.
+    if (e.timeout) throw new Error("Die Antwort kam nicht rechtzeitig - das Workout ist vielleicht trotzdem angekommen. Bitte in Garmin Connect nachsehen, bevor du erneut sendest.");
+    throw e;
+  }
   updatePlannedWorkout(id, { garminSentAt: new Date().toISOString(), garminWorkoutId: res.data.garmin_workout_id });
   return res.data;
 }
