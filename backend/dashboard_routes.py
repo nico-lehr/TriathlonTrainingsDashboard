@@ -59,16 +59,21 @@ def put_store(key):
     session = get_session()
     try:
         athlete_id = get_current_athlete_id()
-        row = session.query(AthleteStore).filter_by(athlete_id=athlete_id, key=key).first()
-        if row is None:
-            row = AthleteStore(athlete_id=athlete_id, key=key)
-            session.add(row)
-        row.value = data["value"]
-        row.updated_at = datetime.utcnow()
-        session.commit()
-        return response_success({"key": key})
-    except IntegrityError:  # zwei gleichzeitige Erst-Speicherungen desselben Schluessels
-        session.rollback()
+        # Zweiter Versuch nur fuer den Wettlauf zweier gleichzeitiger
+        # Erst-Speicherungen (zwei Tabs): dann gibt es die Zeile inzwischen
+        # und es wird einfach sie aktualisiert.
+        for attempt in range(2):
+            row = session.query(AthleteStore).filter_by(athlete_id=athlete_id, key=key).first()
+            if row is None:
+                row = AthleteStore(athlete_id=athlete_id, key=key)
+                session.add(row)
+            row.value = data["value"]
+            row.updated_at = datetime.utcnow()
+            try:
+                session.commit()
+                return response_success({"key": key})
+            except IntegrityError:
+                session.rollback()
         return response_error("Bitte erneut speichern", "conflict", 409)
     finally:
         session.close()
