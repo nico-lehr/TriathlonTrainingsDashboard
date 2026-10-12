@@ -341,6 +341,7 @@ class Equipment(Base):
     __tablename__ = "equipment"
     __table_args__ = (
         Index("idx_equipment_athlete", "athlete_id"),
+        {"sqlite_autoincrement": True},  # geloeschte ids werden nie wieder vergeben
     )
 
     id = Column(Integer, primary_key=True)
@@ -371,6 +372,7 @@ class EquipmentWorkout(Base):
     __table_args__ = (
         UniqueConstraint("athlete_id", "workout_file", name="uq_equipment_workout_file"),
         Index("idx_equipment_workout_item", "equipment_id"),
+        {"sqlite_autoincrement": True},
     )
 
     id = Column(Integer, primary_key=True)

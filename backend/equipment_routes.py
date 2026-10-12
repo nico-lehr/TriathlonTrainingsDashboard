@@ -12,14 +12,16 @@ from flask import request
 from sqlalchemy.exc import IntegrityError
 
 from . import get_current_athlete_id
-from .models import Equipment, EquipmentWorkout
+from .models import AthleteStore, Equipment, EquipmentWorkout
 from .routes import api_bp, get_session, response_error, response_success
 
 SPORTS = ("Laufen", "Rad", "Schwimmen")
 MAX_KM = 1_000_000
 MAX_ID = 2 ** 31 - 1  # groessere Zahlen passen nicht in die Datenbank (sonst Fehler 500 statt 404)
 MAX_IMPORT = 500
-DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+# Gleicher Schluessel wie js/data/equipment.js (EQUIPMENT_MIGRATED_KEY): "die alte Liste ist uebernommen".
+MIGRATED_KEY = "triathlon_dashboard_equipment_migrated_v1"
+DAY_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 # Zusatzfelder, die das Dashboard in `details` ablegt (Namen wie im Frontend).
 DETAIL_DAYS = ("activeFrom", "activeTo", "resetAt", "createdAt")
 
@@ -44,7 +46,7 @@ def clean_details(details):
     out = {}
     for key in DETAIL_DAYS:
         value = details.get(key)
-        if value is not None and not (isinstance(value, str) and DAY_RE.match(value)):
+        if value is not None and not (isinstance(value, str) and DAY_RE.fullmatch(value)):
             raise ValueError(f"'details.{key}' muss ein Datum JJJJ-MM-TT sein")
         out[key] = value
     out["manualKm"] = None if details.get("manualKm") is None else km_value(details["manualKm"], "details.manualKm")
@@ -112,6 +114,11 @@ def list_equipment(session, athlete_id):
     return session.query(Equipment).filter_by(athlete_id=athlete_id).order_by(Equipment.id).all()
 
 
+def list_response(session, athlete_id, **meta):
+    rows = list_equipment(session, athlete_id)
+    return response_success([serialize_equipment(e) for e in rows], {"count": len(rows), **meta})
+
+
 # ============================================================================
 # EQUIPMENT
 # ============================================================================
@@ -121,8 +128,7 @@ def get_equipment():
     """GET /api/v1/equipment - alle Items der Person."""
     session = get_session()
     try:
-        rows = list_equipment(session, get_current_athlete_id())
-        return response_success([serialize_equipment(e) for e in rows], {"count": len(rows)})
+        return list_response(session, get_current_athlete_id())
     finally:
         session.close()
 
@@ -162,8 +168,11 @@ def update_equipment(equipment_id):
         if row is None:
             return response_error("Equipment nicht gefunden", "not_found", 404)
         fields = parse_fields(data, partial=True)
-        if "parent_id" in fields:
+        if "parent_id" in fields and fields["parent_id"] != row.parent_id:
             check_parent(session, athlete_id, fields["parent_id"], own_id=row.id)
+            if session.query(Equipment).filter_by(athlete_id=athlete_id, parent_id=row.id).count() \
+                    or session.query(EquipmentWorkout).filter_by(athlete_id=athlete_id, equipment_id=row.id).count():
+                raise ValueError("'parent_id' laesst sich nicht aendern, solange der Eintrag eigene Teile oder zugeordnete Trainings hat")
         for key, value in fields.items():
             setattr(row, key, value)
         session.commit()
@@ -199,7 +208,12 @@ def import_equipment():
     """POST /api/v1/equipment/import - einmalige Uebernahme der frueheren Liste
     aus der Ablage pro Person. {items: [{ref, parent_ref, ...Felder wie bei POST}]};
     ref ist die alte Kennung, parent_ref die alte Kennung des zugehoerigen Rads.
-    Nur wenn die Person noch gar kein Equipment hat - sonst passiert nichts.
+    Nur wenn die Person noch gar kein Equipment hat und noch nie uebernommen
+    hat - sonst passiert nichts. Zwei gleichzeitige Aufrufe (zwei Browser-Tabs)
+    legen trotzdem nur einmal an: der Marker MIGRATED_KEY wird als ERSTES in
+    derselben Transaktion eingefuegt, die eindeutige (athlete_id, key)-Regel
+    von athlete_store laesst den zweiten Aufruf scheitern - auch ueber
+    mehrere Prozesse hinweg.
     Antwort: die komplette Liste, meta.imported sagt, ob uebernommen wurde."""
     data = request.get_json(silent=True)
     items = data.get("items") if isinstance(data, dict) else None
@@ -208,9 +222,8 @@ def import_equipment():
     session = get_session()
     try:
         athlete_id = get_current_athlete_id()
-        if session.query(Equipment).filter_by(athlete_id=athlete_id).count():
-            rows = list_equipment(session, athlete_id)
-            return response_success([serialize_equipment(e) for e in rows], {"count": len(rows), "imported": False})
+        if not items or session.query(Equipment).filter_by(athlete_id=athlete_id).count():
+            return list_response(session, athlete_id, imported=False)
 
         parsed = []
         for raw in items:
@@ -220,6 +233,13 @@ def import_equipment():
                 raise ValueError("'ref' kommt doppelt vor")
             body = {k: v for k, v in raw.items() if k not in ("ref", "parent_ref", "parent_id")}
             parsed.append((raw["ref"], raw.get("parent_ref"), parse_fields(body, partial=False)))
+
+        session.add(AthleteStore(athlete_id=athlete_id, key=MIGRATED_KEY, value=True))
+        try:
+            session.flush()
+        except IntegrityError:  # schon uebernommen (oder gerade von einem anderen Aufruf)
+            session.rollback()
+            return list_response(session, athlete_id, imported=False)
 
         new_ids, skipped = {}, 0
         for ref, parent_ref, fields in parsed:  # erst die Hauptausruestung, dann deren Teile
@@ -236,8 +256,7 @@ def import_equipment():
                 continue
             session.add(new_item(athlete_id, fields, parent_id=new_ids[parent_ref]))
         session.commit()
-        rows = list_equipment(session, athlete_id)
-        return response_success([serialize_equipment(e) for e in rows], {"count": len(rows), "imported": True, "skipped": skipped})
+        return list_response(session, athlete_id, imported=True, skipped=skipped)
     except ValueError as e:
         session.rollback()
         return response_error(str(e), "VALIDATION_ERROR", 400)

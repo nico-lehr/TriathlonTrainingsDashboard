@@ -38,10 +38,15 @@
 // Warnung "bald fällig" ab diesem Anteil von max_km (serviceIntervalKm).
 const EQUIPMENT_WARN_RATIO = 0.9;
 
+// Größter km-Wert, den der Server annimmt (MAX_KM, backend/equipment_routes.py).
+const EQUIPMENT_MAX_KM = 1000000;
+
 // Frühere Ablage der Liste (Ablage pro Person). Wird nur noch einmal gelesen,
 // um sie in die Datenbank zu übernehmen, und danach als Sicherheitskopie
 // stehen gelassen. EQUIPMENT_MIGRATED_KEY merkt sich, dass das passiert ist -
-// sonst käme die alte Liste zurück, sobald man alles gelöscht hat.
+// sonst käme die alte Liste zurück, sobald man alles gelöscht hat. Der Server
+// setzt denselben Schlüssel beim Import selbst (backend/equipment_routes.py) -
+// das verhindert, dass zwei gleichzeitig offene Tabs die Liste doppelt anlegen.
 const EQUIPMENT_ITEMS_KEY = "triathlon_dashboard_equipment_items_v1";
 const EQUIPMENT_MIGRATED_KEY = "triathlon_dashboard_equipment_migrated_v1";
 
@@ -71,7 +76,7 @@ function equipmentFromApi(row) {
 }
 
 function equipmentToApi(item) {
-  const km = v => (v != null && v !== "" && Number.isFinite(Number(v))) ? Math.max(0, Number(v)) : null;
+  const km = v => (v != null && v !== "" && Number.isFinite(Number(v))) ? Math.min(EQUIPMENT_MAX_KM, Math.max(0, Number(v))) : null;
   return {
     name: String(item.name || "Ohne Namen").slice(0, 255),
     typ: item.category || "Sonstiges",
@@ -170,6 +175,7 @@ async function addEquipmentItem(data) {
     showApiError(`Equipment konnte nicht angelegt werden (${e.message}).`);
     return null;
   }
+  showApiError(null); // ein früherer Fehlerhinweis ist damit erledigt
   equipmentItems.push(item);
   // Direkt beim Anlegen als Standard setzen, wenn es das erste Item dieser
   // Sportart ist (Komfort - sonst müsste man extra noch einmal klicken).

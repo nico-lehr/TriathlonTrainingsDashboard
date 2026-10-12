@@ -19,13 +19,14 @@ const SCRIPTS = ["js/utils/formatting.js", "js/data/equipment.js"];
 const store = {};
 const calls = [];
 const errors = [];
+const shown = []; // alles, was der Hinweisbanner bekam (null = ausgeblendet)
 let respond = () => ({ data: [] });
 const app = vm.createContext({
   ALL: [], window: {},
   sportGroup: sport => (["Laufen", "Rad", "Schwimmen"].includes(sport) ? sport : "Sonstiges"),
   storeGet: key => (key in store ? JSON.parse(JSON.stringify(store[key])) : null),
   storeSet: (key, value) => { store[key] = JSON.parse(JSON.stringify(value)); },
-  showApiError: message => { if (message) errors.push(message); },
+  showApiError: message => { shown.push(message); if (message) errors.push(message); },
   apiCall: async (endpoint, method = "GET", body = null) => {
     calls.push({ endpoint, method, body: body === null ? null : JSON.parse(JSON.stringify(body)) });
     return respond(endpoint, method, body);
@@ -46,6 +47,7 @@ const run_ = (file, day, km, sport = "Laufen") => ({ file, sport, _date: new Dat
 function reset({ items = [], workouts = [], assignments = {} } = {}) {
   calls.length = 0;
   errors.length = 0;
+  shown.length = 0;
   Object.keys(store).forEach(k => delete store[k]);
   respond = () => ({ data: [] });
   app.ALL = workouts;
@@ -171,6 +173,14 @@ test("API-Übersetzung: nichts geht verloren (Hin und zurück ergibt dasselbe It
   assert.deepStrictEqual([row.typ, row.max_km, row.start_km, row.aktiv], ["Laufschuhe", 700, 12.5, false]);
 });
 
+test("API-Übersetzung: zu große km-Werte werden auf das Maximum des Servers gekappt (kein 400 beim Übernehmen)", () => {
+  assert.strictEqual(run("EQUIPMENT_MAX_KM"), 1000000);
+  const row = plain(app.equipmentToApi(item("1", { startKm: 5e6, serviceIntervalKm: 2e9, manualKm: 1e7 })));
+  assert.deepStrictEqual([row.start_km, row.max_km, row.details.manualKm], [1000000, 1000000, 1000000]);
+  assert.strictEqual(plain(app.equipmentToApi(item("2", { startKm: 1000000 }))).start_km, 1000000);
+  assert.strictEqual(plain(app.equipmentToApi(item("3", { serviceIntervalKm: Infinity }))).max_km, null);
+});
+
 test("API-Übersetzung: ungültige alte Werte werden zu gültigen (kein 400 beim Übernehmen)", () => {
   const row = plain(app.equipmentToApi(item("1", { name: "", serviceIntervalKm: "", startKm: "abc", manualKm: -5, category: "" })));
   assert.deepStrictEqual([row.name, row.max_km, row.start_km, row.details.manualKm, row.typ], ["Ohne Namen", null, 0, 0, "Sonstiges"]);
@@ -259,6 +269,14 @@ test("Anlegen: Server vergibt die id; erstes Item einer Sportart wird gleich Sta
   assert.deepStrictEqual(calls.map(c => [c.method, c.endpoint]), [["POST", "equipment"], ["PUT", "equipment/7"]]);
   assert.deepStrictEqual([calls[0].body.typ, calls[0].body.max_km, calls[0].body.start_km, calls[0].body.sport], ["Laufschuhe", 700, 20, "Laufen"]);
   assert.strictEqual(calls[1].body.details.activeFrom, created.activeFrom);
+});
+
+test("Anlegen klappt: ein früherer Fehlerhinweis verschwindet", async () => {
+  reset();
+  respond = (endpoint, method, body) => ({ data: { id: 8, ...body } });
+  await run(`addEquipmentItem({ name: "Kette", category: "Sonstiges" })`);
+  assert.strictEqual(shown[0], null);
+  assert.deepStrictEqual(errors, []);
 });
 
 test("Anlegen scheitert: null, Hinweisbanner, nichts in der Liste", async () => {

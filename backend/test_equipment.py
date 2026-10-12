@@ -5,11 +5,14 @@ einer anderen sieht oder veraendert.
 Aufruf im Projektordner:  python -m unittest backend.test_equipment -v
 Laeuft gegen eine Datenbank im Arbeitsspeicher - training.db bleibt unberuehrt.
 """
+import os
+import tempfile
+import threading
 import unittest
 
 from backend import auth, create_app
 from backend.config import config
-from backend.models import Equipment, EquipmentWorkout
+from backend.models import AthleteStore, Equipment, EquipmentWorkout
 
 config.SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
 config.SECRET_KEY = "nur-fuer-tests"
@@ -37,6 +40,7 @@ class EquipmentTest(unittest.TestCase):
         session = self.session_factory()
         session.query(EquipmentWorkout).delete()
         session.query(Equipment).delete()
+        session.query(AthleteStore).delete()
         session.commit()
         session.close()
 
@@ -97,6 +101,7 @@ class EquipmentTest(unittest.TestCase):
         bad = [{}, {"name": "  "}, {"name": "x" * 256}, {"name": "x", "sport": "Yoga"}, {"name": "x", "start_km": -1},
                {"name": "x", "max_km": "700"}, {"name": "x", "aktiv": "ja"}, {"name": "x", "typ": 5},
                {"name": "x", "details": {"activeFrom": "gestern"}}, {"name": "x", "details": []},
+               {"name": "x", "details": {"activeFrom": "2026-01-01\n"}}, {"name": "x", "details": {"resetAt": "٢٠٢٦-٠١-٠١"}},
                {"name": "x", "details": {"note": "n" * 301}}, {"name": "x", "parent_id": 99999}, {"name": "x", "parent_id": "1"}]
         for body in bad:
             with self.subTest(body=body):
@@ -117,6 +122,35 @@ class EquipmentTest(unittest.TestCase):
         self.assertEqual(self.client.delete(f"/api/v1/equipment/{rad['id']}", headers=self.a).status_code, 200)
         self.assertEqual(self.items(), [])
         self.assertEqual(self.assignments(), [])
+
+    def test_parent_id_nicht_aenderbar_mit_teilen_oder_zuordnungen(self):
+        rad, rad2 = self.create({"name": "Rad", "sport": "Rad"}), self.create({"name": "Rad 2", "sport": "Rad"})
+        kette = self.create({"name": "Kette", "parent_id": rad["id"]})
+        lose = self.create({"name": "Lose", "sport": "Laufen"})
+        url = lambda item: f"/api/v1/equipment/{item['id']}"
+
+        # Das Dashboard schickt beim Speichern immer alles mit - ein unveraendertes parent_id ist erlaubt.
+        self.assertEqual(self.client.put(url(kette), json={"name": "Kette neu", "parent_id": rad["id"]}, headers=self.a).status_code, 200)
+        # Teile duerfen zu einem anderen Hauptequipment wechseln oder frei werden.
+        self.assertEqual(self.client.put(url(kette), json={"parent_id": rad2["id"]}, headers=self.a).get_json()["data"]["parent_id"], rad2["id"])
+        self.assertIsNone(self.client.put(url(kette), json={"parent_id": None}, headers=self.a).get_json()["data"]["parent_id"])
+        # Ein Rad mit Teil darf kein Teil werden (sonst verschachtelte Teile) ...
+        self.client.put(url(kette), json={"parent_id": rad["id"]}, headers=self.a)
+        r = self.client.put(url(rad), json={"parent_id": rad2["id"]}, headers=self.a)
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("parent_id", r.get_json()["error"])
+        # ... und eines mit zugeordnetem Training auch nicht.
+        self.client.post(f"{url(rad2)}/workouts", json={"workout_file": "f.fit"}, headers=self.a)
+        self.assertEqual(self.client.put(url(rad2), json={"parent_id": rad["id"]}, headers=self.a).status_code, 400)
+        # Ohne Teile und Zuordnungen geht es (hier ist rad selbst schon ein Rad mit Teil, also bleibt "lose" der Fall).
+        self.assertEqual(self.client.put(url(lose), json={"parent_id": rad["id"]}, headers=self.a).status_code, 200)
+        self.assertIsNone(next(i for i in self.items() if i["id"] == rad["id"])["parent_id"])
+        self.assertIsNone(next(i for i in self.items() if i["id"] == rad2["id"])["parent_id"])
+
+    def test_geloeschte_ids_werden_nicht_wieder_vergeben(self):
+        erste = self.create({"name": "Eins"})
+        self.client.delete(f"/api/v1/equipment/{erste['id']}", headers=self.a)
+        self.assertGreater(self.create({"name": "Zwei"})["id"], erste["id"])
 
     def test_trainings_zuordnen(self):
         alt, neu = self.create(SCHUH), self.create({**SCHUH, "name": "Neue"})
@@ -190,6 +224,8 @@ class EquipmentTest(unittest.TestCase):
         self.assertEqual((kette["parent_id"], kette["details"]["resetAt"]), (rad["id"], "2026-03-01"))
         self.assertEqual((brille["typ"], brille["details"]["manualKm"]), ("Sonstiges", 42.5))
         self.assertEqual(self.items(), [rad, brille, kette])
+        # Der Server merkt sich die Uebernahme in der Ablage (derselbe Schluessel wie im Dashboard).
+        self.assertIs(self.client.get("/api/v1/store", headers=self.a).get_json()["data"]["triathlon_dashboard_equipment_migrated_v1"], True)
 
         # Zweiter Aufruf (z.B. zweiter Browser-Tab): nichts wird doppelt angelegt.
         r = self.client.post("/api/v1/equipment/import", json={"items": alt}, headers=self.a)
@@ -201,6 +237,14 @@ class EquipmentTest(unittest.TestCase):
         self.assertTrue(r.get_json()["meta"]["imported"])
         self.assertEqual([i["name"] for i in self.items(self.b)], ["Brille"])
         self.assertEqual(len(self.items()), 3)
+        # Alles geloescht und noch einmal versucht: nichts kommt zurueck.
+        for item in self.items():
+            if item["parent_id"] is None:
+                self.client.delete(f"/api/v1/equipment/{item['id']}", headers=self.a)
+        self.assertEqual(self.items(), [])
+        r = self.client.post("/api/v1/equipment/import", json={"items": alt}, headers=self.a)
+        self.assertFalse(r.get_json()["meta"]["imported"])
+        self.assertEqual(self.items(), [])
 
     def test_uebernahme_ungueltig_legt_nichts_an(self):
         gut = {"ref": "a", "name": "Gut"}
@@ -209,6 +253,63 @@ class EquipmentTest(unittest.TestCase):
             with self.subTest(items=str(items)[:60]):
                 self.assertEqual(self.client.post("/api/v1/equipment/import", json={"items": items}, headers=self.a).status_code, 400)
         self.assertEqual(self.items(), [])
+        # Ein abgelehnter Import zaehlt nicht als "uebernommen", ein leerer auch nicht.
+        self.client.post("/api/v1/equipment/import", json={"items": []}, headers=self.a)
+        self.assertEqual(self.client.get("/api/v1/store", headers=self.a).get_json()["data"], {})
+        self.assertTrue(self.client.post("/api/v1/equipment/import", json={"items": [gut]}, headers=self.a).get_json()["meta"]["imported"])
+
+
+class EquipmentRaceTest(unittest.TestCase):
+    """Zwei Tabs uebernehmen die alte Liste gleichzeitig: angelegt wird nur einmal.
+
+    Eigene Datenbank-DATEI statt :memory: - SQLAlchemy gibt jedem Thread sonst
+    seine eigene (leere) Speicher-Datenbank, dann gaebe es nichts zu bestreiten.
+    """
+    ITEMS = [{"ref": "rad", "name": "Rad", "typ": "Rad", "sport": "Rad"},
+             {"ref": "kette", "parent_ref": "rad", "name": "Kette"},
+             {"ref": "brille", "name": "Brille"}]
+    THREADS = 6
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.old_uri = config.SQLALCHEMY_DATABASE_URI
+        config.SQLALCHEMY_DATABASE_URI = "sqlite:///" + os.path.join(cls.tmp.name, "race.db")
+        cls.app, cls.session_factory = create_app()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.session_factory.remove()
+        cls.session_factory.get_bind().dispose()
+        config.SQLALCHEMY_DATABASE_URI = cls.old_uri
+        cls.tmp.cleanup()
+
+    def test_gleichzeitige_uebernahme_legt_nur_einmal_an(self):
+        session = self.session_factory()
+        for runde in range(5):  # mehrere Personen/Runden, damit ein Wettlauf sicher auftritt
+            name = f"race-{runde}"
+            auth.create_login(session, name, PASSWORD)
+            token = self.app.test_client().post("/api/v1/auth/login", json={"username": name, "password": PASSWORD}).get_json()["data"]["token"]
+            barrier, results = threading.Barrier(self.THREADS), []
+
+            def tab():
+                client = self.app.test_client()
+                barrier.wait()
+                r = client.post("/api/v1/equipment/import", json={"items": self.ITEMS}, headers={"Authorization": f"Bearer {token}"})
+                results.append((r.status_code, r.get_json()["meta"]["imported"], len(r.get_json()["data"])))
+
+            threads = [threading.Thread(target=tab) for _ in range(self.THREADS)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            with self.subTest(runde=runde):
+                self.assertEqual(sorted(r[1] for r in results), [False] * (self.THREADS - 1) + [True])
+                self.assertEqual({r[0] for r in results}, {200})
+                self.assertEqual({r[2] for r in results}, {3})  # alle sehen am Ende dieselbe, vollstaendige Liste
+                athlete_id = auth.check_login(session, name, PASSWORD)
+                self.assertEqual(session.query(Equipment).filter_by(athlete_id=athlete_id).count(), 3)
+        session.close()
 
 
 if __name__ == "__main__":
