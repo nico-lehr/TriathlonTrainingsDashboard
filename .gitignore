@@ -6,6 +6,7 @@ workouts.json
 # dieselben persönlichen Trainingsdaten eingebettet - ebenfalls lokal, nicht
 # im Repo. index.html selbst ist reiner Code und bleibt im Repo.
 data/workouts-data.js
+wellness-data.js
 
 # Export des alten Doppelklick-Dashboards (tools/export-browser-data.html) -
 # enthaelt Profil, Ziele, Plan und Workouts, gehoert nie ins Repo.
@@ -33,6 +34,9 @@ dashboard-demo.html
 
 # Phase 1 Backend - lokale Entwicklung
 training.db
+training.db-journal
+training.db-wal
+training.db-shm
 # Sicherungen der Datenbank (backup.py) - persoenliche Daten
 backups/
 # Generierte Trainingsdaten, egal wo sie liegen

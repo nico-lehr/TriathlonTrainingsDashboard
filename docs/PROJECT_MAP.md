@@ -220,6 +220,6 @@ Trainings und Gesundheitsdaten in die Datenbank. Anleitung:
 | `parse_fit.py` | Python-Referenzimplementierung, liest `.fit`-Dateien (Standard: `fit-files/`) in `workouts.json`. Quellordner/Ziel per Argument überschreibbar. |
 | `build_dashboard.py` | Erzeugt `data/workouts-data.js` aus `workouts.json`. |
 | `verify_parser.py` | Vergleicht den JS-FIT-Parser Feld für Feld gegen die Python-Referenz. |
-| `test_full_ui.py`, `test_new_features.py`, `test_dnd_ui.py` | Playwright-Regressionstests gegen `index.html`. |
+| `test_full_ui.py`, `test_new_features.py`, `test_dnd_ui.py` (und weitere `test_*.py` im Hauptordner) | **Veraltet:** alte Playwright-Tests, die `index.html` per `file://` öffnen und landen jetzt auf der Login-Seite. Brauchen einen Umbau auf den Server, bevor sie wieder laufen. |
 | `tests/js/*.test.js` | Tests der Rechenlogik ohne Browser (Planregeln, Periodisierung, Rennplan, Wetter, Triathlon-Auswertungen, Material, Schritte): `node --test tests/js/` |
 | `PROGRESS.md` | Fortschritt und offene Fragen des Arbeitspakets. |

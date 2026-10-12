@@ -23,6 +23,8 @@ class Config:
 
     # API
     API_VERSION = "v1"
+    # Groesste erlaubte Anfrage (Flask und waitress): mehr als ein .fit-Import braucht.
+    MAX_CONTENT_LENGTH = 64 * 1024 * 1024
 
     # KI: der Server leitet Anfragen an Ollama auf diesem PC weiter (ai_routes.py)
     OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")

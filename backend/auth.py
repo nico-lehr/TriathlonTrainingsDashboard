@@ -16,7 +16,7 @@ from itsdangerous import BadSignature, URLSafeSerializer, URLSafeTimedSerializer
 from sqlalchemy import func
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .models import Athlete, AthleteLogin
+from .models import Athlete, AthleteLogin, AthleteStore, Workout
 
 TOKEN_MAX_AGE_S = 30 * 24 * 3600  # 30 Tage
 MIN_PASSWORD_LENGTH = 10
@@ -59,14 +59,41 @@ def normalize_username(username):
     return username.strip().lower() if isinstance(username, str) else ""
 
 
+_dummy_hash = None
+
+
 def check_login(session, username, password):
     """athlete_id bei richtigem Benutzernamen + Passwort, sonst None."""
+    global _dummy_hash
     if not isinstance(password, str):
         return None
     login = session.query(AthleteLogin).filter_by(username=normalize_username(username)).first()
-    if login and check_password_hash(login.password_hash, password):
+    if login is None:
+        # Genauso lange rechnen wie bei einem echten Benutzer, sonst verraet die
+        # Antwortzeit (ca. 115 ms gegen 2 ms), welche Benutzernamen es gibt.
+        if _dummy_hash is None:
+            _dummy_hash = generate_password_hash("kein-echtes-passwort")
+        check_password_hash(_dummy_hash, password)
+        return None
+    if check_password_hash(login.password_hash, password):
         return login.athlete_id
     return None
+
+
+def unclaimed_athlete(session):
+    """Der Athlet ohne Login, den der naechste create_login() uebernimmt (oder None)."""
+    taken = {row.athlete_id for row in session.query(AthleteLogin.athlete_id)}
+    return next((a for a in session.query(Athlete).order_by(Athlete.athlete_id) if a.athlete_id not in taken), None)
+
+
+def unclaimed_data_count(session):
+    """Wie viele Trainings und Ablage-Eintraege schon am Athleten ohne Login haengen.
+    Der naechste neue Benutzer sieht sie alle - create_user.py fragt deshalb vorher nach."""
+    athlete = unclaimed_athlete(session)
+    if athlete is None:
+        return 0
+    return (session.query(Workout).filter_by(athlete_id=athlete.athlete_id).count()
+            + session.query(AthleteStore).filter_by(athlete_id=athlete.athlete_id).count())
 
 
 def create_login(session, username, password):
@@ -84,8 +111,7 @@ def create_login(session, username, password):
     if session.query(AthleteLogin).filter_by(username=username).first():
         raise ValueError(f"Den Benutzernamen '{username}' gibt es schon.")
 
-    taken = {row.athlete_id for row in session.query(AthleteLogin.athlete_id)}
-    athlete = next((a for a in session.query(Athlete).order_by(Athlete.athlete_id) if a.athlete_id not in taken), None)
+    athlete = unclaimed_athlete(session)
     if athlete is None:
         next_id = (session.query(func.max(Athlete.athlete_id)).scalar() or 0) + 1
         athlete = Athlete(athlete_id=next_id, name=username)

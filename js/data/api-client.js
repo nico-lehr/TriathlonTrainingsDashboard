@@ -99,6 +99,9 @@ function showApiError(message) {
 let userStore = {};
 const storeSending = new Set(); // Schluessel, die gerade zum Server unterwegs sind
 const storeDirty = new Set();   // Schluessel mit noch nicht gesendeter Aenderung
+let storeSaveFailed = false;    // das letzte Speichern ist gescheitert (der Browser hat dann den neueren Stand)
+let storeStale = false;         // auf einem anderen Geraet wurde inzwischen etwas geaendert
+let storeCheckedAt = 0;
 
 async function loadUserStore() {
   userStore = (await apiCall("store")).data || {};
@@ -123,8 +126,10 @@ async function sendStoreKey(key) {
     storeDirty.delete(key);
     try {
       await apiCall(`store/${key}`, "PUT", { value: userStore[key] });
-      showApiError(null);
+      storeSaveFailed = false;
+      if (!storeStale) showApiError(null);
     } catch (e) {
+      storeSaveFailed = true;
       showApiError(`Speichern fehlgeschlagen (${e.message}). Die letzte Änderung ist evtl. nicht gesichert.`);
     }
   }
@@ -136,6 +141,49 @@ async function sendStoreKey(key) {
 async function storeSaved(key) {
   while (storeSending.has(key)) await new Promise(resolve => setTimeout(resolve, 100));
 }
+
+// Ein lange offener Tab kennt nur den Stand vom Start, und jedes Speichern
+// ersetzt den ganzen Wert auf dem Server. Wurde auf einem anderen Geraet
+// (Handy/PC) inzwischen etwas geaendert, wuerde der naechste Haken hier das
+// stillschweigend ueberschreiben. Deshalb: kommt der Tab wieder nach vorn,
+// wird der Serverstand verglichen und bei Abweichung gewarnt (nicht einfach neu
+// geladen - sonst ginge eine halb ausgefuellte Eingabe verloren).
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map(k => `${JSON.stringify(k)}:${stableJson(value[k])}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+function storeChangedElsewhere(server) {
+  const keys = new Set([...Object.keys(server), ...Object.keys(userStore)]);
+  return [...keys].some(k => stableJson(server[k]) !== stableJson(userStore[k]));
+}
+
+function showStoreStaleNotice() {
+  const el = document.getElementById("api-error-banner");
+  if (!el) return;
+  el.textContent = "Auf einem anderen Gerät wurde inzwischen etwas geändert. Bitte neu laden, sonst überschreibst du es beim nächsten Speichern. ";
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "cal-today-btn";
+  btn.textContent = "Neu laden";
+  btn.addEventListener("click", () => window.location.reload());
+  el.appendChild(btn);
+  el.hidden = false;
+}
+
+async function checkStoreStale() {
+  const idle = () => !storeSending.size && !storeDirty.size && !storeSaveFailed;
+  if (document.visibilityState !== "visible" || storeStale || !idle() || Date.now() - storeCheckedAt < 30000) return;
+  storeCheckedAt = Date.now();
+  let server;
+  try { server = (await apiCall("store")).data || {}; } catch (e) { return; }
+  if (!idle()) return; // waehrenddessen selbst etwas geaendert: der Vergleich gilt nicht mehr
+  if (storeChangedElsewhere(server)) { storeStale = true; showStoreStaleNotice(); }
+}
+document.addEventListener("visibilitychange", checkStoreStale);
 
 // Warnen, wenn die Seite geschlossen wird, waehrend noch gespeichert wird.
 window.addEventListener("beforeunload", (e) => {

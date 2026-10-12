@@ -22,10 +22,12 @@ function todayStr() {
 }
 
 
+// Auch Anführungszeichen werden ersetzt: der Text steht oft in einem
+// Attribut (value="..."), und ein " darin würde das Attribut vorzeitig beenden.
 function escapeHtml(s) {
   const d = document.createElement("div");
   d.textContent = s == null ? "" : String(s);
-  return d.innerHTML;
+  return d.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 // Baut den fachlichen Kontext (Form, Historie, Bestzeiten, Athletenprofil,

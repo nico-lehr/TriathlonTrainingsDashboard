@@ -26,6 +26,10 @@ heißt es meist `python3`. Alle Befehle im Projektordner ausführen.
    ```
    python backend/create_user.py
    ```
+   **Lege zuerst dich selbst an, danach die Freunde.** Wer zuerst angelegt
+   wird, bekommt alle schon vorhandenen Daten (z. B. deine importierten
+   Trainings). Gibt es solche Daten, fragt das Programm vorher nach, ob das
+   dein eigenes Konto ist.
    Passwort mindestens 10 Zeichen. Die angezeigte Nummer (`athlete_id`) ist
    die Benutzer-Nummer, die z. B. der Garmin-Sync braucht.
    Passwort vergessen: `python backend/create_user.py --reset`.
@@ -55,7 +59,8 @@ heißt es meist `python3`. Alle Befehle im Projektordner ausführen.
 
 - **Garmin-Sync** für alle Benutzer: siehe `docs/GARMIN_SYNC_GUIDE.md`.
 - **„An Garmin senden“** (geplante Einheit direkt in den Garmin-Kalender):
-  braucht für die jeweilige Person **einmal** die Garmin-Anmeldung des Syncs
+  braucht einmalig die Garmin-Bibliotheken (`python -m pip install -r requirements.txt`)
+  und für die jeweilige Person **einmal** die Garmin-Anmeldung des Syncs
   (`python tools/garmin_sync.py --login --athlete <nummer>`). Das Dashboard
   fragt nie nach einem Garmin-Passwort. Ohne Anmeldung zeigt der Knopf eine
   Meldung; der `.fit`-Download geht immer. Bitte einmal mit dem echten Konto
@@ -122,7 +127,8 @@ Adresse mit `http://` beginnt.
 
 ### Updates
 
-Server beenden → `git pull` → wieder starten. Beim Start wird vorher
+Server beenden → `git pull` → `start.bat`/`start.sh` (installiert fehlende
+Bibliotheken von selbst) → wieder starten. Beim Start wird vorher
 automatisch gesichert; neue Tabellen legt der Server selbst an, vorhandene
 Daten bleiben erhalten.
 
@@ -139,13 +145,17 @@ Daten bleiben erhalten.
   und Garmin-Token sind von außen nicht abrufbar.
 - Der Login gilt 30 Tage pro Gerät. **An fremden/geteilten Geräten immer
   abmelden** (Einstellungen → Konto → Abmelden) – das löscht auch alles
-  Persönliche aus dem Browser.
+  Persönliche aus dem Browser. Ein einzelner Login lässt sich nicht
+  zurückziehen: auch nach „Passwort neu“ gilt ein alter Login noch bis zu 30
+  Tage. Sofort alle abmelden (z. B. bei verlorenem Handy): in `.env` den
+  `SECRET_KEY` ändern und neu starten – dann müssen sich alle neu anmelden.
 - **Erreichbar ist der Server im ganzen Heimnetz** (WLAN) und über Tailscale.
   Daten sind durch den Login geschützt. Wer ihn nur über Tailscale
   erreichbar machen will: in `.env` `DASHBOARD_HOST=100.x.y.z` (deine
   Tailscale-IP) eintragen und neu starten.
 - Der **Kalender-Abo-Link** enthält einen geheimen Schlüssel – nicht
-  weitergeben. Ungültig machen lässt er sich nur zusammen mit allen Logins,
+  weitergeben. Alte Abos ohne Schlüssel (`…/ical/1.ics`) funktionieren nicht
+  mehr: den Link neu aus den Einstellungen kopieren und neu abonnieren. Ungültig machen lässt er sich nur zusammen mit allen Logins,
   indem man `SECRET_KEY` in `.env` ändert.
 - `.env`, `training.db`, `backups/`, Token-Dateien und Trainingsdaten sind
   per `.gitignore` vom Repository ausgeschlossen.

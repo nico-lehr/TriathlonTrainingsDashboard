@@ -642,7 +642,9 @@ def sync_ical_planned_workouts():
             if not w.get("id") or not w.get("date") or w.get("status") != "geplant":
                 continue  # erledigte/uebersprungene Einheiten gehoeren nicht in einen Vorschau-Kalender
             session.add(IcalPlannedWorkout(
-                id=str(w["id"]),
+                # Die Spalte id ist tabellenweit eindeutig: ohne die Nummer der
+                # Person kollidieren zwei Personen mit derselben Plan-Kennung.
+                id=f"{athlete_id}-{w['id']}"[:64],
                 athlete_id=athlete_id,
                 date=w["date"],
                 sport=w.get("sport"),

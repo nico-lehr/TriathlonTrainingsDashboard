@@ -106,6 +106,38 @@ class AuthTest(unittest.TestCase):
         finally:
             session.close()
 
+    def test_vorhandene_daten_gehen_an_den_ersten_benutzer(self):
+        # Ein Athlet ohne Login mit Daten (z. B. nach dem Import) faellt dem
+        # naechsten neuen Benutzer zu - unclaimed_data_count() macht das sichtbar,
+        # damit create_user.py vorher nachfragen kann.
+        from datetime import date
+        from backend.models import Athlete, Workout
+        session = session_factory()
+        try:
+            athlete = Athlete(athlete_id=9001, name="Altbestand")
+            session.add(athlete)
+            session.flush()
+            session.add(Workout(athlete_id=9001, date=date(2026, 1, 2), sport="Laufen", duration_min=30))
+            session.commit()
+            before = auth.unclaimed_data_count(session)
+            self.assertEqual(auth.unclaimed_athlete(session).athlete_id, 9001)
+            self.assertGreaterEqual(before, 1)
+            new_id = auth.create_login(session, "erbe", PASSWORD)
+            self.assertEqual(new_id, 9001)
+            self.assertEqual(auth.unclaimed_data_count(session), 0)
+        finally:
+            session.close()
+
+    def test_unbekannter_name_wird_genauso_geprueft(self):
+        # Kein Hinweis aus der Antwortzeit auf vorhandene Benutzernamen:
+        # auch ohne Treffer wird ein Hash berechnet.
+        session = session_factory()
+        try:
+            self.assertIsNone(auth.check_login(session, "gibts-nicht", "irgendwas-langes"))
+        finally:
+            session.close()
+        self.assertIsNotNone(auth._dummy_hash)
+
     def test_passwort_zuruecksetzen(self):
         make_user("vergesslich")
         session = session_factory()

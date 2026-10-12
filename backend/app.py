@@ -18,7 +18,13 @@ from backend.models import Athlete, AthleteLogin
 from backend.config import config
 
 # Vor dem Start sichern: create_app() legt bei neuen Versionen evtl. neue Tabellen an.
-backup_db()
+# Klappt die Sicherung nicht, wird NICHT gestartet (kein Datenbank-Eingriff ohne Backup).
+try:
+    backup_db()
+except Exception as e:
+    sys.exit(f"Die Datensicherung hat nicht geklappt ({e}).\n"
+             "Der Server startet deshalb nicht. Ist training.db oder der Ordner backups/ "
+             "in einem anderen Programm geoeffnet? Danach erneut starten.")
 app, session_factory = create_app()
 
 
@@ -73,4 +79,7 @@ if __name__ == "__main__":
     print("\nBeenden: dieses Fenster schliessen oder Strg+C.")
     print("=" * 60 + "\n")
 
-    serve(app, host=host, port=port, threads=8)
+    # 16 Threads: eine KI-Anfrage blockiert bis zu 10 Minuten einen davon.
+    # Anfragen ueber 64 MB lehnt der Server ab (auch ohne Login), sonst koennte
+    # jemand im WLAN die Platte fuellen.
+    serve(app, host=host, port=port, threads=16, max_request_body_size=config.MAX_CONTENT_LENGTH)

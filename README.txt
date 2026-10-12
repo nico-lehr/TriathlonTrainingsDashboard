@@ -1,3 +1,10 @@
+ACHTUNG - ALTER STAND: Diese Datei stammt aus der Zeit, als das Dashboard per
+Doppelklick auf index.html geoeffnet wurde. Das geht nicht mehr: das Dashboard
+laeuft jetzt als Server auf dem eigenen PC (start.bat / start.sh, danach
+http://localhost:5000, Anmeldung mit Benutzername und Passwort).
+Aktuelle Anleitung: README.md und docs/DEPLOYMENT.md. Die Beschreibungen der
+einzelnen Funktionen weiter unten gelten weiterhin.
+
 Triathlon Trainings-Dashboard
 ==============================
 

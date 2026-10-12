@@ -11,13 +11,25 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from backend import create_app
-from backend.auth import MIN_PASSWORD_LENGTH, create_login, reset_password
+from backend.auth import MIN_PASSWORD_LENGTH, create_login, reset_password, unclaimed_data_count
 
 
 def main():
     _, session_factory = create_app()
     reset = "--reset" in sys.argv[1:]
 
+    if not reset:
+        session = session_factory()
+        try:
+            existing = unclaimed_data_count(session)
+        finally:
+            session.close()
+        if existing:
+            print(f"Achtung: Es gibt schon {existing} Eintraege (Trainings, Plan, Ziele ...) ohne Benutzer,")
+            print("z. B. aus dem Import deiner alten Daten. Der Benutzer, den du jetzt anlegst,")
+            print("bekommt SIE ALLE zu sehen. Lege zuerst dich selbst an, dann deine Freunde.")
+            if input("Ist das dein eigenes Konto? (j/n): ").strip().lower() not in ("j", "ja"):
+                sys.exit("Nichts angelegt.")
     username = input("Benutzername: ")
     password = getpass(f"Passwort (mind. {MIN_PASSWORD_LENGTH} Zeichen, wird beim Tippen nicht angezeigt): ")
     if password != getpass("Passwort wiederholen: "):

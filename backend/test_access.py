@@ -236,19 +236,27 @@ class DatentrennungTest(AccessTestBase):
         self.assertIn("Plan-von-B", feed_b)
         self.assertNotIn("Plan-von-A", feed_b)
 
-    @unittest.expectedFailure
     def test_kalender_abgleich_gleiche_kennung_bei_zwei_personen(self):
-        # BEKANNTER FEHLER (Abschluss-Check F): ical_planned_workouts.id ist
-        # tabellenweit eindeutig. Hat B einen Plan-Eintrag mit derselben
-        # Kennung wie A (z. B. derselbe Browser-Export bei zwei Personen
-        # importiert), scheitert der Abgleich von B mit 500 und sein
-        # Kalender-Abo bleibt still auf dem alten Stand. Nach der Korrektur in
-        # routes.py (Kennung je Person, z. B. f"{athlete_id}-{id}") diese
-        # @unittest.expectedFailure-Zeile entfernen.
+        # ical_planned_workouts.id ist tabellenweit eindeutig; die Kennung
+        # bekommt deshalb die Nummer der Person vorangestellt (sonst 500, wenn
+        # z. B. derselbe Browser-Export bei zwei Personen importiert wurde).
         body = {"workouts": [{"id": "gleiche-kennung", "date": "2026-10-21", "title": "Kopie", "status": "geplant"}]}
         self.assertEqual(self.client.post("/api/v1/ical-sync", headers=self.a, json=body).status_code, 200)
         self.assertEqual(self.client.post("/api/v1/ical-sync", headers=self.b, json=body).status_code, 200)
         self.assertIn("Kopie", self.client.get(f"/api/v1/ical/{self.b_id}.ics", headers=self.b).get_data(as_text=True))
+
+    def test_zu_grosse_anfrage_wird_abgelehnt(self):
+        # config.MAX_CONTENT_LENGTH (64 MB) schuetzt die Platte vor Riesen-Uploads;
+        # hier mit einer kleinen Grenze geprueft, damit der Test schnell bleibt.
+        self.assertEqual(self.app.config["MAX_CONTENT_LENGTH"], 64 * 1024 * 1024)
+        self.app.config["MAX_CONTENT_LENGTH"] = 1000
+        try:
+            r = self.client.put("/api/v1/store/gross", headers=self.a, json={"value": "x" * 5000})
+            self.assertEqual(r.status_code, 413)
+            r = self.client.put("/api/v1/store/klein", headers=self.a, json={"value": "ok"})
+            self.assertEqual(r.status_code, 200)
+        finally:
+            self.app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024
 
     def test_konto_zeigt_die_eigene_person(self):
         me = lambda h: self.client.get("/api/v1/auth/me", headers=h).get_json()["data"]["username"]

@@ -15,14 +15,17 @@ Kontext-Builder (js/ai/context-builder.js) — buildCompactContext()
     ↓
 Prompt (js/ai/prompts.js) — buildCoachPrompt()
     ↓
-LLM (js/ai/ollama.js) — aktuell Ollama/lokal; so gebaut, dass später auch
-                          eine Remote-API angeschlossen werden kann, ohne
-                          dass context-builder.js/prompts.js sich ändern
-                          müssten.
+LLM (js/ai/provider.js) — je Aufgabe Ollama (Standard, lokal) oder die
+                          Claude API (js/ai/claude.js, bewusst pro Aufgabe
+                          zu aktivieren). Ollama wird nie direkt vom Browser
+                          gefragt, sondern über den eigenen Server:
+                          POST /api/v1/ai/chat (backend/ai_routes.py), der
+                          Server kennt die Adresse aus .env (OLLAMA_URL).
 ```
 
-Der Rest der App kennt keine LLM-Details — nur `js/ai/ollama.js` weiß,
-dass es gerade Ollama ist.
+Der Rest der App kennt keine LLM-Details — nur `js/ai/provider.js`,
+`ollama.js` und `claude.js` wissen, wer antwortet. Context-Builder und
+Prompts bleiben dafür unverändert.
 
 ## Warum kompakter Text statt Rohdaten
 

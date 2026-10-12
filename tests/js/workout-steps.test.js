@@ -203,7 +203,7 @@ test("sendPlannedWorkoutToGarmin: nach Zeitüberschreitung eigener Hinweis, nich
 test("apiCall markiert eine Zeitüberschreitung (timeout), andere Netzfehler nicht", async () => {
   const fail = { name: "TypeError" };
   const ctx = vm.createContext({
-    window: { addEventListener: () => {} }, localStorage: { getItem: () => null },
+    window: { addEventListener: () => {} }, document: { addEventListener: () => {} }, localStorage: { getItem: () => null },
     AbortSignal: { timeout: () => undefined }, fetch: () => Promise.reject(fail),
   });
   vm.runInContext(fs.readFileSync(path.join(ROOT, "js/data/api-client.js"), "utf8"), ctx);

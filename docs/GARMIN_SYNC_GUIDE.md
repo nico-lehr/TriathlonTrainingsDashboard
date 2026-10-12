@@ -113,11 +113,11 @@ automatisch gestartete Läufe).
   (deine Nummer aus `create_user.py`).
 - Der Sync schreibt **nicht mehr** nach `fit-files/*.fit` und
   `data/wellness-data.js`. Beides kann nur eine Person enthalten. Das
-  Dashboard liest die Daten künftig aus der Datenbank (Etappe 3). Bis dahin
-  bekommt das Doppelklick-Dashboard keine neuen Garmin-Daten; alte Dateien
-  bleiben unangetastet.
-- `sync-garmin.command` (Mac) ruft den Sync weiterhin auf; die
-  anschließenden Schritte `parse_fit.py`/`build_dashboard.py` bringen aber
-  keine neuen Daten mehr ins Doppelklick-Dashboard.
+  Dashboard liest die Daten aus der Datenbank (`GET /api/v1/workouts/full`
+  und `/wellness/daily`); alte Dateien bleiben unangetastet.
+- `sync-garmin.command` (Mac, alter Einzelplatz-Ablauf) ruft den Sync weiterhin
+  auf; die anschließenden Schritte `parse_fit.py`/`build_dashboard.py` und das
+  Öffnen von `index.html` bringen aber nichts mehr ins Dashboard. Nimm
+  stattdessen `python tools/garmin_sync.py`.
 - Beim ersten Lauf pro Person werden die Gesundheitsdaten einmal komplett
   neu geholt (bei 300 Tagen ein paar Minuten).
