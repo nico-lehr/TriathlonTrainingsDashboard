@@ -561,6 +561,25 @@
 
   .coach-summary-divider { height: 1px; background: var(--border); margin: 18px 0 14px; }
 
+  /* Wettkampf-Countdown (renderRaceCountdown, js/components/race-countdown.js):
+     dieselben Kacheln wie die Coach-Zusammenfassung, im Raster statt in einer
+     Zeile, damit die Wochenumfang-Kachel mit Balken genug Breite hat. */
+  .race-countdown { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+  .race-countdown .csc-sub { line-height: 1.45; }
+  .rc-hero { font-size: 48px; font-weight: 650; line-height: 1.05; letter-spacing: -0.02em; color: var(--text-primary); }
+  .rc-meter { display: block; width: 100%; height: 10px; border-radius: 5px; margin: 8px 0 6px; overflow: hidden; }
+  .rc-meter-track { fill: var(--accent-wash); }
+  .rc-meter-done { fill: var(--accent); }
+  .rc-meter-planned { fill: var(--accent); opacity: 0.5; }
+  .rc-meter-gap { stroke: var(--page); stroke-width: 2px; }
+  .rc-meter-target { stroke: var(--text-primary); stroke-width: 2px; }
+  .legend.rc-legend { gap: 2px 12px; margin: 0 0 4px; font-size: 11px; }
+  .rc-swatch-done { background: var(--accent); }
+  .rc-swatch-planned { background: var(--accent); opacity: 0.5; }
+  .rc-swatch-target { background: var(--text-primary); }
+  .rc-hint { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; background: var(--page); border-radius: 12px; padding: 12px 14px; }
+  .rc-hint p { margin: 0; flex: 1 1 260px; font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+
   /* Banner der automatischen Risiko-Kontrolle (ACWR/TSB/Monotonie), siehe
      js/components/risk-adjust.js - bewusst wie eine Warn-Kachel gestaltet
      (Farbe an .plan-intensity-hart/.stat-tile.at-risk angelehnt), damit sie
