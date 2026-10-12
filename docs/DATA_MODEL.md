@@ -7,6 +7,36 @@ Grundsatz aus AI_RULES.md: nicht jede Sportart hat jede Kennzahl (z. B. Pace
 nur beim Laufen/Schwimmen, Leistung nur mit passendem Sensor). Fehlende
 Werte sind `null` und gültig — nie geraten/erfunden.
 
+## Wo die Daten liegen (Server-Betrieb)
+
+Das Dashboard läuft über den eigenen Server (`backend/`, siehe
+`docs/DEPLOYMENT.md`). Alles Persönliche liegt in `training.db` und ist an
+die `athlete_id` der angemeldeten Person gebunden — jede Abfrage filtert
+danach. Im Browser bleiben nur der Login-Token und das Farbschema.
+
+| Daten | Wo | Zugriff im Browser |
+|---|---|---|
+| Trainings (Workout unten) | Tabelle `workouts`, komplettes Parser-Ergebnis in `fit_data` | `GET /api/v1/workouts/full`, neue per `POST /api/v1/workouts` |
+| Gesundheitsdaten (Garmin) | Tabelle `wellness`, Rohwerte in `garmin_wellness_data` | `GET /api/v1/wellness/daily` |
+| Profil, Ziele, Trainingsplan, Wünsche, Erholung, Gewicht, Notizen, KI-Auswertungen, Erfolge, Einstellungen | Tabelle `athlete_store` (`athlete_id`, `key`, `value` als JSON) | `storeGet(key)` / `storeSet(key, value)` (`js/data/api-client.js`) |
+| Material | Tabellen `equipment`, `equipment_workouts` | `/api/v1/equipment…` |
+| Login | Tabelle `athlete_logins` (Benutzername, Passwort-Hash) | `POST /api/v1/auth/login` |
+
+**Ablage pro Person (`athlete_store`).** Ersetzt das frühere `localStorage`.
+Die Schlüssel sind dieselben wie vorher (z. B.
+`triathlon_dashboard_goals_v1`), erlaubt sind `a-z`, `0-9`, `_`, höchstens
+64 Zeichen. `loadUserStore()` lädt beim Start alles mit einer Anfrage,
+`storeGet()` liest danach aus dem Speicher, `storeSet()` schreibt sofort in
+den Speicher und schickt den Wert gebündelt an `PUT /api/v1/store/<key>`
+(ersetzt den alten Wert). Scheitert das Speichern, erscheint ein roter
+Hinweis; beim Schließen mit ungespeicherten Änderungen warnt der Browser.
+Abschnitte unten mit „Ablage“ liegen hier.
+
+**Trainings und Dubletten auf dem Server** (`backend/workout_store.py`):
+Dieselbe Einheit wird nicht zweimal gespeichert — gleich gilt: gleicher Tag,
+gleiche Startzeit (als Zeitpunkt verglichen) und gleiches `sport_raw`. Aus
+dem Garmin-Sync kommt zusätzlich `garmin_activity_id`, eindeutig pro Person.
+
 ## Workout
 
 Ein Trainingseintrag, wie er aus einer `.fit`-Datei extrahiert wird
@@ -82,15 +112,15 @@ gehalten wird. Felder, wie sie aktuell tatsächlich befüllt werden:
   dev_raw: null,                      // { "Feldname aus der Datei": Wert, ... } - alle übrigen
                                        // Developer-Felder unverändert, als Fallback/Debug
 
-  stream: {                           // Zeitreihen fürs Detail-Chart, s. u.
-    t: [0, 5, 10, ...],
+  stream: {                           // Zeitreihen fürs Detail-Chart, s. u. (gleich lange Arrays)
+    t: [0, 5, 10, ...],               // Sekunden seit Start
     hr: [98, 101, ...],
-    pace_or_speed: [...],
-    elevation: [...] ,
-    cadence: [...],
-    power: [...],
-    stance_time: [...],
-    vertical_ratio: [...],
+    speed: [...],                     // m/s
+    dist: [...],                      // Meter seit Start
+    alt: [...],                       // Höhe in m
+    power: [...], cad: [...], grade: [...],
+    vo: [...], gct: [...], vr: [...], sl: [...], // Laufdynamik: vertikale Bewegung,
+                                       // Bodenkontaktzeit, vertikales Verhältnis, Schrittlänge
   },
 
   is_summary: false,                  // true = keine Streckendaten, nur Zusammenfassung
@@ -238,15 +268,16 @@ leistungsbasiert. Watt sind umgebungsunabhängig, deshalb fließen Indoor-
 Einheiten hier absichtlich mit ein; eine Trennung würde die Punktdichte der
 Regression halbieren und die Schätzung verschlechtern.
 
-## Gesundheitsdaten (`data/wellness-data.js` / `GARMIN_WELLNESS`)
+## Gesundheitsdaten (`GET /api/v1/wellness/daily` → `WELLNESS`)
 
-Erzeugt von `tools/garmin_sync.py`, gelesen über `js/data/garmin-wellness.js`.
-Bewusst eine generierte `.js`-Datei statt JSON - beim Doppelklick-Aufruf
-(`file://`) erlaubt der Browser kein `fetch()` auf lokale Dateien, ein
-`<script src>` lädt aber normal. Gleiche Mechanik wie `EMBEDDED_DATA`.
+Geschrieben von `tools/garmin_sync.py` in die Tabelle `wellness` (je Person
+und Tag), gelesen über `loadWellness()` in `js/data/garmin-wellness.js`. Der
+Server liefert dieselbe Form wie früher die Datei `data/wellness-data.js`,
+deshalb blieben die Auswertungen unverändert. `sync.at` ist der Zeitpunkt
+der letzten Änderung.
 
 ```javascript
-const GARMIN_WELLNESS = {
+const WELLNESS = {
   generated_at: "2026-09-12T13:00:00+02:00",
   sync: { at, von, bis, aktivitaeten: { neu, vorhanden, fehler, gesamt } },
   daily: {
@@ -304,13 +335,18 @@ ohnehin nur die 12 ähnlichsten Einheiten. Nicht abgedeckt sind allein die
 `fit-files/` als Archiv dient und der Downloader vorhandene Dateien
 überspringt, ist das jederzeit nachholbar und verliert nichts.
 
-**Roh-Zwischenspeicher** `data/garmin-raw-cache.json` hält die unveränderten
+**Roh-Zwischenspeicher** `fit-files/athlete_<id>/garmin-raw-cache.json` (je Person) hält die unveränderten
 Garmin-Antworten je Tag. Zwei Gründe: der Sync wird dadurch inkrementell
 (bereits geholte Tage werden nie erneut abgefragt - schont das Rate-Limit),
 und bei einer Formatänderung auf Garmins Seite lässt sich die Aufbereitung
 wiederholen, ohne alles neu herunterzuladen.
 
-## Roh-Container (`workouts.json` / `data/workouts-data.js`)
+## Roh-Container (`workouts.json` von `parse_fit.py`)
+
+Nur noch Eingabe für den einmaligen Import
+(`python backend/import_workouts_json.py --user <name>`). Das Dashboard liest
+Trainings vom Server (siehe oben); `data/workouts-data.js` wird nicht mehr
+geladen.
 
 ```javascript
 {
@@ -322,10 +358,13 @@ wiederholen, ohne alles neu herunterzuladen.
 }
 ```
 
-`js/data/workouts.js` liest daraus `ALL` (alles) und leitet `DATA`
-(zeitraum-/sportart-gefiltert über `filterState`) ab.
+`js/data/workouts.js` lädt die Trainings vom Server
+(`loadPersistedWorkouts()`) nach `ALL` (alles) und leitet `DATA`
+(zeitraum-/sportart-gefiltert über `filterState`) ab. Neue `.fit`-Dateien
+aus dem Browser-Import speichert `saveImportedWorkouts()` per
+`POST /api/v1/workouts`.
 
-## Athlete Profile (`js/data/athlete.js`, localStorage)
+## Athlete Profile (`js/data/athlete.js`, Ablage)
 
 ```javascript
 {
@@ -351,10 +390,14 @@ wiederholen, ohne alles neu herunterzuladen.
   includeMobility: false,             // Mobility/Beweglichkeit in den automatischen Trainingsplan mit aufnehmen
 
   onboardingDone: true,               // schaltet das Coach-Onboarding-Gate frei
+
+  swimCssTest: { t400: "7:10", t200: "3:25", date: "2026-09-01" }, // CSS-Test (Analyse-Tab), Ergebnis in swimCss
+  homeLocation: { name: "Kraichtal", lat: 49.1, lon: 8.7 },         // Wetter im Kalender, null = aus
+  sportBalanceTarget: { Schwimmen: 15, Rad: 50, Laufen: 35 },       // Ziel-Anteile in %, null = Standard 15/50/35
 }
 ```
 
-## Goal (`js/data/goals.js`, localStorage)
+## Goal (`js/data/goals.js`, Ablage)
 
 ```javascript
 {
@@ -376,10 +419,15 @@ wiederholen, ohne alles neu herunterzuladen.
   recommendation: "...",              // zuletzt generierte KI-Empfehlung
   recommendationAt: "2026-08-20T...", // Zeitstempel dazu
   lastPlannedAt: "2026-08-27T...",    // Zeitstempel der letzten Trainingsplan-Generierung (s.u.)
+  racePlan: null,                     // Rennplan, siehe "Rennplan" unten (null = Standard-Listen)
 }
 ```
 
-## Geplantes Workout (`js/data/planned-workouts.js`, localStorage)
+**Zeitformat:** `targetTime` ist `H:MM:SS` oder `H:MM` — zwei Teile heißen
+Stunden:Minuten („5:30“ = 5 h 30 min). Gelesen wird überall mit
+`goalTimeToSeconds()` (`js/utils/dates.js`), dem einen Parser für Zielzeiten.
+
+## Geplantes Workout (`js/data/planned-workouts.js`, Ablage)
 
 Eine vorgeschlagene/geplante Trainingseinheit - komplett getrennt von den
 echten, aus `.fit`-Dateien importierten Workouts oben: kein `stream`, keine
@@ -420,13 +468,45 @@ Trainingsplan-Kachel (die filtert bewusst nach dem Hauptevent-Ziel).
                                        // [{ name: "Kniebeuge", sets: 3, reps: "12", note: "..." }]
   status: "geplant",                  // "geplant" | "erledigt" | "uebersprungen"
   goalId: "g1234...",                 // welchem Ziel/Trainingsplan zugeordnet
-  phase: "grundlage",                 // Trainingsphase bei Erstellung, siehe computeTrainingPhase()
+  phase: "grundlage",                 // Trainingsphase am Tag der Einheit (getPhase, s. "Periodisierung");
+                                       // wird beim Verschieben auf ein neues Datum neu berechnet
+  steps: null,                        // optional: Schritte fürs Garmin-Workout/.fit, s.u.
   source: "ai",                       // "ai" | "manual"
   createdAt: "2026-08-27T...",
+  garminSentAt: "2026-09-01T...",     // nur nach "An Garmin senden": wann
+  garminWorkoutId: 123456789,         //   und unter welcher Nummer in Garmin Connect
 }
 ```
 
-## Gewichtsverlauf (`js/data/weight-log.js`, localStorage)
+**Schritte (`steps`, optional).** Struktur einer Einheit, geprüft von
+`validateWorkoutSteps()`; fehlen sie, gelten `defaultWorkoutSteps()`:
+
+```javascript
+[{ type: "warmup", duration_min: 10, target: { kind: "none" } },
+ { type: "repeat", count: 6, steps: [
+     { type: "interval", distance_km: 0.4, target: { kind: "pace_zone", zone: 4 } },
+     { type: "recovery", duration_min: 1.5, target: { kind: "none" } } ] },
+ { type: "cooldown", duration_min: 10 }]
+// type: warmup | interval | recovery | cooldown | rest | repeat
+// target.kind: none | hr_zone | pace_zone | power_zone
+// je Schritt duration_min ODER distance_km (keins = bis Lap-Taste), max. 50 Schritte,
+// keine Wiederholung in der Wiederholung
+```
+
+## Terminwünsche (`js/data/plan-wishes.js`, Ablage)
+
+„Ich möchte Donnerstag 60 min schwimmen“ — die nächste KI-Planung plant
+offene Wünsche fest ein. Ob ein Wunsch eingeplant ist, wird nicht
+gespeichert, sondern am Plan abgelesen (gleicher Tag + gleiche Sportart).
+Vergangene Wünsche fallen beim Laden weg.
+
+```javascript
+[{ id: "pw…", date: "2026-09-10", sport: "Schwimmen", duration_min: 60, note: null, createdAt: "…" }]
+```
+
+Daneben bleibt der freie Wunschtext `athleteProfile.customPlanWishes`.
+
+## Gewichtsverlauf (`js/data/weight-log.js`, Ablage)
 
 Separates Log fürs Körpergewicht über die Zeit (Basis für künftige
 Trend-Auswertungen) — getrennt von `athleteProfile.weightKg`, das weiterhin
@@ -447,7 +527,7 @@ wurde) — genutzt von der Ernährungs-Berechnung unten. `weightTrend(days)`
 gibt die Veränderung ggü. vor `days` Tagen zurück, oder `null` bei zu wenig
 Historie (nie interpoliert/geraten).
 
-## Recovery Check / Health (`js/data/health.js`, localStorage)
+## Recovery Check / Health (`js/data/health.js`, Ablage)
 
 ```javascript
 // aktueller Tag:
@@ -470,7 +550,7 @@ Historie (nie interpoliert/geraten).
 Wird täglich zurückgesetzt: beim Laden verglichen mit dem heutigen Datum,
 der Vortag wird (falls nicht leer) ins Logbuch archiviert.
 
-## KI-Auswertung je Trainingseinheit (`js/ai/ollama.js`, localStorage)
+## KI-Auswertung je Trainingseinheit (`js/ai/ollama.js`, Ablage)
 
 Separater Cache (nicht Teil des Workout-Objekts, da `ALL`/`DATA` bei jedem
 "Aktualisieren" aus `RAW` neu abgeleitet werden), Schlüssel = Dateiname:
@@ -522,9 +602,8 @@ Taper-Phase (20, gewichtet TSB stärker je näher das Event). Nutzt
 Automatisch von der KI erstellter Trainingsplan fürs Hauptevent-Ziel
 (`goal.isPrimary`). Rein deterministischer Teil (`training-plan.js`):
 
-- `computeTrainingPhase(daysUntil)` — grobe Periodisierungs-Phase
-  (Grundlagenausdauer > 84 Tage, Aufbau 29-84, spezifische Vorbereitung
-  15-28, Taper ≤ 14 Tage) - reines Label für den KI-Kontext, KEINE
+- `computeTrainingPhase(daysUntil)` — Phase als Text für den KI-Kontext,
+  abgeleitet aus `getPhase()` (siehe „Periodisierung“ unten), KEINE
   Trainingsinhalte.
 - `computePlanningWindow(goalId, days=7)` — rollierendes Fenster: die
   nächsten `days` Tage, die für dieses Ziel noch KEINEN geplanten Eintrag
@@ -541,6 +620,142 @@ und Prompt, `generateTrainingPlan()` (`js/ai/ollama.js`) ruft Ollama mit
 bevor daraus `plannedWorkouts`-Einträge werden (siehe oben) - ungültige
 Einträge (falsches Datum/Sportart/unplausible Dauer) werden verworfen statt
 ungeprüft übernommen.
+
+Danach prüft das Regelwerk (`validatePlan()`, nächster Abschnitt) jeden
+KI-Plan: Verstöße mit fertigem Vorschlag werden automatisch korrigiert,
+sonst wird die KI höchstens 2-mal mit der Liste der Verstöße neu gefragt.
+Bleibt ein „block“-Verstoß, wird der Plan nicht übernommen. Beim Verschieben
+per Drag & Drop oder Datum gilt dasselbe Regelwerk: „warn“ → „Trotzdem
+verschieben“, „block“ → Vorschlag per Klick.
+
+## Planregeln (`js/analytics/plan-rules.js`)
+
+`validatePlan(plannedWorkouts, history, wellness, recovery, options)` — rein
+rechnerisch, ohne Speicherzugriff (`tests/js/plan-rules.test.js`). Die KI
+darf Einheiten vorschlagen; ob ein Plan zu hart ist, entscheidet nur dieses
+Regelwerk. `wellness` = `{ hrv_ms, resting_hr }` (Abweichung vom eigenen
+Mittel), `recovery` = heutiger Erholungs-Check, `options` =
+`{ goal, today, acwr, planUntil }`.
+
+| Nr. | Regel (`rule`) | Stufe |
+|---|---|---|
+| 1 | nie 2 harte Tage hintereinander (`hard_in_row`); hart = „hart“/„VO2max“ oder > 120 min | block |
+| 2 | max. 3 harte Einheiten/Woche (`hard_per_week`), ~80 % locker (`easy_share`) | warn |
+| 3 | mind. 1 freier Tag pro Woche (`rest_day`) | block |
+| 4 | Wochenumfang max. +10 % (`volume_increase`), jede 4. Woche Entlastung −30 % (`deload`), Zielumfang der Phase (`phase_volume`) | warn |
+| 5 | nach Belastungsspitze (ACWR > 1,3) oder schlechter Erholung nur locker (`recovery` block, `wellness` warn) | block/warn |
+| 6 | je Ziel-Sportart mind. eine lockere Grundlageneinheit (`goal_base`) | warn |
+| 7 | nach dem Wettkampf (Erholungswoche) nur locker (`recovery_week`) | warn |
+
+**Wiedereinstieg (Regel 4):** Nach mind. 2 leichteren Wochen in Folge
+(Krankheit, Urlaub) ist die letzte normale Woche als Maßstab zu hoch. Dann
+zählt die stärkste dieser leichteren Wochen, mindestens die Hälfte der
+letzten normalen Woche.
+
+Ein Verstoß:
+
+```javascript
+{
+  rule: "hard_in_row", severity: "block",  // "block" = so nicht übernehmen, "warn" = Hinweis
+  date: "2026-09-10",                       // bei Wochenregeln der Montag der Woche
+  workoutId: "pw…",                         // bei Wochenregeln null
+  text: "…",                                // deutscher Satz für die Anzeige
+  suggestion: { action: "set_intensity", workoutId: "pw…", intensity: "leicht" } // oder null
+}
+// action: set_intensity | reduce_duration | move | make_rest_day | reduce_week_volume | add_easy_session
+```
+
+## Periodisierung (`js/analytics/periodization.js`)
+
+Rein rechnerisch (`tests/js/periodization.test.js`). Einzige Quelle für die
+Phasen — Kalender, Coach-Tab, Planregeln und KI-Kontext leiten sich davon ab.
+
+- `getPhase(date, goal)` → `"grundlage" | "aufbau" | "spezifisch" | "taper" |
+  "erholung"` oder `null` (kein Ziel/Datum, Rennen länger als 7 Tage vorbei).
+  Gezählt in Kalenderwochen (Mo–So) bis zur Rennwoche: Taper = Rennwoche +
+  Woche davor, Spezifisch = 6 Wochen davor, Aufbau = 8 Wochen davor, sonst
+  Grundlage; Erholung = 7 Tage nach dem Rennen.
+- `getPhaseTimeline(date, goal)` → `[{ phase, from, to }]` ab heute.
+- `getWeeklyTargets(goal, plannedWorkouts, history, today)` → Zielumfang je
+  Woche:
+
+```javascript
+{
+  baselineMin: 420,           // Anker: letzte normale Woche (Minuten), null ohne Training in 8 Wochen
+  baselineWeek: "2026-09-07", // ihr Montag; null beim Wiedereinstieg
+  returnAfterWeeks: 0,        // > 0 = Wiedereinstieg nach so vielen leichten Wochen
+  weeks: [{
+    weekStart: "2026-09-14", phase: "aufbau",
+    type: "belastung",        // belastung | entlastung | taper | rennwoche | erholung
+    targetPct: 105, targetMin: 441,   // targetMin null ohne Anker
+    doneMin: 120, plannedMin: 300,
+  }],
+}
+```
+
+Steigerung je Belastungswoche: Grundlage +3 %, Aufbau +5 %, Spezifisch 0 %;
+höchstens +30 % über dem Anker. Taper: Woche vor dem Rennen 70 %, Rennwoche
+50 %, Erholungswoche 40 % der letzten Belastungswoche.
+
+## Rennplan (`js/analytics/race-plan.js`, gespeichert in `goal.racePlan`)
+
+Coach-Tab, je Ziel: Tempo je Disziplin aus Distanz + Zielzeit
+(`computeRacePacing()`), die Tage der Rennwoche und drei Checklisten. Fehlt
+Distanz oder Zielzeit, wird nichts geschätzt. Liegt ein errechnetes Tempo
+außerhalb des Plausiblen (`RACE_PACE_LIMITS`: Schwimmen 0:50–5:00/100 m,
+Rad 10–60 km/h, Laufen 2:30–15:00/km), erscheint ein Hinweis statt einer
+Zahl — die Zielzeit war dann fast sicher anders gemeint.
+
+```javascript
+goal.racePlan = null  // = Standard-Listen aus defaultRacePlan(), sonst:
+{ transition: [{ text, done }],             // Wechselzone (Triathlon) bzw. Ausrüstung
+  nutrition:  [{ text, done }],             // Verpflegung - freie Checkliste
+  raceWeek:   [{ text, done, dayOffset }] } // dayOffset -6..0 = Tage vor dem Renntag
+```
+
+## Wetter (`js/data/weather.js`, `backend/weather_routes.py`)
+
+7-Tage-Vorhersage für `athleteProfile.homeLocation` im Kalender. Der Browser
+fragt nur den eigenen Server (`GET /api/v1/weather?lat=&lon=`, Ortssuche
+`GET /api/v1/weather/geocode?name=`), der Open-Meteo anfragt und eine Stunde
+zwischenspeichert. Die Vorhersage wird nicht in der Datenbank gespeichert.
+
+```javascript
+weatherState.byDate["2026-09-10"] = { date, code, temp_max, temp_min, precip_prob, wind_max }
+// °C, Regenwahrscheinlichkeit in %, Wind km/h; fehlende Werte null
+// code = WMO-Wettercode -> weatherCodeInfo(code) = { icon, label }
+```
+
+## Material (`equipment`, `equipment_workouts`)
+
+Laufschuhe, Räder und Verschleißteile je Person in der Datenbank
+(`backend/equipment_routes.py`, Browser: `js/data/equipment.js`).
+
+- `equipment`: `name`, `typ` (Laufschuhe | Rad | Verschleißteil | Sonstiges),
+  `sport` (zählt Trainings dieser Sportart), `parent_id` (Verschleißteil →
+  Rad), `start_km`, `max_km` (Warnung ab 90 %), `aktiv`, `details` (JSON).
+- `equipment_workouts`: ausdrückliche Zuordnung Training (`workout_file`) →
+  Material, je Person und Training höchstens eine.
+- Die frühere Liste in der Ablage (`triathlon_dashboard_equipment_items_v1`)
+  wird einmalig übernommen (`POST /api/v1/equipment/import`); der Server
+  setzt dabei `triathlon_dashboard_equipment_migrated_v1`, damit zwei offene
+  Tabs sie nicht doppelt anlegen. Die alte Liste bleibt als Sicherheitskopie.
+
+## Triathlon-Auswertungen (`js/analytics/triathlon.js`, Analyse-Tab)
+
+Rein rechnerisch, ohne neue Speicherfelder außer den drei Profilfeldern
+`swimCssTest`, `sportBalanceTarget` (siehe Athlete Profile) und dem
+vorhandenen `swimCss`/`ftpWatts`:
+
+- `computeSportBalance()` — Anteil Schwimmen/Rad/Laufen je Woche (8) oder
+  Monat (6) gegen das Ziel (Standard 15/50/35 %, ±5 %).
+- `computeSwimCss(t400, t200)` / `computeSwimAnalysis()` — CSS aus dem
+  400/200-m-Test (plausibel 0:50–5:00/100 m), Pace-/SWOLF-Trend 6 gegen
+  6 Wochen.
+- `computeBikeAnalysis()` — FTP-Schätzung aus der besten 20-min-Leistung der
+  letzten 90 Tage, Verlauf 12 Monate, Zeit in den Leistungszonen (4 Wochen).
+- Koppeltraining: Lauf startet höchstens 30 min nach dem Radende; die ersten
+  10 Minuten werden mit normalen Läufen der 90 Tage davor verglichen.
 
 ## Garmin-Export (`js/data/fit-workout-writer.js`)
 
@@ -581,38 +796,25 @@ Reine Client-Seite: `Blob` + `URL.createObjectURL` + unsichtbarer
 (nicht Standard-CRC-16-CCITT) wird per fester Referenztabelle berechnet
 (`fitCrc16()`), sowohl für die Header- als auch die Datei-CRC.
 
-**Vorbereitung auf eine API-Anbindung:** Garmin Connect bietet keine offene
-Consumer-API zum direkten Hochladen einzelner Workouts von einer
-Drittanwendung aus - nur ein Partner-/Business-Zugang (Garmin Connect
-Developer Program, für Privatpersonen nicht erhältlich) oder
-Reverse-Engineering des internen Uploads wären technisch möglich. Der
-**Upload** ist deshalb weiterhin bewusst nicht umgesetzt.
+**An Garmin senden (`sendPlannedWorkoutToGarmin(id)`).** Lauf-, Rad- und
+Schwimmeinheiten gehen auch direkt an Garmin Connect:
+`POST /api/v1/planned-workouts/<id>/send-to-garmin` (`backend/garmin_workouts.py`)
+lädt die Einheit als Garmin-Workout hoch (mit `steps`, siehe „Geplantes
+Workout“) und legt sie auf den geplanten Tag in den Garmin-Kalender; die Uhr
+holt sie beim nächsten Sync. Danach trägt der Browser `garminSentAt` und
+`garminWorkoutId` am Eintrag ein.
 
-> **Abgrenzung zum Garmin-Sync (Download).** Für den umgekehrten Weg - Daten
-> aus Garmin Connect HERUNTERLADEN - gibt es seit der Einführung von
-> `tools/garmin_sync.py` sehr wohl eine Anbindung, und sie nutzt zwangsläufig
-> die interne API und ein gespeichertes Token. Das ist kein Widerspruch zum
-> obigen Prinzip, sondern eine bewusste Trennung:
->
-> - Das **Dashboard selbst** bleibt unverändert serverlos, loginfrei und
->   offline. `index.html` kennt weder Zugangsdaten noch Netzwerkzugriff auf
->   Garmin; es liest ausschließlich lokale Dateien.
-> - Der **Sync ist ein getrenntes, freiwillig gestartetes lokales Programm**.
->   Wer es nicht benutzt, merkt nichts davon.
-> - Das **Passwort wird nirgends gespeichert** - es wird einmalig abgefragt,
->   gegen ein Token getauscht und verworfen. Das Token liegt unter
->   `~/.garminconnect` (Rechte 0600) und damit bewusst AUSSERHALB des
->   Projektordners: der liegt in iCloud, und ein Token hat in der Cloud
->   nichts zu suchen. `.gitignore` sperrt zusätzlich alle Token-Dateinamen.
-> - Für den **Upload** bleibt es beim Nein - dort gäbe es keinen
->   vergleichbaren Nutzen, der das Risiko rechtfertigt.
-Damit ein solcher Weg später trotzdem ohne Umbau ergänzt werden kann, laufen
-- wie oben beschrieben - ausnahmslos ALLE Export-Buttons über die beiden
-Funktionen `exportPlannedWorkoutAsFit`/`exportPlannedWorkoutsAsFit`. Kommt
-später eine API hinzu, ändert sich nur der Funktionskörper dieser beiden
-Funktionen (z. B. zusätzlich zum Download ein `fetch()`-Aufruf) - keine der
-aufrufenden Stellen (Coach-Tab, Kalender, Bearbeiten-Overlay) müsste
-angefasst werden.
+- Der Server liest die Einheit aus der Ablage der angemeldeten Person, nie
+  aus einer fremden.
+- Angemeldet wird mit dem Token des Garmin-Syncs dieser Person
+  (`~/.triathlon/garmin_<id>.token`, siehe `docs/GARMIN_SYNC_GUIDE.md`) —
+  im Dashboard wird nie ein Garmin-Passwort abgefragt. Ohne Token gibt es
+  eine verständliche Meldung.
+- Kraft/Mobility gehen nicht per Versand (Garmin verlangt Übungen aus dem
+  eigenen Katalog) — dort bleibt der `.fit`-Download, ebenso als Plan B,
+  wenn der Versand scheitert.
+- Nutzt die inoffizielle Schnittstelle der Bibliothek `garminconnect`
+  (dieselbe wie der Sync); Garmin kann sie jederzeit ändern.
 
 ## Trainingsmonotonie/-Strain (`js/analytics/training-load.js`)
 
@@ -833,7 +1035,7 @@ Drei Kategorien, alle über `checkAndUnlockAchievements()`
   "neu", sondern merkt sich nur den Ausgangsstand.
 
 Freigeschaltete Erfolge (`achievementsState.unlocked`,
-`triathlon_dashboard_achievements_v1` in `localStorage`) sind dauerhaft:
+`triathlon_dashboard_achievements_v1` in der Ablage) sind dauerhaft:
 `{ id, label, achievedAt, seen }`, eindeutige `id` (z. B. `count_100`,
 `streak_30`, `pb_Laufen_10000_2145`) verhindert doppelte Freischaltung.
 

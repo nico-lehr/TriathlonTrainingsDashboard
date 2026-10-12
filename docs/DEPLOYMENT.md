@@ -51,14 +51,25 @@ heißt es meist `python3`. Alle Befehle im Projektordner ausführen.
      Import darf mehrfach laufen. Vorher wird automatisch ein Backup gemacht.
   3. `dashboard-export.json` danach löschen (enthält persönliche Daten).
 
-### Garmin und KI (optional)
+### Garmin, KI und Wetter (optional)
 
 - **Garmin-Sync** für alle Benutzer: siehe `docs/GARMIN_SYNC_GUIDE.md`.
+- **„An Garmin senden“** (geplante Einheit direkt in den Garmin-Kalender):
+  braucht für die jeweilige Person **einmal** die Garmin-Anmeldung des Syncs
+  (`python tools/garmin_sync.py --login --athlete <nummer>`). Das Dashboard
+  fragt nie nach einem Garmin-Passwort. Ohne Anmeldung zeigt der Knopf eine
+  Meldung; der `.fit`-Download geht immer. Bitte einmal mit dem echten Konto
+  ausprobieren – Garmin kann seine Schnittstelle jederzeit ändern.
 - **KI-Coach:** [Ollama](https://ollama.com/download) auf diesem PC installieren
   und ein Modell laden (`ollama pull llama3.1`). Die Freunde brauchen kein
   eigenes Ollama – ihr Browser fragt den Dashboard-Server, der fragt Ollama.
   Läuft Ollama auf einem anderen Rechner: in `.env` die Zeile
   `OLLAMA_URL=http://…:11434` eintragen und neu starten.
+- **Wetter im Kalender:** in den Einstellungen den Heimatort suchen. Der
+  Server fragt den kostenlosen Dienst Open-Meteo (ohne Anmeldung, ohne
+  Schlüssel). Dorthin gehen nur der gesuchte Ortsname (bei der Suche) und
+  danach die Koordinaten des Orts – nie Trainingsdaten oder Benutzernamen.
+  Ohne Heimatort wird nichts abgefragt.
 
 ---
 
@@ -138,6 +149,9 @@ Daten bleiben erhalten.
   indem man `SECRET_KEY` in `.env` ändert.
 - `.env`, `training.db`, `backups/`, Token-Dateien und Trainingsdaten sind
   per `.gitignore` vom Repository ausgeschlossen.
+- Nach außen spricht nur der Server, und nur mit: Ollama (KI), Garmin (Sync
+  und „An Garmin senden“, mit dem Token der jeweiligen Person) und Open-Meteo
+  (Wetter, nur Ortsname bzw. Koordinaten des Heimatorts).
 
 ---
 
@@ -151,3 +165,91 @@ Daten bleiben erhalten.
 | Rote Meldung „Speichern fehlgeschlagen“ im Dashboard | Der Server war kurz nicht erreichbar. Server prüfen, Seite neu laden und die letzte Änderung wiederholen. |
 | KI: „Ollama ist … nicht erreichbar“ | Ollama auf dem Dashboard-PC starten; Modell geladen (`ollama list`)? |
 | Passwort vergessen | `python backend/create_user.py --reset` |
+
+---
+
+## 6. iPhone über Tailscale (als App auf dem Home-Bildschirm)
+
+Das Dashboard läuft weiter auf deinem PC. Das iPhone verbindet sich über
+Tailscale damit und bekommt ein eigenes Symbol auf dem Home-Bildschirm, das
+sich wie eine App öffnet (ohne Safari-Leisten).
+
+**Wichtig vorab:** Es gibt keinen Offline-Modus. Die App zeigt nur etwas, wenn
+dein PC an ist, das Dashboard-Fenster offen ist und Tailscale auf dem iPhone
+verbunden ist. Auf dem iPhone wird nichts zwischengespeichert.
+
+### Schritt 1: Tailscale auf dem iPhone
+
+1. **Tailscale** aus dem App Store laden und mit **demselben Konto** wie am PC
+   anmelden (Freunde: mit ihrem eigenen Konto, siehe Abschnitt 2 „Gerät teilen“).
+2. Den Schalter in der App auf **an** stellen (oben im Bildschirm erscheint das
+   VPN-Symbol).
+
+### Schritt 2: Sichere Adresse (HTTPS) am PC einrichten – einmalig
+
+1. **HTTPS im Tailscale-Netz erlauben:** auf login.tailscale.com die Seite
+   **DNS** öffnen. Dort **MagicDNS** einschalten (bei neueren Netzen schon an),
+   dann unter **HTTPS Certificates** auf **Enable HTTPS** klicken und den
+   Hinweis bestätigen.
+   *Hinweis:* Dabei werden der Rechnername und der Netzwerkname in einem
+   öffentlichen Zertifikatsverzeichnis sichtbar. Nimm also keinen Rechnernamen,
+   der etwas Privates verrät. (Wenn du den Schritt vergisst, fragt der Befehl
+   unten selbst nach und zeigt einen Link zum Bestätigen.)
+2. Das Dashboard muss laufen (`start.bat` bzw. `./start.sh`).
+3. In einem **zweiten Fenster** (Windows: PowerShell, Mac: Terminal; falls
+   nötig mit `sudo` davor) eingeben:
+   ```
+   tailscale serve --bg 5000
+   ```
+   Die `5000` ist der Port des Dashboards (steht in `.env` bei
+   `DASHBOARD_PORT`, falls du ihn geändert hast). Der Befehl zeigt die fertige
+   Adresse an, sie sieht so aus:
+   **https://\<pc-name\>.\<netzwerkname\>.ts.net** (ohne `:5000`).
+   `--bg` heißt: läuft im Hintergrund weiter, auch nach einem Neustart des PCs.
+   (Das Dashboard selbst musst du nach einem Neustart trotzdem wieder starten.)
+4. Prüfen, was gerade läuft: `tailscale serve status`
+
+   *Falls du in `.env` `DASHBOARD_HOST` auf die Tailscale-IP gesetzt hast:*
+   Tailscale reicht die Anfragen intern an `127.0.0.1` weiter. Dann entweder die
+   Zeile entfernen oder `DASHBOARD_HOST=127.0.0.1` setzen und neu starten.
+
+### Schritt 3: Als App auf den Home-Bildschirm
+
+1. Auf dem iPhone in **Safari** die Adresse aus Schritt 2 öffnen (Tailscale
+   muss dabei an sein) und anmelden.
+2. Unten auf das **Teilen-Symbol** (Quadrat mit Pfeil) tippen →
+   **„Zum Home-Bildschirm“** → Name „TriDashboard“ → **Hinzufügen**.
+3. Das neue Symbol antippen. **In der App musst du dich einmal neu anmelden** –
+   die Home-Bildschirm-App hat auf dem iPhone einen eigenen Speicher, getrennt
+   von Safari.
+
+### Geht es auch ohne HTTPS?
+
+Ja. Über `http://<pc-name>:5000` (Abschnitt 2) lässt sich das Dashboard
+ebenfalls auf den Home-Bildschirm legen, und die Verbindung ist durch Tailscale
+trotzdem verschlüsselt. Aber manche Funktionen verlangen von iPhone/Safari eine
+„echte“ HTTPS-Adresse – zum Beispiel die **Kopieren-Knöpfe** (etwa beim
+Kalender-Abo-Link). Ohne HTTPS tun sie nichts. Deshalb empfehlen wir Schritt 2.
+
+### Was auf dem iPhone nicht geht
+
+- **Kein Offline-Modus** (siehe oben).
+- **Ordner-Import** („Aktualisieren → Ordner“): Safari auf dem iPhone kann keine
+  Ordner auswählen. Neue Trainings kommen über den Garmin-Sync am PC ins
+  Dashboard.
+- Ältere iPhones: Das Layout braucht iOS 16 oder neuer.
+
+### Wieder abschalten
+
+Am PC: `tailscale serve reset` – das beendet die https-Adresse. Das Dashboard
+bleibt wie gewohnt über `http://<pc-name>:5000` erreichbar.
+Die Home-Bildschirm-App einfach wie jede andere App löschen (lange drücken →
+App entfernen).
+
+### Wenn es nicht klappt
+
+| Problem | Lösung |
+|---|---|
+| Seite lädt nicht / leere App | PC an? Dashboard-Fenster offen? Tailscale auf dem iPhone an (VPN-Symbol)? Am PC `tailscale serve status` prüfen. |
+| Kein „https“ / Zertifikatsfehler | Schritt 2.1 noch nicht gemacht (HTTPS nicht eingeschaltet). |
+| Wieder abgemeldet | Normal alle 30 Tage oder nach „Abmelden“ – einfach neu anmelden. |

@@ -42,12 +42,21 @@ Danach läuft direkt der erste Sync für diese Person.
 `~/.triathlon/garmin_2.token` (ein kleiner Ordner, nur für deinen
 Computer-Benutzer lesbar). Das Passwort wird **nie** gespeichert und nie ins
 Log geschrieben. Das Token erneuert sich selbst. Aber: Wer das Token hat,
-kann die Garmin-Daten dieser Person lesen – deshalb liegt es außerhalb des
+kann die Garmin-Daten dieser Person lesen und Workouts anlegen – deshalb liegt es außerhalb des
 Projektordners und darf nicht weitergegeben werden. Ein erneutes `--login`
 ersetzt das alte Token.
 
+**Dasselbe Token für „An Garmin senden“:** Im Dashboard kann jede Person
+eine geplante Lauf-, Rad- oder Schwimmeinheit direkt in ihren
+Garmin-Kalender schicken (Trainingsplan → „An Garmin senden“). Der Server
+benutzt dafür genau dieses Token – deshalb kann er auch Workouts in Garmin
+Connect **anlegen**, nicht nur lesen. Im Dashboard wird nie ein
+Garmin-Passwort abgefragt; ohne `--login` für diese Person zeigt der Knopf
+nur eine Meldung.
+
 **Anmeldung zurückziehen:** den Ordner `~/.triathlon/garmin_<Nummer>.token`
-löschen. Der Sync lässt diese Person ab dann aus.
+löschen. Der Sync lässt diese Person ab dann aus, und „An Garmin senden“
+geht für sie nicht mehr.
 
 ## Regelmäßig: synchronisieren
 
