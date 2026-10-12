@@ -374,3 +374,80 @@ test("Periodisierung: ohne Zieldatum oder weit vor dem Rennen keine neuen Hinwei
   assert.deepStrictEqual(rules(validate(cleanWeek(), { goal: TRIATHLON })), []);
   assert.deepStrictEqual(rules(validate(cleanWeek(), { goal: { name: "Marathon", sport: "Laufen" } })), []);
 });
+
+/* ---------- Grenzwerte der 7 Regeln (Abschluss-Check F) ---------- */
+
+test("Regel 1: genau 120 Minuten locker zählen nicht als hart, 121 schon", () => {
+  const plan = minutes => [pw(day(2), "Laufen", 50, "hart"), pw(day(3), "Rad", minutes, "leicht"), pw(day(5), "Schwimmen", 40, "leicht")];
+  assert.strictEqual(byRule(validate(plan(120)), "hard_in_row").length, 0);
+
+  const long = plan(121);
+  const v = byRule(validate(long), "hard_in_row");
+  assert.strictEqual(v.length, 1);
+  assert.strictEqual(v[0].workoutId, long[1].id);
+  assert.strictEqual(byRule(validate(applySuggestion(long, v[0].suggestion)), "hard_in_row").length, 0);
+});
+
+test("Regel 2: genau 3 harte Einheiten sind erlaubt, 80/20 erst ab 3 Einheiten mit Intensität", () => {
+  const three = [
+    pw(day(0), "Laufen", 45, "hart"), pw(day(1), "Schwimmen", 45, "leicht"), pw(day(2), "Rad", 60, "hart"),
+    pw(day(3), "Laufen", 50, "leicht"), pw(day(4), "Schwimmen", 40, "VO2max"),
+  ];
+  assert.strictEqual(byRule(validate(three), "hard_per_week").length, 0);
+
+  const twoRated = [pw(day(1), "Laufen", 60, "hart"), pw(day(4), "Rad", 60, "hart")]; // 0 % locker, aber nur 2 bewertete
+  assert.strictEqual(byRule(validate(twoRated), "easy_share").length, 0);
+  const threeRated = [...twoRated, pw(day(6), "Schwimmen", 30, "mittel")];
+  assert.strictEqual(byRule(validate(threeRated), "easy_share").length, 1);
+});
+
+test("Regel 3: ein freier Tag früher in der Woche zählt, vorgeschlagen wird nie ein vergangener Tag", () => {
+  const wednesday = new Date(2026, 9, 14, 9, 0); // Mi 14.10.: Mo/Di sind vorbei
+  const plan = [2, 3, 4, 5, 6].map(n => pw(day(n), n % 2 ? "Rad" : "Laufen", 45, "leicht"));
+  assert.strictEqual(byRule(validate(plan, { today: wednesday }), "rest_day").length, 0); // Mo/Di ohne Training
+
+  const history = [...HISTORY, hist(day(0), "Schwimmen", 40), hist(day(1), "Laufen", 40)];
+  const v = byRule(validate(plan, { today: wednesday, history }), "rest_day");
+  assert.strictEqual(v.length, 1);
+  assert.strictEqual(v[0].severity, "block");
+  assert.ok(v[0].suggestion.date >= day(2), `Ruhetag-Vorschlag ${v[0].suggestion.date} liegt in der Vergangenheit`);
+});
+
+test("Regel 4: genau +10 % Wochenumfang ist erlaubt, eine Minute mehr nicht", () => {
+  const week = lastRun => { const p = cleanWeek(); p[5] = pw(day(6), "Laufen", lastRun, "leicht"); return p; };
+  // Vergleichswoche 05.10. = 370 min -> höchstens 407 min (370 * 1,1 abgerundet).
+  assert.strictEqual(byRule(validate(week(92)), "volume_increase").length, 0); // 407 min
+  const v = byRule(validate(week(93)), "volume_increase");                     // 408 min
+  assert.strictEqual(v.length, 1);
+  assert.strictEqual(v[0].suggestion.target_minutes, 407);
+});
+
+test("Regel 5: Erschöpfung oder starker Muskelkater allein reichen für block", () => {
+  const plan = [pw(day(0), "Laufen", 45, "hart"), pw(day(2), "Rad", 60, "leicht")];
+  for (const recovery of [
+    { date: day(0), soreness: "none", energy: "low", injury: "no" },
+    { date: day(0), soreness: "severe", energy: "normal", injury: "no" },
+  ]) {
+    const v = byRule(validate(plan, { recovery }), "recovery");
+    assert.strictEqual(v.length, 1, JSON.stringify(recovery));
+    assert.strictEqual(v[0].severity, "block");
+    assert.deepStrictEqual([v[0].suggestion.action, v[0].suggestion.intensity], ["set_intensity", "leicht"]);
+  }
+});
+
+test("Garmin-Werte (Regel 5): Ruhepuls ab +5 Schlägen -> warn, +4 noch nicht", () => {
+  const plan = [pw(day(1), "Laufen", 50, "hart"), pw(day(3), "Rad", 60, "leicht")];
+  const rhr = value => ({ hrv_ms: null, resting_hr: { date: day(0), value, baseline: 48, deltaPct: ((value - 48) / 48) * 100 } });
+  const v = byRule(validate(plan, { wellness: rhr(53) }), "wellness");
+  assert.strictEqual(v.length, 1);
+  assert.strictEqual(v[0].severity, "warn");
+  assert.match(v[0].text, /Ruhepuls liegt 5 Schläge/);
+  assert.strictEqual(byRule(validate(plan, { wellness: rhr(52) }), "wellness").length, 0);
+});
+
+test("Regel 7: die Erholungswoche endet 7 Tage nach dem Rennen", () => {
+  const goal = raceOn(-1); // Rennen gestern (So 11.10.)
+  const plan = [pw(day(6), "Laufen", 50, "hart"), pw(day(7), "Laufen", 50, "hart")]; // 7 bzw. 8 Tage danach
+  const v = byRule(validate(plan, { goal }), "recovery_week");
+  assert.deepStrictEqual(v.map(x => x.workoutId), [plan[0].id]);
+});
