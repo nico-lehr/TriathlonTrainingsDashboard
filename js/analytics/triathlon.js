@@ -96,3 +96,64 @@ function computeSportBalance(workouts, mode, target, today = new Date()) {
   done.forEach(p => TRI_SPORTS.forEach(s => { minutes[s] += p.minutes[s]; }));
   return { mode, target, periods, overall: { periodCount: done.length, minutes, ...sportBalanceShares(minutes, target) } };
 }
+
+/* ======================================================================
+   SCHWIMMEN: Pace je 100 m, Trend, SWOLF und Critical Swim Speed (CSS)
+   ====================================================================== */
+
+const SWIM_TREND_WINDOW_DAYS = 42; // Trend: Ø der letzten 6 Wochen gegen die 6 Wochen davor
+const SWIM_TREND_MIN_SWIMS = 2;    // je Fenster mindestens so viele Einheiten, sonst kein Trend
+
+// Testzeit "m:ss" (auch "mm:ss" oder mit Zehnteln "6:40.5") in Sekunden, sonst null.
+function parseSwimTestTime(str) {
+  const s = String(str == null ? "" : str).trim();
+  return /^\d{1,2}:[0-5]\d(\.\d+)?$/.test(s) ? paceToSeconds(s) : null;
+}
+
+// Critical Swim Speed aus einem 400-m- und einem 200-m-Test (Standardformel):
+// CSS [m/s] = (400 - 200) / (t400 - t200), als Pace je 100 m also
+// (t400 - t200) / 2 Sekunden. Liefert { mps, secPer100, pace, error: null }
+// oder { error } mit einem deutschen Hinweis.
+function computeSwimCss(t400Str, t200Str) {
+  const t400 = parseSwimTestTime(t400Str), t200 = parseSwimTestTime(t200Str);
+  if (t400 == null || t200 == null) return { error: "Bitte beide Testzeiten im Format m:ss eintragen, z.B. 7:10 und 3:25." };
+  // Auf 400 m ist man je 100 m langsamer als auf 200 m - sonst sind die
+  // Zeiten vertauscht oder vertippt, und die Formel ergäbe Unsinn.
+  if (t400 <= 2 * t200) return { error: "Die 400-m-Zeit muss mehr als doppelt so lang sein wie die 200-m-Zeit – sind die Zeiten vertauscht?" };
+  const secPer100 = (t400 - t200) / 2;
+  return { mps: 200 / (t400 - t200), secPer100, pace: secondsToPace(secPer100), error: null };
+}
+
+const swimPaceSec = w => (w.pace_min_per_100m ? paceToSeconds(w.pace_min_per_100m) : null);
+
+// Ø von `key` in den letzten SWIM_TREND_WINDOW_DAYS Tagen gegen das Fenster
+// davor. delta < 0 heißt besser (weniger Sekunden je 100 m bzw. kleinerer SWOLF).
+function swimWindowTrend(points, key, today) {
+  const windowMs = SWIM_TREND_WINDOW_DAYS * 86400000;
+  const recentFrom = today.getTime() - windowMs, priorFrom = recentFrom - windowMs;
+  const vals = (from, to) => points.filter(p => p[key] != null && p.date >= from && p.date < to).map(p => p[key]);
+  const recent = vals(recentFrom, today.getTime() + 1), prior = vals(priorFrom, recentFrom);
+  if (recent.length < SWIM_TREND_MIN_SWIMS || prior.length < SWIM_TREND_MIN_SWIMS) return null;
+  const avg = list => list.reduce((a, b) => a + b, 0) / list.length;
+  return { recent: avg(recent), prior: avg(prior), delta: avg(recent) - avg(prior), recentCount: recent.length, priorCount: prior.length };
+}
+
+// Schwimm-Auswertung über die Vergleichsgruppe der letzten Einheit
+// (sameComparisonGroup: Becken- und Freiwasser-Pace werden nicht vermischt).
+// null, wenn es keine Schwimmeinheit mit Pace gibt.
+function computeSwimAnalysis(workouts, today = new Date()) {
+  const swims = workouts
+    .filter(w => w._date && !w.is_summary && sportGroup(w.sport) === "Schwimmen" && swimPaceSec(w))
+    .sort((a, b) => a._date - b._date);
+  if (!swims.length) return null;
+  const latest = swims[swims.length - 1];
+  const points = swims.filter(w => sameComparisonGroup(latest, w))
+    .map(w => ({ date: w._date.getTime(), paceSec: swimPaceSec(w), swolf: w.avg_swolf ?? null, workout: w }));
+  return {
+    groupLabel: comparisonGroupLabel(latest),
+    points,
+    swolfCount: points.filter(p => p.swolf != null).length,
+    paceTrend: swimWindowTrend(points, "paceSec", today),
+    swolfTrend: swimWindowTrend(points, "swolf", today),
+  };
+}

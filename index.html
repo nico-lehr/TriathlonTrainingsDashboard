@@ -523,7 +523,7 @@
   </div>
 
   <div id="view-analysis" class="view">
-    <div class="dash-grid">
+    <div class="dash-grid ana-grid">
       <div class="card full">
         <h2>Sport-Balance
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Wie sich deine Trainingszeit je Woche bzw. Monat auf Schwimmen, Rad und Laufen verteilt — im Vergleich zu deiner Zielverteilung (Standard 15/50/35 %, änderbar in den Einstellungen). Liegt eine Sportart mehr als 5 Prozentpunkte unter ihrem Ziel, wird sie markiert. Sonstige Einheiten (z.B. Kraft) zählen nicht mit. Nutzt immer die volle Historie, unabhängig vom Zeitraum-Filter der Übersicht.</div></span>
@@ -537,6 +537,31 @@
           <button type="button" class="reset-link" id="analysis-balance-settings-link">Zielverteilung ändern</button>
         </div>
         <div class="chart-wrap" id="analysis-balance-body"></div>
+      </div>
+
+      <div class="card">
+        <h2>Schwimmen
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover"><b>Pace</b> je 100 m aus deinen Schwimmeinheiten. Der Trend vergleicht den Ø der letzten 6 Wochen mit den 6 Wochen davor (je mindestens 2 Einheiten). Becken und Freiwasser werden nicht vermischt — ausgewertet wird die Gruppe deiner letzten Einheit. <b>SWOLF</b> (Bahnzeit in Sekunden + Züge, kleiner ist besser) gibt es nur aus Garmin-Beckenaufzeichnungen mit Bahnen; Werte aus 25-m- und 50-m-Becken sind nicht vergleichbar. <b>CSS</b> (Critical Swim Speed) = 200 m ÷ (Zeit 400 m − Zeit 200 m), angegeben als Pace je 100 m — ungefähr deine Schwellenpace im Wasser.</div></span>
+        </h2>
+        <p class="card-sub" id="analysis-swim-sub">Pace je 100 m, SWOLF und Critical Swim Speed (CSS)</p>
+        <div id="analysis-swim-body"></div>
+        <div class="chart-wrap" id="analysis-swim-chart"></div>
+        <h3 class="ana-subhead">CSS-Test eintragen</h3>
+        <p class="card-sub">Gut einschwimmen, dann 400 m und nach einer Pause 200 m jeweils so schnell wie möglich.</p>
+        <div class="goal-form">
+          <div class="goal-form-row">
+            <label for="analysis-css-400">400 m (m:ss)</label>
+            <input type="text" id="analysis-css-400" class="coach-input" placeholder="z.B. 7:10" autocomplete="off">
+          </div>
+          <div class="goal-form-row">
+            <label for="analysis-css-200">200 m (m:ss)</label>
+            <input type="text" id="analysis-css-200" class="coach-input" placeholder="z.B. 3:25" autocomplete="off">
+          </div>
+          <div class="goal-form-row">
+            <button type="button" class="update-btn ana-form-btn" id="analysis-css-save-btn">CSS berechnen</button>
+          </div>
+        </div>
+        <p class="coach-test-status ana-status" id="analysis-css-status"></p>
       </div>
     </div>
   </div>

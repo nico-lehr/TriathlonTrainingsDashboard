@@ -103,3 +103,67 @@ test("Sport-Balance: keine Daten -> keine Anteile, keine Hinweise", () => {
   assert.strictEqual(r.overall.shares, null);
   assert.deepStrictEqual(r.overall.short, []);
 });
+
+/* ---------- Schwimmen ---------- */
+
+test("secondsToPace rundet erst die Gesamtzeit (kein '1:60')", () => {
+  assert.strictEqual(app.secondsToPace(119.6), "2:00");
+  assert.strictEqual(app.secondsToPace(105), "1:45");
+  assert.strictEqual(app.secondsToPace(59.4), "0:59");
+});
+
+test("CSS aus 400-m- und 200-m-Test (Standardformel)", () => {
+  // 400 m in 7:10 (430 s), 200 m in 3:25 (205 s): CSS = 200 / 225 = 0,889 m/s = 1:52,5 je 100 m
+  const r = app.computeSwimCss("7:10", "3:25");
+  assert.strictEqual(r.error, null);
+  assert.ok(Math.abs(r.mps - 200 / 225) < 1e-9);
+  assert.strictEqual(r.secPer100, 112.5);
+  assert.strictEqual(r.pace, "1:53");
+  assert.strictEqual(app.computeSwimCss(" 6:40.0 ", "3:10").secPer100, 105);
+  // Eingabefehler -> deutscher Hinweis statt Zahl
+  assert.match(app.computeSwimCss("", "3:25").error, /m:ss/);
+  assert.match(app.computeSwimCss("7:75", "3:25").error, /m:ss/);
+  assert.match(app.computeSwimCss("430", "205").error, /m:ss/);
+  assert.match(app.computeSwimCss("3:25", "7:10").error, /vertauscht/);
+  assert.match(app.computeSwimCss("6:00", "3:00").error, /vertauscht/); // 400er nicht langsamer je 100 m
+});
+
+function swim(y, m, d, pace, extra = {}) {
+  return wo("Schwimmen", y, m, d, 40, { pace_min_per_100m: pace, ...extra });
+}
+
+test("Schwimmen: Pace-Trend 6 Wochen gegen die 6 Wochen davor, SWOLF falls vorhanden", () => {
+  const data = [
+    swim(2026, 7, 20, "2:10"),                         // älter als 12 Wochen: zählt nicht zum Trend
+    swim(2026, 8, 20, "2:06", { avg_swolf: 40 }), swim(2026, 8, 27, "2:04", { avg_swolf: 39 }),   // Fenster davor
+    swim(2026, 9, 10, "2:00", { avg_swolf: 37 }), swim(2026, 10, 1, "1:58"), swim(2026, 10, 12, "1:56", { avg_swolf: 36 }), // letzte 6 Wochen
+    swim(2026, 10, 2, null),                           // ohne Pace: wird ignoriert
+    wo("Laufen", 2026, 10, 3, 40, { pace_min_per_km: "5:00" }),
+  ];
+  const r = plain(app.computeSwimAnalysis(data, TODAY));
+  assert.strictEqual(r.points.length, 6);
+  assert.strictEqual(r.groupLabel, "Schwimmen");
+  assert.strictEqual(r.paceTrend.recentCount, 3);
+  assert.strictEqual(r.paceTrend.priorCount, 2);
+  assert.strictEqual(r.paceTrend.recent, 118);
+  assert.strictEqual(r.paceTrend.prior, 125);
+  assert.strictEqual(r.paceTrend.delta, -7); // 7 s je 100 m schneller
+  assert.strictEqual(r.swolfCount, 4);
+  assert.strictEqual(r.swolfTrend.delta, 36.5 - 39.5);
+});
+
+test("Schwimmen: zu wenig Einheiten -> kein Trend, keine Schwimmeinheit -> null", () => {
+  const r = plain(app.computeSwimAnalysis([swim(2026, 10, 1, "1:58"), swim(2026, 10, 8, "1:57")], TODAY));
+  assert.strictEqual(r.paceTrend, null);
+  assert.strictEqual(r.swolfTrend, null);
+  assert.strictEqual(r.swolfCount, 0);
+  assert.strictEqual(app.computeSwimAnalysis([wo("Rad", 2026, 10, 1, 60)], TODAY), null);
+});
+
+test("Schwimmen: Becken und Freiwasser werden nicht vermischt (Gruppe der letzten Einheit)", () => {
+  const data = [swim(2026, 9, 1, "2:20", { sub_sport: "Freiwasser" }), swim(2026, 9, 5, "1:58", { sub_sport: "Becken" }),
+    swim(2026, 9, 9, "2:01"), swim(2026, 10, 10, "1:57", { sub_sport: "Becken" })];
+  const r = plain(app.computeSwimAnalysis(data, TODAY));
+  assert.strictEqual(r.groupLabel, "Schwimmen (Becken)");
+  assert.deepStrictEqual(r.points.map(p => p.paceSec), [118, 121, 117]); // Freiwasser fehlt, unbekannt zählt mit
+});
