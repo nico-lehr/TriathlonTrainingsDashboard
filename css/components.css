@@ -942,6 +942,24 @@
 
   .plan-ex-remove:hover { background: var(--grid); color: var(--text-primary); }
 
+  /* "Schritte für die Uhr" im Bearbeiten-Overlay (Garmin-Workout / .fit) */
+  .pe-steps-preview { margin: 0; padding-left: 20px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.6; }
+  .pe-steps-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .pe-steps-actions .wd-analysis-hint { margin-left: 0; }
+  .pe-steps-list { display: flex; flex-direction: column; gap: 6px; }
+  .pe-step-row, .pe-repeat-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .onb-field .pe-step-row .pe-step-type { width: 132px; }
+  .onb-field .pe-step-row .pe-step-value { width: 76px; }
+  .onb-field .pe-step-row .pe-step-unit { width: 66px; }
+  .onb-field .pe-step-row .pe-step-target { width: 140px; }
+  .onb-field .pe-step-row .pe-step-zone { width: 90px; }
+  .onb-field .pe-repeat-head .pe-repeat-count { width: 64px; }
+  /* Zone ohne Ziel unsichtbar, aber mit Platz - so bleiben die Zeilen bündig */
+  .pe-step-zone[hidden] { display: inline-block; visibility: hidden; }
+  .pe-step-repeat { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 8px; border: 1px dashed var(--border); border-radius: 10px; }
+  .pe-repeat-head { font-size: 12.5px; color: var(--text-secondary); }
+  .pe-repeat-steps { display: flex; flex-direction: column; gap: 6px; align-self: stretch; }
+
   .plan-edit-nutrition {
     margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-soft, var(--grid));
   }

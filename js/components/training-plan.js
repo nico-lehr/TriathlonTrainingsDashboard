@@ -268,6 +268,85 @@ function renderPlanEditLessons(pw) {
   });
 }
 
+/* ---------- Schritte für die Uhr (Bearbeiten-Overlay) ----------
+   Ohne eigene Schritte zeigt das Overlay nur die Standard-Schritte aus Dauer
+   + Intensität (defaultWorkoutSteps, js/data/planned-workouts.js) - sie
+   folgen jeder Änderung von Dauer/Intensität. "Schritte anpassen" macht
+   daraus bearbeitbare Zeilen, die als `steps` gespeichert werden. */
+
+function workoutStepText(s) {
+  if (s.type === "repeat") return `${s.count}× (${s.steps.map(workoutStepText).join(" / ")})`;
+  const amount = s.duration_min ? `${fmtNum(s.duration_min, 2)} min` : s.distance_km ? `${fmtNum(s.distance_km, 2)} km` : "bis Lap-Taste";
+  const target = s.target && s.target.kind !== "none" ? ` · ${WORKOUT_TARGET_LABELS[s.target.kind]} ${s.target.zone}` : "";
+  return `${WORKOUT_STEP_LABELS[s.type]} · ${amount}${target}`;
+}
+
+const stepOptionHtml = (value, label, selected) => `<option value="${value}"${selected ? " selected" : ""}>${label}</option>`;
+
+function stepRowHtml(s) {
+  const t = s.target || { kind: "none" };
+  const unit = s.distance_km != null ? "km" : "min";
+  return `
+    <div class="pe-step-row">
+      <select class="coach-input pe-step-type" aria-label="Art">${WORKOUT_STEP_TYPES.filter(x => x !== "repeat").map(x => stepOptionHtml(x, WORKOUT_STEP_LABELS[x], s.type === x)).join("")}</select>
+      <input type="number" class="coach-input pe-step-value" min="0" step="any" value="${s.distance_km ?? s.duration_min ?? ""}" placeholder="offen" aria-label="Dauer oder Distanz">
+      <select class="coach-input pe-step-unit" aria-label="Einheit">${stepOptionHtml("min", "min", unit === "min")}${stepOptionHtml("km", "km", unit === "km")}</select>
+      <select class="coach-input pe-step-target" aria-label="Ziel">${WORKOUT_TARGET_KINDS.map(k => stepOptionHtml(k, WORKOUT_TARGET_LABELS[k], t.kind === k)).join("")}</select>
+      <select class="coach-input pe-step-zone" aria-label="Zone"${t.kind === "none" ? " hidden" : ""}>${[1, 2, 3, 4, 5].map(z => stepOptionHtml(z, `Zone ${z}`, t.zone === z)).join("")}</select>
+      <button type="button" class="plan-ex-remove pe-step-remove" title="Schritt entfernen" aria-label="Schritt entfernen">✕</button>
+    </div>`;
+}
+
+function stepRepeatHtml(s) {
+  return `
+    <div class="pe-step-repeat">
+      <div class="pe-repeat-head">
+        <input type="number" class="coach-input pe-repeat-count" min="1" max="50" step="1" value="${s.count}" aria-label="Anzahl Wiederholungen"><span>× wiederholen</span>
+        <button type="button" class="plan-ex-remove pe-step-remove" title="Wiederholung entfernen" aria-label="Wiederholung entfernen">✕</button>
+      </div>
+      <div class="pe-repeat-steps">${s.steps.map(stepRowHtml).join("")}</div>
+      <button type="button" class="chip pe-repeat-add">+ Schritt</button>
+    </div>`;
+}
+
+function planEditStepsHtml(custom, steps) {
+  if (!custom) return `
+    <ol class="pe-steps-preview">${steps.map(s => `<li>${escapeHtml(workoutStepText(s))}</li>`).join("")}</ol>
+    <div class="pe-steps-actions"><span class="wd-analysis-hint">Standard aus Dauer und Intensität</span><button type="button" class="chip pe-steps-customize">Schritte anpassen</button></div>`;
+  return `
+    <div class="pe-steps-list">${steps.map(s => (s.type === "repeat" ? stepRepeatHtml(s) : stepRowHtml(s))).join("")}</div>
+    <div class="pe-steps-actions">
+      <button type="button" class="chip pe-steps-add">+ Schritt</button>
+      <button type="button" class="chip pe-steps-add-repeat">+ Wiederholung</button>
+      <button type="button" class="chip pe-steps-reset">Standard verwenden</button>
+    </div>`;
+}
+
+function readStepRow(row) {
+  const raw = row.querySelector(".pe-step-value").value.trim();
+  const kind = row.querySelector(".pe-step-target").value;
+  const step = { type: row.querySelector(".pe-step-type").value };
+  if (raw !== "") step[row.querySelector(".pe-step-unit").value === "km" ? "distance_km" : "duration_min"] = Number(raw);
+  step.target = kind === "none" ? { kind } : { kind, zone: Number(row.querySelector(".pe-step-zone").value) };
+  return step;
+}
+
+function readStepsEditor(listEl) {
+  return [...listEl.children].map(el => (el.classList.contains("pe-step-repeat")
+    ? { type: "repeat", count: Number(el.querySelector(".pe-repeat-count").value), steps: [...el.querySelectorAll(".pe-step-row")].map(readStepRow) }
+    : readStepRow(el)));
+}
+
+// Prüft die bearbeiteten Schritte für die Sportart. { steps, errors } wie validateWorkoutSteps.
+function checkEditedSteps(listEl, sport) {
+  const res = validateWorkoutSteps(readStepsEditor(listEl));
+  const flat = res.steps ? res.steps.flatMap(s => (s.type === "repeat" ? s.steps : [s])) : [];
+  if (flat.some(s => s.target.kind === "pace_zone" && !paceZoneMps(sport, s.target.zone))) {
+    return { steps: null, errors: ["Pace-Zonen gehen nur bei Laufen (Schwellenpace im Profil) und Schwimmen (CSS im Profil) - bitte dort eintragen oder ein anderes Ziel wählen."] };
+  }
+  return res;
+}
+
 function openPlanEdit(id, defaults) {
   const isNew = !id;
   const p = isNew ? {
@@ -295,6 +374,13 @@ function openPlanEdit(id, defaults) {
         </div>`).join("")}</div>
       <button type="button" class="chip" id="plan-ex-add">+ Übung</button>
     </div>`;
+  let stepsCustom = !!(p.steps && validateWorkoutSteps(p.steps).steps);
+  const stepsHtml = `
+    <div class="onb-field" id="plan-edit-steps-field"${isStrengthLike ? " hidden" : ""}>
+      <label>Schritte für die Uhr <span class="wd-analysis-hint">für „An Garmin senden“ und den .fit-Export</span></label>
+      <div id="plan-edit-steps">${planEditStepsHtml(stepsCustom, plannedWorkoutSteps(p))}</div>
+      <p class="goal-error pe-steps-error" hidden></p>
+    </div>`;
 
   host.innerHTML = `
     <div class="onb-step">
@@ -321,6 +407,7 @@ function openPlanEdit(id, defaults) {
       </div>
       <div class="onb-field"><label for="plan-edit-desc">Beschreibung / Struktur</label><textarea id="plan-edit-desc" class="coach-input plan-edit-textarea" rows="3" placeholder="z.B. 10min Einrollen, 6x400m zügig mit 90s Pause, 10min Auslaufen">${escapeHtml(p.description || "")}</textarea></div>
       ${exercisesHtml}
+      ${stepsHtml}
       ${isNew ? "" : `
       <div class="onb-field">
         <label>Status</label>
@@ -349,26 +436,50 @@ function openPlanEdit(id, defaults) {
   // Dauer auf >=90min erhöht -> zusätzlicher Fueling-Schritt erscheint) -
   // arbeitet mit dem AKTUELLEN Formularstand, nicht mit den gespeicherten
   // Werten von p, damit die Vorschau schon vor dem Speichern stimmt.
+  const formDraft = () => ({
+    sport: host.querySelector("#plan-edit-sport").value,
+    duration_min: Number(host.querySelector("#plan-edit-duration").value) || null,
+    intensity: host.querySelector("#plan-edit-intensity").value || null,
+  });
   const refreshPlanEditNutrition = () => {
-    const draft = {
-      sport: host.querySelector("#plan-edit-sport").value,
-      duration_min: Number(host.querySelector("#plan-edit-duration").value) || null,
-      intensity: host.querySelector("#plan-edit-intensity").value || null,
-    };
     const wrap = host.querySelector("#plan-edit-nutrition");
     if (!wrap) return;
-    const inner = planEditNutritionInnerHtml(draft, isNew);
+    const inner = planEditNutritionInnerHtml(formDraft(), isNew);
     wrap.innerHTML = inner;
     wrap.style.display = inner ? "" : "none";
   };
 
+  // Schritte: Vorschau der Standard-Schritte folgt dem Formular; eigene
+  // Schritte werden direkt in den Zeilen bearbeitet (Klicks per Delegation).
+  const stepsField = host.querySelector("#plan-edit-steps-field");
+  const stepsHost = host.querySelector("#plan-edit-steps");
+  const stepsError = host.querySelector(".pe-steps-error");
+  const renderSteps = steps => { stepsHost.innerHTML = planEditStepsHtml(stepsCustom, steps); stepsError.hidden = true; };
+  const refreshPlanEditSteps = () => { if (!stepsCustom) renderSteps(defaultWorkoutSteps(formDraft())); };
+  stepsField.addEventListener("click", e => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    const list = stepsHost.querySelector(".pe-steps-list");
+    if (btn.classList.contains("pe-steps-customize")) { stepsCustom = true; renderSteps(defaultWorkoutSteps(formDraft())); }
+    else if (btn.classList.contains("pe-steps-reset")) { stepsCustom = false; refreshPlanEditSteps(); }
+    else if (btn.classList.contains("pe-steps-add")) list.insertAdjacentHTML("beforeend", stepRowHtml({ type: "interval", duration_min: 10 }));
+    else if (btn.classList.contains("pe-steps-add-repeat")) list.insertAdjacentHTML("beforeend", stepRepeatHtml({ type: "repeat", count: 4, steps: [{ type: "interval", duration_min: 4 }, { type: "recovery", duration_min: 2 }] }));
+    else if (btn.classList.contains("pe-repeat-add")) btn.previousElementSibling.insertAdjacentHTML("beforeend", stepRowHtml({ type: "interval", duration_min: 4 }));
+    else if (btn.classList.contains("pe-step-remove")) btn.closest(".pe-step-row, .pe-step-repeat").remove();
+  });
+  stepsField.addEventListener("change", e => {
+    if (e.target.classList.contains("pe-step-target")) e.target.parentElement.querySelector(".pe-step-zone").hidden = e.target.value === "none";
+  });
+
   host.querySelector("#plan-edit-sport").addEventListener("change", e => {
     const strengthLike = e.target.value === "Kraft" || e.target.value === "Mobility";
     host.querySelector("#plan-edit-exercises-field").style.display = strengthLike ? "" : "none";
+    stepsField.hidden = strengthLike;
     refreshPlanEditNutrition();
+    refreshPlanEditSteps();
   });
-  host.querySelector("#plan-edit-duration").addEventListener("input", refreshPlanEditNutrition);
-  host.querySelector("#plan-edit-intensity").addEventListener("change", refreshPlanEditNutrition);
+  host.querySelector("#plan-edit-duration").addEventListener("input", () => { refreshPlanEditNutrition(); refreshPlanEditSteps(); });
+  host.querySelector("#plan-edit-intensity").addEventListener("change", () => { refreshPlanEditNutrition(); refreshPlanEditSteps(); });
 
   let statusVal = p.status;
   host.querySelectorAll("#plan-edit-status .onb-radio-chip").forEach(btn => {
@@ -463,6 +574,17 @@ function openPlanEdit(id, defaults) {
       reps: row.querySelector(".plan-ex-reps").value.trim() || null,
       note: null,
     })).filter(ex => ex.name) : null;
+    let steps = null;
+    if (stepsCustom && !currentlyStrengthLike) {
+      const checked = checkEditedSteps(stepsHost.querySelector(".pe-steps-list"), currentSport);
+      if (!checked.steps) {
+        stepsError.textContent = checked.errors.join(" ");
+        stepsError.hidden = false;
+        stepsError.scrollIntoView({ block: "nearest" });
+        return;
+      }
+      steps = checked.steps;
+    }
     const patch = {
       date: document.getElementById("plan-edit-date").value || p.date,
       sport: currentSport,
@@ -471,6 +593,7 @@ function openPlanEdit(id, defaults) {
       intensity: document.getElementById("plan-edit-intensity").value || null,
       description: document.getElementById("plan-edit-desc").value.trim() || null,
       exercises: exercises && exercises.length ? exercises : null,
+      steps,
     };
     if (isNew) {
       addPlannedWorkout({ ...patch, goalId: p.goalId, phase: p.phase, source: "manual" });
