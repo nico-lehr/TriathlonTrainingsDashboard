@@ -1,6 +1,11 @@
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# Geheime Werte (SECRET_KEY, ...) stehen in .env im Projektordner, nie im Code.
+load_dotenv(Path(__file__).parent.parent / ".env")
+
 # Phase 1: Local development, SQLite
 class Config:
     """Base configuration for Phase 1 (local development)."""
@@ -13,7 +18,8 @@ class Config:
     # Flask
     DEBUG = True
     TESTING = False
-    SECRET_KEY = os.getenv("SECRET_KEY", "phase-1-local-dev-key")
+    # Signiert die Login-Token. Pflicht: create_app() verweigert ohne ihn den Start.
+    SECRET_KEY = os.getenv("SECRET_KEY")
 
     # API
     API_VERSION = "v1"
@@ -21,9 +27,6 @@ class Config:
     # Garmin
     GARMIN_TOKEN_PATH = Path.home() / ".triathlon" / "garmin.token"
     GARMIN_LOG_PATH = Path.home() / ".triathlon" / "garmin-sync.log"
-
-    # Phase 1: single athlete (hardcoded)
-    CURRENT_ATHLETE_ID = 1
 
 
 class TestConfig(Config):

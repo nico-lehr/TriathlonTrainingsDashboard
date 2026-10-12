@@ -43,6 +43,25 @@ class Athlete(Base):
     goals = relationship("Goal", back_populates="athlete", cascade="all, delete-orphan")
 
 
+class AthleteLogin(Base):
+    """Zugangsdaten je Athlet - angelegt nur per backend/create_user.py.
+
+    Eigene Tabelle statt neuer Spalten in Athlete, aus demselben Grund wie bei
+    IcalPlannedWorkout: create_all() legt in einer schon vorhandenen
+    training.db neue Tabellen an, neue Spalten aber nicht (kein
+    Migrations-Framework). Gespeichert wird nur der Passwort-Hash
+    (werkzeug.security), nie das Passwort selbst.
+    """
+    __tablename__ = "athlete_logins"
+
+    id = Column(Integer, primary_key=True)
+    athlete_id = Column(Integer, ForeignKey("athletes.athlete_id"), nullable=False, unique=True)
+    username = Column(String(80), nullable=False, unique=True)  # immer klein geschrieben, siehe auth.py
+    password_hash = Column(String(255), nullable=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class Workout(Base):
     """Completed workout/activity."""
     __tablename__ = "workouts"

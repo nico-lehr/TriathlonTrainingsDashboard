@@ -1,0 +1,105 @@
+"""Login fuer eine Handvoll Freunde: Passwort-Hash, signierter Token, Bremse
+gegen Passwort-Raten. Keine oeffentliche Registrierung - Benutzer legt nur
+backend/create_user.py an.
+
+Der Token ist kein Datenbank-Eintrag, sondern die mit SECRET_KEY signierte
+athlete_id (itsdangerous). Wer SECRET_KEY nicht kennt, kann keinen gueltigen
+Token bauen; nach TOKEN_MAX_AGE_S ist er abgelaufen und es braucht einen
+neuen Login.
+"""
+import threading
+import time
+from collections import defaultdict, deque
+
+from flask import current_app
+from itsdangerous import BadSignature, URLSafeTimedSerializer
+from sqlalchemy import func
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from .models import Athlete, AthleteLogin
+
+TOKEN_MAX_AGE_S = 30 * 24 * 3600  # 30 Tage
+MIN_PASSWORD_LENGTH = 10
+LOGIN_MAX_FAILS = 5   # Fehlversuche ...
+LOGIN_WINDOW_S = 60   # ... pro Minute und IP
+
+
+def _serializer():
+    return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="login-token")
+
+
+def make_token(athlete_id):
+    return _serializer().dumps({"athlete_id": athlete_id})
+
+
+def athlete_id_from_token(token):
+    """athlete_id aus einem gueltigen, nicht abgelaufenen Token, sonst None."""
+    try:
+        return _serializer().loads(token, max_age=TOKEN_MAX_AGE_S)["athlete_id"]
+    except (BadSignature, KeyError, TypeError):  # BadSignature deckt auch "abgelaufen" ab
+        return None
+
+
+def normalize_username(username):
+    # Klein geschrieben, weil Handy-Tastaturen den ersten Buchstaben gern gross machen.
+    return username.strip().lower() if isinstance(username, str) else ""
+
+
+def check_login(session, username, password):
+    """athlete_id bei richtigem Benutzernamen + Passwort, sonst None."""
+    if not isinstance(password, str):
+        return None
+    login = session.query(AthleteLogin).filter_by(username=normalize_username(username)).first()
+    if login and check_password_hash(login.password_hash, password):
+        return login.athlete_id
+    return None
+
+
+def create_login(session, username, password):
+    """Legt einen Benutzer an und gibt seine athlete_id zurueck.
+
+    Gibt es noch einen Athleten ohne Login (den bisherigen Einzelplatz-Athleten
+    aus backend/app.py: init_db), bekommt der erste Benutzer diesen - so bleiben
+    dessen Daten erhalten. Wirft ValueError bei ungueltiger Eingabe.
+    """
+    username = normalize_username(username)
+    if not username:
+        raise ValueError("Der Benutzername darf nicht leer sein.")
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise ValueError(f"Das Passwort muss mindestens {MIN_PASSWORD_LENGTH} Zeichen lang sein.")
+    if session.query(AthleteLogin).filter_by(username=username).first():
+        raise ValueError(f"Den Benutzernamen '{username}' gibt es schon.")
+
+    taken = {row.athlete_id for row in session.query(AthleteLogin.athlete_id)}
+    athlete = next((a for a in session.query(Athlete).order_by(Athlete.athlete_id) if a.athlete_id not in taken), None)
+    if athlete is None:
+        next_id = (session.query(func.max(Athlete.athlete_id)).scalar() or 0) + 1
+        athlete = Athlete(athlete_id=next_id, name=username)
+        session.add(athlete)
+
+    session.add(AthleteLogin(
+        athlete_id=athlete.athlete_id,
+        username=username,
+        password_hash=generate_password_hash(password),
+    ))
+    session.commit()
+    return athlete.athlete_id
+
+
+# Fehlversuche je IP, nur im Arbeitsspeicher (nach einem Neustart wieder leer).
+_failed_logins = defaultdict(deque)
+_failed_logins_lock = threading.Lock()
+
+
+def too_many_failed_logins(ip):
+    now = time.monotonic()
+    with _failed_logins_lock:
+        attempts = _failed_logins[ip]
+        while attempts and now - attempts[0] > LOGIN_WINDOW_S:
+            attempts.popleft()
+        return len(attempts) >= LOGIN_MAX_FAILS
+
+
+def note_failed_login(ip):
+    with _failed_logins_lock:
+        _failed_logins[ip].append(time.monotonic())

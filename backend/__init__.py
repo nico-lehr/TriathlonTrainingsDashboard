@@ -1,5 +1,5 @@
 """Triathlon Dashboard Backend - Phase 1 (Local)."""
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
@@ -13,6 +13,11 @@ def create_app():
     """Create and configure Flask application."""
     app = Flask(__name__)
     app.config.from_object(config)
+    if not app.config.get("SECRET_KEY"):
+        raise RuntimeError(
+            "SECRET_KEY fehlt. Lege im Projektordner eine Datei .env an "
+            "(Vorlage: .env.example) und trage dort einen langen Zufallswert ein."
+        )
 
     # Enable CORS for localhost frontend
     CORS(app, origins=["http://localhost:3000", "http://localhost:8000", "file://"])
@@ -36,5 +41,13 @@ def create_app():
 
 
 def get_current_athlete_id():
-    """Phase 1: Always return athlete_id=1 (single user)."""
-    return config.CURRENT_ATHLETE_ID
+    """athlete_id aus dem Bearer-Token der laufenden Anfrage, None ohne gueltigen Token.
+
+    Ohne Token blockt routes.require_login() jede Anfrage ausser /health und
+    /auth/login mit 401 - die Endpunkte bekommen hier also immer eine echte id.
+    """
+    from .auth import athlete_id_from_token
+    header = request.headers.get("Authorization", "")
+    if not header.startswith("Bearer "):
+        return None
+    return athlete_id_from_token(header[len("Bearer "):].strip())
