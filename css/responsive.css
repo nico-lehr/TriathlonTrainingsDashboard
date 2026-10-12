@@ -19,6 +19,8 @@
      zusätzlich und halten Popover/Topnav auf dem Handy in Form). */
   @media (max-width: 980px) {
     header.top h1 { font-size: 24px; }
+    header.top { margin-bottom: 12px; }
+    .page { padding-top: calc(16px + var(--safe-top)); padding-bottom: calc(48px + var(--safe-bottom)); }
     .stat-row { grid-template-columns: repeat(2, 1fr); }
     .pmc-substats { grid-template-columns: repeat(2, 1fr); }
     .grid-2 { grid-template-columns: 1fr; }
@@ -27,14 +29,31 @@
     .small-multiples { grid-template-columns: 1fr; }
     .modal-stats { grid-template-columns: repeat(2, 1fr); }
     .filter-bar { flex-direction: column; align-items: stretch; }
-    .update-group { margin-left: 0; flex-wrap: wrap; row-gap: 8px; }
-    .topnav { flex-direction: column; align-items: stretch; }
+    /* Kompakte Navigation (Handy, iPad hochkant, iPhone quer): Zeile 1 = Suche +
+       Einstellungen/Aktualisieren (alles 40px hoch), Zeile 2 = Tab-Leiste, seitlich
+       wischbar ohne Scrollbalken. Beim Scrollen bleibt nur die Tab-Leiste kleben:
+       top = -(6px Abstand + 40px Zeile 1 + 8px Lücke - 6px Luft über den Tabs). */
+    .topnav {
+      flex-direction: row; align-items: center; gap: 8px;
+      padding: 6px 0 8px; margin-bottom: 12px;
+      top: calc(-48px + var(--safe-top));
+    }
     .topnav-tabs {
-      max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
+      order: 2; flex: 1 0 100%; min-width: 0; padding: 2px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+      scrollbar-width: none; overscroll-behavior-x: contain;
     }
     .topnav-tabs::-webkit-scrollbar { display: none; }
-    .tab-btn { padding: 8px 12px; font-size: 12.5px; white-space: nowrap; flex: none; }
+    .tab-btn { flex: 1 0 auto; min-height: 40px; padding: 0 10px; font-size: 13px; white-space: nowrap; }
+    .update-group { flex-wrap: wrap; row-gap: 8px; }
+    .topnav:has(.search-wrap.expanded) .update-group { display: none; } /* beim Suchen: Suchfeld über die ganze Zeile */
+    .update-menu-trigger { min-height: 40px; }
+    .theme-toggle-btn { width: 40px; height: 40px; }
+    .search-wrap { height: 40px; padding: 0; }
+    .search-wrap.expanded { flex: 1 1 100%; max-width: none; gap: 4px; padding: 0 12px 0 0; }
+    .search-icon-btn { width: 40px; height: 40px; margin: -1px; font-size: 16px; opacity: 0.7; }
+    .search-input { height: 40px; margin-block: -1px; }
+    .card { scroll-margin-top: 64px; }
     .records-grid { grid-template-columns: 1fr; }
     .cal-monthbar { flex-direction: column; align-items: stretch; }
     .cal-controls { justify-content: space-between; }
@@ -56,12 +75,89 @@
     .onb-card { padding: 24px 20px; }
     .dnd-card { padding: 24px 20px; }
     .update-menu { right: 0; left: auto; min-width: 210px; }
-    .info-popover { left: auto; right: -8px; width: 240px; max-width: 78vw; }
+    /* Info-Popover am Kartenrand statt am kleinen Symbol verankern: sonst ragt er bei
+       kurzen Überschriften links aus dem Bild. top:auto + margin = direkt unter der Zeile. */
+    .info-wrap { position: static; }
+    .info-popover { top: auto; margin-top: 26px; left: 12px; right: 12px; width: auto; max-width: none; }
+  }
+
+  /* Handy hochkant (bis 600px): schmalere Ränder, Karten und Dialoge nutzen die
+     Breite besser aus. --gutter/--gap steuern die Abstände in main.css bzw.
+     components.css, die Sicherheitsabstände für die Notch kommen von dort. */
+  @media (max-width: 600px) {
+    .page { --gutter: 16px; }
+    .topnav { background: color-mix(in srgb, var(--page) 80%, transparent); } /* klebende Tab-Leiste: Inhalt scheint nicht durch */
+    /* glow-1/-2 liegen auf dem Handy ohnehin außerhalb des Bildschirms, das
+       große Weichzeichnen kostet dort nur Akku und Scroll-Flüssigkeit. */
+    .glow-1, .glow-2 { display: none; }
+    .card { padding: 18px 16px; }
+    .card-drag-handle + h2 { padding-right: 34px; }
+    /* Diagramme skalieren mit der Kartenbreite (viewBox 1120 breit = ca. 0,3-fach,
+       560 breit = ca. 0,6-fach): Achsenbeschriftung größer, damit sie lesbar bleibt. */
+    svg[viewBox^="0 0 1120 "] .axis-label { font-size: 22px; }
+    svg[viewBox^="0 0 560 "] .axis-label, svg[viewBox^="0 0 600 "] .axis-label { font-size: 12px; }
+    .filter-bar { padding: 12px; }
+    .range-custom-group { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; }
+    .range-custom-group .filter-label { grid-column: 1 / -1; }
+    .range-custom-group .range-date-input { width: 100%; }
+    .modal-overlay, .dnd-overlay, .onb-overlay, .coach-gate { --gap: 12px; }
+    .modal-card, .dnd-card, .onb-card { max-height: 100%; }
+    .modal-card { padding: 22px 16px; border-radius: 18px; }
+    .modal-close, .dnd-close, .onb-close { top: 8px; right: 8px; }
+  }
+
+  /* Touch (iPhone/iPad, auch schmales Browserfenster): Tipp-Ziele mind. 40px
+     (--touch-min), Eingabefelder 16px (kleinere Schrift lässt iOS beim
+     Antippen ins Feld hineinzoomen). Unsichtbare Tipp-Flächen (::after) für
+     winzige Symbole, damit sich das Aussehen nicht ändert. */
+  @media (max-width: 600px) {
+    .modal-head { padding-right: 36px; }
+  }
+
+  @media (pointer: coarse), (max-width: 600px) {
+    input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px; }
+    .chip, .update-btn, .cal-today-btn, .cal-view-btn, .onb-radio-chip, .coach-input, .cal-select,
+    .update-menu-item, .reset-link, .equipment-banner-link, .workouts-col-toggle, .onb-checkbox-row,
+    .cal-planned-list-day .cal-planned-chip { min-height: var(--touch-min); }
+    .reset-link, .equipment-banner-link { display: inline-flex; align-items: center; }
+    .coach-gate-skip { padding: 13px 10px; }
+    .coach-workouts-full-link { display: inline-block; padding: 13px 6px; margin: -13px -6px; }
+    .theme-toggle-btn, .cal-nav-btn, .modal-close, .dnd-close, .onb-close,
+    .goal-delete, .goal-expand-btn, .goal-primary-star, .plan-item-edit, .plan-item-export,
+    .plan-ex-remove, .equipment-delete, .wd-rating-star, .onb-weekday-chip, .goals-collapse-btn {
+      min-width: var(--touch-min); min-height: var(--touch-min);
+    }
+    .modal-close, .dnd-close, .onb-close, .goal-delete, .goal-expand-btn, .goal-primary-star,
+    .plan-item-edit, .plan-item-export, .plan-ex-remove, .equipment-delete, .wd-rating-star {
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .goal-primary-star { margin-block: -9px; }
+    .modal-close, .dnd-close, .onb-close { width: var(--touch-min); height: var(--touch-min); }
+    .info-btn, .cal-dot { position: relative; }
+    .info-btn::after { content: ""; position: absolute; inset: -11px; }
+    .card-drag-handle::after { content: ""; position: absolute; inset: -7px; }
+    .cal-dot { width: 10px; height: 10px; }
+    .cal-dot::after { content: ""; position: absolute; inset: -7px; }
+    table.workouts td { padding-top: 13px; padding-bottom: 13px; }
+    table.workouts.workouts-compact td { padding-top: 12px; padding-bottom: 12px; }
+    .record-row { padding-top: 11px; padding-bottom: 11px; }
+    .compare-picker-item { padding-top: 11px; padding-bottom: 11px; }
+    .onb-weekday-chip { flex: 1 0 var(--touch-min); width: auto; }
+  }
+
+  /* Touch kennt kein Hovern: ohne diese Regeln bliebe eine angetippte Karte
+     "angehoben", bis man woanders hintippt. */
+  @media (hover: none) {
+    .card:hover { transform: none; box-shadow: var(--card-shadow); }
+    .record-card:hover { transform: none; box-shadow: none; }
+    .stat-tile:hover { box-shadow: var(--card-shadow); }
+    .record-row:hover { padding-left: 0; }
   }
 
   /* Schmale Handys: etwas kompaktere Kennzahl-Kacheln (2 pro Reihe), damit
      Werte wie "ml/kg/min" oder "Erholung" nicht mitten im Wort umbrechen. */
   @media (max-width: 480px) {
+    .update-menu-trigger { padding: 0 12px; gap: 5px; } /* Aktionszeile der Navigation bleibt auch bei 320px einzeilig */
     .stat-tile { padding: 16px 14px; }
     .stat-tile .value { font-size: 22px; }
   }
