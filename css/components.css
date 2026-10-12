@@ -1887,3 +1887,88 @@
     border: 1px solid var(--c-crit); background: var(--surface-1);
     color: var(--text-primary); font-size: 12.5px;
   }
+
+  /* ---------- Analyse-Tab (js/components/analysis.js) ---------- */
+
+  /* Höchstens zwei Karten nebeneinander (Schwimmen | Rad), darunter einspaltig */
+  .dash-grid.ana-grid { grid-template-columns: repeat(auto-fit, minmax(min(560px, 100%), 1fr)); }
+
+  .ana-toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 8px 14px; margin-bottom: 14px;
+  }
+
+  /* Sportfarben für Legenden-Kästchen (background) und SVG-Flächen (fill) */
+  .ana-swim { background: var(--c-schwimmen); fill: var(--c-schwimmen); }
+  .ana-bike { background: var(--c-rad); fill: var(--c-rad); }
+  .ana-run  { background: var(--c-laufen); fill: var(--c-laufen); }
+
+  .ana-bal-rows { display: flex; flex-direction: column; gap: 10px; }
+
+  .ana-bal-row {
+    display: grid; grid-template-columns: 72px minmax(0, 1fr) 52px;
+    align-items: center; gap: 3px 12px; font-size: 12px;
+  }
+
+  .ana-bal-label { color: var(--text-secondary); white-space: nowrap; }
+
+  .ana-bal-label small { color: var(--text-muted); font-size: 10.5px; }
+
+  .ana-bal-total { text-align: right; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+  .ana-bal-short { grid-column: 2 / 4; font-size: 11.5px; color: var(--text-secondary); }
+
+  .ana-warn-icon { color: var(--c-warn); }
+
+  .ana-bal-empty { fill: var(--grid); }
+
+  .ana-seg { stroke: var(--surface-1); stroke-width: 1.5; }
+
+  .ana-target-mark { stroke: var(--text-primary); stroke-width: 2; }
+
+  .ana-target-swatch { width: 2px; height: 12px; border-radius: 1px; background: var(--text-primary); display: inline-block; }
+
+  .ana-hint {
+    margin: 16px 0 0; padding: 10px 14px; border-radius: 12px;
+    background: var(--page); color: var(--text-secondary); font-size: 12.5px; line-height: 1.55;
+  }
+
+  .ana-hint.warn { background: color-mix(in srgb, var(--c-warn) 16%, transparent); color: var(--text-primary); }
+
+  .ana-hint b { color: var(--text-primary); }
+
+  .ana-settings-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; }
+
+  .ana-subhead { font-size: 13px; font-weight: 620; margin: 20px 0 2px; }
+
+  .ana-note { font-size: 11.5px; color: var(--text-muted); line-height: 1.5; margin: 10px 0 14px; }
+
+  .ana-form-btn { justify-content: center; }
+
+  .ana-status { display: block; margin: 8px 0 0; min-height: 1em; }
+
+  .pmc-substats.ana-tiles { margin-top: 0; }
+
+  .ana-zone-rows { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
+
+  .ana-zone-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 4px 12px; font-size: 12.5px; }
+
+  .ana-zone-name { font-weight: 600; }
+
+  .ana-zone-name small { font-weight: 500; color: var(--text-secondary); margin-left: 4px; }
+
+  .ana-zone-share { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+  .ana-zone-bar { grid-column: 1 / -1; display: block; }
+
+  .ana-z1 { fill: var(--c-z1); }
+  .ana-z2 { fill: var(--c-z2); }
+  .ana-z3 { fill: var(--c-z3); }
+  .ana-z4 { fill: var(--c-z4); }
+  .ana-z5 { fill: var(--c-z5); }
+
+  .ana-brick-table { margin-top: 14px; }
+
+  .ana-brick-table td small { color: var(--text-muted); font-size: 11px; margin-left: 2px; }
+
+  .ana-brick-ride .env-badge { margin-left: 6px; }

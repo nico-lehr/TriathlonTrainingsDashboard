@@ -44,6 +44,7 @@
       <button class="tab-btn" data-view="coach">Coach</button>
       <button class="tab-btn" data-view="nutrition">Ernährung</button>
       <button class="tab-btn" data-view="records">Rekorde</button>
+      <button class="tab-btn" data-view="analysis">Analyse</button>
     </div>
     <div class="search-wrap" id="search-wrap">
       <button type="button" class="search-icon-btn" id="search-icon-btn" aria-label="Dashboard durchsuchen" title="Dashboard durchsuchen (auch Einstellungen)">🔍</button>
@@ -541,6 +542,66 @@
     </section>
   </div>
 
+  <div id="view-analysis" class="view">
+    <div class="dash-grid ana-grid">
+      <div class="card full">
+        <h2>Sport-Balance
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Wie sich deine Trainingszeit je Woche bzw. Monat auf Schwimmen, Rad und Laufen verteilt — im Vergleich zu deiner Zielverteilung (Standard 15/50/35 %, änderbar in den Einstellungen). Liegt eine Sportart mehr als 5 Prozentpunkte unter ihrem Ziel, wird sie markiert. Sonstige Einheiten (z.B. Kraft) zählen nicht mit. Nutzt immer die volle Historie, unabhängig vom Zeitraum-Filter der Übersicht.</div></span>
+        </h2>
+        <p class="card-sub">Anteil an der Trainingszeit im Vergleich zu deiner Zielverteilung</p>
+        <div class="ana-toolbar">
+          <div class="filter-group" id="analysis-balance-mode">
+            <button type="button" class="chip active" data-mode="week">Wochen</button>
+            <button type="button" class="chip" data-mode="month">Monate</button>
+          </div>
+          <button type="button" class="reset-link" data-ana-settings="profile-balance-card">Zielverteilung ändern</button>
+        </div>
+        <div class="chart-wrap" id="analysis-balance-body"></div>
+      </div>
+
+      <div class="card">
+        <h2>Schwimmen
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover"><b>Pace</b> je 100 m aus deinen Schwimmeinheiten. Der Trend vergleicht den Ø der letzten 6 Wochen mit den 6 Wochen davor (je mindestens 2 Einheiten). Becken und Freiwasser werden nicht vermischt — ausgewertet wird die Gruppe deiner letzten Einheit. <b>SWOLF</b> (Bahnzeit in Sekunden + Züge, kleiner ist besser) gibt es nur aus Garmin-Beckenaufzeichnungen mit Bahnen; Werte aus 25-m- und 50-m-Becken sind nicht vergleichbar. <b>CSS</b> (Critical Swim Speed) = 200 m ÷ (Zeit 400 m − Zeit 200 m), angegeben als Pace je 100 m — ungefähr deine Schwellenpace im Wasser.</div></span>
+        </h2>
+        <p class="card-sub" id="analysis-swim-sub">Pace je 100 m, SWOLF und Critical Swim Speed (CSS)</p>
+        <div id="analysis-swim-body"></div>
+        <div class="chart-wrap" id="analysis-swim-chart"></div>
+        <h3 class="ana-subhead">CSS-Test eintragen</h3>
+        <p class="card-sub">Gut einschwimmen, dann 400 m und nach einer Pause 200 m jeweils so schnell wie möglich.</p>
+        <div class="goal-form">
+          <div class="goal-form-row">
+            <label for="analysis-css-400">400 m (m:ss)</label>
+            <input type="text" id="analysis-css-400" class="coach-input" placeholder="z.B. 7:10" autocomplete="off">
+          </div>
+          <div class="goal-form-row">
+            <label for="analysis-css-200">200 m (m:ss)</label>
+            <input type="text" id="analysis-css-200" class="coach-input" placeholder="z.B. 3:25" autocomplete="off">
+          </div>
+          <div class="goal-form-row">
+            <button type="button" class="update-btn ana-form-btn" id="analysis-css-save-btn">CSS berechnen</button>
+          </div>
+        </div>
+        <p class="coach-test-status ana-status" id="analysis-css-status"></p>
+      </div>
+
+      <div class="card">
+        <h2>Rad
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover"><b>FTP</b> (Functional Threshold Power) ist die Leistung, die du etwa eine Stunde halten kannst. Neben deinem Wert aus den Einstellungen wird sie als 95 % deiner besten 20 Minuten am Stück der letzten 90 Tage geschätzt — das passt nur, wenn darin ein harter 20-Minuten-Abschnitt steckt, sonst fällt die Schätzung zu niedrig aus. Die Leistungskurven sind auf ca. 200 Punkte je Einheit verdichtet, kurze Spitzen werden dabei geglättet. <b>Zonen</b>: Anteile der FTP (dasselbe 5-Zonen-Modell wie im Trainingsplan), die Zeit in den Zonen stammt aus den letzten 4 Wochen. Indoor und Outdoor zählen gemeinsam — Watt sind auf der Rolle und auf der Straße vergleichbar.</div></span>
+        </h2>
+        <p class="card-sub">FTP, Leistungszonen und FTP-Verlauf aus deinen Leistungsdaten</p>
+        <div class="chart-wrap" id="analysis-bike-body"></div>
+      </div>
+
+      <div class="card full">
+        <h2>Koppeltraining
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Als Koppeleinheit zählt ein Lauf, der höchstens 30 Minuten nach dem Ende einer Radeinheit beginnt. Verglichen werden die ersten 10 Minuten des Laufs (Pace in Bewegung und Ø-Puls aus den Sekundendaten) mit denselben ersten 10 Minuten deiner normalen Läufe aus den 90 Tagen davor — auch ein normaler Lauf beginnt meist ruhiger, so wird Gleiches mit Gleichem verglichen. Für einen Vergleich braucht es mindestens 3 normale Läufe. Klick auf eine Zeile öffnet den Lauf.</div></span>
+        </h2>
+        <p class="card-sub">Läufe direkt nach dem Rad: die ersten 10 Minuten im Vergleich zu deinen normalen Läufen</p>
+        <div id="analysis-brick-body"></div>
+      </div>
+    </div>
+  </div>
+
   <div id="view-settings" class="view">
     <section class="card full settings-page-head">
       <button type="button" class="reset-link settings-back-btn" id="settings-back-btn">← Zurück</button>
@@ -717,6 +778,31 @@
         </div>
         <div class="goal-form-row">
           <label class="onb-checkbox-row"><input type="checkbox" id="profile-include-mobility">Mobility/Beweglichkeit in den Trainingsplan einplanen</label>
+        </div>
+      </div>
+
+      <div class="card" id="profile-balance-card">
+        <h2>Sport-Balance
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Zielverteilung deiner Trainingszeit für die Karte „Sport-Balance" im Analyse-Tab. Gespeichert wird nur, wenn die drei Werte zusammen 100 % ergeben.</div></span>
+        </h2>
+        <p class="card-sub">Ziel-Anteil der Trainingszeit je Sportart (zusammen 100 %).</p>
+        <div class="goal-form">
+          <div class="goal-form-row">
+            <label for="profile-balance-swim">Schwimmen (%)</label>
+            <input type="number" id="profile-balance-swim" class="coach-input" min="0" max="100" step="1" data-balance-sport="Schwimmen">
+          </div>
+          <div class="goal-form-row">
+            <label for="profile-balance-bike">Rad (%)</label>
+            <input type="number" id="profile-balance-bike" class="coach-input" min="0" max="100" step="1" data-balance-sport="Rad">
+          </div>
+          <div class="goal-form-row">
+            <label for="profile-balance-run">Laufen (%)</label>
+            <input type="number" id="profile-balance-run" class="coach-input" min="0" max="100" step="1" data-balance-sport="Laufen">
+          </div>
+        </div>
+        <div class="ana-settings-actions">
+          <button type="button" class="cal-today-btn" id="profile-balance-reset-btn">Standard 15/50/35</button>
+          <span class="coach-test-status" id="profile-balance-status"></span>
         </div>
       </div>
 
@@ -902,6 +988,7 @@
 <script src="js/analytics/nutrition.js"></script>
 <script src="js/analytics/streak.js"></script>
 <script src="js/analytics/achievements.js"></script>
+<script src="js/analytics/triathlon.js"></script>
 <script src="js/ai/context-builder.js"></script>
 <script src="js/ai/prompts.js"></script>
 <script src="js/ai/ollama.js"></script>
@@ -922,6 +1009,7 @@
 <script src="js/components/ollama-setup.js"></script>
 <script src="js/components/nutrition.js"></script>
 <script src="js/components/achievements.js"></script>
+<script src="js/components/analysis.js"></script>
 <script src="js/components/workout-card.js"></script>
 <script src="js/components/compare.js"></script>
 <script src="js/components/data-import.js"></script>

@@ -16,7 +16,8 @@ const fmtDateWeekday = d => d.toLocaleDateString("de-DE", { weekday: "short", da
 
 function paceToSeconds(str) { if (!str) return null; const [m, s] = str.split(":").map(Number); return m * 60 + s; }
 
-function secondsToPace(sec) { const m = Math.floor(sec / 60), s = Math.round(sec % 60); return `${m}:${String(s).padStart(2, "0")}`; }
+// Erst auf ganze Sekunden runden, dann teilen - sonst wird z.B. 119,6 s zu "1:60".
+function secondsToPace(sec) { const r = Math.round(sec), m = Math.floor(r / 60), s = r % 60; return `${m}:${String(s).padStart(2, "0")}`; }
 
 
 const DOW_LABELS_DE = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];

@@ -49,8 +49,9 @@ function computeSwimPaceZones() { return computePaceZonesFromThreshold(athletePr
 // hier auf 5 Zonen komprimiert, damit es zum selben Label-Set passt).
 const POWER_ZONE_FTP_BOUNDS = [[0, 0.55], [0.56, 0.75], [0.76, 0.90], [0.91, 1.05], [1.06, 1.30]];
 
-function computeBikePowerZones() {
-  const ftp = athleteProfile.ftpWatts;
+// ftpWatts optional (z.B. die geschätzte FTP im Analyse-Tab), sonst die FTP aus dem Profil.
+function computeBikePowerZones(ftpWatts) {
+  const ftp = ftpWatts || athleteProfile.ftpWatts;
   if (!ftp) return null;
   return POWER_ZONE_FTP_BOUNDS.map(([lo, hi], i) => ({
     label: ZONE_LABELS[i],
