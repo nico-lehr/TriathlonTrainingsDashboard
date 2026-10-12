@@ -173,7 +173,7 @@ function renderRaceFueling() {
         ? "Kein Zieldatum beim Hauptevent hinterlegt."
         : daysUntil < 0
           ? "Das Hauptevent liegt in der Vergangenheit."
-          : `Erscheint automatisch ab der Taper-Phase, ${RACE_FUELING_TAPER_DAYS} Tage vor „${escapeHtml(goal.name)}" (noch ${daysUntil} ${daysUntil === 1 ? "Tag" : "Tage"}).`;
+          : `Erscheint automatisch ${RACE_FUELING_TAPER_DAYS} Tage vor „${escapeHtml(goal.name)}" (noch ${daysUntil} ${daysUntil === 1 ? "Tag" : "Tage"}).`;
     host.innerHTML = `<p class="empty-note racefueling-waiting">${note}</p>`;
     return;
   }

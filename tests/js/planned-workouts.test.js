@@ -109,6 +109,14 @@ test("neue Einheiten bekommen die Phase an ihrem Datum (getPhase), ohne Ziel kei
   app.deletePlannedWorkout(manual.id);
 });
 
+test("neues Datum -> neue Phase (move, patchedPlannedWorkouts), eine gesetzte Phase bleibt", () => {
+  const list = [{ ...pw("m", day(5), "Rad", 60, "leicht"), phase: "spezifisch" }];
+  assert.strictEqual(byId(apply(list, { action: "move", workoutId: "m", toDate: day(8) }), "m").phase, "taper");
+  assert.strictEqual(plain(app.patchedPlannedWorkouts(list, "m", { date: day(21) }))[0].phase, "erholung");
+  assert.strictEqual(plain(app.patchedPlannedWorkouts(list, "m", { duration_min: 30 }))[0].phase, "spezifisch");
+  assert.strictEqual(plain(app.patchedPlannedWorkouts(list, "m", { date: day(21), phase: "aufbau" }))[0].phase, "aufbau");
+});
+
 test("unpassende Vorschläge liefern null statt einer kaputten Liste", () => {
   assert.strictEqual(apply(plan(), { action: "move", workoutId: "gibtsnicht", toDate: day(5) }), null);
   assert.strictEqual(apply(plan(), { action: "make_rest_day", date: day(6), workoutIds: [] }), null);

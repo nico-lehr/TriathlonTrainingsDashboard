@@ -11,9 +11,7 @@
 // "unklar" (kein Zieldatum) und "nach-event" (Rennen samt Erholungswoche vorbei).
 function computeTrainingPhase(daysUntil) {
   if (daysUntil == null) return { key: "unklar", label: "kein Zieldatum" };
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const race = new Date(today); race.setDate(race.getDate() + daysUntil);
-  const key = getPhase(today, { date: localDateStr(race) });
+  const key = getPhase(new Date(), periodRaceInDays(daysUntil));
   return key ? { key, label: PERIOD_PHASES[key].label } : { key: "nach-event", label: "nach dem Ziel-Event" };
 }
 
