@@ -6,12 +6,13 @@
     --page:           #f5f5f3;
     --text-primary:   #0b0b0b;
     --text-secondary: #52514e;
-    --text-muted:     #898781;
+    --text-muted:     #6b6a64;
     --grid:           #e1e0d9;
     --baseline:       #c3c2b7;
     --border:         rgba(11,11,11,0.08);
     --card-shadow:    0 1px 2px rgba(11,11,11,0.04), 0 8px 24px rgba(11,11,11,0.05);
-    --accent:         #2a78d6;
+    --accent:         #2570cc;
+    --accent-fill:    var(--accent); /* Füllung für Knöpfe mit weißer Schrift */
     --accent-wash:    rgba(42,120,214,0.10);
 
     --c-schwimmen: #1baf7a;
@@ -36,6 +37,12 @@
     --card-shadow-hover: 0 4px 10px rgba(11,11,11,0.06), 0 16px 36px rgba(11,11,11,0.09);
     --row-added-wash: rgba(12,163,12,0.16);
 
+    /* Statusfarben als SCHRIFT: --c-good/-warn/-crit sind als Füllung gedacht
+       und als Text auf hellem Grund zu blass (Kontrast unter 4,5:1). */
+    --c-good-text: #097009;
+    --c-warn-text: #8a5a00;
+    --c-crit-text: #a82a2a;
+
     /* iPhone/Touch: Mindestgröße für Tipp-Ziele und Sicherheitsabstände für
        Notch, Home-Indikator und Querformat (0 auf Geräten ohne Aussparung). */
     --touch-min:   40px;
@@ -52,13 +59,17 @@
       --page:           #101010;
       --text-primary:   #ffffff;
       --text-secondary: #c3c2b7;
-      --text-muted:     #8f8d86;
+      --text-muted:     #9a9892;
       --grid:           #2c2c2a;
       --baseline:       #3a3a38;
       --border:         rgba(255,255,255,0.08);
       --card-shadow:    0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
       --accent:         #3987e5;
+      --accent-fill:    #2872d0;
       --accent-wash:    rgba(57,135,229,0.16);
+      --c-good-text: #2fc42f;
+      --c-warn-text: #fab219;
+      --c-crit-text: #e66767;
       --c-schwimmen: #199e70;
       --c-rad:       #3987e5;
       --c-laufen:    #d95926;
@@ -83,13 +94,17 @@
     --page:           #101010;
     --text-primary:   #ffffff;
     --text-secondary: #c3c2b7;
-    --text-muted:     #8f8d86;
+    --text-muted:     #9a9892;
     --grid:           #2c2c2a;
     --baseline:       #3a3a38;
     --border:         rgba(255,255,255,0.08);
     --card-shadow:    0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
     --accent:         #3987e5;
+    --accent-fill:    #2872d0;
     --accent-wash:    rgba(57,135,229,0.16);
+    --c-good-text: #2fc42f;
+    --c-warn-text: #fab219;
+    --c-crit-text: #e66767;
     --c-schwimmen: #199e70;
     --c-rad:       #3987e5;
     --c-laufen:    #d95926;

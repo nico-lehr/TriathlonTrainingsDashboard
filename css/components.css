@@ -61,7 +61,7 @@
 
   .update-btn {
     border: none;
-    background: var(--accent);
+    background: var(--accent-fill);
     color: #fff;
     font-size: 12.5px;
     font-weight: 650;
@@ -100,7 +100,7 @@
     text-align: right;
   }
 
-  .update-status.err { color: #b13030; }
+  .update-status.err { color: var(--c-crit-text); }
 
   /* Aktualisieren-Dropdown-Menü (Ordner-Scan vs. Drag & Drop) */
   .update-menu-wrap { position: relative; }
@@ -242,7 +242,7 @@
 
   .dnd-status { font-size: 12.5px; color: var(--text-secondary); margin-top: 16px; text-align: center; min-height: 16px; }
 
-  .dnd-status.err { color: #b13030; }
+  .dnd-status.err { color: var(--c-crit-text); }
 
   /* Kalender: Monatsansicht, Zeilen = Wochen, Spalten = Wochentage + Zusammenfassung */
   .cal-monthbar {
@@ -326,13 +326,13 @@
 
   .cal-cell.muted { background: var(--page); }
 
-  .cal-cell.muted .cal-daynum { color: var(--text-muted); opacity: 0.55; }
+  .cal-cell.muted .cal-daynum { color: var(--text-muted); opacity: 0.75; }
 
   .cal-cell.today { background: var(--accent-wash); }
 
   .cal-daynum { font-size: 12.5px; font-weight: 620; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 
-  .cal-cell.today .cal-daynum { color: var(--accent); font-weight: 750; }
+  .cal-cell.today .cal-daynum { color: color-mix(in srgb, var(--accent) 75%, var(--text-primary)); font-weight: 750; }
 
   .cal-dots { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
 
@@ -574,7 +574,7 @@
 
   .risk-adjust-banner .rab-body { flex: 1; min-width: 0; }
 
-  .risk-adjust-banner .rab-title { font-weight: 650; font-size: 13.5px; color: var(--c-crit); margin-bottom: 2px; }
+  .risk-adjust-banner .rab-title { font-weight: 650; font-size: 13.5px; color: var(--c-crit-text); margin-bottom: 2px; }
 
   .risk-adjust-banner .rab-reasons { font-size: 12px; color: var(--text-secondary); }
 
@@ -646,11 +646,11 @@
 
   .coach-test-status { font-size: 12px; color: var(--text-secondary); }
 
-  .coach-test-status.ok { color: var(--c-good, #199e70); }
+  .coach-test-status.ok { color: var(--c-good-text); }
 
-  .coach-test-status.warn { color: var(--c-warn, #b8860b); }
+  .coach-test-status.warn { color: var(--c-warn-text); }
 
-  .coach-test-status.err { color: #b13030; }
+  .coach-test-status.err { color: var(--c-crit-text); }
 
   .goal-form {
     /* minmax(0, 1fr) statt 1fr: sonst zwingt z.B. das native Datumsfeld oder
@@ -741,7 +741,7 @@
   }
 
   .goal-priority-A { background: var(--c-crit); color: #fff; }
-  .goal-priority-B { background: var(--c-warn); color: #fff; }
+  .goal-priority-B { background: color-mix(in srgb, var(--c-warn) 24%, var(--surface-1)); color: var(--c-warn-text); }
   .goal-priority-C { background: var(--border); color: var(--text-secondary); }
 
   .goal-adv { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border); }
@@ -756,7 +756,7 @@
 
   .goal-rec-date { font-size: 11px; color: var(--text-muted); }
 
-  .goal-error { font-size: 12px; color: #b13030; margin-top: 10px; }
+  .goal-error { font-size: 12px; color: var(--c-crit-text); margin-top: 10px; }
 
   .goal-recommendation {
     margin-top: 12px; padding: 14px 16px; background: var(--surface-1);
@@ -767,7 +767,7 @@
   /* "Hauptevent"-Markierung (Trainingsplan bezieht sich immer auf dieses Ziel) */
   .goal-primary-star {
     border: none; background: none; cursor: pointer; font-size: 16px; line-height: 1;
-    color: var(--border); padding: 2px 4px; margin-right: 2px; vertical-align: middle;
+    color: var(--text-muted); padding: 2px 4px; margin-right: 2px; vertical-align: middle;
     transition: color 0.15s ease, transform 0.15s ease;
   }
 
@@ -794,7 +794,7 @@
   .plan-status-badge {
     display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600;
     padding: 3px 9px; border-radius: 999px; background: color-mix(in srgb, var(--c-good) 14%, transparent);
-    color: var(--c-good); white-space: nowrap;
+    color: var(--c-good-text); white-space: nowrap;
   }
   .plan-status-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c-good); animation: btnPulse 2.4s ease-in-out infinite; }
   .plan-status-badge.plan-status-none { background: var(--page); color: var(--text-muted); font-weight: 500; }
@@ -850,11 +850,11 @@
 
   .plan-intensity { font-size: 10.5px; font-weight: 650; padding: 2px 7px; border-radius: 6px; }
 
-  .plan-intensity-leicht { background: color-mix(in srgb, var(--c-good) 18%, transparent); color: var(--c-good); }
+  .plan-intensity-leicht { background: color-mix(in srgb, var(--c-good) 18%, transparent); color: var(--c-good-text); }
 
-  .plan-intensity-mittel { background: color-mix(in srgb, var(--c-warn) 18%, transparent); color: var(--c-warn); }
+  .plan-intensity-mittel { background: color-mix(in srgb, var(--c-warn) 18%, transparent); color: var(--c-warn-text); }
 
-  .plan-intensity-hart { background: color-mix(in srgb, var(--c-crit) 18%, transparent); color: var(--c-crit); }
+  .plan-intensity-hart { background: color-mix(in srgb, var(--c-crit) 18%, transparent); color: var(--c-crit-text); }
 
   .plan-item-erledigt { opacity: 0.6; }
 
@@ -904,6 +904,10 @@
   .pe-regen .goal-error { margin: 8px 0 0; }
 
   .plan-edit-actions-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  /* Der Löschen-Knopf trägt die Farbe fest im HTML (style=...), die im Dunkelmodus
+     zu blass ist - nur !important schlägt eine solche Inline-Angabe. */
+  .plan-edit-delete { color: var(--c-crit-text) !important; }
 
   /* Geplante Einheiten im Kalender (Monats-/Wochen-/Tagesansicht) - optisch
      als "Absicht" statt "Ist-Wert" erkennbar (gestrichelter Rahmen). */
@@ -1078,7 +1082,7 @@
 
   .onb-weekday-chip.selected-swim { background: var(--c-schwimmen); border-color: var(--c-schwimmen); color: #fff; }
 
-  .onb-weekday-chip.selected-long { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .onb-weekday-chip.selected-long { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
 
   .onb-weekday-chip:disabled { opacity: 0.32; cursor: not-allowed; }
 
@@ -1140,19 +1144,22 @@
 
   .recovery-chip { padding: 7px 13px; }
 
-  #recovery-soreness-group .recovery-chip[data-value="light"].selected    { background: #6fae4f; border-color: #6fae4f; color: #fff; }
+  /* gewählter Zustand getönt statt voll gefüllt: Schrift bleibt in Hell und Dunkel lesbar */
+  #recovery-soreness-group .recovery-chip[data-value="light"].selected,
+  #recovery-energy-group .recovery-chip[data-value="high"].selected {
+    background: color-mix(in srgb, var(--c-good) 22%, var(--surface-1)); border-color: var(--c-good); color: var(--c-good-text);
+  }
 
-  #recovery-soreness-group .recovery-chip[data-value="moderate"].selected { background: #d99a1f; border-color: #d99a1f; color: #fff; }
+  #recovery-soreness-group .recovery-chip[data-value="moderate"].selected,
+  #recovery-energy-group .recovery-chip[data-value="reduced"].selected {
+    background: color-mix(in srgb, var(--c-warn) 24%, var(--surface-1)); border-color: var(--c-warn); color: var(--c-warn-text);
+  }
 
-  #recovery-soreness-group .recovery-chip[data-value="severe"].selected   { background: #c24545; border-color: #c24545; color: #fff; }
-
-  #recovery-energy-group .recovery-chip[data-value="low"].selected      { background: #c24545; border-color: #c24545; color: #fff; }
-
-  #recovery-energy-group .recovery-chip[data-value="reduced"].selected  { background: #d99a1f; border-color: #d99a1f; color: #fff; }
-
-  #recovery-energy-group .recovery-chip[data-value="high"].selected     { background: #6fae4f; border-color: #6fae4f; color: #fff; }
-
-  #recovery-injury-group .recovery-chip[data-value="yes"].selected { background: #c24545; border-color: #c24545; color: #fff; }
+  #recovery-soreness-group .recovery-chip[data-value="severe"].selected,
+  #recovery-energy-group .recovery-chip[data-value="low"].selected,
+  #recovery-injury-group .recovery-chip[data-value="yes"].selected {
+    background: color-mix(in srgb, var(--c-crit) 18%, var(--surface-1)); border-color: var(--c-crit); color: var(--c-crit-text);
+  }
 
   .load-status.muted { background: var(--grid); color: var(--text-muted); }
 
@@ -1201,7 +1208,7 @@
      nichts importiert) - dezenter Hinweis, ohne aufdringlich zu wirken. */
   .stat-tile.at-risk { box-shadow: 0 0 0 1.5px var(--c-warn), var(--card-shadow); }
 
-  .stat-tile.at-risk .sub { color: var(--c-warn); }
+  .stat-tile.at-risk .sub { color: var(--c-warn-text); }
 
   /* Erfolge-Karte */
   .achievement-row {
@@ -1449,21 +1456,21 @@
 
   .pmc-substats .sub-tile .v small { font-size: 11px; font-weight: 500; color: var(--text-muted); }
 
-  .pmc-substats .sub-tile .v small.delta-good { color: var(--c-good); }
+  .pmc-substats .sub-tile .v small.delta-good { color: var(--c-good-text); }
   /* Erholungs-Kacheln nutzen dieselbe Farbkonvention (js/components/recovery.js) */
-  #recovery-tiles .stat-tile .sub small.delta-good { color: var(--c-good); font-weight: 700; }
-  #recovery-tiles .stat-tile .sub small.delta-warn { color: var(--c-warn); font-weight: 700; }
+  #recovery-tiles .stat-tile .sub small.delta-good { color: var(--c-good-text); font-weight: 700; }
+  #recovery-tiles .stat-tile .sub small.delta-warn { color: var(--c-warn-text); font-weight: 700; }
   #recovery-tiles .stat-tile .label small { color: var(--text-secondary); font-weight: 500; }
 
   /* Garmin-Sync-Status im Update-Menue (js/components/dashboard.js) */
   .update-menu-sync { padding: 2px 12px 8px; font-size: 11px; color: var(--text-secondary); }
-  .update-menu-sync.stale { color: var(--c-warn); font-weight: 600; }
+  .update-menu-sync.stale { color: var(--c-warn-text); font-weight: 600; }
   #menu-item-garmin { text-decoration: none; }
   .update-menu-sync .sync-hint { display: block; margin-top: 4px; line-height: 1.45; opacity: 0.85; }
   .update-menu-sync .sync-hint code { font-size: 10px; padding: 1px 4px; border-radius: 4px;
     background: var(--bg-subtle, rgba(127,127,127,0.15)); }
 
-  .pmc-substats .sub-tile .v small.delta-warn { color: var(--c-warn); }
+  .pmc-substats .sub-tile .v small.delta-warn { color: var(--c-warn-text); }
 
   .load-status {
     display: inline-flex;
@@ -1478,11 +1485,11 @@
 
   .load-status .dot { width: 7px; height: 7px; border-radius: 50%; }
 
-  .load-status.ok    { background: rgba(12,163,12,0.10); color: #0a7a0a; }
+  .load-status.ok    { background: rgba(12,163,12,0.10); color: var(--c-good-text); }
 
-  .load-status.watch { background: rgba(250,178,25,0.16); color: #93650a; }
+  .load-status.watch { background: rgba(250,178,25,0.16); color: var(--c-warn-text); }
 
-  .load-status.risk  { background: rgba(208,59,59,0.10); color: #b13030; }
+  .load-status.risk  { background: rgba(208,59,59,0.10); color: var(--c-crit-text); }
 
   /* Trainingsstatus als erste Stat-Kachel im Übersicht-Tab (Garmin-Connect-
      artig, siehe renderStats() in js/components/dashboard.js) - gleiches
@@ -1491,16 +1498,16 @@
      neutral für "noch keine Einordnung"), Text bleibt normal groß wie bei
      den anderen Stat-Kacheln. */
   .stat-tile.training-tile-good     { box-shadow: 0 0 0 1.5px var(--c-good), var(--card-shadow); }
-  .stat-tile.training-tile-good .sub     { color: var(--c-good); }
+  .stat-tile.training-tile-good .sub     { color: var(--c-good-text); }
 
   .stat-tile.training-tile-recovery { box-shadow: 0 0 0 1.5px var(--accent), var(--card-shadow); }
   .stat-tile.training-tile-recovery .sub { color: var(--accent); }
 
   .stat-tile.training-tile-watch    { box-shadow: 0 0 0 1.5px var(--c-warn), var(--card-shadow); }
-  .stat-tile.training-tile-watch .sub    { color: var(--c-warn); }
+  .stat-tile.training-tile-watch .sub    { color: var(--c-warn-text); }
 
   .stat-tile.training-tile-risk     { box-shadow: 0 0 0 1.5px var(--c-crit), var(--card-shadow); }
-  .stat-tile.training-tile-risk .sub     { color: var(--c-crit); }
+  .stat-tile.training-tile-risk .sub     { color: var(--c-crit-text); }
 
   .stat-tile.training-tile-muted    { }
 
@@ -1546,7 +1553,7 @@
     padding: 2px 7px;
     border-radius: 999px;
     background: color-mix(in srgb, var(--c-rad) 16%, transparent);
-    color: var(--c-rad);
+    color: color-mix(in srgb, var(--c-rad) 70%, var(--text-primary));
     border: 1px solid color-mix(in srgb, var(--c-rad) 32%, transparent);
     flex: none;
     white-space: nowrap;
@@ -1645,7 +1652,7 @@
   .compare-summary .item b { font-weight: 640; color: var(--text-primary); }
   .compare-mode-toggle { margin-bottom: 16px; }
   .compare-stats-table { margin-bottom: 22px; }
-  .compare-stats-table td.compare-best { color: var(--c-good); font-weight: 650; }
+  .compare-stats-table td.compare-best { color: var(--c-good-text); font-weight: 650; }
   .compare-columns { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 4px; }
   .compare-column { flex: 0 0 320px; background: var(--page); border-radius: 14px; padding: 14px; }
   .compare-column-head { display: flex; align-items: center; gap: 8px; font-weight: 650; margin-bottom: 10px; }
@@ -1703,7 +1710,7 @@
 
   .wd-rating-star {
     background: none; border: none; padding: 0; cursor: pointer;
-    font-size: 22px; line-height: 1; color: var(--border);
+    font-size: 22px; line-height: 1; color: var(--text-muted);
     transition: color 0.15s ease, transform 0.1s ease;
   }
 
@@ -1820,21 +1827,21 @@
   .equipment-item-sub { font-size: 12px; color: var(--text-secondary); flex: 2 1 260px; }
   .equipment-item-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; flex: 0 0 auto; margin-left: auto; }
   .equipment-delete { border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 13px; padding: 4px 6px; border-radius: 6px; }
-  .equipment-delete:hover { color: var(--c-crit, #d03b3b); background: var(--page); }
+  .equipment-delete:hover { color: var(--c-crit-text); background: var(--page); }
 
   .equipment-badge { display: inline-flex; align-items: center; font-size: 10.5px; font-weight: 650; padding: 2px 8px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.02em; }
   .equipment-badge-ok { background: var(--accent-wash); color: var(--accent); }
   .equipment-badge-active { background: var(--accent-wash); color: var(--accent); }
   .equipment-badge-nolimit { background: var(--page); color: var(--text-muted); }
-  .equipment-badge-soon { background: rgba(250,178,25,0.16); color: var(--c-warn, #b8860b); }
-  .equipment-badge-due { background: rgba(208,59,59,0.14); color: var(--c-crit, #d03b3b); }
+  .equipment-badge-soon { background: rgba(250,178,25,0.16); color: var(--c-warn-text); }
+  .equipment-badge-due { background: rgba(208,59,59,0.14); color: var(--c-crit-text); }
   .equipment-badge-retired { background: var(--page); color: var(--text-muted); }
 
   .equipment-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 14px 0; padding: 10px 14px; border-radius: 12px; background: rgba(250,178,25,0.12); border: 1px solid rgba(250,178,25,0.35); font-size: 12.5px; }
   .equipment-banner-icon { font-size: 15px; flex: none; }
   .equipment-banner-text { flex: 1 1 auto; color: var(--text-primary); }
   .equipment-banner-item { margin-right: 8px; color: var(--text-secondary); }
-  .equipment-banner-item.due { color: var(--c-crit, #d03b3b); font-weight: 620; }
+  .equipment-banner-item.due { color: var(--c-crit-text); font-weight: 620; }
   .equipment-banner-link { border: none; background: transparent; color: var(--accent); font-weight: 620; cursor: pointer; font-size: 12.5px; padding: 2px 4px; flex: none; }
   .equipment-banner-link:hover { text-decoration: underline; }
 
@@ -1852,7 +1859,7 @@
 
   .login-card .update-btn:disabled { opacity: 0.6; cursor: default; }
 
-  .login-error { margin: 0; font-size: 12.5px; color: var(--c-crit); }
+  .login-error { margin: 0; font-size: 12.5px; color: var(--c-crit-text); }
 
   /* Hinweis oben im Dashboard, wenn Laden/Speichern beim Server scheitert
      (showApiError, js/data/api-client.js). */
