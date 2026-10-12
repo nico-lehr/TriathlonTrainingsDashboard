@@ -28,12 +28,14 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 | C Garmin-Workouts auf die Uhr | fertig (geprüft: PASS; kleine Nachbesserungen) | 3 / 3 | 100 % | 2026-10-12 |
 | D Handy / iPhone | fertig (geprüft: PASS; kleine CSS-Nachbesserungen eingebaut) | 4 / 4 | 100 % | 2026-10-12 |
 | E Equipment, Wetter, Rennplan | fertig (E1 erst FAIL dann PASS; E2 PASS; E3 erst FAIL dann PASS) | 3 / 3 | 100 % | 2026-10-12 |
-| F Abschluss-Check | läuft | 0 / 4 | 0 % | 2026-10-12 |
+| F Abschluss-Check | läuft (F4 Doku fertig; F1–F3 Prüfung läuft) | 1 / 4 | 25 % | 2026-10-12 |
 
 **Gesamt: 86 % (18 von 21 Schritten)**
 
 ## Offene Fragen
 
+- Zählfehler korrigiert: A–E sind 17 Schritte (3+4+3+4+3), nicht 18. Mit der fertigen Doku (F4) sind es jetzt 18 von 21.
+- iPhone über HTTPS (`tailscale serve`): Der Server sieht dann alle Anfragen von `127.0.0.1`. Die Login-Bremse (5 Fehlversuche/Minute) gilt damit für alle HTTPS-Nutzer gemeinsam – tippt einer 5-mal falsch, müssen alle über HTTPS eine Minute warten. Standard: so gelassen (selten, nach 1 Minute vorbei). Änderbar, indem der Server bei Anfragen von `127.0.0.1` die von Tailscale mitgeschickte echte Adresse nimmt.
 - `.btn-primary` / `.btn-secondary` gibt es im CSS nicht. Standard: Hauptknopf = `.update-btn`, Nebenknopf = `.cal-today-btn` (beide vorhanden).
 - Einen „Analyse“-Tab gab es nicht. Standard: Aufgabe B legt ihn neu an (ein Tab-Knopf + eine Ansicht).
 - Layout: Mit der gewünschten Mindestbreite 420 px stehen bei 1680 px drei Karten nebeneinander; weil die Übersicht-Karten in Zweier-/Vierergruppen kommen, bleiben in manchen Reihen Lücken. Wer keine Lücken will: Mindestbreite in `.dash-grid` auf ca. 540 px setzen (dann 2 Spalten bis ca. 2000 px). Vorerst wie gewünscht 420 px.
