@@ -187,3 +187,50 @@ function buildPlanWishesPrompt(wishes) {
 Feste Terminwünsche des Athleten - genau so einplanen (gleiches Datum, gleiche Sportart, diese Dauer), auch wenn der Tag laut Profil kein Trainingstag ist, und die übrigen Einheiten darauf abstimmen (z.B. keine harte Einheit direkt davor oder danach):
 ${lines.join("\n")}`;
 }
+
+// Ergänzung zum Trainingsplan-Prompt: die festen Regeln des Regelwerks als
+// Text (planRulesText, js/analytics/plan-rules.js) - dieselben Zahlen, mit
+// denen generateTrainingPlan() den Vorschlag danach prüft.
+function buildPlanRulesPrompt(goal) {
+  return `
+
+Feste Trainingsregeln - dein Plan wird danach automatisch geprüft (zusammen mit den schon geplanten und den zuletzt absolvierten Einheiten); Verstöße werden korrigiert oder der Plan wird verworfen:
+${planRulesText(goal)}`;
+}
+
+// Zweiter Versuch der Trainingsplan-Erstellung: diese Regelverstöße hatte der
+// erste Vorschlag (Texte aus validatePlan()). Ohne Verstöße ein leerer Text.
+function buildPlanRetryPrompt(violations) {
+  if (!violations || !violations.length) return "";
+  return `
+
+Dein letzter Vorschlag verstieß gegen diese Regeln. Erstelle den Plan komplett neu und vermeide genau diese Fehler:
+${violations.map(v => "- " + v.text).join("\n")}`;
+}
+
+// KI-Empfehlungen "Heute / Diese Woche / Nächste Woche" (Coach-Tab,
+// generateOutlook in js/ai/ollama.js). Alle Zahlen stehen fertig berechnet
+// in `facts` (buildOutlookFacts, context-builder.js); die KI ordnet nur ein.
+// Antwort als JSON, damit jede Empfehlung ihre eigene Begründung bekommt.
+function buildOutlookPrompt(facts, goal) {
+  const section = (title, lines) => `${title}:\n${lines.map(l => "- " + l).join("\n")}`;
+  return `Du bist ein erfahrener Triathlon-Coach. Hier sind fertig berechnete Fakten zu einem Athleten:
+
+${section("Heute", facts.today)}
+
+${section("Diese Woche", facts.thisWeek)}
+
+${section("Nächste Woche", facts.nextWeek)}
+${facts.ruleHints.length ? `\n${section("Hinweise des Regelwerks zum aktuellen Trainingsplan", facts.ruleHints)}\n` : ""}
+Feste Trainingsregeln, an die sich jede Empfehlung halten muss:
+${planRulesText(goal)}
+
+Gib drei kurze Empfehlungen auf Deutsch: für heute, für diese Woche und für nächste Woche. Je Empfehlung:
+- "empfehlung": 1-2 Sätze, konkret (was trainieren oder lieber nicht, wie intensiv, ob der geplante Plan so passt). Zahlen hier höchstens als Trainingsdauer in Minuten.
+- "begruendung": 1-2 Sätze, warum - mit Bezug auf Belastung/Form (ACWR, TSB), Erholung (Erholungs-Check, Garmin-Werte) und den Wettkampf, soweit oben Fakten dazu stehen.
+WICHTIG: In "begruendung" ausschließlich Zahlen verwenden, die oben in den Fakten stehen - keine eigenen Zahlen, Prozentwerte, Zeiten oder Pulswerte erfinden oder umrechnen. Fehlt eine Angabe, lass sie weg statt zu schätzen.
+Alle Texte als reiner Klartext ohne Markdown.
+
+Antworte AUSSCHLIESSLICH mit einem JSON-Objekt in genau dieser Form, keinerlei Text davor/danach:
+{"heute":{"empfehlung":"...","begruendung":"..."},"diese_woche":{"empfehlung":"...","begruendung":"..."},"naechste_woche":{"empfehlung":"...","begruendung":"..."}}`;
+}

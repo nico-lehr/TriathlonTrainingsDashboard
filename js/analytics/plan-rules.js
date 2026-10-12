@@ -458,6 +458,26 @@ function validatePlan(plannedWorkouts, history, wellness, recovery, options = {}
   ].sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999") || severityOrder[a.severity] - severityOrder[b.severity]);
 }
 
+// Die Regeln als kurze Sätze für den KI-Trainingsplan-Prompt
+// (buildPlanRulesPrompt, js/ai/prompts.js) - direkt aus den Schwellenwerten
+// oben erzeugt, damit die KI nie andere Zahlen bekommt als die Prüfung danach.
+// Mit `goal` kommt Regel 6 (lockere Einheit je Ziel-Sportart) dazu.
+function planRulesText(goal) {
+  const pct = x => Math.round(x * 100);
+  const sports = (goal && PLAN_GOAL_SPORTS[goal.sport]) || [];
+  return [
+    `Nie zwei harte Tage hintereinander. Hart ist eine Einheit mit Intensität "hart" oder mit mehr als ${PLAN_HARD_MIN_DURATION} Minuten (auch wenn sie locker ist).`,
+    `Höchstens ${PLAN_MAX_HARD_PER_WEEK} harte Einheiten pro Woche (Montag bis Sonntag).`,
+    `Etwa ${pct(PLAN_EASY_SHARE_TARGET)} % der Trainingsminuten einer Woche "leicht".`,
+    `Mindestens ${PLAN_MIN_FREE_DAYS} komplett freier Tag pro Woche (Montag bis Sonntag).`,
+    `Der Wochenumfang (Minuten) steigt höchstens um ${pct(PLAN_MAX_WEEKLY_INCREASE)} % gegenüber der letzten normalen Woche.`,
+    `Nach ${PLAN_DELOAD_EVERY_WEEKS - 1} Aufbauwochen in Folge kommt eine Entlastungswoche mit mindestens ${pct(PLAN_DELOAD_REDUCTION)} % weniger Minuten.`,
+    `Die nächste Einheit nur "leicht", wenn der ACWR über ${fmtNum(PLAN_ACWR_LIMIT, 1)} liegt oder heute Erschöpfung, starker Muskelkater oder eine Verletzung gemeldet ist - bei einer Verletzung stattdessen ein Ruhetag.`,
+    `Die nächste Einheit besser "leicht", wenn die HRV mindestens ${PLAN_HRV_DROP_PCT} % unter dem eigenen Durchschnitt oder der Ruhepuls mindestens ${PLAN_RHR_RISE_BPM} Schläge darüber liegt.`,
+    ...(sports.length ? [`Jede Woche mindestens eine lockere ("leicht") Einheit in jeder Sportart des Ziels: ${sports.join(", ")}.`] : []),
+  ].map(s => "- " + s).join("\n");
+}
+
 // Verstöße aus `after`, die es in `before` noch nicht gab (gleiche Regel,
 // gleicher Tag bzw. gleiche Woche, gleiche Einheit) - eine Änderung am Plan
 // soll nur für das warnen oder stoppen, was sie selbst neu verursacht.

@@ -65,6 +65,7 @@ test("move: verschiebt die Einheit, die Eingabe bleibt unverändert", () => {
 test("set_intensity: Intensität runter, bei Angabe auch kürzer", () => {
   let out = apply(plan(), { action: "set_intensity", workoutId: "b", intensity: "leicht" });
   assert.deepStrictEqual([byId(out, "b").intensity, byId(out, "b").duration_min], ["leicht", 50]);
+  assert.match(byId(out, "b").description, /Vom Regelwerk auf „leicht“ gesetzt/, "Hinweis, dass die Beschreibung nicht mehr passt");
   out = apply(plan(), { action: "set_intensity", workoutId: "b", intensity: "leicht", duration_min: 30 });
   assert.deepStrictEqual([byId(out, "b").intensity, byId(out, "b").duration_min], ["leicht", 30]);
 });

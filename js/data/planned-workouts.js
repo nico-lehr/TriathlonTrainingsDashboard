@@ -151,6 +151,9 @@ function applyPlanSuggestion(list, suggestion, defaults = {}) {
       return copy;
     case "set_intensity":
       if (!target || !s.intensity) return null;
+      // Die Beschreibung (z. B. "6x400m zügig") passt danach nicht mehr zur
+      // Intensität - deshalb ein sichtbarer Hinweis davor statt still ändern.
+      if (target.intensity !== s.intensity) target.description = [`Vom Regelwerk auf „${s.intensity}“ gesetzt.`, target.description].filter(Boolean).join(" ");
       target.intensity = s.intensity;
       if (s.duration_min) target.duration_min = s.duration_min;
       return copy;

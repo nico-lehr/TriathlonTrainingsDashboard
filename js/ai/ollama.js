@@ -181,6 +181,51 @@ function parsePlanResponse(rawText, windowDates) {
   return valid;
 }
 
+/* ---------- Regelprüfung für KI-Pläne (js/analytics/plan-rules.js) ---------- */
+
+// Kein KI-Plan wird mit einem "block"-Verstoß gespeichert. Ablauf je Versuch:
+// Verstöße, die der Vorschlag NEU verursacht (newPlanViolations), werden
+// zuerst automatisch behoben - der Vorschlag jedes "block"-Verstoßes wird
+// übernommen (fix = applyPlanSuggestion) und neu geprüft. Bleibt ein "block"
+// übrig, fragt ask() die KI ein zweites Mal, diesmal mit den Verstoß-Texten.
+//   ask(violations) -> Promise<{ base, list }>: base = Plan vorher, list = mit Vorschlag
+//   validate(list)  -> Verstöße (validatePlan)
+//   fix(list, suggestion) -> Liste | null
+// Ergebnis: { list, corrected, violations, attempts } - list = null heißt
+// "nicht speichern", violations sind dann die übrig gebliebenen "block"-
+// Verstöße, sonst die verbleibenden Hinweise ("warn"); corrected = Texte der
+// automatisch übernommenen Korrekturen.
+const PLAN_AI_MAX_ATTEMPTS = 2;
+const PLAN_AUTOFIX_MAX_ROUNDS = 10;
+
+async function checkedPlanFromAi({ ask, validate, fix }) {
+  let feedback = [], blocks = [];
+  for (let attempt = 1; attempt <= PLAN_AI_MAX_ATTEMPTS; attempt++) {
+    const { base, list: proposed } = await ask(feedback);
+    const known = validate(base);
+    const fresh = l => newPlanViolations(known, validate(l));
+    let list = proposed, violations = fresh(list);
+    const firstBlocks = violations.filter(v => v.severity === "block");
+    const corrected = [];
+    for (let round = 0; round < PLAN_AUTOFIX_MAX_ROUNDS; round++) {
+      const block = violations.find(v => v.severity === "block");
+      const next = block && fix(list, block.suggestion);
+      if (!next) break;
+      corrected.push(block.suggestion.text);
+      list = next;
+      violations = fresh(list);
+    }
+    blocks = violations.filter(v => v.severity === "block");
+    if (!blocks.length) return { list, corrected, violations, attempts: attempt };
+    feedback = firstBlocks;
+  }
+  return { list: null, corrected: [], violations: blocks, attempts: PLAN_AI_MAX_ATTEMPTS };
+}
+
+// Ergebnis der letzten Prüfung (nur für die laufende Sitzung), angezeigt in
+// der Trainingsplan-Kachel: { goalId, corrected: [Text], hints: [Text] }.
+let planCheckNotes = null;
+
 // Generiert die nächsten (rollierend) geplanten Tage für das Hauptevent-Ziel
 // und speichert sie als plannedWorkouts (js/data/planned-workouts.js). Wird
 // sowohl manuell (Button im Coach-Tab) als auch automatisch im Hintergrund
@@ -189,6 +234,7 @@ function parsePlanResponse(rawText, windowDates) {
 // bevorstehenden geplanten Einheiten DIESES Ziels und plant dann komplett
 // neu ab heute, statt wie sonst nur die Lücke nach dem letzten bereits
 // geplanten Tag aufzufüllen (rollierendes Fenster, s.o.).
+// Gespeichert wird erst nach der Regelprüfung (checkedPlanFromAi, s.o.).
 async function generateTrainingPlan(goalId, { replace = false } = {}) {
   const goal = goals.find(g => g.id === goalId);
   if (!goal) return;
@@ -201,19 +247,36 @@ async function generateTrainingPlan(goalId, { replace = false } = {}) {
   goal._planLoading = true; goal._planError = null;
   renderTrainingPlanCard();
   renderCalendar();
+  planCheckNotes = null;
   try {
     // Offene Terminwünsche (js/data/plan-wishes.js) im Fenster bekommt die KI
     // als feste Vorgabe; was sie trotzdem nicht einplant - oder was auf einem
     // schon verplanten Tag liegt -, ergänzt addOpenWishesToPlan() danach selbst.
     const wishes = openPlanWishes().filter(w => windowDates.includes(w.date));
-    const prompt = buildPlanPrompt(goal, windowDates) + buildPlanWishesPrompt(wishes);
-    const text = await callAiText(prompt, { task: "plan", json: true });
-    const entries = parsePlanResponse(text, windowDates);
     const phase = computeTrainingPhase(Math.round((new Date(goal.date + "T00:00:00") - new Date(new Date().setHours(0, 0, 0, 0))) / 86400000));
-    const withAi = [...plannedWorkouts, ...entries.map(entry => buildPlannedWorkout({ ...entry, goalId: goal.id, phase: phase.key, source: "ai" }))];
-    replacePlannedWorkouts(addOpenWishesToPlan(withAi, windowDates[windowDates.length - 1], { goalId: goal.id, phase: phase.key, source: "manual" }));
-    goal.lastPlannedAt = new Date().toISOString();
-    goal._planError = null;
+    const defaults = { goalId: goal.id, phase: phase.key, source: "ai" };
+    const planUntil = windowDates[windowDates.length - 1];
+    const result = await checkedPlanFromAi({
+      ask: async violations => {
+        const prompt = buildPlanPrompt(goal, windowDates) + buildPlanRulesPrompt(goal) + buildPlanWishesPrompt(wishes) + buildPlanRetryPrompt(violations);
+        const entries = parsePlanResponse(await callAiText(prompt, { task: "plan", json: true }), windowDates);
+        // Basis erst nach der (langen) KI-Anfrage lesen - Änderungen, die in
+        // der Zwischenzeit gemacht wurden, bleiben so erhalten.
+        const base = plannedWorkouts;
+        const withAi = [...base, ...entries.map(entry => buildPlannedWorkout({ ...entry, ...defaults }))];
+        return { base, list: addOpenWishesToPlan(withAi, planUntil, { ...defaults, source: "manual" }) };
+      },
+      validate: list => planRuleViolations(list, { planUntil }),
+      fix: (list, suggestion) => applyPlanSuggestion(list, suggestion, defaults),
+    });
+    if (result.list) {
+      replacePlannedWorkouts(result.list);
+      goal.lastPlannedAt = new Date().toISOString();
+      goal._planError = null;
+      planCheckNotes = { goalId: goal.id, corrected: result.corrected, hints: result.violations.map(v => v.text) };
+    } else {
+      goal._planError = `Der KI-Vorschlag verstößt auch nach ${PLAN_AI_MAX_ATTEMPTS} Versuchen gegen Trainingsregeln und wurde deshalb nicht gespeichert: ${result.violations.map(v => v.text).join(" ")}`;
+    }
   } catch (e) {
     goal._planError = describeAiError(e, "plan");
   } finally {
@@ -352,5 +415,74 @@ async function generatePerformanceSummary() {
   } finally {
     performanceSummary.loading = false;
     if (typeof renderPerformanceSummary === "function") renderPerformanceSummary();
+  }
+}
+
+
+/* ---------- Empfehlungen Heute / Diese Woche / Nächste Woche (Coach-Tab) ---------- */
+
+// Gleiches Zustands-Schema wie performanceSummary, gerendert von
+// renderOutlook() (js/components/coach.js). `facts` = die Fakten, mit denen
+// die Empfehlung erstellt wurde (buildOutlookFacts, context-builder.js).
+// Nutzt dieselbe KI-Einstellung wie die Ziel-Empfehlung ("recommendation").
+const OUTLOOK_HORIZONS = [
+  { key: "heute", label: "Heute", facts: "today" },
+  { key: "diese_woche", label: "Diese Woche", facts: "thisWeek" },
+  { key: "naechste_woche", label: "Nächste Woche", facts: "nextWeek" },
+];
+
+let outlook = { result: null, facts: null, at: null, loading: false, error: null };
+
+// Zahlen eines Textes ("1,15", "12.10", "45"); "1,15" und "1.15" sind gleich.
+const outlookNumberTokens = text => String(text || "").match(/\d+(?:[.,]\d+)*/g) || [];
+const outlookNumber = token => Number(token.replace(",", "."));
+
+// Entfernt aus der KI-Begründung jeden Satz mit einer Zahl, die nicht im
+// Prompt stand - eine solche Zahl hätte die KI erfunden. Erlaubt sind die
+// Zahlen des Prompts und ihre Teile (aus "15.10." auch 15 und 10).
+function keepPromptNumbers(text, promptText) {
+  const allowed = new Set();
+  outlookNumberTokens(promptText).forEach(t => {
+    allowed.add(outlookNumber(t));
+    t.split(/[.,]/).forEach(part => allowed.add(Number(part)));
+  });
+  return String(text || "").split(/(?<=[.!?])\s+/)
+    .filter(sentence => outlookNumberTokens(sentence).every(t => allowed.has(outlookNumber(t))))
+    .join(" ").trim();
+}
+
+function parseOutlookResponse(rawText, promptText) {
+  let data;
+  try {
+    const match = rawText.match(/\{[\s\S]*\}/);
+    data = JSON.parse(match ? match[0] : rawText);
+  } catch (e) {
+    throw new Error("Antwort war kein gültiges JSON.");
+  }
+  const text = v => (typeof v === "string" ? v.trim().slice(0, 600) : "");
+  const result = {};
+  OUTLOOK_HORIZONS.forEach(h => {
+    const item = (data && data[h.key]) || {};
+    result[h.key] = { empfehlung: text(item.empfehlung), begruendung: keepPromptNumbers(text(item.begruendung), promptText) };
+  });
+  if (!OUTLOOK_HORIZONS.some(h => result[h.key].empfehlung)) throw new Error("Keine Empfehlungen in der Antwort gefunden.");
+  return result;
+}
+
+async function generateOutlook() {
+  outlook.loading = true; outlook.error = null;
+  if (typeof renderOutlook === "function") renderOutlook();
+  try {
+    const facts = buildOutlookFacts();
+    const prompt = buildOutlookPrompt(facts, getPrimaryGoal());
+    const text = await callAiText(prompt, { task: "recommendation", json: true });
+    outlook.result = parseOutlookResponse(text, prompt);
+    outlook.facts = facts;
+    outlook.at = new Date().toISOString();
+  } catch (e) {
+    outlook.error = describeAiError(e, "recommendation");
+  } finally {
+    outlook.loading = false;
+    if (typeof renderOutlook === "function") renderOutlook();
   }
 }

@@ -75,6 +75,7 @@ function renderTrainingPlanCard() {
       </div>
     </div>
     ${goal._planError ? `<p class="goal-error">${escapeHtml(goal._planError)}</p>` : ""}
+    ${planCheckNotesHtml(goal)}
     <div class="plan-item-list">${listHtml}</div>
   `;
 
@@ -99,6 +100,19 @@ function renderTrainingPlanCard() {
   if (exportAllBtn) exportAllBtn.addEventListener("click", () => exportPlannedWorkoutsAsFit(upcoming));
 
   if (typeof renderCoachSummary === "function") renderCoachSummary();
+}
+
+// Was die Regelprüfung nach der letzten KI-Planung automatisch angepasst hat
+// und welche Hinweise ("warn") geblieben sind (planCheckNotes, js/ai/ollama.js).
+function planCheckNotesHtml(goal) {
+  const n = planCheckNotes;
+  if (!n || n.goalId !== goal.id || (!n.corrected.length && !n.hints.length)) return "";
+  const list = items => `<ul>${items.map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>`;
+  return `
+    <div class="plan-check-notes">
+      ${n.corrected.length ? `<p>Vom Regelwerk angepasst</p>${list(n.corrected)}` : ""}
+      ${n.hints.length ? `<p>Hinweise zum neuen Plan</p>${list(n.hints)}` : ""}
+    </div>`;
 }
 
 /* ---------- Trainingsplan-Zeitleiste: grobe Periodisierungs-Übersicht ----------
