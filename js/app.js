@@ -24,6 +24,7 @@ function renderAll() {
   renderRecords(); // nutzt immer die volle Historie
   renderNutrition(); // nutzt Trainingsplan/Ziel-Daten, nicht den Zeitraum-Filter oben
   renderAchievements(); // nutzt immer die volle Historie
+  renderAnalysis(); // Analyse-Tab, nutzt immer die volle Historie
   showAchievementToast(checkAndUnlockAchievements());
   checkAndShowBirthdayMessage();
 }
@@ -81,6 +82,7 @@ function checkAutoReplan() {
   initInfoPopovers();
   initCardSearch();
   initAccount();
+  initAnalysis();
   renderAll();
   checkAutoReplan();
   // Automatische Risiko-Kontrolle (ACWR/TSB/Monotonie + Erholungs-Check) für

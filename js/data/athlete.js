@@ -21,6 +21,7 @@ let athleteProfile = {
   name: null, gender: null, birthDate: null,
   raceExperience: null, // Wettkampferfahrung (Chips: none/few/some/many) - Kontext für die KI-Trainingsplan-Erstellung
   limitations: null, // Verletzungen/Einschränkungen (Freitext) - wird im KI-Trainingsplan-Kontext berücksichtigt
+  sportBalanceTarget: null, // Ziel-Anteile der Trainingszeit { Schwimmen, Rad, Laufen } in % (zusammen 100) - Analyse-Tab "Sport-Balance", null = Standard 15/50/35 (js/analytics/triathlon.js)
 };
 
 const WEEKDAYS = [["mo", "Mo"], ["di", "Di"], ["mi", "Mi"], ["do", "Do"], ["fr", "Fr"], ["sa", "Sa"], ["so", "So"]];
