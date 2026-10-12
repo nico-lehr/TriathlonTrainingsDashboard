@@ -176,13 +176,20 @@
   .workouts-col-toggle { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12.5px; font-weight: 500; color: var(--text-primary); cursor: pointer; }
   .workouts-col-toggle input { margin: 0; cursor: pointer; }
 
+  /* Vollbild-Overlays (Dialoge, Onboarding, Coach-Sperre): Abstand zum Rand,
+     aber nie unter Notch/Home-Indikator (--gap wird auf dem Handy kleiner). */
+  .modal-overlay, .dnd-overlay, .onb-overlay, .coach-gate {
+    --gap: 24px;
+    padding: max(var(--gap), var(--safe-top)) max(var(--gap), var(--safe-right)) max(var(--gap), var(--safe-bottom)) max(var(--gap), var(--safe-left));
+  }
+
   /* Drag & Drop Upload-Overlay */
   .dnd-overlay {
     position: fixed; inset: 0;
     background: rgba(11,11,11,0.4);
     display: flex; visibility: hidden; opacity: 0;
     align-items: center; justify-content: center;
-    z-index: 100; padding: 24px;
+    z-index: 100;
     transition: opacity 0.22s ease, visibility 0s linear 0.22s;
   }
 
@@ -302,7 +309,7 @@
     overflow: hidden;
   }
 
-  .cal-grid-scroll { overflow-x: auto; }
+  .cal-grid-scroll { overflow-x: auto; overscroll-behavior-x: contain; }
 
   .cal-dow-header {
     font-size: 11px; font-weight: 650; color: var(--text-muted);
@@ -946,7 +953,7 @@
     -webkit-backdrop-filter: blur(22px) saturate(150%);
     display: flex; visibility: hidden; opacity: 0;
     align-items: center; justify-content: center;
-    z-index: 100; padding: 24px;
+    z-index: 100;
     transition: opacity 0.28s ease, visibility 0s linear 0.28s;
     overflow: hidden;
   }
@@ -1094,7 +1101,7 @@
   /* z-index bewusst UNTER der Topnav (40): kein echtes Modal - man soll per
      Tab-Wechsel jederzeit rausnavigieren können, ohne erst "Onboarding
      starten"/"Ohne Onboarding fortfahren" anklicken zu müssen. */
-  .coach-gate { display: none; position: fixed; inset: 0; z-index: 35; align-items: center; justify-content: center; padding: 20px; }
+  .coach-gate { display: none; position: fixed; inset: 0; z-index: 35; align-items: center; justify-content: center; }
 
   .coach-gate.active { display: flex; }
 
@@ -1216,7 +1223,8 @@
      ohne pointer-events:none - visibility:hidden reicht dafür bereits aus
      und lässt sich hier zusätzlich für den Hover-Zustand nutzen. */
   .achievement-toast {
-    position: fixed; top: 18px; left: 50%; transform: translateX(-50%);
+    position: fixed; top: calc(18px + var(--safe-top)); left: 50%; transform: translateX(-50%);
+    width: max-content; max-width: calc(100vw - 32px);
     z-index: 200; display: flex; align-items: center; gap: 10px;
     background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px;
     box-shadow: var(--card-shadow); padding: 12px 18px; font-size: 13.5px; font-weight: 600;
@@ -1552,7 +1560,7 @@
 
   table.workouts td.num { text-align: right; }
 
-  .table-scroll { overflow-x: auto; }
+  .table-scroll { overflow-x: auto; overscroll-behavior-x: contain; }
 
   /* Kompakte Variante der Workout-Tabelle (Coach-Tab) - gleiche Optik,
      etwas kleinere Schrift/Abstände, damit die Karte insgesamt kleiner
@@ -1570,7 +1578,6 @@
     opacity: 0;
     align-items: center; justify-content: center;
     z-index: 100;
-    padding: 24px;
     transition: opacity 0.22s ease, visibility 0s linear 0.22s;
   }
 
@@ -1833,7 +1840,7 @@
 
   /* Login-Seite (login.html): eine schmale Karte in der Bildschirmmitte. */
   .login-page {
-    min-height: 100vh; box-sizing: border-box;
+    min-height: 100vh; min-height: 100dvh; box-sizing: border-box;
     display: flex; align-items: center; justify-content: center;
   }
 
