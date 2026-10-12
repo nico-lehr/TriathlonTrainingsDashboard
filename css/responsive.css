@@ -153,6 +153,7 @@
   /* Schmale Handys: etwas kompaktere Kennzahl-Kacheln (2 pro Reihe), damit
      Werte wie "ml/kg/min" oder "Erholung" nicht mitten im Wort umbrechen. */
   @media (max-width: 480px) {
+    .update-menu-trigger { padding: 0 12px; gap: 5px; } /* Aktionszeile der Navigation bleibt auch bei 320px einzeilig */
     .stat-tile { padding: 16px 14px; }
     .stat-tile .value { font-size: 22px; }
   }
