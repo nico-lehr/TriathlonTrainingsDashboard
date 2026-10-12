@@ -457,3 +457,12 @@ function validatePlan(plannedWorkouts, history, wellness, recovery, options = {}
     ...checkPlanGoalSports(ctx, goal),
   ].sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999") || severityOrder[a.severity] - severityOrder[b.severity]);
 }
+
+// Verstöße aus `after`, die es in `before` noch nicht gab (gleiche Regel,
+// gleicher Tag bzw. gleiche Woche, gleiche Einheit) - eine Änderung am Plan
+// soll nur für das warnen oder stoppen, was sie selbst neu verursacht.
+function newPlanViolations(before, after) {
+  const key = v => `${v.rule}|${v.date}|${v.workoutId}`;
+  const known = new Set(before.map(key));
+  return after.filter(v => !known.has(key(v)));
+}

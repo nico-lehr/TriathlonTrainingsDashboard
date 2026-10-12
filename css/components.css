@@ -176,6 +176,21 @@
   .workouts-col-toggle { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12.5px; font-weight: 500; color: var(--text-primary); cursor: pointer; }
   .workouts-col-toggle input { margin: 0; cursor: pointer; }
 
+  /* Terminwünsche im ⚙-Menü der Trainingsplan-Kachel (js/components/training-plan.js) */
+  .trainingplan-settings-popover { width: 320px; }
+  .card .card-sub.plan-wish-sub { margin: 0 0 8px; }
+  .plan-wish-title { margin-top: 16px; }
+  .plan-wish-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; margin-bottom: 4px; }
+  .plan-wish-form .update-btn { grid-column: 1 / -1; justify-content: center; }
+  .plan-wish-list { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .plan-wish-item { display: flex; align-items: center; gap: 8px; padding: 6px 4px 6px 10px; background: var(--page); border-radius: 10px; }
+  .plan-wish-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .plan-wish-what { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+  .plan-wish-note { font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .plan-wish-state { font-size: 10.5px; font-weight: 650; padding: 2px 7px; border-radius: 6px; background: var(--grid); color: var(--text-secondary); }
+  .plan-wish-state.planned { background: color-mix(in srgb, var(--c-good) 18%, transparent); color: var(--c-good); }
+  .plan-wish-empty { margin: 0; font-size: 12px; color: var(--text-muted); }
+
   /* Drag & Drop Upload-Overlay */
   .dnd-overlay {
     position: fixed; inset: 0;
@@ -1615,8 +1630,10 @@
   .modal-close:hover { background: var(--grid); }
 
   .confirm-card { max-width: 380px; padding: 26px 26px 20px; text-align: center; }
-  .confirm-message { font-size: 15px; color: var(--text-primary); margin: 6px 0 20px; line-height: 1.45; }
-  .confirm-actions { display: flex; justify-content: center; gap: 10px; }
+  .confirm-message { font-size: 15px; color: var(--text-primary); margin: 6px 0 20px; line-height: 1.45; white-space: pre-line; }
+  .confirm-actions { display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; }
+  /* Lange Beschriftungen (Vorschlag des Plan-Regelwerks als Knopf) umbrechen statt überlaufen. */
+  .confirm-actions .update-btn { white-space: normal; justify-content: center; text-align: center; border-radius: 14px; }
   .confirm-danger-btn { background: var(--c-crit); }
   .confirm-danger-btn:hover { filter: brightness(1.08); }
 

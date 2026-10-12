@@ -38,9 +38,11 @@ function newPlannedWorkoutId() {
   return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ("pw" + Date.now() + Math.random().toString(16).slice(2));
 }
 
+// Neuer, noch nicht gespeicherter Eintrag - gemeinsame Form für
+// addPlannedWorkout() und applyPlanSuggestion() (add_easy_session).
 // entry: { date, sport, title, duration_min, intensity, description, exercises, goalId, phase, source }
-function addPlannedWorkout(entry) {
-  const pw = {
+function buildPlannedWorkout(entry) {
+  return {
     id: newPlannedWorkoutId(),
     date: entry.date,
     sport: entry.sport,
@@ -55,6 +57,10 @@ function addPlannedWorkout(entry) {
     source: entry.source || "manual", // "ai" | "manual"
     createdAt: new Date().toISOString(),
   };
+}
+
+function addPlannedWorkout(entry) {
+  const pw = buildPlannedWorkout(entry);
   plannedWorkouts.push(pw);
   savePlannedWorkouts();
   return pw;
@@ -110,4 +116,67 @@ function deleteFuturePlannedWorkoutsForOtherGoals(goalId) {
 function futurePlannedDatesForGoal(goalId) {
   const todayKey = todayStr();
   return [...new Set(plannedWorkouts.filter(p => p.goalId === goalId && p.date >= todayKey).map(p => p.date))].sort();
+}
+
+/* ---------- Änderungen mit Regelprüfung (js/analytics/plan-rules.js) ---------- */
+
+// Prüft eine (geänderte) Liste mit validatePlan() gegen den aktuellen Stand
+// des Athleten: echte Workouts (DATA), Garmin-Werte, heutiger
+// Erholungs-Check, Hauptevent. Den ACWR holt validatePlan() selbst
+// (computePerformanceState). options: weitere validatePlan-Optionen, z. B. planUntil.
+function planRuleViolations(list, options = {}) {
+  const wellness = { hrv_ms: wellnessDeviation("hrv_ms"), resting_hr: wellnessDeviation("resting_hr") };
+  return validatePlan(list, DATA, wellness, recoveryCheck, { goal: getPrimaryGoal(), ...options });
+}
+
+// Kopie der Liste mit geänderter Einheit - die Vorschau, die erst geprüft
+// und dann mit replacePlannedWorkouts() übernommen wird.
+function patchedPlannedWorkouts(list, id, patch) {
+  return list.map(p => (p.id === id ? { ...p, ...patch } : p));
+}
+
+// Wendet einen Vorschlag des Regelwerks (suggestion aus validatePlan()) auf
+// eine KOPIE von `list` an - gespeichert wird erst mit replacePlannedWorkouts().
+// `defaults` ergänzt eine neu eingeplante Einheit (add_easy_session), z. B.
+// { goalId, phase, source }. null = der Vorschlag passt nicht zur Liste.
+function applyPlanSuggestion(list, suggestion, defaults = {}) {
+  const s = suggestion || {};
+  const copy = list.map(p => ({ ...p }));
+  const find = id => copy.find(p => p.id === id);
+  const target = s.workoutId != null ? find(s.workoutId) : null;
+  switch (s.action) {
+    case "move":
+      if (!target || !s.toDate) return null;
+      target.date = s.toDate;
+      return copy;
+    case "set_intensity":
+      if (!target || !s.intensity) return null;
+      target.intensity = s.intensity;
+      if (s.duration_min) target.duration_min = s.duration_min;
+      return copy;
+    case "reduce_duration":
+      if (!target || !s.duration_min) return null;
+      target.duration_min = s.duration_min;
+      return copy;
+    case "reduce_week_volume":
+      if (!Array.isArray(s.workouts) || !s.workouts.length || !s.workouts.every(w => find(w.workoutId))) return null;
+      s.workouts.forEach(w => { find(w.workoutId).duration_min = w.duration_min; });
+      return copy;
+    case "make_rest_day": {
+      const ids = s.workoutIds || [];
+      if (!ids.some(id => find(id))) return null;
+      return copy.filter(p => !ids.includes(p.id));
+    }
+    case "add_easy_session":
+      if (!s.date || !s.sport) return null;
+      return [...copy, buildPlannedWorkout({ ...defaults, date: s.date, sport: s.sport, title: `${s.sport} locker`, duration_min: s.duration_min, intensity: "leicht" })];
+    default:
+      return null;
+  }
+}
+
+// Übernimmt eine (geprüfte) Liste als neuen Trainingsplan.
+function replacePlannedWorkouts(list) {
+  plannedWorkouts = list;
+  savePlannedWorkouts();
 }

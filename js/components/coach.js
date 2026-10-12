@@ -808,6 +808,7 @@ function initCoach() {
   loadAthleteProfile();
   loadGoals();
   loadPlannedWorkouts();
+  loadPlanWishes();
   initGoalsCardCollapse();
   applyCoachGateState();
   const urlInput = document.getElementById("coach-ollama-url");
@@ -920,6 +921,7 @@ function initCoach() {
 
   initPlanEditOverlay();
   initTrainingPlanWishes();
+  initPlanWishForm();
   initIcalSettings();
   renderGoals();
   renderTrainingPlanCard();

@@ -202,11 +202,16 @@ async function generateTrainingPlan(goalId, { replace = false } = {}) {
   renderTrainingPlanCard();
   renderCalendar();
   try {
-    const prompt = buildPlanPrompt(goal, windowDates);
+    // Offene Terminwünsche (js/data/plan-wishes.js) im Fenster bekommt die KI
+    // als feste Vorgabe; was sie trotzdem nicht einplant - oder was auf einem
+    // schon verplanten Tag liegt -, ergänzt addOpenWishesToPlan() danach selbst.
+    const wishes = openPlanWishes().filter(w => windowDates.includes(w.date));
+    const prompt = buildPlanPrompt(goal, windowDates) + buildPlanWishesPrompt(wishes);
     const text = await callAiText(prompt, { task: "plan", json: true });
     const entries = parsePlanResponse(text, windowDates);
     const phase = computeTrainingPhase(Math.round((new Date(goal.date + "T00:00:00") - new Date(new Date().setHours(0, 0, 0, 0))) / 86400000));
-    entries.forEach(entry => addPlannedWorkout({ ...entry, goalId: goal.id, phase: phase.key, source: "ai" }));
+    const withAi = [...plannedWorkouts, ...entries.map(entry => buildPlannedWorkout({ ...entry, goalId: goal.id, phase: phase.key, source: "ai" }))];
+    replacePlannedWorkouts(addOpenWishesToPlan(withAi, windowDates[windowDates.length - 1], { goalId: goal.id, phase: phase.key, source: "manual" }));
     goal.lastPlannedAt = new Date().toISOString();
     goal._planError = null;
   } catch (e) {

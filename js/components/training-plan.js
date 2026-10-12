@@ -11,6 +11,7 @@ const PLAN_INTENSITY_LABELS = { leicht: "leicht", mittel: "mittel", hart: "hart"
 const PLAN_STATUS_LABELS = { geplant: "geplant", erledigt: "erledigt", uebersprungen: "übersprungen" };
 
 function renderTrainingPlanCard() {
+  renderPlanWishList(); // Status offen/eingeplant hängt am Plan
   const host = document.getElementById("trainingplan-body");
   if (!host) return;
   const timelineHost = document.getElementById("plan-timeline");
@@ -441,7 +442,7 @@ function openPlanEdit(id, defaults) {
     renderCalendar();
   });
 
-  host.querySelector(".plan-edit-save").addEventListener("click", () => {
+  host.querySelector(".plan-edit-save").addEventListener("click", async () => {
     // Live-Sportart-Auswahl entscheidet, nicht die beim Öffnen erfasste
     // isStrengthLike - die kann sich per Sportart-Wechsel geändert haben (s.o.).
     const currentSport = document.getElementById("plan-edit-sport").value;
@@ -465,7 +466,11 @@ function openPlanEdit(id, defaults) {
       addPlannedWorkout({ ...patch, goalId: p.goalId, phase: p.phase, source: "manual" });
     } else {
       patch.status = statusVal;
-      updatePlannedWorkout(id, patch);
+      // Jede Änderung einer bestehenden Einheit (neues Datum, aber auch ein
+      // übernommener "Alternativer Vorschlag" der KI) läuft durch das
+      // Regelwerk; bei Abbruch bleibt der Dialog offen.
+      const label = patch.date !== p.date ? "Trotzdem verschieben" : "Trotzdem speichern";
+      if (!(await commitCheckedPlanChange(patchedPlannedWorkouts(plannedWorkouts, id, patch), label))) return;
     }
     closePlanEdit();
     renderTrainingPlanCard();
@@ -477,6 +482,95 @@ function openPlanEdit(id, defaults) {
 
 function closePlanEdit() {
   document.getElementById("plan-edit-overlay").classList.remove("open");
+}
+
+/* ---------- Regelprüfung bei Änderungen (Verschieben, Bearbeiten) ----------
+   Eine geänderte Planliste wird erst nach validatePlan() (js/analytics/
+   plan-rules.js) übernommen. Gezeigt wird nur, was die Änderung NEU
+   verursacht: "warn" -> Rückfrage mit `okLabel` (z. B. "Trotzdem
+   verschieben"); "block" -> so wird nichts gespeichert, der Knopf bietet
+   stattdessen den Vorschlag des Regelwerks an (applyPlanSuggestion) und
+   danach wird erneut geprüft. true = übernommen und gespeichert. */
+const PLAN_CHANGE_MAX_ROUNDS = 4;
+
+async function commitCheckedPlanChange(nextList, okLabel = "Trotzdem verschieben") {
+  const before = planRuleViolations(plannedWorkouts);
+  const goal = getPrimaryGoal();
+  let next = nextList;
+  for (let round = 0; ; round++) {
+    const fresh = newPlanViolations(before, planRuleViolations(next));
+    if (!fresh.length) break;
+    const block = fresh.find(v => v.severity === "block");
+    if (block && round >= PLAN_CHANGE_MAX_ROUNDS) return false;
+    const intro = block ? "Das verstößt gegen eine Trainingsregel:" : "Bitte beachten:";
+    const ordered = [...fresh].sort((a, b) => (a.severity === "block" ? 0 : 1) - (b.severity === "block" ? 0 : 1));
+    const ok = await confirmDialog([intro, ...ordered.map(v => v.text)].join("\n\n"), { okLabel: block ? block.suggestion.text.replace(/\.$/, "") : okLabel, danger: false });
+    if (!ok) return false;
+    if (!block) break;
+    next = applyPlanSuggestion(next, block.suggestion, { goalId: goal ? goal.id : null, source: "manual" });
+    if (!next) return false;
+  }
+  replacePlannedWorkouts(next);
+  return true;
+}
+
+/* ---------- Terminwünsche ("Ich möchte Donnerstag schwimmen") ----------
+   Neben dem freien Wunschtext im ⚙-Menü der Trainingsplan-Kachel, Daten in
+   js/data/plan-wishes.js. Der Status (offen/eingeplant) kommt aus dem Plan,
+   deshalb zeichnet renderTrainingPlanCard() die Liste jedes Mal mit. */
+function renderPlanWishList() {
+  const host = document.getElementById("plan-wish-list");
+  if (!host) return;
+  const list = upcomingPlanWishes();
+  if (!list.length) {
+    host.innerHTML = `<p class="plan-wish-empty">Noch keine Terminwünsche.</p>`;
+    return;
+  }
+  host.innerHTML = list.map(w => {
+    const planned = isPlanWishPlanned(w);
+    return `
+      <div class="plan-wish-item">
+        <div class="plan-wish-main">
+          <span class="plan-wish-what">${fmtDateWeekday(new Date(w.date + "T00:00:00"))} · ${escapeHtml(w.sport)} · ${w.duration_min} min</span>
+          ${w.note ? `<span class="plan-wish-note">${escapeHtml(w.note)}</span>` : ""}
+        </div>
+        <span class="plan-wish-state${planned ? " planned" : ""}">${planned ? "eingeplant" : "offen"}</span>
+        <button type="button" class="plan-ex-remove plan-wish-delete" data-id="${w.id}" title="Wunsch löschen" aria-label="Wunsch löschen">✕</button>
+      </div>`;
+  }).join("");
+  host.querySelectorAll(".plan-wish-delete").forEach(btn => btn.addEventListener("click", e => {
+    // Sonst schließt der Klick das ⚙-Menü (der Knopf ist nach dem Neuzeichnen
+    // nicht mehr im Popover, siehe initInfoPopovers).
+    e.stopPropagation();
+    deletePlanWish(btn.dataset.id);
+    renderPlanWishList();
+  }));
+}
+
+function initPlanWishForm() {
+  const sportSelect = document.getElementById("plan-wish-sport");
+  const addBtn = document.getElementById("plan-wish-add-btn");
+  if (!sportSelect || !addBtn) return;
+  sportSelect.innerHTML = PLAN_ALLOWED_SPORTS.map(s => `<option value="${s}">${s}</option>`).join("");
+  const dateInput = document.getElementById("plan-wish-date");
+  dateInput.min = todayStr();
+  addBtn.addEventListener("click", () => {
+    const status = document.getElementById("plan-wish-status");
+    const wish = addPlanWish({
+      date: dateInput.value,
+      sport: sportSelect.value,
+      duration_min: document.getElementById("plan-wish-duration").value,
+      note: document.getElementById("plan-wish-note").value,
+    });
+    status.textContent = wish ? "✓ Gespeichert – kommt in die nächste Planung" : `Bitte Datum (ab heute), Sportart und Dauer (1–${PLAN_WISH_MAX_MIN} min) angeben.`;
+    status.className = "coach-test-status " + (wish ? "ok" : "err");
+    if (!wish) return;
+    setTimeout(() => { status.textContent = ""; status.className = "coach-test-status"; }, 2500);
+    document.getElementById("plan-wish-duration").value = "";
+    document.getElementById("plan-wish-note").value = "";
+    renderPlanWishList();
+  });
+  renderPlanWishList();
 }
 
 // "Erweiterte Einstellungen" (⚙ an der Trainingsplan-Kartenüberschrift) -

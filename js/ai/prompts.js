@@ -172,3 +172,18 @@ Fasse den aktuellen Leistungszustand in einer kurzen, praezisen Zusammenfassung 
 
 Nur normaler Fliesstext - KEIN Markdown (keine **, keine #-Ueberschriften, keine Aufzaehlungszeichen/nummerierten Listen), keine Tabellen/Code-Bloecke.`;
 }
+
+// Ergänzung zum Trainingsplan-Prompt (generateTrainingPlan, js/ai/ollama.js):
+// feste Terminwünsche des Athleten (js/data/plan-wishes.js) für Tage im
+// Planungsfenster. Ohne Wünsche ein leerer Text.
+function buildPlanWishesPrompt(wishes) {
+  if (!wishes || !wishes.length) return "";
+  const lines = wishes.map(w => {
+    const weekday = new Date(w.date + "T00:00:00").toLocaleDateString("de-DE", { weekday: "long" });
+    return `- ${w.date} (${weekday}): ${w.sport}, ${w.duration_min} min${w.note ? `, Notiz des Athleten: "${w.note}"` : ""}`;
+  });
+  return `
+
+Feste Terminwünsche des Athleten - genau so einplanen (gleiches Datum, gleiche Sportart, diese Dauer), auch wenn der Tag laut Profil kein Trainingstag ist, und die übrigen Einheiten darauf abstimmen (z.B. keine harte Einheit direkt davor oder danach):
+${lines.join("\n")}`;
+}

@@ -122,13 +122,16 @@ function wireCalPlannedDrag(chipEl, plannedId) {
 function wireCalDropTarget(cellEl, dayDate) {
   cellEl.addEventListener("dragover", e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; cellEl.classList.add("cal-drop-target"); });
   cellEl.addEventListener("dragleave", () => cellEl.classList.remove("cal-drop-target"));
-  cellEl.addEventListener("drop", e => {
+  cellEl.addEventListener("drop", async e => {
     e.preventDefault();
     cellEl.classList.remove("cal-drop-target");
     const id = e.dataTransfer.getData("text/plain");
-    if (!id) return;
+    const pw = id && plannedWorkouts.find(p => p.id === id);
     const newDate = localDateStr(dayDate);
-    updatePlannedWorkout(id, { date: newDate });
+    if (!pw || pw.date === newDate) return;
+    // Erst nach der Regelprüfung verschieben (Rückfrage/Vorschlag, siehe
+    // commitCheckedPlanChange in training-plan.js).
+    await commitCheckedPlanChange(patchedPlannedWorkouts(plannedWorkouts, id, { date: newDate }));
     renderCalendar();
     renderTrainingPlanCard();
   });
