@@ -11,6 +11,9 @@
 function renderCoachSummary() {
   const host = document.getElementById("coach-summary-body");
   if (!host) return;
+  // Die "Grundlage" der Empfehlungs-Karte hängt an denselben Daten (Form,
+  // Plan, Erholung) - deshalb hier mit auffrischen, wie renderPerformanceSummary.
+  if (typeof renderOutlook === "function") renderOutlook();
 
   const chips = [];
 
@@ -98,6 +101,39 @@ function renderPerformanceSummary() {
   host.innerHTML = buildPerformanceSummaryHtml();
   const btn = document.getElementById("perf-summary-btn");
   if (btn) btn.addEventListener("click", () => generatePerformanceSummary());
+}
+
+// Empfehlungen "Heute / Diese Woche / Nächste Woche" (eigene Karte im
+// Coach-Tab) - gleiches Muster wie buildPerformanceSummaryHtml (Button +
+// Ergebnis/Fehler/Lade-Zustand, outlook in js/ai/ollama.js). Unter jeder
+// Empfehlung stehen die Fakten, aus denen sie entstanden ist
+// (buildOutlookFacts) - vor dem ersten Abruf die aktuellen.
+function renderOutlook() {
+  const host = document.getElementById("coach-outlook-body");
+  if (!host) return;
+  const r = outlook.result;
+  const facts = (r && outlook.facts) || buildOutlookFacts();
+  const btnLabel = outlook.loading ? "Analysiere …" : (r ? "Neu einschätzen" : "Empfehlungen abrufen");
+  host.innerHTML = `
+    <div class="goal-actions">
+      <button type="button" class="chip" id="coach-outlook-btn" ${outlook.loading ? "disabled" : ""}>${btnLabel}</button>
+      ${outlook.at ? `<span class="goal-rec-date">Stand: ${fmtDateFull(new Date(outlook.at))}</span>` : ""}
+    </div>
+    ${outlook.error ? `<p class="goal-error">${escapeHtml(outlook.error)}</p>` : ""}
+    <div class="outlook-grid">
+      ${OUTLOOK_HORIZONS.map(h => {
+        const item = r && r[h.key];
+        return `
+        <div class="outlook-item">
+          <h3 class="outlook-title">${h.label}</h3>
+          ${item && item.empfehlung ? `<p class="outlook-text">${escapeHtml(item.empfehlung)}</p>` : ""}
+          ${item && item.begruendung ? `<p class="outlook-reason"><b>Warum:</b> ${escapeHtml(item.begruendung)}</p>` : ""}
+          <p class="workouts-columns-title outlook-facts-title">Grundlage</p>
+          <ul class="outlook-facts">${facts[h.facts].map(f => `<li>${escapeHtml(f)}</li>`).join("")}</ul>
+        </div>`;
+      }).join("")}
+    </div>`;
+  host.querySelector("#coach-outlook-btn").addEventListener("click", () => generateOutlook());
 }
 
 // Minimalistische Karten: pro Ziel nur Name/Datum/Countdown + kompakte
@@ -808,6 +844,7 @@ function initCoach() {
   loadAthleteProfile();
   loadGoals();
   loadPlannedWorkouts();
+  loadPlanWishes();
   initGoalsCardCollapse();
   applyCoachGateState();
   const urlInput = document.getElementById("coach-ollama-url");
@@ -920,6 +957,7 @@ function initCoach() {
 
   initPlanEditOverlay();
   initTrainingPlanWishes();
+  initPlanWishForm();
   initIcalSettings();
   renderGoals();
   renderTrainingPlanCard();

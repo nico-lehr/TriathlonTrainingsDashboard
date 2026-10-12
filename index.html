@@ -340,6 +340,15 @@
         </div>
       </div>
 
+      <div class="card full" data-card-id="coach-outlook">
+        <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+        <h2>Empfehlungen
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Was heute, diese Woche und nächste Woche sinnvoll ist – mit kurzer Begründung. Alle Zahlen kommen aus deinen Daten (Form, ACWR, Erholungs-Check, Garmin, Trainingsplan, Hauptevent) und stehen unter „Grundlage“; die KI ordnet sie nur ein. Eine Begründung mit einer Zahl, die nicht aus deinen Daten stammt, wird nicht angezeigt.</div></span>
+        </h2>
+        <p class="card-sub">Heute · Diese Woche · Nächste Woche</p>
+        <div id="coach-outlook-body"></div>
+      </div>
+
       <div class="card" data-card-id="new-goal" id="new-goal-card" hidden>
         <span class="card-drag-handle" title="Karte verschieben">⠿</span>
         <h2>Neues Ziel</h2>
@@ -420,6 +429,17 @@
               <button type="button" class="update-btn" id="trainingplan-wishes-save-btn">Speichern</button>
               <span class="coach-test-status" id="trainingplan-wishes-status"></span>
             </div>
+            <p class="workouts-columns-title plan-wish-title">Terminwünsche</p>
+            <p class="card-sub plan-wish-sub">Ein fester Wunsch wie „Donnerstag schwimmen“ – die nächste Planung baut ihn ein.</p>
+            <div class="plan-wish-form">
+              <input type="date" id="plan-wish-date" class="coach-input" aria-label="Datum">
+              <select id="plan-wish-sport" class="coach-input" aria-label="Sportart"></select>
+              <input type="number" id="plan-wish-duration" class="coach-input" min="1" max="480" step="5" placeholder="Minuten" aria-label="Dauer in Minuten">
+              <input type="text" id="plan-wish-note" class="coach-input" maxlength="200" placeholder="Notiz (optional)" aria-label="Notiz">
+              <button type="button" class="update-btn" id="plan-wish-add-btn">+ Wunsch</button>
+            </div>
+            <span class="coach-test-status" id="plan-wish-status"></span>
+            <div id="plan-wish-list" class="plan-wish-list"></div>
           </div></span>
         </h2>
         <div id="plan-timeline"></div>
@@ -864,6 +884,7 @@
 <script src="js/data/health.js"></script>
 <script src="js/data/garmin-wellness.js"></script>
 <script src="js/data/planned-workouts.js"></script>
+<script src="js/data/plan-wishes.js"></script>
 <script src="js/data/fit-workout-writer.js"></script>
 <script src="js/data/weight-log.js"></script>
 <script src="js/data/equipment.js"></script>

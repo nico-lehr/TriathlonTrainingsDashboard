@@ -133,8 +133,11 @@ initDragGrid(document.getElementById("coach-grid"), document.getElementById("res
    für alle destruktiven Aktionen wiederverwendbar (aktuell: Ziel/Event
    löschen, siehe coach.js). Nutzt dieselbe .modal-overlay-Struktur wie die
    übrigen Overlays (siehe PROJECT_MAP.md Rule 5 - keine Duplikate).
+   Optional mit eigener Beschriftung für den OK-Knopf und ohne Rot (danger:
+   false) - z. B. "Trotzdem verschieben" bei der Regelprüfung des Plans
+   (commitCheckedPlanChange, training-plan.js). Absätze im Text: "\n\n".
    ====================================================================== */
-function confirmDialog(message) {
+function confirmDialog(message, { okLabel = "Löschen", danger = true } = {}) {
   const overlay = document.getElementById("confirm-overlay");
   const messageEl = document.getElementById("confirm-message");
   const okBtn = document.getElementById("confirm-ok-btn");
@@ -142,6 +145,8 @@ function confirmDialog(message) {
   if (!overlay || !messageEl || !okBtn || !cancelBtn) return Promise.resolve(window.confirm(message));
 
   messageEl.textContent = message;
+  okBtn.textContent = okLabel;
+  okBtn.classList.toggle("confirm-danger-btn", danger);
   overlay.classList.add("open");
 
   return new Promise(resolve => {
