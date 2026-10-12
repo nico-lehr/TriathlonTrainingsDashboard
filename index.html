@@ -537,8 +537,8 @@
 
       <div class="card full">
         <h2>Ollama-Verbindung</h2>
-        <p class="card-sub">Für den KI-Coach (Trainingsempfehlungen, Auswertungen). Läuft lokal, deine Daten bleiben auf deinem Rechner.</p>
-        <div class="coach-settings-row">
+        <p class="card-sub">Für den KI-Coach (Trainingsempfehlungen, Auswertungen). Ollama läuft auf dem Dashboard-PC, die Anfragen gehen über den Dashboard-Server – deine Daten verlassen das eigene Netz nicht.</p>
+        <div class="coach-settings-row" hidden>
           <label for="coach-ollama-url">Adresse</label>
           <input type="text" id="coach-ollama-url" class="coach-input" placeholder="http://localhost:11434">
         </div>
@@ -554,9 +554,9 @@
           <button class="cal-today-btn" id="ollama-setup-btn" type="button">⚙️ Ollama Setup</button>
         </div>
         <p class="card-sub coach-setup-hint">
-          Einmalig einrichten: <a href="https://ollama.com/download" target="_blank" rel="noopener">Ollama installieren</a>,
-          ein Modell laden (Terminal: <code>ollama pull llama3.1</code>), Ollama für den Zugriff aus dieser Datei freischalten
-          (Terminal: <code>launchctl setenv OLLAMA_ORIGINS "*"</code>, dann Ollama neu starten) — Details in der README.
+          Einmalig auf dem Dashboard-PC einrichten: <a href="https://ollama.com/download" target="_blank" rel="noopener">Ollama installieren</a>
+          und ein Modell laden (Terminal: <code>ollama pull llama3.1</code>). Läuft Ollama auf einem anderen Rechner,
+          die Adresse in der Datei <code>.env</code> eintragen (<code>OLLAMA_URL</code>) — Details in docs/DEPLOYMENT.md.
         </p>
       </div>
 

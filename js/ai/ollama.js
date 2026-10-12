@@ -1,5 +1,7 @@
 // Anbindung an ein lokales LLM ueber Ollama: Einstellungen, Verbindungstest,
-// Trainingsempfehlung generieren.
+// Trainingsempfehlung generieren. Ollama laeuft auf dem Dashboard-PC; der
+// Browser fragt nur den eigenen Server (POST /api/v1/ai/chat, backend/
+// ai_routes.py), die Ollama-Adresse steht dort in .env (OLLAMA_URL).
 
 const COACH_SETTINGS_KEY = "triathlon_dashboard_coach_settings_v1";
 
@@ -25,36 +27,30 @@ function saveCoachSettings() {
 const WORKOUT_ANALYSIS_KEY = "triathlon_dashboard_workout_analysis_v1";
 
 let workoutAnalysisCache = {};
-try {
-  const raw = localStorage.getItem(WORKOUT_ANALYSIS_KEY);
-  if (raw) workoutAnalysisCache = JSON.parse(raw) || {};
-} catch (e) { /* Cache leer starten */ }
 
-function saveWorkoutAnalysisCache() {
-  try { localStorage.setItem(WORKOUT_ANALYSIS_KEY, JSON.stringify(workoutAnalysisCache)); } catch (e) {}
+// Persoenliche KI-Texte -> Ablage pro Person auf dem Server (js/data/api-client.js);
+// app.js ruft das nach loadUserStore() auf.
+function loadWorkoutAnalysisCache() {
+  workoutAnalysisCache = storeGet(WORKOUT_ANALYSIS_KEY) || {};
 }
 
+function saveWorkoutAnalysisCache() {
+  storeSet(WORKOUT_ANALYSIS_KEY, workoutAnalysisCache);
+}
+
+// Die Server-Meldungen sind schon verstaendlich ("Ollama ist auf dem
+// Dashboard-PC nicht erreichbar ..."), siehe backend/ai_routes.py.
 function describeCoachError(e) {
-  const msg = String((e && e.message) || e || "");
-  if (/Failed to fetch|NetworkError|Load failed|ERR_CONNECTION/i.test(msg)) {
-    return "Ollama nicht erreichbar. Läuft Ollama gerade auf diesem Rechner, und ist OLLAMA_ORIGINS für den Zugriff aus dieser Datei freigeschaltet? (Details im Hinweis oben / in der README)";
-  }
-  return "Fehler bei der Anfrage an Ollama: " + msg;
+  return "Fehler bei der Anfrage an Ollama: " + String((e && e.message) || e || "");
 }
 
 // Ein einzelner Text-Call an Ollama - von callAiText() (js/ai/provider.js)
 // aufgerufen, wenn die jeweilige Aufgabe (Einstellungen → KI-Verbindung) auf
 // Ollama statt Claude steht (Standard für alle Aufgaben).
 async function callOllamaApi(prompt, { json = false } = {}) {
-  const base = (coachSettings.baseUrl || "http://localhost:11434").replace(/\/$/, "");
-  const res = await fetch(base + "/api/generate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(json ? { model: coachSettings.model, prompt, format: "json", stream: false } : { model: coachSettings.model, prompt, stream: false }),
-  });
-  if (!res.ok) throw new Error("Status " + res.status);
-  const data = await res.json();
-  const text = (data.response || "").trim();
+  // Lange Wartezeit: ein ganzer Trainingsplan braucht auf langsamen PCs Minuten.
+  const res = await apiCall("ai/chat", "POST", { prompt, json, model: coachSettings.model }, { timeoutMs: 10 * 60 * 1000 });
+  const text = ((res.data && res.data.response) || "").trim();
   if (!text) throw new Error("Leere Antwort vom Modell erhalten.");
   return text;
 }
@@ -65,11 +61,8 @@ async function testOllamaConnection() {
   statusEl.textContent = "Teste Verbindung …";
   statusEl.className = "coach-test-status";
   try {
-    const base = (coachSettings.baseUrl || "http://localhost:11434").replace(/\/$/, "");
-    const res = await fetch(base + "/api/tags");
-    if (!res.ok) throw new Error("Status " + res.status);
-    const data = await res.json();
-    const models = (data.models || []).map(m => m.name || m.model).filter(Boolean);
+    const res = await apiCall("ai/models");
+    const models = (res.data.models || []).filter(Boolean);
     const wanted = coachSettings.model;
     const hasModel = models.includes(wanted) || models.some(m => m.split(":")[0] === wanted.split(":")[0]);
     if (hasModel) {

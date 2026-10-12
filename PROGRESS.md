@@ -8,10 +8,10 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 | Vorarbeit | Status | Letzte Änderung |
 |---|---|---|
 | Tailscale Etappe 1 – Login (Backend) | fertig | 2026-10-12 |
-| Tailscale Etappe 2 – Frontend ausliefern | läuft | 2026-10-12 |
-| Tailscale Etappe 3 – Frontend auf API | offen | – |
-| Tailscale Etappe 4 – Import | offen | – |
-| Tailscale Etappe 5 – KI über Backend | offen | – |
+| Tailscale Etappe 2 – Frontend ausliefern | fertig | 2026-10-12 |
+| Tailscale Etappe 3 – Frontend auf API | fertig | 2026-10-12 |
+| Tailscale Etappe 4 – Import | fertig | 2026-10-12 |
+| Tailscale Etappe 5 – KI über Backend | läuft | 2026-10-12 |
 | Tailscale Etappe 6 – Betrieb | offen | – |
 | Tailscale Etappe 7 – Garmin mehrere Nutzer | fertig | 2026-10-12 |
 | Layout (breitere Seite) | läuft | 2026-10-12 |
@@ -33,6 +33,9 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 **Gesamt: 0 % (0 von 21 Schritten)**
 
 ## Offene Fragen
+
+- `.btn-primary` / `.btn-secondary` gibt es im CSS nicht. Standard: Hauptknopf = `.update-btn`, Nebenknopf = `.cal-today-btn` (beide vorhanden).
+- Altes Doppelklick-Dashboard: Daten lassen sich mit `tools/export-browser-data.html` exportieren und mit `backend/import_workouts_json.py --browser-export` übernehmen.
 
 - Die Regeldateien AI_RULES.md, DESIGN_GUIDE.md und docs/TECH_DESIGN_2026.md gibt es nicht. Entscheidung (mit dir abgestimmt): Regeln aus deinen Nachrichten; Farben, Radien und Schatten aus `css/variables.css`.
 - Tailscale-Fragen 2, 3 und 5: Empfehlungen übernommen (geheimer Kalender-Link, Ablage pro Person, alle Browser-Daten auf den Server).

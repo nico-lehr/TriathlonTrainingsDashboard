@@ -24,6 +24,9 @@ class Config:
     # API
     API_VERSION = "v1"
 
+    # KI: der Server leitet Anfragen an Ollama auf diesem PC weiter (ai_routes.py)
+    OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
+
     # Garmin
     GARMIN_TOKEN_PATH = Path.home() / ".triathlon" / "garmin.token"
     GARMIN_LOG_PATH = Path.home() / ".triathlon" / "garmin-sync.log"

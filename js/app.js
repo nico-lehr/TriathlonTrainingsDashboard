@@ -66,6 +66,7 @@ function checkAutoReplan() {
     return;
   }
   loadWorkoutNotes();
+  loadWorkoutAnalysisCache();
   // Garmin-Waagedaten ins Gewichts-Log uebernehmen, bevor irgendetwas
   // gerendert wird - sonst zeigt die erste Darstellung noch das alte Gewicht.
   // Ergaenzt nur fehlende Tage, ueberschreibt keine manuellen Eintraege.
