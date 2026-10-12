@@ -45,7 +45,9 @@ async function apiCall(endpoint, method = "GET", body = null, { timeoutMs = 2000
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (e) {
-    throw new Error("Server nicht erreichbar - läuft das Dashboard auf dem PC?");
+    const err = new Error("Server nicht erreichbar - läuft das Dashboard auf dem PC?");
+    err.timeout = !!e && e.name === "TimeoutError"; // Anfrage evtl. trotzdem ausgeführt (z. B. An Garmin senden)
+    throw err;
   }
 
   if (response.status === 401 && redirectOn401) {
@@ -127,6 +129,12 @@ async function sendStoreKey(key) {
     }
   }
   storeSending.delete(key);
+}
+
+// Wartet, bis die letzte Aenderung dieses Schluessels beim Server angekommen
+// ist - fuer Server-Funktionen, die selbst aus der Ablage lesen (An Garmin senden).
+async function storeSaved(key) {
+  while (storeSending.has(key)) await new Promise(resolve => setTimeout(resolve, 100));
 }
 
 // Warnen, wenn die Seite geschlossen wird, waehrend noch gespeichert wird.

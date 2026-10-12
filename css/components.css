@@ -877,7 +877,7 @@
   .plan-item-list { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
 
   .plan-item {
-    display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+    display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 10px 12px;
     background: var(--page); border-radius: 12px;
   }
 
@@ -926,6 +926,17 @@
 
   .plan-item-export:hover { background: var(--grid); color: var(--text-primary); }
 
+  /* "An Garmin senden" (Liste + Bearbeiten-Overlay); Fehler mit .fit-Download als eigene Zeile */
+  .plan-item-garmin { flex-shrink: 0; }
+  .plan-item-garmin :disabled, .plan-edit-actions-right :disabled { opacity: 0.5; cursor: default; }
+  .plan-garmin-sent { font-size: 12px; font-weight: 600; color: var(--c-good-text); }
+  .plan-item-garmin .plan-garmin-sent { white-space: nowrap; }
+  .plan-garmin-error { flex-basis: 100%; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+  .plan-garmin-error .goal-error { margin: 0; flex: 1 1 220px; }
+  .pe-garmin-note { margin-top: 12px; }
+  .pe-garmin-note:empty { display: none; }
+  .pe-garmin-note .plan-garmin-sent { margin: 0; font-weight: 500; line-height: 1.5; }
+
   /* Bearbeiten-Overlay für eine einzelne geplante Einheit */
   .plan-edit-card { max-width: 640px; }
 
@@ -941,6 +952,24 @@
   }
 
   .plan-ex-remove:hover { background: var(--grid); color: var(--text-primary); }
+
+  /* "Schritte für die Uhr" im Bearbeiten-Overlay (Garmin-Workout / .fit) */
+  .pe-steps-preview { margin: 0; padding-left: 20px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.6; }
+  .pe-steps-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .pe-steps-actions .wd-analysis-hint { margin-left: 0; }
+  .pe-steps-list { display: flex; flex-direction: column; gap: 6px; }
+  .pe-step-row, .pe-repeat-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .onb-field .pe-step-row .pe-step-type { width: 132px; }
+  .onb-field .pe-step-row .pe-step-value { width: 76px; }
+  .onb-field .pe-step-row .pe-step-unit { width: 66px; }
+  .onb-field .pe-step-row .pe-step-target { width: 140px; }
+  .onb-field .pe-step-row .pe-step-zone { width: 90px; }
+  .onb-field .pe-repeat-head .pe-repeat-count { width: 64px; }
+  /* Zone ohne Ziel unsichtbar, aber mit Platz - so bleiben die Zeilen bündig */
+  .pe-step-zone[hidden] { display: inline-block; visibility: hidden; }
+  .pe-step-repeat { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 8px; border: 1px dashed var(--border); border-radius: 10px; }
+  .pe-repeat-head { font-size: 12.5px; color: var(--text-secondary); }
+  .pe-repeat-steps { display: flex; flex-direction: column; gap: 6px; align-self: stretch; }
 
   .plan-edit-nutrition {
     margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-soft, var(--grid));

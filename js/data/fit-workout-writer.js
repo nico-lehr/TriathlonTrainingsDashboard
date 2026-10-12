@@ -3,13 +3,14 @@
 //
 // Das ist die Gegenrichtung zu fit-parser.js (der liest fertige .fit-
 // Aktivitäten ein) - hier wird eine .fit-Datei vom Typ "workout" (kein
-// "activity") neu geschrieben, mit genau einem Trainingsschritt.
+// "activity") neu geschrieben, mit einem Trainingsschritt je Schritt aus
+// plannedWorkoutSteps() (js/data/planned-workouts.js: eigene Schritte der
+// Einheit oder die Standard-Schritte aus Dauer + Intensität).
 //
-// Bewusste Design-Entscheidung (siehe AI_RULES "keine erfundenen Daten"):
-// Es wird IMMER target_type = "open" (kein festes Pace-/Puls-/Leistungsziel)
-// verwendet, weil die App für den einzelnen geplanten Schritt keine
-// verlässliche Zielzahl hat (nur Intensität als Text). Die Dauer wird nur
-// gesetzt, wenn duration_min vorhanden ist - sonst "open duration".
+// Ziele sind Zonen (HF-/Leistungszone = die auf der Uhr eingestellten Zonen),
+// keine erfundenen Zahlen. Eine Pace-Zone wird über die eigenen Pace-Zonen
+// (js/analytics/zones.js) zu einem Tempobereich; fehlt dafür der Wert im
+// Profil, bleibt der Schritt ohne Ziel. Ohne Dauer/Distanz: "open duration".
 //
 // FIT-Binärformat-Grundlagen (offizielle Garmin-FIT-Spezifikation):
 // 14-Byte-Datei-Header, dann beliebig viele Definition-/Data-Records,
@@ -80,10 +81,65 @@ function fitTimestampNow() {
   return Math.floor(Date.now() / 1000) - FIT_EPOCH_OFFSET_SECONDS;
 }
 
+// Pace-Zone (1-5) -> Tempobereich in m/s aus den eigenen Pace-Zonen
+// (js/analytics/zones.js: Laufen aus der Schwellenpace je km, Schwimmen aus
+// der CSS je 100 m). null, wenn das Profil keinen Wert hat oder die Sportart
+// keine Pace kennt. low = langsamer, high = schneller.
+function paceZoneMps(sport, zone) {
+  const zones = sport === "Laufen" ? computeRunPaceZones() : sport === "Schwimmen" ? computeSwimPaceZones() : null;
+  const z = zones && zones[zone - 1];
+  if (!z) return null;
+  const meters = sport === "Laufen" ? 1000 : 100;
+  return { low: meters / paceToSeconds(z.slowPace), high: meters / paceToSeconds(z.fastPace) };
+}
+
+// Die Schritte für .fit-Datei UND Garmin-Versand: plannedWorkoutSteps(), dazu
+// je Pace-Zone der Tempobereich (low_mps/high_mps), sofern berechenbar.
+function resolvedWorkoutSteps(pw) {
+  const withPace = s => {
+    if (s.type === "repeat") return { ...s, steps: s.steps.map(withPace) };
+    const range = s.target && s.target.kind === "pace_zone" ? paceZoneMps(pw.sport, s.target.zone) : null;
+    return range ? { ...s, target: { ...s.target, low_mps: range.low, high_mps: range.high } } : s;
+  };
+  return plannedWorkoutSteps(pw).map(withPace);
+}
+
+// FIT-Werte je Schritt-Art (intensity: 0 active, 1 rest, 2 warmup, 3 cooldown,
+// 4 recovery) und Ziel (target_type: 0 speed, 1 heart_rate, 2 open, 4 power).
+const FIT_STEP_INTENSITY = { warmup: 2, interval: 0, recovery: 4, cooldown: 3, rest: 1 };
+const FIT_TARGET_TYPE = { hr_zone: 1, power_zone: 4 };
+
+// Schritte -> flache Liste der workout_step-Nachrichten. Eine Wiederholung
+// steht in FIT HINTER ihren Schritten: duration_type 6 ("bis Schritte
+// erledigt"), duration_value = Index des ersten wiederholten Schritts,
+// target_value = Anzahl Durchgänge.
+function fitWorkoutStepRecords(pw) {
+  const steps = resolvedWorkoutSteps(pw);
+  const single = steps.length === 1 && steps[0].type !== "repeat";
+  const out = [];
+  const add = s => {
+    const rec = { name: single ? (pw.title || pw.sport) : WORKOUT_STEP_LABELS[s.type], durationType: 5, durationValue: 0, targetType: 2, targetValue: 0, low: 0, high: 0, intensity: FIT_STEP_INTENSITY[s.type] };
+    if (s.duration_min) { rec.durationType = 0; rec.durationValue = Math.round(s.duration_min * 60000); } // ms
+    else if (s.distance_km) { rec.durationType = 1; rec.durationValue = Math.round(s.distance_km * 100000); } // cm
+    const t = s.target || {};
+    if (t.low_mps) Object.assign(rec, { targetType: 0, low: Math.round(t.low_mps * 1000), high: Math.round(t.high_mps * 1000) }); // mm/s
+    else if (FIT_TARGET_TYPE[t.kind]) Object.assign(rec, { targetType: FIT_TARGET_TYPE[t.kind], targetValue: t.zone });
+    out.push(rec);
+  };
+  steps.forEach(s => {
+    if (s.type !== "repeat") return add(s);
+    const first = out.length;
+    s.steps.forEach(add);
+    out.push({ name: WORKOUT_STEP_LABELS.repeat, durationType: 6, durationValue: first, targetType: 2, targetValue: s.count, low: 0, high: 0, intensity: 0xFF });
+  });
+  return out;
+}
+
 // Baut die rohen Bytes einer .fit-Workout-Datei aus einer geplanten Einheit
-// (ein plannedWorkouts-Eintrag, siehe planned-workouts.js). Ergebnis: genau
-// ein Trainingsschritt mit offenem Ziel (siehe Kommentar oben).
+// (ein plannedWorkouts-Eintrag, siehe planned-workouts.js), ein
+// workout_step je Schritt (fitWorkoutStepRecords).
 function buildFitWorkoutFile(pw) {
+  const records = fitWorkoutStepRecords(pw);
   const body = new FitByteWriter();
 
   // --- file_id (Pflicht-Message, muss als erstes stehen) ---
@@ -109,32 +165,33 @@ function buildFitWorkoutFile(pw) {
   ]);
   fitWriteDataHeader(body, 1);
   body.u8(FIT_SPORT_BY_NAME[pw.sport] ?? 0);
-  body.u16(1); // num_valid_steps
+  body.u16(records.length); // num_valid_steps
   body.str(pw.title || pw.sport, FIT_WKT_NAME_SIZE);
 
-  // --- workout_step (genau ein Schritt) ---
+  // --- workout_step (eine Nachricht je Schritt) ---
   fitWriteDefinition(body, 2, 27, [
     { num: 254, size: 2, baseType: FIT_BASE_TYPE.UINT16 },                    // message_index
     { num: 0, size: FIT_WKT_STEP_NAME_SIZE, baseType: FIT_BASE_TYPE.STRING }, // wkt_step_name
     { num: 1, size: 1, baseType: FIT_BASE_TYPE.ENUM },                        // duration_type
     { num: 2, size: 4, baseType: FIT_BASE_TYPE.UINT32 },                      // duration_value
     { num: 3, size: 1, baseType: FIT_BASE_TYPE.ENUM },                        // target_type
-    { num: 4, size: 4, baseType: FIT_BASE_TYPE.UINT32 },                      // target_value
-    { num: 6, size: 1, baseType: FIT_BASE_TYPE.ENUM },                        // intensity
+    { num: 4, size: 4, baseType: FIT_BASE_TYPE.UINT32 },                      // target_value (Zone bzw. Durchgänge)
+    { num: 5, size: 4, baseType: FIT_BASE_TYPE.UINT32 },                      // custom_target_value_low
+    { num: 6, size: 4, baseType: FIT_BASE_TYPE.UINT32 },                      // custom_target_value_high
+    { num: 7, size: 1, baseType: FIT_BASE_TYPE.ENUM },                        // intensity
   ]);
-  fitWriteDataHeader(body, 2);
-  body.u16(0); // message_index
-  body.str(pw.title || pw.sport, FIT_WKT_STEP_NAME_SIZE);
-  if (pw.duration_min) {
-    body.u8(0); // duration_type = time
-    body.u32(Math.round(pw.duration_min * 60 * 1000)); // ms
-  } else {
-    body.u8(5); // duration_type = open (keine Dauer erfunden)
-    body.u32(0);
-  }
-  body.u8(2); // target_type = open (kein erfundenes Pace-/Puls-/Leistungsziel)
-  body.u32(0);
-  body.u8(0); // intensity = active
+  records.forEach((r, i) => {
+    fitWriteDataHeader(body, 2);
+    body.u16(i);
+    body.str(r.name, FIT_WKT_STEP_NAME_SIZE);
+    body.u8(r.durationType);
+    body.u32(r.durationValue);
+    body.u8(r.targetType);
+    body.u32(r.targetValue);
+    body.u32(r.low);
+    body.u32(r.high);
+    body.u8(r.intensity);
+  });
 
   const bodyBytes = body.toUint8Array();
 
@@ -182,11 +239,9 @@ function downloadFitBytes(bytes, filename) {
 // denen eine geplante Einheit tatsächlich "nach Garmin exportiert" wird -
 // alle Buttons (Coach-Tab, Kalender-Tages-/Wochenansicht, Bearbeiten-Overlay)
 // rufen ausschließlich diese beiden Funktionen auf, nie direkt
-// downloadFitBytes()/buildFitWorkoutFile(). Sobald es einmal eine direkte
-// Garmin-Connect-API-Anbindung gibt (Hochladen statt Datei-Download), muss
-// nur HIER der Versandweg ausgetauscht/ergänzt werden (z. B. downloadFitBytes
-// durch einen fetch()-Aufruf ersetzen) - keine der aufrufenden Stellen
-// müsste sich ändern.
+// downloadFitBytes()/buildFitWorkoutFile(). Der direkte Versand an Garmin
+// Connect ist sendPlannedWorkoutToGarmin() ganz unten; der .fit-Download
+// bleibt als Plan B, wenn der Versand scheitert.
 
 // Exportiert eine einzelne geplante Einheit als .fit-Datei (Download-Klick).
 function exportPlannedWorkoutAsFit(id) {
@@ -202,4 +257,31 @@ function exportPlannedWorkoutsAsFit(list) {
   list.forEach((pw, i) => {
     setTimeout(() => downloadFitBytes(buildFitWorkoutFile(pw), fitExportFilename(pw)), i * 350);
   });
+}
+
+// Garmin nimmt per Versand nur Ausdauer-Workouts an (Kraft braucht Übungen
+// aus Garmins eigenem Katalog) - dort bleibt der .fit-Download.
+function canSendToGarmin(pw) {
+  return ["Laufen", "Rad", "Schwimmen"].includes(pw.sport);
+}
+
+// Schickt eine geplante Einheit direkt an Garmin Connect (backend/
+// garmin_workouts.py: Upload + Eintrag in den Garmin-Kalender am geplanten
+// Tag) und vermerkt am Eintrag, wann. Ergebnis { garmin_workout_id,
+// scheduled_date }; Fehler kommen als Error mit verständlicher Meldung.
+async function sendPlannedWorkoutToGarmin(id) {
+  const pw = plannedWorkouts.find(p => p.id === id);
+  if (!pw) throw new Error("Diese Einheit gibt es nicht mehr.");
+  await storeSaved(PLANNED_WORKOUTS_KEY); // der Server liest die Einheit aus der Ablage
+  let res;
+  try {
+    res = await apiCall(`planned-workouts/${encodeURIComponent(id)}/send-to-garmin`, "POST",
+      { steps: resolvedWorkoutSteps(pw) }, { timeoutMs: 60000 });
+  } catch (e) {
+    // Zeitüberschreitung: der Server kann trotzdem hochgeladen haben.
+    if (e.timeout) throw new Error("Die Antwort kam nicht rechtzeitig - das Workout ist vielleicht trotzdem angekommen. Bitte in Garmin Connect nachsehen, bevor du erneut sendest.");
+    throw e;
+  }
+  updatePlannedWorkout(id, { garminSentAt: new Date().toISOString(), garminWorkoutId: res.data.garmin_workout_id });
+  return res.data;
 }
