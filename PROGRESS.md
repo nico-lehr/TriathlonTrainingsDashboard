@@ -15,16 +15,16 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 | Tailscale Etappe 6 – Betrieb | fertig | 2026-10-12 |
 | Tailscale Etappe 7 – Garmin mehrere Nutzer | fertig | 2026-10-12 |
 | Layout (breitere Seite) | läuft | 2026-10-12 |
-| Trainingsplaner 1 – Regelwerk plan-rules.js | läuft | 2026-10-12 |
-| Trainingsplaner 2 – Verschieben & Wünsche | offen | – |
-| Trainingsplaner 3 – KI-Empfehlungen | offen | – |
+| Trainingsplaner 1 – Regelwerk plan-rules.js | fertig | 2026-10-12 |
+| Trainingsplaner 2 – Verschieben & Wünsche | läuft | 2026-10-12 |
+| Trainingsplaner 3 – KI-Empfehlungen | läuft | 2026-10-12 |
 
 ## Arbeitspaket (21 Schritte)
 
 | Aufgabe | Status | Erledigte Schritte | Prozent | Letzte Änderung |
 |---|---|---|---|---|
 | A Wettkampf-Countdown & Periodisierung | offen | 0 / 3 | 0 % | – |
-| B Triathlon-Auswertungen | offen | 0 / 4 | 0 % | – |
+| B Triathlon-Auswertungen | läuft | 0 / 4 | 0 % | 2026-10-12 |
 | C Garmin-Workouts auf die Uhr | offen | 0 / 3 | 0 % | – |
 | D Handy / iPhone | offen | 0 / 4 | 0 % | – |
 | E Equipment, Wetter, Rennplan | offen | 0 / 3 | 0 % | – |
@@ -35,6 +35,8 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 ## Offene Fragen
 
 - `.btn-primary` / `.btn-secondary` gibt es im CSS nicht. Standard: Hauptknopf = `.update-btn`, Nebenknopf = `.cal-today-btn` (beide vorhanden).
+- Einen „Analyse“-Tab gab es nicht. Standard: Aufgabe B legt ihn neu an (ein Tab-Knopf + eine Ansicht).
+- Reihenfolge: A startet erst nach Trainingsplaner 2/3 (gleiche Dateien), D erst nach dem Layout (gleiches CSS).
 - Passwort vergessen: zusätzlich `backend/create_user.py --reset` gebaut (sonst gäbe es keinen Weg zurück).
 - Altes Doppelklick-Dashboard: Daten lassen sich mit `tools/export-browser-data.html` exportieren und mit `backend/import_workouts_json.py --browser-export` übernehmen.
 
