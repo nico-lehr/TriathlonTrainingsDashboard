@@ -23,10 +23,10 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 
 | Aufgabe | Status | Erledigte Schritte | Prozent | Letzte Änderung |
 |---|---|---|---|---|
-| A Wettkampf-Countdown & Periodisierung | läuft | 0 / 3 | 0 % | 2026-10-12 |
+| A Wettkampf-Countdown & Periodisierung | in Prüfung (3 Schritte gebaut) | 0 / 3 | 0 % | 2026-10-12 |
 | B Triathlon-Auswertungen | fertig (geprüft: erst FAIL, nach Korrektur PASS) | 4 / 4 | 100 % | 2026-10-12 |
 | C Garmin-Workouts auf die Uhr | offen | 0 / 3 | 0 % | – |
-| D Handy / iPhone | läuft | 0 / 4 | 0 % | 2026-10-12 |
+| D Handy / iPhone | in Prüfung (4 Schritte gebaut) | 0 / 4 | 0 % | 2026-10-12 |
 | E Equipment, Wetter, Rennplan | offen | 0 / 3 | 0 % | – |
 | F Abschluss-Check | offen | 0 / 4 | 0 % | – |
 
@@ -40,6 +40,9 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 - Layout: Diagramm-Beschriftungen wachsen auf sehr breiten Karten mit (SVG wird skaliert); Eingabefelder in den Einstellungen werden sehr breit. Optional später.
 - Trainingsplaner: Eine Verschiebung oder ein KI-Plan wird nur an den Verstößen gemessen, die er NEU erzeugt (vorhandene Probleme blockieren nichts). Bleibt nach Selbstkorrektur und 2. KI-Versuch ein „block“, wird der KI-Plan nicht gespeichert und der alte Plan bleibt erhalten.
 - B: Der neue Tab „Analyse“ steht hinten (nach „Rekorde“) und nutzt immer die ganze Historie (der Zeitraum-Filter gibt es nur in der Übersicht). Koppeltraining ist nur mit erfundenen Daten getestet – mit echten Multisport-Dateien noch einmal ansehen.
+- A: Die Phasen-Angaben (Taper 7–14 Tage, Spezifisch 4–6 Wochen, Aufbau 6–8 Wochen) überschneiden sich, wenn man sie als Abstand zum Rennen liest. Standard: als Phasen-LÄNGEN gelesen – Taper 2 Wochen (inkl. Rennwoche), Spezifisch 6, Aufbau 8, davor Grundlage; Wechsel immer montags. Änderbar über Konstanten in `js/analytics/periodization.js`.
+- A: Plan-Einheiten nutzen das vorhandene Feld `phase` (statt eines zweiten Felds `training_phase`). Neue Regel 7 „Erholungswoche nach dem Rennen“ ist eine Warnung, kein Block.
+- D: iPhone-Layout braucht iOS 16 oder neuer; Kalender-Monatsansicht scrollt auf dem Handy innerhalb der Karte; Kopieren-Knöpfe gehen auf dem iPhone nur über HTTPS (`tailscale serve`).
 - Reihenfolge: A startet erst nach Trainingsplaner 2/3 (gleiche Dateien), D erst nach dem Layout (gleiches CSS).
 - Passwort vergessen: zusätzlich `backend/create_user.py --reset` gebaut (sonst gäbe es keinen Weg zurück).
 - Altes Doppelklick-Dashboard: Daten lassen sich mit `tools/export-browser-data.html` exportieren und mit `backend/import_workouts_json.py --browser-export` übernehmen.
