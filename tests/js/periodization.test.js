@@ -131,7 +131,7 @@ test("getWeeklyTargets: ohne Ziel/Datum null", () => {
 test("getWeeklyTargets: Kurve von heute bis zur Erholungswoche", () => {
   const t = targets(HISTORY);
   // Anker = letzte normale Woche (05.10., 330 min); die Entlastungswoche davor verschiebt ihn nicht.
-  assert.deepStrictEqual([t.baselineMin, t.baselineWeek, t.baselineWeeks], [330, day(-7), 0]);
+  assert.deepStrictEqual([t.baselineMin, t.baselineWeek, t.returnAfterWeeks], [330, day(-7), 0]);
   assert.deepStrictEqual(t.weeks.map(w => w.weekStart), Array.from({ length: 11 }, (_, i) => day(7 * i)));
   assert.deepStrictEqual(t.weeks.map(w => w.phase), ["aufbau", "aufbau", ...Array(6).fill("spezifisch"), "taper", "taper", "erholung"]);
   assert.deepStrictEqual(t.weeks.map(w => w.type), ["belastung", "belastung", "entlastung", "belastung", "belastung", "belastung",
@@ -192,12 +192,48 @@ test("Ein Plan genau nach der Kurve verstößt gegen keine Umfangsregel", () => 
   assert.deepStrictEqual(result.filter(v => ["volume_increase", "deload", "phase_volume", "recovery_week"].includes(v.rule)), []);
 });
 
-test("ohne normale Woche: Ø der letzten Wochen als Anker", () => {
-  // Nur eine Woche Historie, und die ist die aktuelle -> keine abgeschlossene normale Woche.
-  const t = targets([hist(day(0), "Laufen", 40)]);
-  assert.deepStrictEqual([t.baselineMin, t.baselineWeek], [null, null]);
-  const t2 = targets(histWeek(-7, 200).slice(0, 2)); // eine Woche mit 100 min
-  assert.deepStrictEqual([t2.baselineMin, t2.baselineWeek], [100, day(-7)]);
+test("ohne Training in den letzten 8 Wochen: nur Prozent-Kurve", () => {
+  // Training nur heute bzw. nur vor mehr als 8 Wochen -> keine normale Woche als Anker.
+  [[hist(day(0), "Laufen", 40)], histWeek(-63, 300)].forEach(history => {
+    const t = targets(history);
+    assert.deepStrictEqual([t.baselineMin, t.baselineWeek, t.returnAfterWeeks], [null, null, 0]);
+    assert.ok(t.weeks.length && t.weeks.every(w => w.targetMin === null && w.targetPct > 0));
+  });
+  // Eine einzige abgeschlossene Woche reicht als Anker.
+  const t = targets(histWeek(-7, 200).slice(0, 2)); // 100 min
+  assert.deepStrictEqual([t.baselineMin, t.baselineWeek], [100, day(-7)]);
+});
+
+// Wiedereinstieg: 380, 400, dann 3 Wochen krank (0 min).
+const SICK = [...histWeek(-35, 380), ...histWeek(-28, 400)];
+
+test("Wiedereinstieg nach 3 Krankheitswochen: Ziel 210 statt 105 % der Woche vor der Pause", () => {
+  const goal = goalOn(day(70)); // Aufbau
+  const t = targets(SICK, [], goal);
+  assert.deepStrictEqual([t.baselineMin, t.baselineWeek, t.returnAfterWeeks], [200, null, 3]); // Hälfte von 400
+  assert.strictEqual(t.weeks[0].targetMin, 210);
+
+  const week = minutes => [day(1), day(3), day(5)].map((d, i) => ({ id: "s" + i, date: d, sport: ["Schwimmen", "Rad", "Laufen"][i], title: "locker", duration_min: minutes / 3, intensity: "leicht", status: "geplant" }));
+  const inc = plan => plain(app.validatePlan(plan, SICK, null, null, { today: TODAY, acwr: 1.0, goal })).filter(v => v.rule === "volume_increase");
+  const v = inc(week(300));
+  assert.strictEqual(v.length, 1);
+  assert.match(v[0].text, /nach 3 leichteren Wochen in Folge/);
+  assert.strictEqual(v[0].suggestion.target_minutes, 220); // 200 + 10 %
+  assert.strictEqual(inc(week(210)).length, 0);
+
+  // Stärkste leichte Woche über der Hälfte: sie ist der Ausgangswert (400, Entlastung 280, Pause).
+  const t2 = targets([...histWeek(-21, 400), ...histWeek(-14, 280)], [], goal);
+  assert.deepStrictEqual([t2.baselineMin, t2.returnAfterWeeks], [280, 2]);
+  // Im Taper bleibt die letzte normale Woche der Anker (die leichten Wochen sind dort gewollt).
+  const taper = targets(SICK, [], goalOn(day(10)));
+  assert.deepStrictEqual([taper.baselineMin, taper.baselineWeek, taper.weeks[0].targetMin], [400, day(-28), 280]);
+});
+
+test("eine einzelne Entlastungswoche ist kein Wiedereinstieg", () => {
+  const t = targets(HISTORY); // 300, 320, 200 (Entlastung), 330
+  assert.deepStrictEqual([t.baselineMin, t.returnAfterWeeks], [330, 0]);
+  const streak = plain(run(`planVolumeStreak(wk => ({ "${day(-14)}": 400, "${day(-7)}": 260 })[wk] || 0, "${day(0)}")`));
+  assert.deepStrictEqual([streak.ref, streak.light, streak.base], [400, 1, 400]);
 });
 
 test("Rundung schluckt die Steigerung nicht (kleiner Umfang)", () => {
