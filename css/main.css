@@ -8,6 +8,9 @@
     color: var(--text-primary);
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
+    /* iPhone: Schrift im Querformat nicht automatisch vergrößern; Tipp-Markierung in Akzentfarbe */
+    -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
+    -webkit-tap-highlight-color: var(--accent-wash);
   }
 
   /* Dezenter Parallax-Hintergrund (wie auf der Landingpage): drei weich
@@ -45,9 +48,11 @@
      Spalte ragen sonst über den Viewport hinaus und erzeugen einen
      horizontalen Seiten-Scrollbalken. */
   .page {
+    --gutter: 32px; /* seitlicher Abstand; auf dem Handy kleiner, siehe responsive.css */
     max-width: 1680px;
     margin: 0 auto;
-    padding: 48px 32px 96px;
+    /* Sicherheitsabstände (Notch, Home-Indikator, Querformat) siehe variables.css */
+    padding: calc(48px + var(--safe-top)) max(var(--gutter), var(--safe-right)) calc(96px + var(--safe-bottom)) max(var(--gutter), var(--safe-left));
     position: relative;
     z-index: 1;
     overflow-x: clip;
