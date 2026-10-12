@@ -27,10 +27,10 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 | B Triathlon-Auswertungen | fertig (geprüft: erst FAIL, nach Korrektur PASS) | 4 / 4 | 100 % | 2026-10-12 |
 | C Garmin-Workouts auf die Uhr | in Prüfung (3 Schritte gebaut) | 0 / 3 | 0 % | 2026-10-12 |
 | D Handy / iPhone | fertig (geprüft: PASS; kleine CSS-Nachbesserungen eingebaut) | 4 / 4 | 100 % | 2026-10-12 |
-| E Equipment, Wetter, Rennplan | E1: Prüfung nicht bestanden – Korrektur läuft (Übernahme doppelt bei zwei Tabs); E2+E3 in Prüfung | 0 / 3 | 0 % | 2026-10-12 |
+| E Equipment, Wetter, Rennplan | E1 fertig (geprüft: erst FAIL, dann PASS); E2 geprüft PASS; E3 Korrektur läuft (zwei Zeit-Leser widersprechen sich, verlorener Klick) | 1 / 3 | 33 % | 2026-10-12 |
 | F Abschluss-Check | offen | 0 / 4 | 0 % | – |
 
-**Gesamt: 52 % (11 von 21 Schritten)**
+**Gesamt: 57 % (12 von 21 Schritten)**
 
 ## Offene Fragen
 
