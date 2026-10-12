@@ -24,13 +24,13 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 | Aufgabe | Status | Erledigte Schritte | Prozent | Letzte Änderung |
 |---|---|---|---|---|
 | A Wettkampf-Countdown & Periodisierung | läuft | 0 / 3 | 0 % | 2026-10-12 |
-| B Triathlon-Auswertungen | Prüfung nicht bestanden – Korrektur läuft (Absturz Rad-Karte ohne FTP, unrealistische CSS-Zeiten, doppelte Hilfsfunktion) | 0 / 4 | 0 % | 2026-10-12 |
+| B Triathlon-Auswertungen | fertig (geprüft: erst FAIL, nach Korrektur PASS) | 4 / 4 | 100 % | 2026-10-12 |
 | C Garmin-Workouts auf die Uhr | offen | 0 / 3 | 0 % | – |
 | D Handy / iPhone | läuft | 0 / 4 | 0 % | 2026-10-12 |
 | E Equipment, Wetter, Rennplan | offen | 0 / 3 | 0 % | – |
 | F Abschluss-Check | offen | 0 / 4 | 0 % | – |
 
-**Gesamt: 0 % (0 von 21 Schritten)**
+**Gesamt: 19 % (4 von 21 Schritten)**
 
 ## Offene Fragen
 
@@ -39,6 +39,7 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 - Layout: Mit der gewünschten Mindestbreite 420 px stehen bei 1680 px drei Karten nebeneinander; weil die Übersicht-Karten in Zweier-/Vierergruppen kommen, bleiben in manchen Reihen Lücken. Wer keine Lücken will: Mindestbreite in `.dash-grid` auf ca. 540 px setzen (dann 2 Spalten bis ca. 2000 px). Vorerst wie gewünscht 420 px.
 - Layout: Diagramm-Beschriftungen wachsen auf sehr breiten Karten mit (SVG wird skaliert); Eingabefelder in den Einstellungen werden sehr breit. Optional später.
 - Trainingsplaner: Eine Verschiebung oder ein KI-Plan wird nur an den Verstößen gemessen, die er NEU erzeugt (vorhandene Probleme blockieren nichts). Bleibt nach Selbstkorrektur und 2. KI-Versuch ein „block“, wird der KI-Plan nicht gespeichert und der alte Plan bleibt erhalten.
+- B: Der neue Tab „Analyse“ steht hinten (nach „Rekorde“) und nutzt immer die ganze Historie (der Zeitraum-Filter gibt es nur in der Übersicht). Koppeltraining ist nur mit erfundenen Daten getestet – mit echten Multisport-Dateien noch einmal ansehen.
 - Reihenfolge: A startet erst nach Trainingsplaner 2/3 (gleiche Dateien), D erst nach dem Layout (gleiches CSS).
 - Passwort vergessen: zusätzlich `backend/create_user.py --reset` gebaut (sonst gäbe es keinen Weg zurück).
 - Altes Doppelklick-Dashboard: Daten lassen sich mit `tools/export-browser-data.html` exportieren und mit `backend/import_workouts_json.py --browser-export` übernehmen.
