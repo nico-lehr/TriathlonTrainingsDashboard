@@ -26,11 +26,11 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 | A Wettkampf-Countdown & Periodisierung | in Prüfung (3 Schritte gebaut) | 0 / 3 | 0 % | 2026-10-12 |
 | B Triathlon-Auswertungen | fertig (geprüft: erst FAIL, nach Korrektur PASS) | 4 / 4 | 100 % | 2026-10-12 |
 | C Garmin-Workouts auf die Uhr | offen | 0 / 3 | 0 % | – |
-| D Handy / iPhone | in Prüfung (4 Schritte gebaut) | 0 / 4 | 0 % | 2026-10-12 |
+| D Handy / iPhone | fertig (geprüft: PASS; kleine CSS-Nachbesserungen eingebaut) | 4 / 4 | 100 % | 2026-10-12 |
 | E Equipment, Wetter, Rennplan | offen | 0 / 3 | 0 % | – |
 | F Abschluss-Check | offen | 0 / 4 | 0 % | – |
 
-**Gesamt: 19 % (4 von 21 Schritten)**
+**Gesamt: 38 % (8 von 21 Schritten)**
 
 ## Offene Fragen
 
