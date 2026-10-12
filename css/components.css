@@ -1915,3 +1915,21 @@
   .ana-status { display: block; margin: 8px 0 0; min-height: 1em; }
 
   .pmc-substats.ana-tiles { margin-top: 0; }
+
+  .ana-zone-rows { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
+
+  .ana-zone-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 4px 12px; font-size: 12.5px; }
+
+  .ana-zone-name { font-weight: 600; }
+
+  .ana-zone-name small { font-weight: 500; color: var(--text-secondary); margin-left: 4px; }
+
+  .ana-zone-share { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+  .ana-zone-bar { grid-column: 1 / -1; display: block; }
+
+  .ana-z1 { fill: var(--c-z1); }
+  .ana-z2 { fill: var(--c-z2); }
+  .ana-z3 { fill: var(--c-z3); }
+  .ana-z4 { fill: var(--c-z4); }
+  .ana-z5 { fill: var(--c-z5); }

@@ -534,7 +534,7 @@
             <button type="button" class="chip active" data-mode="week">Wochen</button>
             <button type="button" class="chip" data-mode="month">Monate</button>
           </div>
-          <button type="button" class="reset-link" id="analysis-balance-settings-link">Zielverteilung ändern</button>
+          <button type="button" class="reset-link" data-ana-settings="profile-balance-card">Zielverteilung ändern</button>
         </div>
         <div class="chart-wrap" id="analysis-balance-body"></div>
       </div>
@@ -562,6 +562,14 @@
           </div>
         </div>
         <p class="coach-test-status ana-status" id="analysis-css-status"></p>
+      </div>
+
+      <div class="card">
+        <h2>Rad
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover"><b>FTP</b> (Functional Threshold Power) ist die Leistung, die du etwa eine Stunde halten kannst. Neben deinem Wert aus den Einstellungen wird sie als 95 % deiner besten 20 Minuten am Stück der letzten 90 Tage geschätzt — das passt nur, wenn darin ein harter 20-Minuten-Abschnitt steckt, sonst fällt die Schätzung zu niedrig aus. Die Leistungskurven sind auf ca. 200 Punkte je Einheit verdichtet, kurze Spitzen werden dabei geglättet. <b>Zonen</b>: Anteile der FTP (dasselbe 5-Zonen-Modell wie im Trainingsplan), die Zeit in den Zonen stammt aus den letzten 4 Wochen. Indoor und Outdoor zählen gemeinsam — Watt sind auf der Rolle und auf der Straße vergleichbar.</div></span>
+        </h2>
+        <p class="card-sub">FTP, Leistungszonen und FTP-Verlauf aus deinen Leistungsdaten</p>
+        <div class="chart-wrap" id="analysis-bike-body"></div>
       </div>
     </div>
   </div>

@@ -21,6 +21,7 @@ function anaTile(label, value, small = "", smallCls = "") {
 function renderAnalysis() {
   renderSportBalanceCard();
   renderSwimCard();
+  renderBikeCard();
 }
 
 function initAnalysis() {
@@ -31,10 +32,14 @@ function initAnalysis() {
       renderSportBalanceCard();
     });
   });
-  const settingsLink = document.getElementById("analysis-balance-settings-link");
-  if (settingsLink) settingsLink.addEventListener("click", () => {
+  // Links "... ändern" springen in die Einstellungen zum passenden Feld
+  // (data-ana-settings = ID des Ziels). Delegiert, weil manche Links erst beim Rendern entstehen.
+  document.getElementById("view-analysis").addEventListener("click", e => {
+    const link = e.target.closest("[data-ana-settings]");
+    if (!link) return;
     openSettingsView();
-    document.getElementById("profile-balance-card").scrollIntoView({ block: "center" });
+    const target = document.getElementById(link.dataset.anaSettings);
+    if (target) { target.scrollIntoView({ block: "center" }); if (target.matches("input")) target.focus(); }
   });
   initSportBalanceSettings();
   initSwimCssTest();
@@ -241,4 +246,79 @@ function initSwimCssTest() {
     anaSetStatus(status, `CSS ${res.pace} /100 m gespeichert ✓ – gilt jetzt auch in den Einstellungen.`, "ok");
     renderSwimCard();
   });
+}
+
+/* ---------- Rad ---------- */
+
+function powerZoneRangeText(z, i, last) {
+  if (i === 0) return `bis ${z.highW} W`;
+  if (i === last) return `ab ${z.lowW} W`; // alles über der Z5-Obergrenze zählt ebenfalls zu Z5
+  return `${z.lowW}–${z.highW} W`;
+}
+
+function renderBikeCard() {
+  const host = document.getElementById("analysis-bike-body");
+  if (!host) return;
+  const manual = athleteProfile.ftpWatts || null;
+  const res = computeBikeAnalysis(DATA, manual);
+  const est = res.estimate;
+  const tiles = [
+    anaTile("FTP (Einstellungen)", manual ? `${fmtNum(manual, 0)} <small>W</small>` : "–", manual ? "" : "nicht eingetragen"),
+    est
+      ? anaTile("FTP geschätzt", `${est.ftp} <small>W</small>`, `95&nbsp;% von ${est.best20} W (20 min) am ${fmtDate(est.workout._date)}`)
+      : anaTile("FTP geschätzt", "–", res.hasPower ? `keine 20 min am Stück in den letzten ${FTP_ESTIMATE_WINDOW_DAYS} Tagen` : "keine Leistungsdaten"),
+  ];
+  const settingsLink = `<button type="button" class="reset-link" data-ana-settings="profile-ftp">FTP in den Einstellungen ${manual ? "ändern" : "eintragen"}</button>`;
+  host.innerHTML = `<div class="pmc-substats ana-tiles">${tiles.join("")}</div>`;
+
+  if (!res.hasPower && !manual) {
+    host.insertAdjacentHTML("beforeend", `<p class="ana-hint">Noch keine Leistungsdaten vorhanden. Für FTP-Schätzung, Zonen und Verlauf braucht es Radeinheiten mit Leistungsmesser (Powermeter oder Smart-Trainer). Kennst du deine FTP, kannst du sie auch selbst eintragen — dann siehst du hier deine Zonen.<br>${settingsLink}</p>`);
+    return;
+  }
+
+  const ftpText = res.ftpSource === "manual" ? `FTP ${res.ftp} W (Einstellungen)` : `geschätzter FTP ${res.ftp} W`;
+  const dist = res.distribution;
+  const distText = dist
+    ? `Zeit in den Zonen: letzte ${POWER_ZONE_WINDOW_DAYS / 7} Wochen, ${dist.rideCount} ${dist.rideCount === 1 ? "Fahrt" : "Fahrten"} mit Leistung`
+    : (res.hasPower ? `Keine Leistungsdaten in den letzten ${POWER_ZONE_WINDOW_DAYS / 7} Wochen` : "Wattbereiche je Zone");
+  host.insertAdjacentHTML("beforeend", `<p class="ana-note">Zonen berechnet mit ${ftpText} · ${settingsLink}</p>
+    <h3 class="ana-subhead">Leistungszonen</h3><p class="card-sub">${distText}</p>`);
+  const rows = document.createElement("div");
+  rows.className = "ana-zone-rows";
+  res.zones.forEach((z, i) => {
+    const row = document.createElement("div");
+    row.className = "ana-zone-row";
+    const share = dist ? dist.seconds[i] / dist.total * 100 : null;
+    row.innerHTML = `<span class="ana-zone-name">${z.label} <small>${powerZoneRangeText(z, i, res.zones.length - 1)}</small></span>
+      <span class="ana-zone-share">${dist ? anaPct(share) : ""}</span>`;
+    if (dist) {
+      const svg = svgEl("svg", { class: "ana-zone-bar", width: "100%", height: 8 });
+      svg.appendChild(svgEl("rect", { x: 0, y: 0, width: "100%", height: 8, rx: 4, class: "ana-bal-empty" }));
+      const bar = svgEl("rect", { x: 0, y: 0, width: share + "%", height: 8, rx: 4, class: `ana-z${i + 1}` });
+      bar.addEventListener("mousemove", e => showTip(e, `<b>${z.label}</b><br>${fmtH(dist.seconds[i] / 60)} h · ${anaPct(share)}`, host));
+      bar.addEventListener("mouseleave", hideTip);
+      svg.appendChild(bar);
+      row.appendChild(svg);
+    }
+    rows.appendChild(row);
+  });
+  host.appendChild(rows);
+
+  if (!res.hasPower) {
+    host.insertAdjacentHTML("beforeend", `<p class="ana-hint">Noch keine Leistungsdaten vorhanden. FTP-Schätzung, Zeit in den Zonen und FTP-Verlauf brauchen Radeinheiten mit Leistungsmesser (Powermeter oder Smart-Trainer).</p>`);
+    return;
+  }
+  host.insertAdjacentHTML("beforeend", `<h3 class="ana-subhead">FTP-Verlauf</h3>
+    <p class="card-sub">Geschätzte FTP je Monat (95&nbsp;% der besten 20 Minuten), letzte ${FTP_TREND_MONTHS} Monate</p>`);
+  if (!res.trend.length) {
+    host.insertAdjacentHTML("beforeend", `<p class="empty-note">Noch kein Monat mit 20 Minuten am Stück Leistungsdaten.</p>`);
+    return;
+  }
+  const chart = document.createElement("div");
+  chart.className = "chart-wrap";
+  host.appendChild(chart);
+  drawMiniLine(chart, res.trend.map(p => {
+    const month = p.start.toLocaleDateString("de-DE", { month: "short", year: "2-digit" });
+    return { y: p.ftp, xLabel: month, tooltip: `<b>${month}</b><br>FTP ≈ ${p.ftp} W · beste 20 min ${p.best20} W am ${fmtDate(p.workout._date)}` };
+  }), { color: "var(--c-rad)", fmtAxis: v => fmtNum(v, 0), width: 440, height: 180 });
 }

@@ -3,7 +3,7 @@
 //
 // Die Browser-Skripte werden wie in index.html der Reihe nach in einen
 // gemeinsamen vm-Kontext geladen (utils -> data -> analytics). workouts.js
-// liefert sportGroup()/sameComparisonGroup(), die die Auswertungen nutzen.
+// liefert sportGroup()/sameComparisonGroup(), zones.js die Leistungszonen.
 
 const test = require("node:test");
 const assert = require("node:assert");
@@ -12,7 +12,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const ROOT = path.join(__dirname, "..", "..");
-const SCRIPTS = ["js/utils/dates.js", "js/utils/formatting.js", "js/data/workouts.js", "js/analytics/triathlon.js"];
+const SCRIPTS = ["js/utils/dates.js", "js/utils/formatting.js", "js/data/workouts.js", "js/analytics/zones.js", "js/analytics/triathlon.js"];
 
 const app = vm.createContext({});
 SCRIPTS.forEach(f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), "utf8"), app, { filename: f }));
@@ -166,4 +166,80 @@ test("Schwimmen: Becken und Freiwasser werden nicht vermischt (Gruppe der letzte
   const r = plain(app.computeSwimAnalysis(data, TODAY));
   assert.strictEqual(r.groupLabel, "Schwimmen (Becken)");
   assert.deepStrictEqual(r.points.map(p => p.paceSec), [118, 121, 117]); // Freiwasser fehlt, unbekannt zählt mit
+});
+
+/* ---------- Rad ---------- */
+
+// Leistungskurve: Blöcke [Minuten, Watt], ein Punkt alle 10 s (wie nach dem Verdichten).
+function powerStream(blocks, step = 10) {
+  const t = [], power = [];
+  let sec = 0;
+  blocks.forEach(([min, watt]) => {
+    for (let i = 0; i < min * 60 / step; i++) { t.push(sec); power.push(watt); sec += step; }
+  });
+  return { t, power };
+}
+
+function ride(y, m, d, blocks, extra = {}) {
+  const stream = powerStream(blocks);
+  return wo("Rad", y, m, d, stream.t.length * 10 / 60, { stream, ...extra });
+}
+
+test("Beste 20-Minuten-Leistung aus der Leistungskurve", () => {
+  assert.strictEqual(app.bestAveragePower(powerStream([[30, 200], [20, 300], [10, 150]]), 1200), 300);
+  // zeitgewichtet, Fenster darf einen Abschnitt anschneiden (Punkte alle 600 s)
+  const coarse = { t: [0, 600, 1200, 1800], power: [100, 400, 100, 100] };
+  assert.strictEqual(app.bestAveragePower(coarse, 1200), 250);
+  assert.strictEqual(app.bestAveragePower(coarse, 900), 300);
+  // zu kurz, keine Leistung, Lücke ohne Leistungswert -> null bzw. nicht überbrückt
+  assert.strictEqual(app.bestAveragePower(powerStream([[15, 300]]), 1200), null);
+  assert.strictEqual(app.bestAveragePower({ t: [0, 10, 20], power: [null, null, null] }, 10), null);
+  assert.strictEqual(app.bestAveragePower(null, 1200), null);
+  const gap = powerStream([[15, 300], [1, null], [15, 300]]);
+  assert.strictEqual(app.bestAveragePower(gap, 1200), null);
+});
+
+test("Aufzeichnungspause unterbricht das 20-Minuten-Fenster", () => {
+  const a = powerStream([[15, 300]]), b = powerStream([[15, 300]]);
+  const paused = { t: a.t.concat(b.t.map(x => x + 900 + 1800)), power: a.power.concat(b.power) }; // 30 min Pause
+  assert.strictEqual(app.bestAveragePower(paused, 1200), null);
+  const joined = { t: a.t.concat(b.t.map(x => x + 900)), power: a.power.concat(b.power) };
+  assert.strictEqual(app.bestAveragePower(joined, 1200), 300);
+});
+
+test("Rad: FTP-Schätzung (95 % der besten 20 min, letzte 90 Tage), Verlauf je Monat, Zonen", () => {
+  const data = [
+    ride(2026, 5, 10, [[10, 150], [20, 320], [10, 150]]), // älter als 90 Tage: zählt nur im Verlauf
+    ride(2026, 9, 5, [[10, 150], [20, 260], [10, 150]]),
+    ride(2026, 10, 3, [[10, 150], [25, 280], [5, 100]]),
+    ride(2026, 10, 10, [[60, 180]]),
+    wo("Rad", 2026, 10, 11, 60, { avg_power_w: 200 }),    // ohne Leistungskurve
+  ];
+  const r = plain(app.computeBikeAnalysis(data, null, TODAY));
+  assert.strictEqual(r.hasPower, true);
+  assert.strictEqual(r.estimate.best20, 280);
+  assert.strictEqual(r.estimate.ftp, 266); // 0,95 x 280
+  assert.strictEqual(r.ftp, 266);
+  assert.strictEqual(r.ftpSource, "estimate");
+  assert.deepStrictEqual(r.trend.map(p => [new Date(p.start).getMonth() + 1, p.ftp]), [[5, 304], [9, 247], [10, 266]]);
+  assert.strictEqual(r.zones.length, 5);
+  assert.deepStrictEqual([r.zones[1].lowW, r.zones[1].highW], [149, 200]); // Z2 = 56-75 % der FTP
+  // Zeit in Zonen (letzte 28 Tage, FTP 266): 150 W = Z2, 280 W = Z4, 100 W = Z1, 180 W = Z2
+  assert.deepStrictEqual(r.distribution.seconds, [300, 600 + 3600, 0, 1500, 0]);
+  assert.strictEqual(r.distribution.rideCount, 2);
+});
+
+test("Rad: FTP aus dem Profil hat Vorrang, ohne Leistungsdaten keine Schätzung", () => {
+  const withPower = plain(app.computeBikeAnalysis([ride(2026, 10, 3, [[30, 250]])], 300, TODAY));
+  assert.strictEqual(withPower.ftp, 300);
+  assert.strictEqual(withPower.ftpSource, "manual");
+  assert.strictEqual(withPower.estimate.ftp, 238);
+  assert.deepStrictEqual(withPower.distribution.seconds, [0, 0, 1800, 0, 0]); // 250/300 = 83 % -> Z3
+
+  const noPower = plain(app.computeBikeAnalysis([wo("Rad", 2026, 10, 3, 60, { avg_power_w: 200 })], null, TODAY));
+  assert.deepStrictEqual(noPower, { hasPower: false, estimate: null, trend: [], ftp: null, ftpSource: null, zones: null, distribution: null });
+
+  const manualOnly = plain(app.computeBikeAnalysis([], 250, TODAY));
+  assert.strictEqual(manualOnly.zones[3].lowW, 228);
+  assert.strictEqual(manualOnly.distribution, null);
 });

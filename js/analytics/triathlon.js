@@ -157,3 +157,108 @@ function computeSwimAnalysis(workouts, today = new Date()) {
     swolfTrend: swimWindowTrend(points, "swolf", today),
   };
 }
+
+/* ======================================================================
+   RAD: FTP (aus dem Profil + Schätzung aus den Leistungskurven),
+   Zeit in den Leistungszonen und FTP-Verlauf
+   ====================================================================== */
+
+const FTP_BEST_EFFORT_S = 20 * 60;   // beste 20 Minuten am Stück ...
+const FTP_FROM_20MIN_FACTOR = 0.95;  // ... davon 95 % = FTP (gängige Faustregel nach Allen/Coggan)
+const FTP_ESTIMATE_WINDOW_DAYS = 90; // Schätzung nur aus den letzten 90 Tagen - eine alte Bestleistung sagt wenig über die heutige Form
+const FTP_TREND_MONTHS = 12;         // Verlauf: geschätzte FTP je Kalendermonat, letzte 12 Monate
+const POWER_ZONE_WINDOW_DAYS = 28;   // Zeit in den Leistungszonen: letzte 4 Wochen
+const POWER_PAUSE_FACTOR = 3;        // Punktabstand > 3x des üblichen = Aufzeichnungspause, unterbricht ein Fenster
+
+// Zerlegt die Leistungskurve (stream.t/stream.power, vom Parser auf ~200
+// Punkte verdichtet - jeder Punkt steht für den Abschnitt bis zum nächsten)
+// in lückenlose Stücke aus { dt, p }. Punkte ohne Leistungswert und
+// Aufzeichnungspausen trennen die Stücke, damit nichts überbrückt wird.
+function powerRuns(stream) {
+  if (!stream || !Array.isArray(stream.t) || !Array.isArray(stream.power)) return [];
+  const t = stream.t, pw = stream.power, n = Math.min(t.length, pw.length);
+  const steps = [];
+  for (let i = 0; i < n - 1; i++) if (t[i + 1] > t[i]) steps.push(t[i + 1] - t[i]);
+  if (!steps.length) return [];
+  steps.sort((a, b) => a - b);
+  const step = steps[Math.floor(steps.length / 2)]; // üblicher Punktabstand (Median)
+  const runs = [];
+  let cur = [];
+  for (let i = 0; i < n; i++) {
+    const raw = i < n - 1 ? t[i + 1] - t[i] : step;
+    if (pw[i] == null || !(raw > 0)) { if (cur.length) runs.push(cur); cur = []; continue; }
+    const pause = raw > POWER_PAUSE_FACTOR * step;
+    cur.push({ dt: pause ? step : raw, p: pw[i] });
+    if (pause) { runs.push(cur); cur = []; }
+  }
+  if (cur.length) runs.push(cur);
+  return runs;
+}
+
+// Beste Durchschnittsleistung (W) über `seconds` am Stück, zeitgewichtet.
+// null, wenn kein lückenloses Stück so lang ist.
+function bestAveragePower(stream, seconds) {
+  let best = null;
+  powerRuns(stream).forEach(run => {
+    const T = [0], E = [0]; // Summen von Dauer und Energie bis vor Abschnitt k
+    run.forEach((s, k) => { T.push(T[k] + s.dt); E.push(E[k] + s.p * s.dt); });
+    let j = 0;
+    for (let i = 0; i < run.length; i++) {
+      if (j < i) j = i;
+      while (j < run.length && T[j + 1] - T[i] < seconds) j++;
+      if (j >= run.length) break; // ab hier ist der Rest kürzer als `seconds`
+      const energy = E[j] - E[i] + run[j].p * (seconds - (T[j] - T[i]));
+      if (best == null || energy / seconds > best) best = energy / seconds;
+    }
+  });
+  return best;
+}
+
+const hasPowerStream = w => !!(w.stream && Array.isArray(w.stream.power) && w.stream.power.some(v => v != null));
+
+// Index (0-4) der Leistungszone für einen Anteil der FTP - Zonengrenzen aus
+// POWER_ZONE_FTP_BOUNDS (js/analytics/zones.js), oberhalb von Z5 bleibt es Z5.
+function powerZoneIndex(fraction) {
+  let zi = 0;
+  POWER_ZONE_FTP_BOUNDS.forEach(([lo], i) => { if (fraction >= lo) zi = i; });
+  return zi;
+}
+
+// Rad-Auswertung. manualFtp = athleteProfile.ftpWatts (oder null).
+// Ohne Leistungskurven bleibt alles Gemessene leer (hasPower: false) - die
+// Zonen-Grenzen gibt es dann nur aus der FTP im Profil.
+function computeBikeAnalysis(workouts, manualFtp, today = new Date()) {
+  const dayMs = 86400000;
+  const rides = workouts.filter(w => w._date && !w.is_summary && sportGroup(w.sport) === "Rad" && hasPowerStream(w));
+  const best20 = new Map(rides.map(w => [w, bestAveragePower(w.stream, FTP_BEST_EFFORT_S)]));
+  const bestOf = list => list.reduce((b, w) => (best20.get(w) != null && (!b || best20.get(w) > best20.get(b)) ? w : b), null);
+  const estimateOf = w => (w ? { ftp: Math.round(best20.get(w) * FTP_FROM_20MIN_FACTOR), best20: Math.round(best20.get(w)), workout: w } : null);
+
+  const estimate = estimateOf(bestOf(rides.filter(w => w._date >= today - FTP_ESTIMATE_WINDOW_DAYS * dayMs && w._date <= today)));
+
+  const trend = [];
+  for (let i = FTP_TREND_MONTHS - 1; i >= 0; i--) {
+    const start = new Date(today.getFullYear(), today.getMonth() - i, 1), end = new Date(today.getFullYear(), today.getMonth() - i + 1, 1);
+    const est = estimateOf(bestOf(rides.filter(w => w._date >= start && w._date < end)));
+    if (est) trend.push({ start, ...est });
+  }
+
+  const ftp = manualFtp || (estimate && estimate.ftp) || null;
+  let distribution = null;
+  if (ftp) {
+    const seconds = [0, 0, 0, 0, 0];
+    const recent = rides.filter(w => w._date >= today - POWER_ZONE_WINDOW_DAYS * dayMs && w._date <= today);
+    recent.forEach(w => powerRuns(w.stream).forEach(run => run.forEach(s => { seconds[powerZoneIndex(s.p / ftp)] += s.dt; })));
+    const total = seconds.reduce((a, b) => a + b, 0);
+    if (total) distribution = { seconds, total, rideCount: recent.length };
+  }
+  return {
+    hasPower: rides.length > 0,
+    estimate,
+    trend,
+    ftp,
+    ftpSource: manualFtp ? "manual" : (ftp ? "estimate" : null),
+    zones: ftp ? computeBikePowerZones(ftp) : null,
+    distribution,
+  };
+}
