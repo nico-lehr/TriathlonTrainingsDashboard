@@ -148,10 +148,12 @@ function setGoalCourseElevation(id, elevationM, source, label) {
 
 // Rennplan (Checklisten Wechselzone/Ausrüstung, Verpflegung, Rennwoche - siehe
 // js/analytics/race-plan.js) als Ganzes ersetzen; null = wieder Standard-Listen.
-function setGoalRacePlan(id, racePlan) {
+// rerender = false: nur speichern - für einen geänderten Text, der schon so
+// auf dem Bildschirm steht (neu zeichnen würde den nächsten Klick verschlucken).
+function setGoalRacePlan(id, racePlan, rerender = true) {
   const goal = goals.find(g => g.id === id);
   if (!goal) return;
   goal.racePlan = racePlan || null;
   saveGoals();
-  renderGoals();
+  if (rerender) renderGoals();
 }

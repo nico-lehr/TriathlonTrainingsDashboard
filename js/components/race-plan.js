@@ -85,13 +85,14 @@ function buildRacePlanHtml(goal) {
     </div>`;
 }
 
-// Ändert eine Kopie des Rennplans und speichert sie im Ziel (setGoalRacePlan).
-function changeRacePlan(goalId, mutate) {
+// Ändert eine Kopie des Rennplans und speichert sie im Ziel (setGoalRacePlan);
+// rerender = false nur, wenn der Bildschirm die Änderung schon zeigt.
+function changeRacePlan(goalId, mutate, rerender = true) {
   const goal = goals.find(g => g.id === goalId);
   if (!goal) return;
   const plan = racePlanOf(goal);
   mutate(plan);
-  setGoalRacePlan(goalId, plan);
+  setGoalRacePlan(goalId, plan, rerender);
 }
 
 // Ereignisse im frisch gezeichneten Ziele-Container (renderGoals, coach.js).
@@ -109,6 +110,10 @@ function wireRacePlan(rootEl) {
   }));
   // Text direkt im Eintrag ändern (bricht anders als ein Eingabefeld um, auch
   // auf dem Handy bleibt alles lesbar); Enter oder Wegtippen speichert.
+  // Ein geänderter Text wird nur gespeichert, nicht neu gezeichnet: blur kommt
+  // zwischen mousedown und click des nächsten Klicks (Haken, ✕, Hinzufügen) -
+  // neu zeichnen würde diesen Klick verschlucken. Nur ein geleerter Text
+  // löscht den Punkt und zeichnet neu.
   rootEl.querySelectorAll(".race-plan-text").forEach(el => {
     el.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); el.blur(); } });
     el.addEventListener("blur", () => {
@@ -117,10 +122,12 @@ function wireRacePlan(rootEl) {
       const item = goal && racePlanOf(goal)[list][idx];
       const text = el.textContent.replace(/\s+/g, " ").trim().slice(0, RACE_PLAN_TEXT_MAX);
       if (!item || text === item.text) return;
-      changeRacePlan(id, plan => {
-        if (text) plan[list][idx].text = text;
-        else plan[list].splice(idx, 1); // leer = Punkt löschen
-      });
+      if (!text) {
+        changeRacePlan(id, plan => { plan[list].splice(idx, 1); });
+        return;
+      }
+      if (el.textContent !== text) el.textContent = text; // so anzeigen, wie gespeichert
+      changeRacePlan(id, plan => { plan[list][idx].text = text; }, false);
     });
   });
   rootEl.querySelectorAll(".race-plan-remove").forEach(btn => btn.addEventListener("click", () => {

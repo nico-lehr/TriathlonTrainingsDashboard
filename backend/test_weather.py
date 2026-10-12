@@ -33,12 +33,13 @@ PLACES = {"results": [
 class FakeOpenMeteo(BaseHTTPRequestHandler):
     requests = []
     status = 200
+    raw_body = None  # gesetzt: genau diese Bytes statt der normalen Antwort
 
     def do_GET(self):
         url = urlparse(self.path)
         FakeOpenMeteo.requests.append((url.path, parse_qs(url.query)))
         data = PLACES if url.path == "/search" else FORECAST
-        out = json.dumps(data).encode()
+        out = FakeOpenMeteo.raw_body or json.dumps(data).encode()
         self.send_response(FakeOpenMeteo.status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(out)))
@@ -75,6 +76,7 @@ class WeatherTest(unittest.TestCase):
         weather_routes._cache.clear()
         FakeOpenMeteo.requests.clear()
         FakeOpenMeteo.status = 200
+        FakeOpenMeteo.raw_body = None
 
     def get(self, url):
         return self.client.get(url, headers=self.headers)
@@ -131,6 +133,40 @@ class WeatherTest(unittest.TestCase):
         self.assertIn("Fehler 500", r.get_json()["error"])
         FakeOpenMeteo.status = 200
         self.assertEqual(self.get("/api/v1/weather?lat=49.4&lon=8.7").status_code, 200)
+
+    def test_kaputte_antwort_502_und_nicht_gespeichert(self):
+        for body in (b'{"daily": [1, 2, 3]}', b'{"daily": {"time": "2026-10-12"}}', b"<html>kein JSON</html>", b"[1, 2]"):
+            FakeOpenMeteo.raw_body = body
+            r = self.get("/api/v1/weather?lat=49.4&lon=8.7")
+            self.assertEqual(r.status_code, 502, body)
+            self.assertIn("unerwartete Daten", r.get_json()["error"])
+        FakeOpenMeteo.raw_body = None
+        self.assertEqual(self.get("/api/v1/weather?lat=49.4&lon=8.7").status_code, 200)  # nichts Kaputtes gespeichert
+        self.assertEqual(len(FakeOpenMeteo.requests), 5)
+
+    def strict_json(self, response):
+        """Antwort muss echtes JSON sein - "NaN" koennte der Browser nicht lesen."""
+        def no_constants(name):
+            raise AssertionError(f"{name} in der Antwort")
+        return json.loads(response.get_data(as_text=True), parse_constant=no_constants)
+
+    def test_nan_von_open_meteo_erreicht_den_browser_nie(self):
+        FakeOpenMeteo.raw_body = (b'{"results": [{"name": "Kaputt", "latitude": NaN, "longitude": 8.0},'
+                                  b' {"name": "Weit weg", "latitude": 95.0, "longitude": 8.0},'
+                                  b' {"name": "Gut", "latitude": 49.4, "longitude": 8.7, "country": "Deutschland"}]}')
+        places = self.strict_json(self.get("/api/v1/weather/geocode?name=Test"))["data"]["places"]
+        self.assertEqual(places, [{"name": "Gut", "region": "Deutschland", "lat": 49.4, "lon": 8.7}])
+        FakeOpenMeteo.raw_body = (b'{"daily": {"time": ["2026-10-12"], "weather_code": [3], "temperature_2m_max": [NaN],'
+                                  b' "temperature_2m_min": [Infinity], "precipitation_probability_max": [true]}}')
+        day = self.strict_json(self.get("/api/v1/weather?lat=49.4&lon=8.7"))["data"]["days"][0]
+        self.assertEqual(day, {"date": "2026-10-12", "code": 3, "temp_max": None, "temp_min": None,
+                               "precip_prob": None, "wind_max": None})
+
+    def test_ortssuche_ohne_treffer(self):
+        FakeOpenMeteo.raw_body = b'{"generationtime_ms": 0.5}'  # so antwortet Open-Meteo ohne Treffer
+        r = self.get("/api/v1/weather/geocode?name=Xyzabc")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.get_json()["data"]["places"], [])
 
 
 if __name__ == "__main__":

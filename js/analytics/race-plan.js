@@ -72,16 +72,6 @@ function racePlanOf(goal) {
   return goal && goal.racePlan ? JSON.parse(JSON.stringify(goal.racePlan)) : defaultRacePlan(goal);
 }
 
-// Zielzeit "H:MM:SS" oder "H:MM" -> Sekunden, sonst null. Zwei Teile heißen
-// hier Stunden:Minuten wie in den Ziel-Formularen ("z.B. 5:30" = 5 h 30 min);
-// die Anzeige nennt die gelesene Zeit, damit ein Missverständnis auffällt.
-function parseRaceTargetTime(str) {
-  const m = /^(\d{1,2}):([0-5]\d)(?::([0-5]\d))?$/.exec(String(str == null ? "" : str).trim());
-  if (!m) return null;
-  const sec = Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3] || 0);
-  return sec > 0 ? sec : null;
-}
-
 // Gleichmäßiges Tempo je Disziplin. Triathlon: Schwimmen/Rad/Laufen aus den
 // Unterdisziplinen, sonst eine Zeile aus Distanz + Zielzeit des Ziels.
 // Je Disziplin: { key, label, sport, distanceKm, seconds, value, text, missing }
@@ -100,7 +90,7 @@ function computeRacePacing(goal) {
 
 function racePacingLeg({ key, distanceKm, targetTime }) {
   const km = Number(distanceKm) > 0 ? Number(distanceKm) : null;
-  const seconds = parseRaceTargetTime(targetTime);
+  const seconds = goalTimeToSeconds(targetTime); // js/utils/dates.js - die Anzeige nennt die gelesene Zeit
   const missing = [];
   if (km == null) missing.push("Distanz fehlt");
   if (seconds == null) missing.push(targetTime ? `Zielzeit „${targetTime}“ nicht lesbar (Format H:MM:SS)` : "Zielzeit fehlt");

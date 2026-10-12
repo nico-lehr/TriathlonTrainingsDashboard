@@ -183,12 +183,14 @@ function isIndoorRide(w) { return (w._rideEnv !== undefined ? w._rideEnv : rideE
 // Sportart und Titel (keine sub_sport/GPS-Signale wie oben), deshalb eine
 // einfache, feste Regel nur über den Titel:
 //  - Rad und Laufen: draußen, außer der Titel nennt ein Indoor-Stichwort
-//    (dieselben wie bei echten Radeinheiten + Laufband/Halle/Plattformen).
-//  - Schwimmen: nur mit "Freiwasser"/"Open Water"/"See"/"Meer" im Titel, sonst Becken.
+//    (dieselben wie bei echten Radeinheiten + Laufband/Ergometer/Halle/Plattformen).
+//    Ein Stichwort zählt nur am Wortanfang ("Rollentraining" ja, "Kontrolle" nein).
+//  - Schwimmen: nur mit "Freiwasser"/"Open Water" am Wortanfang ("Freiwasser-
+//    schwimmen" ja) oder dem ganzen Wort "See"/"Meer" ("Seepferdchen" nein), sonst Becken.
 //  - Kraft, Mobility und alles andere: drinnen.
-// Ein Stichwort zählt nur am Wortanfang ("Rollentraining" ja, "Kontrolle" nein).
-const PLANNED_INDOOR_RE = new RegExp(`\\b(${[...RIDE_ENV_INDOOR_LABELS, "Laufband", "Halle", "Zwift", "MyWhoosh", "Rouvy"].join("|")})`, "i");
-const PLANNED_OPEN_WATER_RE = /\b(freiwasser|open ?water|see|meer)/i;
+const PLANNED_INDOOR_WORDS = ["Laufband", "Treadmill", "Ergometer", "Radergometer", "Smart-?Trainer", "Halle", "Zwift", "MyWhoosh", "Rouvy"]; // Regex-Teile
+const PLANNED_INDOOR_RE = new RegExp(`\\b(${[...RIDE_ENV_INDOOR_LABELS, ...PLANNED_INDOOR_WORDS].join("|")})`, "i");
+const PLANNED_OPEN_WATER_RE = /\b(freiwasser|open ?water)|\b(see|meer)\b/i;
 
 function isOutdoorPlannedWorkout(p) {
   const title = (p && p.title) || "";

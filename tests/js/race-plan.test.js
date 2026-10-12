@@ -1,6 +1,8 @@
 // Tests für den Rennplan (js/analytics/race-plan.js): Pacing je Disziplin aus
 // Distanz + Zielzeit, ehrliche Angaben bei fehlenden Werten, Tage der
-// Rennwoche und die Standard-Checklisten.
+// Rennwoche und die Standard-Checklisten. Dazu der gemeinsame Zielzeit-Parser
+// (goalTimeToSeconds, js/utils/dates.js), den auch die Ernährung nutzt
+// (hmsToHours, js/analytics/nutrition.js).
 // Ausführen: node --test tests/js/
 //
 // Wie die übrigen Tests: die Browser-Skripte laufen in einem gemeinsamen
@@ -13,7 +15,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const ROOT = path.join(__dirname, "..", "..");
-const SCRIPTS = ["js/utils/dates.js", "js/utils/formatting.js", "js/analytics/race-plan.js"];
+const SCRIPTS = ["js/utils/dates.js", "js/utils/formatting.js", "js/analytics/nutrition.js", "js/analytics/race-plan.js"];
 
 const app = vm.createContext({});
 SCRIPTS.forEach(f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), "utf8"), app, { filename: f }));
@@ -22,15 +24,24 @@ const plain = x => JSON.parse(JSON.stringify(x)); // Objekte aus dem vm-Kontext 
 const tri = subDisciplines => ({ id: "g1", name: "Mitteldistanz", sport: "Triathlon", date: "2026-11-01", subDisciplines });
 const byKey = legs => Object.fromEntries(plain(legs).map(l => [l.key, l]));
 
-test("Zielzeit lesen: H:MM:SS und H:MM, alles andere null", () => {
-  assert.strictEqual(app.parseRaceTargetTime("0:40:00"), 2400);
-  assert.strictEqual(app.parseRaceTargetTime(" 2:30:00 "), 9000);
-  assert.strictEqual(app.parseRaceTargetTime("5:30"), 19800); // wie im Ziel-Formular: 5 h 30 min
-  assert.strictEqual(app.parseRaceTargetTime("1:60"), null);
-  assert.strictEqual(app.parseRaceTargetTime("0:00"), null);
-  assert.strictEqual(app.parseRaceTargetTime("abc"), null);
-  assert.strictEqual(app.parseRaceTargetTime(""), null);
-  assert.strictEqual(app.parseRaceTargetTime(null), null);
+test("Zielzeit lesen (goalTimeToSeconds): H:MM:SS und H:MM, alles andere null", () => {
+  assert.strictEqual(app.goalTimeToSeconds("0:40:00"), 2400);
+  assert.strictEqual(app.goalTimeToSeconds(" 2:30:00 "), 9000);
+  assert.strictEqual(app.goalTimeToSeconds("5:30"), 19800); // wie im Ziel-Formular: 5 h 30 min
+  assert.strictEqual(app.goalTimeToSeconds("1:60"), null);
+  assert.strictEqual(app.goalTimeToSeconds("0:00"), null);
+  assert.strictEqual(app.goalTimeToSeconds("abc"), null);
+  assert.strictEqual(app.goalTimeToSeconds(""), null);
+  assert.strictEqual(app.goalTimeToSeconds(null), null);
+});
+
+test("Ernährung liest Zielzeiten mit demselben Parser wie der Rennplan", () => {
+  assert.strictEqual(app.hmsToHours("3:30"), 3.5); // Marathon-Ziel "3:30" = 3,5 h (früher 3 min 30 s)
+  assert.strictEqual(app.hmsToHours("0:40:00"), 2400 / 3600);
+  assert.strictEqual(app.hmsToHours("2:30:00"), 2.5);
+  assert.strictEqual(app.hmsToHours("abc"), null);
+  assert.strictEqual(app.hmsToHours(null), null);
+  assert.strictEqual(app.hmsToHours("3:30") * 3600, app.computeRacePacing({ sport: "Laufen", distanceKm: 42.2, targetTime: "3:30" })[0].seconds);
 });
 
 test("Triathlon: Pace je 100 m beim Schwimmen, km/h beim Rad, min/km beim Laufen", () => {

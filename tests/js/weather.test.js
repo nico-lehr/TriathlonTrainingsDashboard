@@ -37,6 +37,11 @@ test("Rad und Laufen sind draußen, außer der Titel nennt ein Indoor-Stichwort"
   assert.strictEqual(outdoor("Rad", "Virtuelle Ausfahrt"), false);
   assert.strictEqual(outdoor("Laufen", "Laufband-Intervalle"), false);
   assert.strictEqual(outdoor("Laufen", "Hallentraining"), false);
+  assert.strictEqual(outdoor("Rad", "Ergometer 3x10 min"), false);
+  assert.strictEqual(outdoor("Rad", "Radergometer locker"), false);
+  assert.strictEqual(outdoor("Rad", "Smart-Trainer Intervalle"), false);
+  assert.strictEqual(outdoor("Rad", "Smarttrainer Grundlage"), false);
+  assert.strictEqual(outdoor("Laufen", "Treadmill Tempo"), false);
 });
 
 test("Schwimmen nur mit Freiwasser-Stichwort draußen, Kraft/Mobility nie", () => {
@@ -44,6 +49,10 @@ test("Schwimmen nur mit Freiwasser-Stichwort draußen, Kraft/Mobility nie", () =
   assert.strictEqual(outdoor("Schwimmen", "Freiwasserschwimmen"), true);
   assert.strictEqual(outdoor("Schwimmen", "Open Water Test"), true);
   assert.strictEqual(outdoor("Schwimmen", "Schwimmen im See"), true);
+  assert.strictEqual(outdoor("Schwimmen", "See-Querung"), true);
+  assert.strictEqual(outdoor("Schwimmen", "Im Meer"), true);
+  assert.strictEqual(outdoor("Schwimmen", "Seepferdchen-Technik"), false); // nur das ganze Wort "See"
+  assert.strictEqual(outdoor("Schwimmen", "Meerjungfrau-Beinschlag"), false);
   assert.strictEqual(outdoor("Kraft", "Kraft draußen im Park"), false);
   assert.strictEqual(outdoor("Mobility", "Mobility"), false);
   assert.strictEqual(app.isOutdoorPlannedWorkout(null), false);
