@@ -13,6 +13,12 @@
 const RACE_WEEK_DAYS = 7; // Rennwoche = Renntag und die 6 Tage davor
 const RACE_PLAN_TEXT_MAX = 120;
 
+// Plausibler Bereich je Disziplin (Schwimmen/Laufen: Sekunden je 100 m bzw.
+// km, Rad: km/h). Liegt das Tempo außerhalb, war die Zielzeit fast sicher
+// anders gemeint (z. B. "40:00" für 40 Minuten wird als 40 Stunden gelesen) -
+// dann gibt es einen Hinweis statt einer unsinnigen Zahl.
+const RACE_PACE_LIMITS = { swim: [50, 300], bike: [10, 60], run: [150, 900] };
+
 const RACE_PACING_LEGS = {
   swim: { label: "Schwimmen", sport: "Schwimmen" },
   bike: { label: "Rad", sport: "Rad" },
@@ -99,6 +105,11 @@ function racePacingLeg({ key, distanceKm, targetTime }) {
     if (key === "swim") { value = seconds / (km * 10); text = `${secondsToPace(value)} /100 m`; }
     else if (key === "bike") { value = km / (seconds / 3600); text = `${fmtNum(value, 1)} km/h`; }
     else { value = seconds / km; text = `${secondsToPace(value)} /km`; }
+    const [min, max] = RACE_PACE_LIMITS[key];
+    if (value < min || value > max) {
+      missing.push(`Zielzeit „${targetTime}“ als ${fmtDurationClock(seconds)} gelesen – das passt nicht zu ${fmtNum(km, 1)} km. Bitte als Std:Min:Sek eintragen, z. B. 0:40:00`);
+      value = null; text = null;
+    }
   }
   return { key, label: RACE_PACING_LEGS[key].label, sport: RACE_PACING_LEGS[key].sport, distanceKm: km, seconds, value, text, missing };
 }

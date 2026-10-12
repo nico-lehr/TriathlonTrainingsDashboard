@@ -132,3 +132,16 @@ test("Standard-Checklisten: Wechselzone nur beim Triathlon, gespeicherter Plan w
   assert.strictEqual(saved.racePlan.transition[0].done, true);
   assert.deepStrictEqual(plain(app.racePlanOf(saved)).transition, [{ text: "Eigene Schuhe", done: true }]);
 });
+
+test("unrealistisches Tempo: Hinweis statt unsinniger Zahl", () => {
+  // "40:00" ist als 40 Stunden gelesen - für 1,5 km Schwimmen unmöglich.
+  const legs = byKey(app.computeRacePacing(tri([
+    { key: "swim", label: "Schwimmen", distanceKm: 1.5, targetTime: "40:00" },
+    { key: "bike", label: "Rad", distanceKm: 40, targetTime: "1:10:00" },
+    { key: "run", label: "Laufen", distanceKm: 10, targetTime: "45:00" },
+  ])));
+  assert.strictEqual(legs.swim.text, null);
+  assert.match(legs.swim.missing[0], /als 40:00:00 gelesen/);
+  assert.strictEqual(legs.run.text, null);
+  assert.ok(legs.bike.text, "realistisches Rad-Tempo bleibt");
+});
