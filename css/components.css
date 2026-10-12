@@ -806,6 +806,63 @@
 
   .goal-adv-elevation-row .goal-adv-elevation { max-width: 120px; }
 
+  /* "Rennplan" je Ziel (js/components/race-plan.js) - aufklappbar wie .goal-adv */
+  .race-plan { gap: 18px; max-width: 760px; }
+
+  .race-plan-section { display: flex; flex-direction: column; gap: 6px; }
+
+  .race-plan-section h4 { font-size: 12px; font-weight: 650; color: var(--text-secondary); margin: 0 0 2px; }
+
+  .race-plan-pace-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; font-size: 12.5px; }
+
+  .race-plan-pace-row .sport-dot { width: 8px; height: 8px; border-radius: 2px; flex: none; align-self: center; }
+
+  .race-plan-pace-label { font-weight: 620; min-width: 76px; }
+
+  .race-plan-pace-value { font-weight: 700; min-width: 92px; font-variant-numeric: tabular-nums; }
+
+  .race-plan-pace-basis { color: var(--text-secondary); }
+
+  .race-plan-missing { color: var(--c-warn-text); }
+
+  .race-plan-note, .race-plan-empty { font-size: 11.5px; color: var(--text-muted); margin: 0; }
+
+  .race-plan-item { display: flex; align-items: center; gap: 8px; }
+
+  .race-plan-item input[type="checkbox"] { width: 18px; height: 18px; margin: 0; flex: none; accent-color: var(--accent); cursor: pointer; }
+
+  .race-plan-text {
+    flex: 1 1 auto; min-width: 0; padding: 5px 8px; border-radius: 8px;
+    font-size: 12.5px; line-height: 1.4; overflow-wrap: anywhere; hyphens: auto; cursor: text;
+  }
+
+  .race-plan-text:hover, .race-plan-text:focus { background: var(--surface-1); }
+
+  .race-plan-text:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+
+  .race-week-day .race-plan-text:hover, .race-week-day .race-plan-text:focus { background: var(--page); }
+
+  .race-plan-item.done .race-plan-text { text-decoration: line-through; color: var(--text-muted); }
+
+  .race-plan-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 2px; }
+
+  .race-plan-add .race-plan-add-text { flex: 1 1 160px; width: auto; }
+
+  .race-plan-add .race-plan-add-day { flex: 0 1 200px; width: auto; }
+
+  .race-week-day {
+    display: flex; flex-direction: column; gap: 5px; padding: 8px 10px;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  }
+
+  .race-week-raceday { border-color: var(--accent); }
+
+  .race-week-day-head { display: flex; align-items: baseline; gap: 8px; font-size: 12px; }
+
+  .race-week-day-head span { font-size: 11.5px; color: var(--text-muted); }
+
+  .race-week-raceday .race-week-day-head span { color: var(--accent); font-weight: 650; }
+
   .goal-rec-date { font-size: 11px; color: var(--text-muted); }
 
   .goal-error { font-size: 12px; color: var(--c-crit-text); margin-top: 10px; }
@@ -1018,6 +1075,39 @@
   .cal-day-planned h4 { font-size: 12px; font-weight: 650; color: var(--text-secondary); margin: 0 0 6px; }
 
   .cal-planned-list-day .cal-planned-chip { font-size: 12px; padding: 6px 10px; }
+
+  /* Wetter an Outdoor-Einheiten (calWeatherHtml, js/components/calendar.js) */
+  .cal-weather {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 1px 5px;
+    font-size: 10.5px; font-weight: 600; color: var(--text-secondary); font-variant-numeric: tabular-nums;
+  }
+
+  .cal-weather-sub { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 0 6px; font-weight: 500; color: var(--text-muted); }
+
+  .cal-weather-sub > span { white-space: nowrap; }
+
+  .cal-weather-day { font-size: 12.5px; margin-bottom: 8px; }
+
+  .cal-weather-day .cal-weather-sub { font-size: 11px; }
+
+  .card .card-sub.cal-weather-note { margin: -4px 0 12px; }
+
+  /* "Wetter im Kalender"-Karte in den Einstellungen (js/components/weather.js) */
+  .weather-search-row { display: flex; align-items: center; gap: 8px; }
+
+  .weather-search-row .cal-today-btn { flex: none; }
+
+  .weather-status { margin: 10px 0 0; }
+
+  .weather-place-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+  .weather-clear-btn { margin-top: 10px; }
+
+  .weather-place-list:empty { display: none; }
+
+  .weather-place-region { color: var(--text-muted); font-weight: 500; }
+
+  .weather-clear-btn[hidden] { display: none; }
 
   .goal-recommendation p { margin: 0 0 10px; }
 

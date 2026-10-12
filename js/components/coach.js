@@ -303,6 +303,7 @@ function renderGoals() {
           ${goal.notes ? `<div class="goal-notes">${escapeHtml(goal.notes)}</div>` : ""}
           ${readinessDetailHtml}
           ${buildGoalAdvancedHtml(goal)}
+          ${buildRacePlanHtml(goal)}
           <div class="goal-actions">
             <button class="chip goal-generate-btn" data-id="${goal.id}" ${goal._loading ? "disabled" : ""}>${btnLabel}</button>
             ${goal.recommendationAt ? `<span class="goal-rec-date">Stand: ${fmtDateFull(new Date(goal.recommendationAt))}</span>` : ""}
@@ -367,6 +368,7 @@ function renderGoals() {
       renderGoals();
     }
   }));
+  wireRacePlan(el);
 
   renderCoachSummary();
   applyGoalsCardCollapseState();

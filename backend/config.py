@@ -27,6 +27,11 @@ class Config:
     # KI: der Server leitet Anfragen an Ollama auf diesem PC weiter (ai_routes.py)
     OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
 
+    # Wetter im Kalender: der Server fragt Open-Meteo (kostenlos, kein API-Key),
+    # siehe weather_routes.py. Nur fuer Tests oder einen eigenen Spiegel aendern.
+    OPEN_METEO_URL = os.getenv("OPEN_METEO_URL", "https://api.open-meteo.com/v1/forecast")
+    OPEN_METEO_GEOCODING_URL = os.getenv("OPEN_METEO_GEOCODING_URL", "https://geocoding-api.open-meteo.com/v1/search")
+
     # Garmin
     GARMIN_TOKEN_PATH = Path.home() / ".triathlon" / "garmin.token"
     GARMIN_LOG_PATH = Path.home() / ".triathlon" / "garmin-sync.log"

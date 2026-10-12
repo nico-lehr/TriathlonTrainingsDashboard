@@ -243,13 +243,10 @@ function carbPerHourForDuration(hours, sportLabel) {
   return { minG: 60, maxG: 90, note: ">2,5h Rad: 60-90 g/h (mehrere Kohlenhydratquellen, z.B. Glukose+Fruktose) - vorher im Training testen" };
 }
 
-// "HH:MM:SS" (Zielzeit-Format, siehe Goal in DATA_MODEL.md) -> Dauer in Stunden.
+// Zielzeit ("H:MM:SS" oder "H:MM", siehe goalTimeToSeconds in js/utils/dates.js) -> Dauer in Stunden.
 function hmsToHours(hms) {
-  if (!hms) return null;
-  const parts = hms.split(":").map(Number);
-  if (!parts.length || parts.some(isNaN)) return null;
-  const [h, m, s] = parts.length === 3 ? parts : [0, parts[0], parts[1] || 0];
-  return h + m / 60 + (s || 0) / 3600;
+  const s = goalTimeToSeconds(hms);
+  return s == null ? null : s / 3600;
 }
 
 const NUTRITION_SPORT_LABEL = { swim: "Schwimmen", bike: "Rad", run: "Laufen" };

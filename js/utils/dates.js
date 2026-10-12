@@ -16,6 +16,16 @@ const fmtDateWeekday = d => d.toLocaleDateString("de-DE", { weekday: "short", da
 
 function paceToSeconds(str) { if (!str) return null; const [m, s] = str.split(":").map(Number); return m * 60 + s; }
 
+// Zielzeit eines Ziels ("H:MM:SS" oder "H:MM") -> Sekunden, sonst null. Zwei
+// Teile heißen Stunden:Minuten wie in den Ziel-Formularen ("z.B. 5:30" =
+// 5 h 30 min). Der EINE Parser für Zielzeiten (Rennplan, Ernährung).
+function goalTimeToSeconds(str) {
+  const m = /^(\d{1,2}):([0-5]\d)(?::([0-5]\d))?$/.exec(String(str == null ? "" : str).trim());
+  if (!m) return null;
+  const sec = Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3] || 0);
+  return sec > 0 ? sec : null;
+}
+
 // Erst auf ganze Sekunden runden, dann teilen - sonst wird z.B. 119,6 s zu "1:60".
 function secondsToPace(sec) { const r = Math.round(sec), m = Math.floor(r / 60), s = r % 60; return `${m}:${String(s).padStart(2, "0")}`; }
 

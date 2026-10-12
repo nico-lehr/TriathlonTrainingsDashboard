@@ -76,6 +76,10 @@ function renderCalendar() {
   if (calViewMode === "week") renderCalendarWeek();
   else if (calViewMode === "day") renderCalendarDay();
   else renderCalendarMonth();
+  renderCalWeatherNote();
+  // Wetter beim ersten Zeichnen und danach höchstens stündlich neu holen
+  // (js/data/weather.js) - ohne Heimatort gar nicht.
+  if (weatherNeedsRefresh()) loadWeatherForecast().then(() => renderCalendar());
   // renderCalendar() wird von praktisch jeder Stelle aufgerufen, die
   // plannedWorkouts verändert (KI-Plan erzeugen/ersetzen, Einheit anlegen/
   // bearbeiten/löschen/verschieben) - der Ernährungs-Tab (Vor-dem-Training-
@@ -85,6 +89,8 @@ function renderCalendar() {
   // Empfehlungen. Hier zentral mit auffrischen, statt an jeder einzelnen
   // Aufrufstelle einzeln daran denken zu müssen.
   if (typeof renderNutrition === "function") renderNutrition();
+  // Aus demselben Grund: die Rennwoche im Rennplan zeigt geplante Einheiten.
+  if (typeof refreshOpenRacePlans === "function") refreshOpenRacePlans();
 }
 
 // Sportart-Filter im Kalender. Indoor/Outdoor wird bewusst NICHT unterschieden -
@@ -141,6 +147,58 @@ function calPlannedChipHtml(p) {
   return `<div class="cal-planned-chip cal-planned-${p.status}" data-id="${p.id}" style="--sport-color:${sportColor(p.sport)}" title="${escapeHtml(p.sport)} · ${escapeHtml(p.title)}${p.duration_min ? " · " + Math.round(p.duration_min) + " min" : ""}">
     <span class="sport-dot" style="background:${sportColor(p.sport)}"></span>${escapeHtml(p.title)}
   </div>`;
+}
+
+/* Wetter an Outdoor-Einheiten: Vorhersage aus js/data/weather.js, ob eine
+   Einheit draußen stattfindet entscheidet isOutdoorPlannedWorkout()
+   (js/data/workouts.js). Nur an Tagen mit Vorhersage UND mindestens einer
+   geplanten Outdoor-Einheit; fehlende Werte werden weggelassen. */
+function calWeatherText(d) {
+  const info = weatherCodeInfo(d.code);
+  return [
+    info ? info.label : null,
+    d.temp_min != null && d.temp_max != null ? `${Math.round(d.temp_min)}–${Math.round(d.temp_max)} °C` : null,
+    d.precip_prob != null ? `Regen ${Math.round(d.precip_prob)} %` : null,
+    d.wind_max != null ? `Wind bis ${Math.round(d.wind_max)} km/h` : null,
+  ].filter(Boolean).join(" · ");
+}
+
+// variant: "month" (Symbol + max/min), "week" (+ Regen/Wind), "day" (ganzer Text + Ort)
+function calWeatherHtml(dayDate, dayPlanned, variant) {
+  const d = weatherForDate(localDateStr(dayDate));
+  if (!d || !dayPlanned.some(isOutdoorPlannedWorkout)) return "";
+  const info = weatherCodeInfo(d.code);
+  const icon = info ? `<span aria-hidden="true">${info.icon}</span>` : "";
+  const text = calWeatherText(d);
+  if (variant === "day") {
+    const place = athleteProfile.homeLocation ? athleteProfile.homeLocation.name : "";
+    return `<div class="cal-weather cal-weather-day">${icon}<span>${escapeHtml(text)}</span><span class="cal-weather-sub">Vorhersage für ${escapeHtml(place)}</span></div>`;
+  }
+  const temps = d.temp_max != null && d.temp_min != null ? `${Math.round(d.temp_max)}° / ${Math.round(d.temp_min)}°` : "";
+  const extra = variant === "week"
+    ? [d.precip_prob != null ? `<span>💧 ${Math.round(d.precip_prob)} %</span>` : "", d.wind_max != null ? `<span>💨 ${Math.round(d.wind_max)} km/h</span>` : ""].join("")
+    : "";
+  return `<div class="cal-weather" title="Wetter-Vorhersage: ${escapeHtml(text)}">${icon}<span>${temps}</span>${extra ? `<span class="cal-weather-sub">${extra}</span>` : ""}</div>`;
+}
+
+// Hinweis über dem Kalender: Fehlertext, wenn das Wetter gerade nicht kommt -
+// ohne Heimatort ein Tipp, aber nur, wenn in den nächsten 7 Tagen überhaupt
+// eine Outdoor-Einheit geplant ist.
+function renderCalWeatherNote() {
+  const el = document.getElementById("cal-weather-note");
+  if (!el) return;
+  let text = "";
+  if (athleteProfile.homeLocation) {
+    if (weatherState.error) text = `Wetter gerade nicht verfügbar: ${weatherState.error}`;
+  } else {
+    const end = new Date(); end.setDate(end.getDate() + 6);
+    const from = todayStr(), to = localDateStr(end);
+    if (plannedWorkouts.some(p => p.date >= from && p.date <= to && isOutdoorPlannedWorkout(p))) {
+      text = "Tipp: Heimatort unter ⚙️ Einstellungen → „Wetter im Kalender“ eintragen, dann steht an Outdoor-Einheiten der nächsten 7 Tage die Vorhersage.";
+    }
+  }
+  el.textContent = text;
+  el.hidden = !text;
 }
 
 function wireCalPlannedChips(rootEl) {
@@ -228,7 +286,7 @@ function renderCalendarMonth() {
       if (dayPlanned.length) {
         const plannedEl = document.createElement("div");
         plannedEl.className = "cal-planned-list";
-        plannedEl.innerHTML = dayPlanned.map(calPlannedChipHtml).join("");
+        plannedEl.innerHTML = calWeatherHtml(dayDate, dayPlanned, "month") + dayPlanned.map(calPlannedChipHtml).join("");
         cell.appendChild(plannedEl);
       }
       wireCalDropTarget(cell, dayDate);
@@ -290,7 +348,7 @@ function renderCalendarWeek() {
         <span class="sport-dot" style="background:${sportColor(w.sport)}"></span>
         <span class="cal-week-item-sport">${w.sport}</span>
         <span class="cal-week-item-dur">${w.duration_min != null ? fmtNum(w.duration_min, 0) + " min" : ""}</span>
-      </div>`).join("") + dayPlanned.map(calPlannedChipHtml).join("")
+      </div>`).join("") + calWeatherHtml(dayDate, dayPlanned, "week") + dayPlanned.map(calPlannedChipHtml).join("")
     ) : `<div class="cal-week-empty">–</div>`;
     return `
       <div class="cal-week-day-col${isToday ? " today" : ""}" data-day-idx="${i}">
@@ -373,6 +431,7 @@ function renderCalendarDay() {
   const plannedHtml = dayPlanned.length ? `
     <div class="cal-day-planned">
       <h4>Geplant</h4>
+      ${calWeatherHtml(calFocusDay, dayPlanned, "day")}
       <div class="cal-planned-list cal-planned-list-day">${dayPlanned.map(calPlannedChipHtml).join("")}</div>
     </div>` : "";
 

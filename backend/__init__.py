@@ -32,7 +32,7 @@ def create_app():
 
     # Register blueprints
     from .routes import api_bp
-    from . import dashboard_routes, ai_routes, equipment_routes, garmin_workouts  # noqa: F401 - haengen weitere Endpunkte an api_bp
+    from . import dashboard_routes, ai_routes, equipment_routes, garmin_workouts, weather_routes  # noqa: F401 - haengen weitere Endpunkte an api_bp
     from .frontend import frontend_bp
     app.register_blueprint(api_bp, url_prefix="/api/v1")
     # Dashboard unter derselben Adresse wie die API - deshalb kein CORS noetig.
