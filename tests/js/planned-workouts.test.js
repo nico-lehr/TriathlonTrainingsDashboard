@@ -4,7 +4,8 @@
 //
 // Wie plan-rules.test.js: die Browser-Skripte laufen der Reihe nach in einem
 // gemeinsamen vm-Kontext. Gestubbt sind nur Server-Ablage (storeGet/
-// storeSet), apiCall, Timer und PLAN_ALLOWED_SPORTS (sonst js/ai/ollama.js).
+// storeSet), apiCall, Timer, PLAN_ALLOWED_SPORTS (sonst js/ai/ollama.js) und
+// goals (sonst js/data/goals.js).
 
 const test = require("node:test");
 const assert = require("node:assert");
@@ -13,7 +14,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const ROOT = path.join(__dirname, "..", "..");
-const SCRIPTS = ["js/utils/dates.js", "js/utils/formatting.js", "js/analytics/training-load.js", "js/analytics/plan-rules.js",
+const SCRIPTS = ["js/utils/dates.js", "js/utils/formatting.js", "js/analytics/training-load.js", "js/analytics/plan-rules.js", "js/analytics/periodization.js",
   "js/data/planned-workouts.js", "js/data/plan-wishes.js"];
 
 const store = {};
@@ -23,6 +24,7 @@ const app = vm.createContext({
   storeGet: key => (key in store ? JSON.parse(JSON.stringify(store[key])) : null),
   storeSet: (key, value) => { store[key] = JSON.parse(JSON.stringify(value)); },
   PLAN_ALLOWED_SPORTS: ["Schwimmen", "Rad", "Laufen", "Kraft", "Mobility"],
+  goals: [{ id: "g1", name: "Ironman 70.3", sport: "Triathlon", date: "2026-11-01", isPrimary: true }], // Sonntag
 });
 SCRIPTS.forEach(f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), "utf8"), app, { filename: f }));
 const run = code => vm.runInContext(code, app);
@@ -92,6 +94,27 @@ test("add_easy_session: neue lockere Einheit mit den Vorgaben des Aufrufers", ()
     { date: added.date, sport: added.sport, duration_min: added.duration_min, intensity: added.intensity, status: added.status, goalId: added.goalId, phase: added.phase, source: added.source },
     { date: day(5), sport: "Rad", duration_min: 45, intensity: "leicht", status: "geplant", goalId: "g1", phase: "aufbau", source: "ai" },
   );
+});
+
+test("neue Einheiten bekommen die Phase an ihrem Datum (getPhase), ohne Ziel keine", () => {
+  // Rennen So 01.11.: Taper ab Mo 19.10., davor Spezifisch, danach Erholung.
+  const add = (date, defaults) => apply([], { action: "add_easy_session", sport: "Rad", weekStart: date, date, duration_min: 45 }, defaults)[0];
+  assert.strictEqual(add(day(5), { goalId: "g1", source: "ai" }).phase, "spezifisch");
+  assert.strictEqual(add(day(8), { goalId: "g1", source: "ai" }).phase, "taper");
+  assert.strictEqual(add(day(21), { goalId: "g1", source: "ai" }).phase, "erholung");
+  assert.strictEqual(add(day(8), { source: "manual" }).phase, null);
+  assert.strictEqual(add(day(8), { goalId: "gibtsnicht" }).phase, null);
+  const manual = plain(app.addPlannedWorkout({ date: day(1), sport: "Laufen", duration_min: 40, goalId: "g1", source: "manual" }));
+  assert.strictEqual(manual.phase, "spezifisch");
+  app.deletePlannedWorkout(manual.id);
+});
+
+test("neues Datum -> neue Phase (move, patchedPlannedWorkouts), eine gesetzte Phase bleibt", () => {
+  const list = [{ ...pw("m", day(5), "Rad", 60, "leicht"), phase: "spezifisch" }];
+  assert.strictEqual(byId(apply(list, { action: "move", workoutId: "m", toDate: day(8) }), "m").phase, "taper");
+  assert.strictEqual(plain(app.patchedPlannedWorkouts(list, "m", { date: day(21) }))[0].phase, "erholung");
+  assert.strictEqual(plain(app.patchedPlannedWorkouts(list, "m", { duration_min: 30 }))[0].phase, "spezifisch");
+  assert.strictEqual(plain(app.patchedPlannedWorkouts(list, "m", { date: day(21), phase: "aufbau" }))[0].phase, "aufbau");
 });
 
 test("unpassende Vorschläge liefern null statt einer kaputten Liste", () => {

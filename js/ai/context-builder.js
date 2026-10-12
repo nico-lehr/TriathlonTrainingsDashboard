@@ -1,6 +1,15 @@
 // Baut den kompakten Text-Kontext (Form, Umfang, Bestzeiten, Profil, Erholung, Ziel)
 // fuer das LLM - bewusst aggregiert statt Rohdaten, siehe docs/AI_CONTEXT.md.
 
+// Eine Woche der Periodisierung (getWeeklyTargets, js/analytics/periodization.js)
+// als Satzteil, z.B. "Belastungswoche (Aufbau), Zielumfang 315 min (105 % des
+// aktuellen Wochenumfangs)". Ohne aktuellen Wochenumfang nur der Prozentwert.
+function periodWeekText(w) {
+  const label = `${PERIOD_WEEK_LABELS[w.type]} (${PERIOD_PHASES[w.phase].label})`;
+  const pct = `${Math.round(w.targetPct * 100)} % des aktuellen Wochenumfangs`;
+  return w.targetMin != null ? `${label}, Zielumfang ${w.targetMin} min (${pct})` : `${label}, Zielumfang ${pct} (in Minuten noch unbekannt)`;
+}
+
 // `goal` ist optional - ohne Ziel (z.B. für die allgemeine KI-
 // Leistungszustand-Zusammenfassung im Coach-Tab, siehe buildPerformanceSummaryPrompt()
 // in prompts.js) werden die zielspezifischen Zeilen (Ziel/Unterdisziplinen/
@@ -231,6 +240,18 @@ function buildCompactContext(goal) {
     if (goal.targetTime) zielBits.push(`Zielzeit ${goal.targetTime}`);
     if (goal.distanceKm) zielBits.push(`${fmtNum(goal.distanceKm, 1)}km`);
     lines.push(`Ziel: ${zielBits.join(" | ")}`);
+
+    // Periodisierung: Phase heute mit Erklärung und der Zielumfang dieser
+    // Woche - fertig berechnet, die KI soll darauf aufbauen statt eigene
+    // Umfänge zu erfinden.
+    const phaseNow = computeTrainingPhase(daysUntil);
+    lines.push(`Trainingsphase: ${phaseNow.label}${PERIOD_PHASES[phaseNow.key] ? ` – ${PERIOD_PHASES[phaseNow.key].text}` : ""}`);
+    const targets = getWeeklyTargets(goal, plannedWorkouts, DATA);
+    if (targets && targets.weeks.length) {
+      const w = targets.weeks[0];
+      lines.push(`Diese Woche: ${periodWeekText(w)}; bisher absolviert ${w.doneMin} min, noch geplant ${w.plannedMin} min`);
+      if (targets.baselineMin != null) lines.push(`Aktueller Wochenumfang: ${targets.baselineMin} min (${targets.returnAfterWeeks ? `Wiedereinstieg nach ${targets.returnAfterWeeks} leichteren Wochen in Folge` : `letzte normale Woche ab ${targets.baselineWeek}`})`);
+    }
     if (goal.subDisciplines && goal.subDisciplines.length) {
       const subBits = goal.subDisciplines.map(s => {
         const parts = [];
@@ -271,8 +292,17 @@ function buildPlanContext(goal, windowDates) {
   const lines = [base];
 
   const daysUntil = goal.date ? Math.round((new Date(goal.date + "T00:00:00") - new Date(new Date().setHours(0, 0, 0, 0))) / 86400000) : null;
-  const phase = computeTrainingPhase(daysUntil);
-  lines.push(`Trainingsphase: ${phase.label}`);
+
+  // Periodisierung für die Wochen des Planungsfensters (die Phase heute steht
+  // schon im Basis-Kontext): Zielumfang je Woche und was davon schon
+  // absolviert/geplant ist - die KI plant den Rest bis zum Ziel.
+  const targets = getWeeklyTargets(goal, plannedWorkouts, DATA);
+  const windowWeeks = targets ? targets.weeks.filter(w => windowDates.some(d => planWeekKey(d) === w.weekStart)) : [];
+  if (windowWeeks.length) {
+    lines.push(`Periodisierung (Zielumfang je Woche Mo-So, der Wettkampf selbst zählt nicht mit): ${windowWeeks.map(w => `Woche ab ${w.weekStart}: ${periodWeekText(w)}, davon schon absolviert/geplant ${w.doneMin + w.plannedMin} min`).join(" | ")}`);
+  }
+  const nextPhase = getPhaseTimeline(new Date(), goal)[1];
+  if (nextPhase) lines.push(`Nächster Phasenwechsel: ${PERIOD_PHASES[nextPhase.phase].label} ab ${nextPhase.from}`);
 
   // "Erweiterte Einstellungen" des Ziels (js/components/coach.js,
   // js/data/goals.js) - alle optional, nur wenn tatsächlich hinterlegt.
@@ -626,14 +656,13 @@ function buildOutlookFacts() {
   } else {
     facts.thisWeek.push("Kein Hauptevent mit Datum in der Zukunft");
   }
+  const targets = getWeeklyTargets(goal, plannedWorkouts, DATA);
+  if (targets && targets.weeks[0]) facts.thisWeek.push(`Diese Woche laut Periodisierung: ${periodWeekText(targets.weeks[0])}`);
 
   // Nächste Woche: Plan, Phase, Fitness-Trend
   const nextWeek = openPlan(shift(wk, 7), shift(wk, 13));
   facts.nextWeek.push(nextWeek.length ? `Nächste Woche geplant: ${planSummary(nextWeek)}` : "Nächste Woche ist noch nichts geplant");
-  if (daysUntil != null && daysUntil >= 0) {
-    const fromNextMonday = Math.round((new Date(goal.date + "T00:00:00") - new Date(shift(wk, 7) + "T00:00:00")) / 86400000);
-    if (fromNextMonday >= 0) facts.nextWeek.push(`Phase nächste Woche: ${computeTrainingPhase(fromNextMonday).label}`);
-  }
+  if (targets && targets.weeks[1]) facts.nextWeek.push(`Phase nächste Woche: ${periodWeekText(targets.weeks[1])}`);
   if (state) facts.nextWeek.push(`Fitness (CTL) ${fmtNum(state.ctl, 1)}, ${signed(state.ctlDelta, 1)} in den letzten 4 Wochen (${state.verdict})`);
 
   facts.ruleHints = planRuleViolations(plannedWorkouts).slice(0, 6).map(v => `${v.severity === "block" ? "Regelverstoß" : "Hinweis"}: ${v.text}`);

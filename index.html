@@ -350,6 +350,15 @@
         </div>
       </div>
 
+      <div class="card full" data-card-id="race-countdown">
+        <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+        <h2>Wettkampf-Countdown
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Zählt die Tage bis zu deinem Hauptevent (★ bei „Deine Ziele“) und zeigt, in welcher Trainingsphase du gerade bist: Grundlage, Aufbau (8 Wochen), Spezifisch (6 Wochen), Taper (Rennwoche und die Woche davor), danach eine Woche Erholung. Der Zielumfang dieser Woche ist ein Anteil deiner letzten normalen Trainingswoche (eine Entlastungswoche zählt nicht); nach drei Belastungswochen folgt eine Entlastungswoche. Nach zwei oder mehr leichteren Wochen in Folge (z. B. Krankheit, Urlaub) startet der Wiedereinstieg vorsichtiger: von der stärksten dieser Wochen aus, mindestens der Hälfte der letzten normalen Woche. Der Wettkampf selbst zählt nicht zum Wochenumfang.</div></span>
+        </h2>
+        <p class="card-sub">Tage bis zum Start · Trainingsphase · Wochenumfang</p>
+        <div id="race-countdown-body"></div>
+      </div>
+
       <div class="card full" data-card-id="coach-outlook">
         <span class="card-drag-handle" title="Karte verschieben">⠿</span>
         <h2>Empfehlungen
@@ -993,6 +1002,7 @@
 <script src="js/analytics/workout-profile.js"></script>
 <script src="js/analytics/training-plan.js"></script>
 <script src="js/analytics/plan-rules.js"></script>
+<script src="js/analytics/periodization.js"></script>
 <script src="js/analytics/zones.js"></script>
 <script src="js/analytics/nutrition.js"></script>
 <script src="js/analytics/streak.js"></script>
@@ -1014,6 +1024,7 @@
 <script src="js/components/health-status.js"></script>
 <script src="js/components/coach.js"></script>
 <script src="js/components/training-plan.js"></script>
+<script src="js/components/race-countdown.js"></script>
 <script src="js/components/risk-adjust.js"></script>
 <script src="js/components/ollama-setup.js"></script>
 <script src="js/components/nutrition.js"></script>

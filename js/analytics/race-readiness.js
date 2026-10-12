@@ -48,13 +48,17 @@ function scoreConsistencyFactor() {
 }
 
 // Faktor 4: Zeit bis zum Event / Taper-Phase - je näher das Event, desto
-// mehr zählt eine steigende Form (TSB) statt weiterem Aufbau.
+// mehr zählt eine steigende Form (TSB) statt weiterem Aufbau. Ob schon
+// Taper ist und ob es die Rennwoche ist, entscheidet die Periodisierung
+// (js/analytics/periodization.js).
 function scorePhaseFactor(daysUntil, tsb) {
   if (daysUntil == null) return { points: READINESS_MAX.phase, note: "kein Datum" };
-  if (daysUntil > 14) return { points: READINESS_MAX.phase, note: `${daysUntil} Tage bis Event — noch keine Taper-Phase` };
-  const weeksLabel = daysUntil >= 7 ? "beginnende Taper-Phase" : "finale Taper-Phase";
+  const race = periodRaceInDays(daysUntil);
+  if (getPhase(new Date(), race) !== "taper") return { points: READINESS_MAX.phase, note: `${daysUntil} Tage bis Event — noch keine Taper-Phase` };
+  const raceWeek = periodWeeksToRace(new Date(), race) === 0;
+  const weeksLabel = raceWeek ? "finale Taper-Phase" : "beginnende Taper-Phase";
   let points;
-  if (daysUntil < 7) points = tsb != null && tsb > 5 ? READINESS_MAX.phase : tsb != null && tsb > 0 ? READINESS_MAX.phase * 0.6 : READINESS_MAX.phase * 0.25;
+  if (raceWeek) points = tsb != null && tsb > 5 ? READINESS_MAX.phase : tsb != null && tsb > 0 ? READINESS_MAX.phase * 0.6 : READINESS_MAX.phase * 0.25;
   else points = tsb != null && tsb > -5 ? READINESS_MAX.phase : READINESS_MAX.phase * 0.5;
   return { points, note: `${daysUntil} Tage bis Event — ${weeksLabel}` };
 }

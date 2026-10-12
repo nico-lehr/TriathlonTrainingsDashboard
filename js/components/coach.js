@@ -14,6 +14,7 @@ function renderCoachSummary() {
   // Die "Grundlage" der Empfehlungs-Karte hängt an denselben Daten (Form,
   // Plan, Erholung) - deshalb hier mit auffrischen, wie renderPerformanceSummary.
   if (typeof renderOutlook === "function") renderOutlook();
+  if (typeof renderRaceCountdown === "function") renderRaceCountdown(); // Wettkampf-Countdown hängt an Ziel + Plan
 
   const chips = [];
 
