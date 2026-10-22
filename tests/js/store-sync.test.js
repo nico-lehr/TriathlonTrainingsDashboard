@@ -104,3 +104,30 @@ test("escapeHtml maskiert auch Anführungszeichen (Text in value=\"...\")", () =
   assert.strictEqual(ctx.escapeHtml(null), "");
   assert.strictEqual(ctx.escapeHtml(5), "5");
 });
+
+test("eigene Änderung während der Prüfung gilt nicht als Änderung von außen", async () => {
+  run("userStore = { a: 1 }; storeLoaded = true; storeStale = false; storeCheckedAt = 0; storeFailed.clear()");
+  let answer;
+  ctx.apiCall = (endpoint) => endpoint === "store"
+    ? new Promise(resolve => { answer = resolve; }) // langsame Antwort mit dem alten Stand
+    : Promise.resolve({});
+  const check = ctx.checkStoreStale();
+  ctx.storeSet("a", 2); // Haken gesetzt, PUT ist schneller fertig als das GET
+  await tick(); await tick();
+  answer({ data: { a: 1 } });
+  await check;
+  assert.strictEqual(run("storeStale"), false);
+});
+
+test("Schließen der Seite warnt bei ungesicherter Änderung", () => {
+  const handlers = {};
+  const win = { addEventListener: (name, fn) => { handlers[name] = fn; } };
+  const c2 = vm.createContext({ window: win, document: { addEventListener: () => {} }, localStorage: { getItem: () => null } });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, "js/data/api-client.js"), "utf8"), c2);
+  const ev = () => ({ prevented: false, preventDefault() { this.prevented = true; } });
+  let e = ev(); handlers.beforeunload(e);
+  assert.strictEqual(e.prevented, false);
+  vm.runInContext("storeFailed.add('x')", c2);
+  e = ev(); handlers.beforeunload(e);
+  assert.strictEqual(e.prevented, true);
+});

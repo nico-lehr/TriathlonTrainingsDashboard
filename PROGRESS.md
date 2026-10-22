@@ -28,9 +28,9 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 | C Garmin-Workouts auf die Uhr | fertig (geprüft: PASS; kleine Nachbesserungen) | 3 / 3 | 100 % | 2026-10-12 |
 | D Handy / iPhone | fertig (geprüft: PASS; kleine CSS-Nachbesserungen eingebaut) | 4 / 4 | 100 % | 2026-10-12 |
 | E Equipment, Wetter, Rennplan | fertig (E1 erst FAIL dann PASS; E2 PASS; E3 erst FAIL dann PASS) | 3 / 3 | 100 % | 2026-10-12 |
-| F Abschluss-Check | Prüfung F1–F3 und Doku F4 fertig; meine Korrekturen werden von einem zweiten Prüfer kontrolliert | 3 / 4 | 75 % | 2026-10-12 |
+| F Abschluss-Check | fertig (Korrekturen: zweiter Prüfer erst FAIL, nach Nachbesserung PASS) | 4 / 4 | 100 % | 2026-10-22 |
 
-**Gesamt: 95 % (20 von 21 Schritten)**
+**Gesamt: 100 % (21 von 21 Schritten)**
 
 ## Offene Fragen
 
@@ -53,6 +53,9 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 - Kalender-Abgleich scheiterte mit Fehler 500, wenn zwei Personen dieselbe Plan-Kennung hatten → Kennung bekommt die Nummer der Person vorangestellt.
 - Wer zuerst angelegt wird, bekam alle alten Daten → `create_user.py` fragt vorher nach, `docs/DEPLOYMENT.md` sagt „zuerst dich selbst anlegen“.
 - Upload-Grenze 64 MB (vorher keine), 16 statt 8 Server-Threads, Benutzernamen sind über die Antwortzeit nicht mehr erratbar, Start bricht mit klarer Meldung ab, wenn die Sicherung nicht klappt, `.gitignore` und Werkzeug-Version ergänzt.
+
+- Prüfung der Korrekturen (zweiter Prüfer): erst FAIL – die neue Warnung „anderes Gerät“ ließ sich durch andere Erfolgsmeldungen verstecken, eine eigene ungesicherte Änderung wurde als „anderes Gerät“ gemeldet (Neuladen hätte sie gelöscht), Fehlalarm während KI-Anfragen, doppelte Maskierung im Coach-Chip. Alles behoben, mit Tests für jeden Fund; danach PASS.
+- Nicht gemacht (optional): Ein gescheitertes Speichern wird nicht automatisch wiederholt. Der Hinweis bleibt stehen und der Browser warnt beim Schließen, bis die Änderung erneut gespeichert ist (so war es auch vorher).
 
 ### Weitere
 

@@ -109,6 +109,7 @@ let storeFailedText = "";
 let storeLoaded = false;
 let storeStale = false;         // auf einem anderen Geraet wurde inzwischen etwas geaendert
 let storeCheckedAt = 0;
+let storeChangeCount = 0;       // zaehlt eigene Aenderungen (siehe checkStoreStale)
 
 async function loadUserStore() {
   userStore = (await apiCall("store")).data || {};
@@ -125,6 +126,7 @@ function storeGet(key) {
 // Lade-Merker der KI) saehe beim Vergleich wie eine Aenderung von aussen aus.
 function storeSet(key, value) {
   userStore[key] = value === undefined ? null : JSON.parse(JSON.stringify(value));
+  storeChangeCount++;
   storeDirty.add(key);
   if (!storeSending.has(key)) sendStoreKey(key);
 }
@@ -193,9 +195,12 @@ async function checkStoreStale() {
   const idle = () => !storeSending.size && !storeDirty.size && !storeFailed.size;
   if (!storeLoaded || document.visibilityState !== "visible" || storeStale || !idle() || Date.now() - storeCheckedAt < 30000) return;
   storeCheckedAt = Date.now();
+  const changesBefore = storeChangeCount;
   let server;
   try { server = (await apiCall("store")).data || {}; } catch (e) { return; }
-  if (!idle()) return; // waehrenddessen selbst etwas geaendert: der Vergleich gilt nicht mehr
+  // Waehrenddessen selbst etwas geaendert (auch wenn es schon gespeichert ist):
+  // die Server-Antwort ist dann aelter als der eigene Stand - nicht vergleichen.
+  if (!idle() || storeChangeCount !== changesBefore) return;
   if (storeChangedElsewhere(server)) { storeStale = true; showStoreStaleNotice(); }
 }
 document.addEventListener("visibilitychange", checkStoreStale);
