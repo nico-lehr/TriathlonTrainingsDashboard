@@ -14,6 +14,7 @@ Person sieht und aendert nur ihren eigenen Schluessel.
 import argparse
 import importlib.util
 import os
+import re
 import threading
 from datetime import date, datetime, timedelta
 
@@ -56,7 +57,9 @@ def put_garmin_personal_api():
     expires = data.get("expires") or None
     if expires is not None:
         try:
-            if date.fromisoformat(str(expires)) < date.today():
+            if not (isinstance(expires, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", expires)):
+                raise ValueError
+            if date.fromisoformat(expires) < date.today():
                 return response_error("Das Ablaufdatum liegt in der Vergangenheit.", "VALIDATION_ERROR", 400)
         except ValueError:
             return response_error("Ablaufdatum bitte als Datum angeben.", "VALIDATION_ERROR", 400)
@@ -86,17 +89,21 @@ def _run_sync(athlete_id):
     from . import Session
     args = argparse.Namespace(login=False, activities_only=False, wellness_only=False)
     end = date.today()
+    result = {"ok": False, "message": "Abruf abgebrochen."}
     try:
         summary = garmin_sync.sync_user(athlete_id, Session, end - timedelta(days=garmin_sync.DEFAULT_DAYS), end, args)
         result = {"ok": True, "message": summary or "Fertig."}
+    except SystemExit as e:  # z. B. fehlende Bibliothek beim alten Weg (garmin_sync.connect)
+        result = {"ok": False, "message": " ".join(str(e).split())}
     except Exception as e:  # jede Panne als verstaendliche Zeile, nie ein Absturz des Servers
         message = garmin_sync.describe_error(e, athlete_id)
         garmin_sync.log_user(athlete_id, f"FEHLER - {message}")
         result = {"ok": False, "message": message}
     finally:
+        # Immer: sonst stuende der Abruf fuer immer auf "laeuft".
         Session.remove()
-    with _sync_lock:
-        _sync_state[athlete_id] = {"running": False, "at": datetime.now().isoformat(timespec="seconds"), **result}
+        with _sync_lock:
+            _sync_state[athlete_id] = {"running": False, "at": datetime.now().isoformat(timespec="seconds"), **result}
 
 
 @api_bp.route("/garmin/sync", methods=["POST"])

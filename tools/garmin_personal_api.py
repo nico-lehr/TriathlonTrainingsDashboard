@@ -134,24 +134,44 @@ def delete_key(athlete_id):
 
 # ------------------------------------------------------------ HTTP
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Weiterleitungen nicht folgen: urllib wuerde den Authorization-Header
+    (Schluessel/Token) sonst auch an eine andere Adresse mitschicken."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None  # -> HTTPError mit dem 3xx-Code
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
+def _open(req):
+    return _OPENER.open(req, timeout=TIMEOUT_S)
+
+
 def _request(method, path, *, token=None, api_key=None, params=None, accept="application/json"):
-    """Eine Anfrage an die Personal API -> (Bytes der Antwort). Fehlermeldungen
-    nennen nur den Pfad, nie Schluessel oder Token."""
+    """Eine Anfrage an die Personal API -> Bytes der Antwort, None bei 404
+    (keine Daten fuer diesen Tag). Fehlermeldungen nennen nur den Pfad, nie
+    Schluessel oder Token."""
     url = BASE_URL + path + ("?" + urllib.parse.urlencode(params) if params else "")
     headers = {"Accept": accept, "User-Agent": "TriathlonDashboard"}
     if api_key:
         headers["Authorization"] = f"ApiKey {api_key}"
     elif token:
         headers["Authorization"] = f"Bearer {token}"
-    req = urllib.request.Request(url, method=method, headers=headers, data=b"" if method == "POST" else None)
+    if method == "POST":
+        headers["Content-Length"] = "0"  # leerer POST wie im Garmin-Client (ohne Formular-Content-Type)
+    req = urllib.request.Request(url, method=method, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as resp:
+        with _open(req) as resp:
             return resp.read()
     except urllib.error.HTTPError as e:
-        if e.code in (401, 403):
+        if e.code == 401:
             raise GarminApiAuthenticationError(KEY_REJECTED) from None
         if e.code == 429:
             raise GarminApiTooManyRequestsError("Garmin blockt gerade (zu viele Anfragen). Später erneut versuchen.") from None
+        if e.code == 404 and method == "GET":
+            return None
         raise GarminApiError(f"Garmin antwortet mit Fehler {e.code} ({path.split('?')[0]}).") from None
     except (urllib.error.URLError, TimeoutError, OSError):
         raise GarminApiError("Garmin ist nicht erreichbar – Internetverbindung prüfen und später erneut versuchen.") from None
@@ -190,8 +210,12 @@ def obtain_token(athlete_id, force=False):
         raise GarminApiAuthenticationError("Kein Garmin-Schlüssel hinterlegt (Dashboard → Einstellungen → Garmin).")
     if not force:
         cached = _read_json(bearer_path(athlete_id)) or {}
+        try:
+            expires_at = float(cached.get("expires_at") or 0)
+        except (TypeError, ValueError):
+            expires_at = 0  # kaputter Zwischenspeicher: einfach neu holen
         if (cached.get("fingerprint") == _fingerprint(api_key) and isinstance(cached.get("access_token"), str)
-                and float(cached.get("expires_at") or 0) - time.time() > TOKEN_REFRESH_S):
+                and expires_at - time.time() > TOKEN_REFRESH_S):
             return cached["access_token"]
     token, expires_at = exchange_key(api_key)
     cache_token(athlete_id, api_key, token, expires_at)
@@ -222,7 +246,7 @@ class PersonalApiClient:
 
     def _get(self, path, params=None):
         body = self._get_bytes(path, params)
-        return json.loads(body) if body else None
+        return json.loads(body) if body else None  # None: keine Daten (leer oder 404)
 
     # Aktivitaeten
     def get_activities_by_date(self, startdate, enddate):
@@ -240,12 +264,22 @@ class PersonalApiClient:
 
     def download_original(self, activity_id):
         """Original-Datei als ZIP (darin die .fit)."""
-        if not str(activity_id).isdigit():
+        aid = str(activity_id)
+        if not (aid.isascii() and aid.isdecimal() and int(aid) > 0):
             raise GarminApiError("Ungültige Aktivitäts-Nummer.")
         return self._get_bytes(f"/download-service/files/activity/{activity_id}",
                                accept="application/zip, application/x-zip-compressed, application/octet-stream")
 
     # Gesundheitsdaten je Tag
+    def get_user_summary(self, cdate):
+        """Tageszusammenfassung (u. a. Body Battery) - der erste Eintrag aus
+        dailysummaries. Feldnamen der neuen Schnittstelle sind nicht
+        dokumentiert; normalize() sucht die Body-Battery-Werte deshalb auch
+        verschachtelt. Die Rohantwort bleibt im Zwischenspeicher."""
+        data = self._get("/usersummary-service/v2/dailysummaries", {"startDate": cdate, "endDate": cdate})
+        items = data.get("data") if isinstance(data, dict) else None
+        return items[0] if isinstance(items, list) and items and isinstance(items[0], dict) else data
+
     def get_sleep_data(self, cdate):
         return self._get("/sleep-service/sleep/dailySleep", {"date": cdate})
 

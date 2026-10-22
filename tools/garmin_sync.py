@@ -126,6 +126,16 @@ def log_user(athlete_id, msg):
         pass  # Log nicht beschreibbar - die Zeile steht trotzdem auf dem Bildschirm
 
 
+def is_rate_limited(e):
+    """Garmin drosselt: eigene Fehlerklasse (beide Wege) oder garminconnects
+    "API Error 429" im Text."""
+    return "TooManyRequests" in type(e).__name__ or re.search(r"API Error 429\b", str(e)) is not None
+
+
+def is_auth_error(e):
+    return "Authentication" in type(e).__name__
+
+
 def describe_error(e, athlete_id):
     """Einzeiliger Fehlertext fuers Log. Enthaelt nie Zugangsdaten - das
     Passwort existiert ohnehin nur waehrend --login im Speicher."""
@@ -256,13 +266,12 @@ def sync_activities(client, start, end, athlete_id, session):
             stats["fehler"] += 1
             log(f"  [{i}/{len(activities)}] {aid}: keine Originaldatei vorhanden (evtl. manuell angelegt)")
         except Exception as e:
-            # Rate-Limit (beide Wege, am Klassennamen erkannt) oder abgelehnter
-            # Schluessel: abbrechen, Bereits-Geladenes aber noch speichern.
-            name = type(e).__name__
-            if "TooManyRequests" in name or "Authentication" in name:
+            # Rate-Limit oder abgelehnter Schluessel: abbrechen (jede weitere
+            # Anfrage scheitert genauso), Bereits-Geladenes aber noch speichern.
+            if is_rate_limited(e) or is_auth_error(e):
                 log("  Garmin drosselt die Anfragen (Rate-Limit). Bereits geladene Aktivitaeten\n"
                     "  werden noch gespeichert, spaeter einfach erneut starten."
-                    if "TooManyRequests" in name else f"  {describe_error(e, athlete_id)}")
+                    if is_rate_limited(e) else f"  {describe_error(e, athlete_id)}")
                 blocked = e
                 break
             stats["fehler"] += 1
@@ -337,18 +346,25 @@ def save_cache(cache, path):
         json.dump(cache, f, ensure_ascii=False)
 
 
+FAILED = object()  # Abfrage gescheitert -> Abschnitt NICHT speichern, beim naechsten Lauf erneut holen
+
+
 def call(client, method, *args):
-    """Ruft eine Client-Methode auf, falls sie in der installierten Version
-    existiert. Die Bibliothek benennt Methoden zwischen Versionen um - ein
-    fehlender Endpunkt darf nie den ganzen Sync stoppen."""
+    """Ruft eine Client-Methode auf, falls es sie gibt. Fehlt sie (andere
+    Bibliotheksversion, oder die offizielle API bietet das nicht an), ist das
+    Ergebnis None - endgueltig "keine Daten". Scheitert die Abfrage, kommt
+    FAILED zurueck. Rate-Limit und abgelehnte Anmeldung werden weitergereicht:
+    dann scheitert jede weitere Anfrage genauso, der Lauf bricht ab."""
     fn = getattr(client, method, None)
     if fn is None:
         return None
     try:
         return fn(*args)
     except Exception as e:
+        if is_rate_limited(e) or is_auth_error(e):
+            raise
         log(f"    {method}: {type(e).__name__}")
-        return None
+        return FAILED
 
 
 def sync_wellness(client, start, end, path):
@@ -379,32 +395,36 @@ def sync_wellness(client, start, end, path):
     log(f"\nGesundheitsdaten: {len(all_days)} Tage im Zeitraum, {len(todo)} abzurufen "
         f"({len(all_days) - len(todo)} bereits vorhanden).")
 
-    for i, ds in enumerate(todo, 1):
-        entry = days.get(ds, {})
-        entry["sleep"] = call(client, "get_sleep_data", ds)  # Abschnitte s. DAY_SECTIONS
-        entry["hrv"] = call(client, "get_hrv_data", ds)
-        entry["rhr"] = call(client, "get_rhr_day", ds)
-        entry["max_metrics"] = call(client, "get_max_metrics", ds)
-        entry["training_status"] = call(client, "get_training_status", ds)
-        # Tageszusammenfassung: liefert u.a. Body Battery (Hoch/Tief). Der
-        # Zeitraum-Endpunkt get_body_battery lieferte im Praxistest nichts,
-        # deshalb wird der Wert hier je Tag mitgenommen.
-        entry["summary"] = call(client, "get_user_summary", ds)
-        days[ds] = entry
-        if i % 10 == 0 or i == len(todo):
-            log(f"  {i}/{len(todo)} Tage")
-            save_cache(cache, path)   # Zwischenstand sichern - ein Abbruch verliert nichts
-        time.sleep(REQUEST_PAUSE_S)
+    # Abschnitte je Tag (s. DAY_SECTIONS). Tageszusammenfassung "summary":
+    # liefert u.a. Body Battery (Hoch/Tief) - der Zeitraum-Endpunkt
+    # get_body_battery lieferte im Praxistest nichts, deshalb je Tag.
+    sections = (("sleep", "get_sleep_data"), ("hrv", "get_hrv_data"), ("rhr", "get_rhr_day"),
+                ("max_metrics", "get_max_metrics"), ("training_status", "get_training_status"),
+                ("summary", "get_user_summary"))
+    try:
+        for i, ds in enumerate(todo, 1):
+            entry = days.get(ds, {})
+            for key, method in sections:
+                result = call(client, method, ds)
+                if result is not FAILED:
+                    entry[key] = result
+            days[ds] = entry
+            if i % 10 == 0 or i == len(todo):
+                log(f"  {i}/{len(todo)} Tage")
+                save_cache(cache, path)   # Zwischenstand sichern - ein Abbruch verliert nichts
+            time.sleep(REQUEST_PAUSE_S)
 
-    # Zeitraum-Abfragen: ein Aufruf fuer die ganze Spanne statt Tagesschleife.
-    s, e = start.isoformat(), end.isoformat()
-    ranges = cache.setdefault("ranges", {})
-    log("  Body Battery, Gewicht, Schritte ...")
-    ranges["body_battery"] = call(client, "get_body_battery", s, e) or ranges.get("body_battery")
-    ranges["body_composition"] = call(client, "get_body_composition", s, e) or ranges.get("body_composition")
-    ranges["daily_steps"] = call(client, "get_daily_steps", s, e) or ranges.get("daily_steps")
-
-    save_cache(cache, path)
+        # Zeitraum-Abfragen: ein Aufruf fuer die ganze Spanne statt Tagesschleife.
+        s, e = start.isoformat(), end.isoformat()
+        ranges = cache.setdefault("ranges", {})
+        log("  Body Battery, Gewicht, Schritte ...")
+        for key, method in (("body_battery", "get_body_battery"), ("body_composition", "get_body_composition"),
+                            ("daily_steps", "get_daily_steps")):
+            result = call(client, method, s, e)
+            if result is not FAILED and result:  # leer/fehlgeschlagen: alten Stand behalten
+                ranges[key] = result
+    finally:
+        save_cache(cache, path)   # auch beim Abbruch (Rate-Limit, Schluessel abgelehnt)
     return cache
 
 
@@ -416,6 +436,19 @@ def num(*candidates):
     for v in candidates:
         if isinstance(v, (int, float)) and not isinstance(v, bool):
             return v
+    return None
+
+
+def find_key(obj, key, depth=3):
+    """Wert eines Feldes - oben oder bis zu `depth` Ebenen tiefer."""
+    if not isinstance(obj, dict) or depth < 0:
+        return None
+    if key in obj:
+        return obj[key]
+    for value in obj.values():
+        found = find_key(value, key, depth - 1)
+        if found is not None:
+            return found
     return None
 
 
@@ -497,13 +530,15 @@ def normalize(cache):
     def day_entry(ds):
         return out.setdefault(ds, {})
 
-    # Body Battery aus der Tageszusammenfassung (get_user_summary).
+    # Body Battery aus der Tageszusammenfassung (get_user_summary). Bei der
+    # offiziellen API ist die Antwort verschachtelt - dieselben Feldnamen
+    # werden deshalb auch eine Ebene tiefer gesucht.
     for ds, raw in (cache.get("days") or {}).items():
         summ = raw.get("summary") or {}
         if not isinstance(summ, dict):
             continue
-        hi = num(summ.get("bodyBatteryHighestValue"), summ.get("bodyBatteryMostRecentValue"))
-        lo = num(summ.get("bodyBatteryLowestValue"))
+        hi = num(find_key(summ, "bodyBatteryHighestValue"), find_key(summ, "bodyBatteryMostRecentValue"))
+        lo = num(find_key(summ, "bodyBatteryLowestValue"))
         if hi is not None or lo is not None:
             e = day_entry(ds)
             if hi is not None:

@@ -635,9 +635,9 @@
         <button type="button" class="cal-today-btn" id="logout-btn">Abmelden</button>
       </div>
 
-      <div class="card full">
+      <div class="card full" id="garmin-settings-card">
         <h2>Garmin-Verbindung
-          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Offizielle Garmin-Schnittstelle („Personal API“): Mit deinem eigenen Schlüssel holt der Dashboard-Server deine Trainings (als .fit-Datei) und Gesundheitsdaten (Schlaf, HRV, Ruhepuls, Body Battery, Gewicht, Schritte) – nur lesen, ohne dein Garmin-Passwort. Workouts auf die Uhr schicken kann dieser Schlüssel nicht. VO2max und Trainingszustand liefert die Schnittstelle nicht; das Dashboard schätzt VO2max dann selbst.</div></span>
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Offizielle Garmin-Schnittstelle („Personal API“): Mit deinem eigenen Schlüssel holt der Dashboard-Server deine Trainings (als .fit-Datei) und Gesundheitsdaten (Schlaf, HRV, Ruhepuls, Gewicht, Schritte; Body Battery, soweit Garmin sie dort liefert) – nur lesen, ohne dein Garmin-Passwort. Workouts auf die Uhr schicken kann dieser Schlüssel nicht. VO2max und Trainingszustand liefert die Schnittstelle nicht; das Dashboard schätzt VO2max dann selbst.</div></span>
         </h2>
         <p class="card-sub">Schlüssel in Garmin Connect erstellen: <a href="https://connect.garmin.com/app/settings/personalApiToken" target="_blank" rel="noopener">Einstellungen → Personal API</a>. Er wird nur einmal angezeigt – gleich hier einfügen. Bitte nur am Dashboard-PC oder über Tailscale eintragen.</p>
         <p class="coach-test-status" id="garmin-api-status"></p>

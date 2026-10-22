@@ -202,15 +202,16 @@ einmalig `backend/import_workouts_json.py`, siehe `docs/DEPLOYMENT.md`.
 
 ## Garmin-Connect-Sync (`tools/`)
 
-Getrennt gestartetes Werkzeug, schreibt für jeden Benutzer mit Garmin-Token
-Trainings und Gesundheitsdaten in die Datenbank. Anleitung:
+Schreibt für jeden Benutzer mit Garmin-Zugang (offizieller Schlüssel oder
+altes Token) Trainings und Gesundheitsdaten in die Datenbank – am PC
+gestartet oder per „Jetzt von Garmin holen“ im Dashboard. Anleitung:
 `docs/GARMIN_SYNC_GUIDE.md`.
 
 | Datei | Zweck |
 |---|---|
-| `tools/garmin_sync.py` | `--athlete <id>` / alle mit Token; `--login --athlete <id>` meldet bei Garmin an (Token unter `~/.triathlon/garmin_<id>.token`, Passwort wird nie gespeichert). Original-.fit-Archiv je Benutzer unter `fit-files/athlete_<id>/`. Eine Log-Zeile je Benutzer in `~/.triathlon/garmin-sync.log`. |
+| `tools/garmin_sync.py` | `--athlete <id>` / alle mit Schlüssel oder Token (Schlüssel hat Vorrang); `--login --athlete <id>` meldet bei Garmin an (Token unter `~/.triathlon/garmin_<id>.token`, Passwort wird nie gespeichert). Original-.fit-Archiv je Benutzer unter `fit-files/athlete_<id>/`. Eine Log-Zeile je Benutzer in `~/.triathlon/garmin-sync.log`. |
 | `tools/garmin_personal_api.py` | Offizielle Garmin-Schnittstelle (Personal API, nur lesen): Schlüssel je Person, 24-h-Token, dieselben Abfragen wie der alte Weg. Ohne Zusatz-Bibliothek. |
-| `tools/__init__.py` | Macht `tools/` importierbar (der Server nutzt die Garmin-Anmeldung aus `garmin_sync.py` für „An Garmin senden“). |
+| `tools/__init__.py` | Macht `tools/` importierbar (der Server nutzt `garmin_sync.py` für „An Garmin senden“ und „Jetzt von Garmin holen“). |
 | `tools/export-browser-data.html` | Einmal-Export der Daten des alten Doppelklick-Dashboards aus dem Browser (nur per Doppelklick, wird nicht ausgeliefert). |
 | `sync-garmin.command`, `tools/install-url-scheme.command` | Alter Mac-Einzelplatz-Ablauf (Sync → `parse_fit.py` → `build_dashboard.py`); bringt keine Daten mehr ins Server-Dashboard. |
 

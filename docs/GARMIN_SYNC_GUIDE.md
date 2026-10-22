@@ -52,7 +52,13 @@ Einstellungen (wenn „Gültig bis“ eingetragen ist); ein abgelaufener
 Schlüssel erscheint im Log als „Garmin hat den Schlüssel abgelehnt“.
 
 **Was fehlt:** VO2max und Garmins „Trainingszustand“ liefert die Personal
-API nicht; das Dashboard schätzt VO2max dann selbst. Ob Garmin in den
+API nicht; das Dashboard schätzt VO2max dann selbst. Ob **Body Battery**
+ankommt, ist offen (Garmin hat das Format der Tageszusammenfassung nicht
+dokumentiert).
+
+Klappt eine einzelne Abfrage nicht, holt der nächste Lauf genau diesen Tag
+nach. Bei „zu viele Anfragen“ oder einem abgelehnten Schlüssel bricht der
+Lauf ab und sichert das bis dahin Geladene. Ob Garmin in den
 `.fit`-Dateien der Schnittstelle einzelne Werte weglässt, ist noch nicht
 bestätigt – bitte beim ersten Abruf mit dem Training in Garmin Connect
 vergleichen.
@@ -145,7 +151,7 @@ automatisch gestartete Läufe).
 | Garmin-Anmeldung fehlt oder ist abgelaufen | Person erneut anmelden: `--login --athlete <Nummer>` |
 | Garmin hat den Schlüssel abgelehnt | Schlüssel abgelaufen oder in Garmin Connect gelöscht: neuen erstellen und in den Einstellungen eintragen |
 | Garmin blockt gerade (zu viele Anfragen) | Ein paar Stunden warten, dann erneut starten. Bis dahin Geladenes bleibt gespeichert. |
-| Benutzer X gibt es nicht | Benutzer mit `backend/create_user.py` anlegen oder Token-Ordner `garmin_X.token` löschen |
+| Benutzer X gibt es nicht | Benutzer mit `backend/create_user.py` anlegen oder Token-Ordner `garmin_X.token` bzw. Schlüssel-Datei `garmin_api_X.json` (samt `garmin_api_X.bearer.json`) löschen |
 | Anmeldefehler trotz richtigem Passwort | Garmin ändert gelegentlich seine Anmeldung: `python -m pip install -U garminconnect curl_cffi` |
 
 ## Wo liegt was?

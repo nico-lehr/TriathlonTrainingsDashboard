@@ -25,7 +25,8 @@ from itsdangerous import URLSafeTimedSerializer
 from itsdangerous.timed import TimestampSigner
 
 import tools.garmin_sync
-from backend import auth, create_app, routes
+from backend import auth, create_app, garmin_api_routes, routes
+from tools import garmin_personal_api
 from backend.config import config
 
 config.SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
@@ -76,11 +77,26 @@ class AccessTestBase(unittest.TestCase):
     def setUpClass(cls):
         cls.old_urls = (config.OLLAMA_URL, config.OPEN_METEO_URL, config.OPEN_METEO_GEOCODING_URL)
         config.OLLAMA_URL = config.OPEN_METEO_URL = config.OPEN_METEO_GEOCODING_URL = CLOSED_PORT
+        # Die Durchsicht ruft JEDEN Endpunkt auf - auch "Garmin-Schluessel entfernen"
+        # und "Abruf starten". Nie den echten ~/.triathlon des Nutzers anfassen und
+        # keinen echten Abruf-Thread starten.
+        cls.garmin_dir = tempfile.mkdtemp()
+        cls.garmin_patchers = [
+            mock.patch.object(garmin_personal_api, "KEY_DIR", cls.garmin_dir),
+            mock.patch.object(tools.garmin_sync, "TOKEN_DIR", cls.garmin_dir),
+            mock.patch.object(tools.garmin_sync, "LOG_PATH", os.path.join(cls.garmin_dir, "garmin-sync.log")),
+            mock.patch.object(garmin_api_routes.threading, "Thread"),
+        ]
+        for patcher in cls.garmin_patchers:
+            patcher.start()
         cls.app, cls.session_factory = create_app()
 
     @classmethod
     def tearDownClass(cls):
         config.OLLAMA_URL, config.OPEN_METEO_URL, config.OPEN_METEO_GEOCODING_URL = cls.old_urls
+        for patcher in cls.garmin_patchers:
+            patcher.stop()
+        shutil.rmtree(cls.garmin_dir, ignore_errors=True)
 
     def setUp(self):
         auth._failed_logins.clear()

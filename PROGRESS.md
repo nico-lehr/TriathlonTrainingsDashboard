@@ -43,12 +43,14 @@ Auftrag (2026-10-22): Weg A – Lesen über die offizielle Schnittstelle, „An 
 | G3 Server: Schlüssel prüfen/speichern/entfernen, „Jetzt von Garmin holen“ im Hintergrund | fertig |
 | G4 Einstellungen-Karte „Garmin-Verbindung“ | fertig (im Browser mit nachgestelltem Garmin von Anfang bis Ende geprüft) |
 | G5 Tests (nur nachgestelltes Garmin) + Doku | fertig |
-| G6 Prüfung durch zweiten Prüfer | läuft |
+| G6 Prüfung durch zweiten Prüfer | erst FAIL (u. a. KRITISCH: die Tests hätten den echten Schlüssel auf dem PC gelöscht), alles behoben – Nachprüfung läuft |
 
 ### Offene Fragen zu G
 
 - **Mit einem echten Schlüssel noch nicht getestet** (nur mit nachgestelltem Garmin). Die Adressen stammen aus Garmins eigenem Beispiel-Client. Bei Schlaf und Gewicht ist das genaue Antwortformat der neuen Schnittstelle nicht dokumentiert; die Aufbereitung liest beide bekannten Formen. Bitte nach dem ersten Abruf prüfen, ob Schlaf, HRV, Ruhepuls, Gewicht und die Trainings stimmen.
 - VO2max und Garmins Trainingszustand liefert die Personal API nicht → bei Personen mit Schlüssel leer; das Dashboard schätzt VO2max selbst.
+- Body Battery: Ob sie über die Personal API ankommt, ist offen (Format der Tageszusammenfassung nicht dokumentiert; die Aufbereitung sucht die bekannten Feldnamen auch verschachtelt). Die Rohantworten bleiben im Zwischenspeicher, damit sich das nachbessern lässt.
+- Neu für beide Wege: Eine gescheiterte Abfrage wird nicht mehr als „keine Daten“ gespeichert, sondern beim nächsten Lauf nachgeholt; bei „zu viele Anfragen“ oder abgelehntem Schlüssel bricht der Lauf ab und sichert das Geladene (vorher blieben solche Lücken für immer).
 - „Gültig bis“ trägt man selbst ein (Garmin verrät das Ablaufdatum über die Schnittstelle nicht). Ohne Eintrag gibt es keine Vorwarnung, nur die Meldung „abgelehnt“, wenn er abgelaufen ist.
 - Garmin sagt, die Personal API sei für eigene Daten gedacht, nicht für Dienste für andere. Hier nutzt jede Person ihren eigenen Schlüssel für ihre eigenen Daten auf deinem PC – bitte Garmins Bedingungen beim Erstellen des Schlüssels selbst lesen.
 - Der Schlüssel liegt wie die bisherigen Garmin-Token als Datei auf dem PC (nur für deinen Computer-Benutzer lesbar), nicht verschlüsselt.
