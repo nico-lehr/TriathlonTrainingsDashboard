@@ -79,7 +79,7 @@ function initUpdates() {
     } else if (st.checked_at) {
       setStatus(latest ? "Du hast die neueste Version." : "Auf GitHub ist noch keine Version veröffentlicht.", "ok");
     } else {
-      setStatus("Noch nicht geprüft – der Server prüft einmal am Tag.", "");
+      setStatus(st.auto_check ? "Noch nicht geprüft – der Server prüft einmal am Tag." : "Noch nicht geprüft (automatische Prüfung ist abgeschaltet).", "");
     }
     notesEl.hidden = !(st.available && latest && latest.notes);
     notesEl.textContent = st.available && latest ? latest.notes : "";
@@ -111,16 +111,16 @@ function initUpdates() {
   }
 
   // Nach dem Neustart: warten, bis ein NEUER Server-Lauf (andere instance)
-  // mit der neuen Version antwortet, dann die Seite neu laden. Die
-  // Versionsnummer allein reicht nicht: die meldet schon der alte Lauf kurz
-  // vor seinem Neustart - ein Neuladen genau dann landete im Nichts.
-  async function waitForRestart(target, oldInstance) {
+  // antwortet, dann die Seite neu laden. Die Versionsnummer allein reicht
+  // nicht: die meldet schon der alte Lauf kurz vor seinem Neustart - ein
+  // Neuladen genau dann landete im Nichts.
+  async function waitForRestart(oldInstance) {
     const until = Date.now() + UPDATE_RESTART_WAIT_MS;
     while (Date.now() < until) {
       await new Promise(resolve => setTimeout(resolve, UPDATE_POLL_MS));
       try {
         const st = (await apiCall("update", "GET", null, { timeoutMs: 4000 })).data;
-        if (st.current === target && st.instance !== oldInstance) { window.location.reload(); return; }
+        if (st.instance !== oldInstance) { window.location.reload(); return; }
         if (st.install && !st.install.running && st.install.ok === false) { render(st); return; }
         if (st.install && !st.install.running && st.install.ok && !st.supervised) { render(st); return; }
       } catch (e) { /* Server startet gerade neu */ }
@@ -133,12 +133,12 @@ function initUpdates() {
     if (!st.available) { render(st); return; }
     const ok = await confirmDialog(
       `Version ${st.latest.version} installieren? Vorher werden Datenbank und Programm gesichert. ` +
-      "Der Server startet danach kurz neu – alle, die gerade angemeldet sind, sind etwa eine Minute getrennt.",
+      "Der Server startet danach neu – alle, die gerade angemeldet sind, sind kurz getrennt (meist unter einer Minute).",
       { okLabel: "Installieren", danger: false });
     if (!ok) return;
     try {
       render((await apiCall("update/install", "POST")).data);
-      waitForRestart(st.latest.version, st.instance);
+      waitForRestart(st.instance);
     } catch (e) {
       setStatus(e.message, "err");
     }

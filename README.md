@@ -138,8 +138,11 @@ belegt, Firewall, Passwort vergessen, KI antwortet nicht) steht in
 - **Alles bleibt auf deinem PC** (Datei `training.db`). Nach außen spricht
   der Server nur mit: Ollama (KI, normalerweise auf demselben PC), Garmin
   (Sync und „An Garmin senden“, mit dem Zugangsschlüssel der jeweiligen
-  Person) und Open-Meteo (Wetter, nur der Ortsname bzw. die Koordinaten
-  deines Heimatorts, falls du einen einstellst).
+  Person), Open-Meteo (Wetter, nur der Ortsname bzw. die Koordinaten
+  deines Heimatorts, falls du einen einstellst) und GitHub (einmal am Tag
+  „gibt es eine neue Version?“, beim Installieren der Download – dazu
+  Python-Bibliotheken von PyPI). An GitHub und PyPI gehen keine
+  persönlichen Daten.
 - **Jede Person sieht nur ihre eigenen Daten.** Ohne Anmeldung ist nur die
   Login-Seite erreichbar; Passwörter werden nur als Hash gespeichert.
 - **Garmin-Passwörter werden nie gespeichert.** Garmin-Schlüssel und
@@ -297,7 +300,8 @@ Datentrennung). Die Datei-Übersicht steht in `docs/PROJECT_MAP.md`.
 
 ## Funktionsweise
 
-`start.bat` / `start.sh` startet `backend/app.py` (waitress). Der Server
+`start.bat` / `start.sh` startet über `backend/launcher.py` den Server
+`backend/app.py` (waitress; nach einem Update startet der Starter ihn neu). Der Server
 liefert die Webseite (`index.html`, `login.html`, `css/`, `js/`, `icons/`) und
 die API unter derselben Adresse aus — nur diese Erlaubt-Liste, nichts sonst.
 Alle persönlichen Daten liegen in `training.db` (SQLite), jede Zeile mit der

@@ -18,6 +18,7 @@ Installieren:
 Nie angefasst werden die Nutzerdaten (PROTECTED): .env, training.db, backups/,
 fit-files/, data/ ... - sie stehen ohnehin nie im Repository.
 """
+import http.client
 import io
 import json
 import os
@@ -44,8 +45,10 @@ RESTART_EXIT_CODE = 3          # backend/launcher.py startet den Server dann neu
 KEEP_PROGRAM_BACKUPS = 5
 MAX_ZIP_BYTES = 50 * 1024 * 1024
 
-# Erste Pfad-Teile, die ein Update nie ueberschreibt (Nutzerdaten, Sicherungen, Werkzeuge).
-PROTECTED_TOP = {".env", ".git", ".claude", "backups", "fit-files", "data", "__pycache__",
+# Erste Pfad-Teile, die ein Update nie ueberschreibt (Nutzerdaten, Sicherungen,
+# Werkzeuge) - klein geschrieben verglichen: Windows/macOS unterscheiden
+# Gross-/Kleinschreibung nicht, ".ENV" waere dort dieselbe Datei wie ".env".
+PROTECTED_TOP = {".env", ".env.local", ".git", ".claude", "backups", "fit-files", "data", "__pycache__",
                  "workouts.json", "dashboard-export.json", "venv", ".venv", "node_modules"}
 REQUIRED_FILES = ("VERSION", "backend/app.py", "index.html")
 # Kennung dieses Server-Laufs: Der Browser erkennt daran den Neustart nach
@@ -100,7 +103,7 @@ def _get(url, accept="application/vnd.github+json"):
         if e.code in (403, 429):
             raise UpdateError("GitHub lässt gerade keine Abfrage zu (zu viele Anfragen). Später erneut prüfen.") from None
         raise UpdateError(f"GitHub antwortet mit Fehler {e.code}.") from None
-    except (urllib.error.URLError, TimeoutError, OSError):
+    except (urllib.error.URLError, http.client.HTTPException, TimeoutError, OSError):
         raise UpdateError("GitHub ist nicht erreichbar – Internetverbindung prüfen.") from None
     if len(body) > MAX_ZIP_BYTES:
         raise UpdateError("Die Antwort von GitHub ist unerwartet groß – Update abgebrochen.")
@@ -138,6 +141,8 @@ def check(force=False):
         latest, error = fetch_latest_release(), None
     except UpdateError as e:
         latest, error = None, str(e)
+    except Exception as e:  # nie den Pruef-Thread oder eine Anfrage abstuerzen lassen
+        latest, error = None, f"Prüfung fehlgeschlagen ({type(e).__name__})."
     with _lock:
         if error is None:  # bei einem Fehler den zuletzt bekannten Stand behalten
             _state["latest"] = latest
@@ -158,6 +163,7 @@ def status():
             "install_type": install_type(),
             "supervised": os.getenv("DASHBOARD_SUPERVISED") == "1",
             "instance": INSTANCE,
+            "auto_check": os.getenv("UPDATE_CHECK", "1") != "0",
             "install": dict(_state["install"]),
         }
 
@@ -167,7 +173,10 @@ def start_background_check():
     def loop():
         time.sleep(FIRST_CHECK_DELAY_S)
         while True:
-            check(force=True)
+            try:
+                check(force=True)  # faengt selbst alles ab - der Thread darf nie enden
+            except Exception as e:
+                print(f"Update-Pruefung: {type(e).__name__}", flush=True)
             time.sleep(CHECK_INTERVAL_S)
     threading.Thread(target=loop, daemon=True, name="update-check").start()
 
@@ -175,8 +184,13 @@ def start_background_check():
 # ------------------------------------------------------------ ZIP pruefen und anwenden
 
 def is_protected(rel):
-    parts = Path(rel).parts
-    return not parts or parts[0] in PROTECTED_TOP or parts[0].startswith("training.db") or "__pycache__" in parts
+    parts = [p.casefold() for p in Path(rel).parts]
+    if not parts:
+        return True
+    name = parts[-1]
+    return (parts[0] in PROTECTED_TOP or parts[0].startswith("training.db") or "__pycache__" in parts
+            or name.endswith(".token") or name == "garmin_tokens.json"
+            or (name.startswith("oauth") and name.endswith("_token.json")))
 
 
 def extract_release(blob, dest):
@@ -220,8 +234,11 @@ def program_files(root):
     return out
 
 
-ZIP_RESTORE_NOTE = ("Zurueck zur vorherigen Version: Dashboard beenden, diese ZIP-Datei im "
-                    "Projektordner entpacken (vorhandene Dateien ersetzen), Dashboard neu starten.\n")
+ZIP_RESTORE_NOTE = ("Zurueck zur vorherigen Version:\n"
+                    "1. Dashboard beenden (Fenster schliessen).\n"
+                    "2. Diese ZIP-Datei entpacken - Ziel ist DER PROJEKTORDNER selbst (dort, wo start.bat liegt),\n"
+                    "   NICHT der vom Entpacken vorgeschlagene Unterordner. Vorhandene Dateien ersetzen.\n"
+                    "3. Dashboard neu starten. Deine Daten (training.db, .env) sind davon nicht betroffen.\n")
 
 
 def backup_program(files, version, note=ZIP_RESTORE_NOTE):
@@ -236,8 +253,32 @@ def backup_program(files, version, note=ZIP_RESTORE_NOTE):
             src = BASE / rel
             if src.is_file() and Path(rel).as_posix() not in z.namelist():
                 z.write(src, Path(rel).as_posix())
-    for old in sorted(backups.glob("programm-*.zip"))[:-KEEP_PROGRAM_BACKUPS]:
-        old.unlink()
+    # Nach Alter, nicht nach Namen: "programm-2.10.0" sortiert sonst vor "2.5.0".
+    for old in sorted(backups.glob("programm-*.zip"), key=lambda p: p.stat().st_mtime)[:-KEEP_PROGRAM_BACKUPS]:
+        if old != target:
+            old.unlink()
+    return target
+
+
+def backup_db_before_update(version):
+    """Eigene Datenbank-Sicherung vor dem Update (die taegliche Sicherung
+    training-<Tag>.db wird beim naechsten Start am selben Tag ueberschrieben)."""
+    import sqlite3
+    db = BASE / "training.db"
+    if not db.exists():
+        return None
+    backups = BASE / "backups"
+    backups.mkdir(exist_ok=True)
+    target = backups / f"vor-update-{version}-{datetime.now():%Y-%m-%d-%H%M%S}.db"
+    src, dst = sqlite3.connect(db), sqlite3.connect(target)
+    try:
+        src.backup(dst)
+    finally:
+        src.close()
+        dst.close()
+    for old in sorted(backups.glob("vor-update-*.db"), key=lambda p: p.stat().st_mtime)[:-KEEP_PROGRAM_BACKUPS]:
+        if old != target:
+            old.unlink()
     return target
 
 
@@ -258,15 +299,56 @@ def pip_install(root):
             raise UpdateError(f"Bibliotheken konnten nicht installiert werden ({last}). Es wurde nichts geändert.")
 
 
-def apply_files(root, files):
-    for rel in files:
-        dst = BASE / rel
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(root / rel, dst)
+def apply_files(root, files, backup_zip):
+    """Kopiert die neuen Dateien - VERSION zuletzt, erst dann gilt die neue
+    Version als installiert. Scheitert eine Datei (z. B. von einem anderen
+    Programm gesperrt), wird das schon Kopierte aus der Sicherung
+    zurueckgeschrieben: kein halb altes, halb neues Programm."""
+    done = []
+    rel = None
+    try:
+        for rel in sorted(files, key=lambda r: Path(r).as_posix() == "VERSION"):
+            dst = BASE / rel
+            existed = dst.exists()
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(root / rel, dst)
+            done.append((Path(rel), existed))
+    except OSError as e:
+        restored = _restore(done, backup_zip)
+        reason = f"{Path(rel).as_posix()}: {e.strerror or type(e).__name__}"
+        if restored:
+            raise UpdateError(f"Eine Datei konnte nicht ersetzt werden ({reason}) – ist sie in einem anderen "
+                              "Programm geöffnet? Der alte Stand ist wiederhergestellt, bitte erneut versuchen.") from None
+        raise UpdateError(f"Eine Datei konnte nicht ersetzt werden ({reason}), und der alte Stand ließ sich nicht "
+                          f"vollständig zurückschreiben. Sicherung: {backup_zip} (siehe WIEDERHERSTELLEN.txt darin).") from None
+
+
+def _restore(done, backup_zip):
+    """Schon kopierte Dateien zuruecksetzen: aus der Sicherung, bzw. neu
+    hinzugekommene loeschen. True, wenn alles geklappt hat."""
+    ok = True
+    with zipfile.ZipFile(backup_zip) as z:
+        saved = set(z.namelist())
+        for rel, existed in reversed(done):
+            dst = BASE / rel
+            try:
+                if rel.as_posix() in saved:
+                    dst.write_bytes(z.read(rel.as_posix()))
+                elif not existed:
+                    dst.unlink(missing_ok=True)
+            except OSError:
+                ok = False
+    return ok
+
+
+def _tempdir():
+    """Temp-Ordner; Aufraeumfehler (Windows: Datei noch offen) brechen nichts ab."""
+    return tempfile.mkdtemp(prefix="dashboard-update-")
 
 
 def install_zip(release):
-    with tempfile.TemporaryDirectory() as tmp:
+    tmp = _tempdir()
+    try:
         _step("Neue Version wird heruntergeladen …")
         blob = _get(f"{API_URL}/repos/{REPO}/zipball/{release['tag']}", accept="application/zip")
         if blob is None:
@@ -279,9 +361,11 @@ def install_zip(release):
         _step("Bibliotheken werden installiert …")
         pip_install(root)
         _step("Programm wird gesichert …")
-        backup_program(files, current_version())
+        backup_zip = backup_program(files, current_version())
         _step("Dateien werden ersetzt …")
-        apply_files(root, files)
+        apply_files(root, files, backup_zip)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def _git(*args):
@@ -306,15 +390,23 @@ def install_git(release):
     if _git("merge-base", "--is-ancestor", "HEAD", tag).returncode != 0:
         raise UpdateError("Die neue Version passt nicht ohne Weiteres zum aktuellen git-Zweig. "
                           f"Bitte selbst aktualisieren (git merge {tag}). Es wurde nichts geändert.")
+    shown = _git("show", f"{tag}:VERSION")
+    tag_version = shown.stdout.strip() if shown.returncode == 0 else "(fehlt)"
+    if parse_version(tag_version) != parse_version(release["version"]):
+        raise UpdateError(f"Versionsnummer im Paket ({tag_version}) passt nicht zur Release ({release['version']}). "
+                          "Es wurde nichts geändert.")
     # Bibliotheken der NEUEN Version vor dem Umschalten installieren.
     _step("Bibliotheken werden installiert …")
-    with tempfile.TemporaryDirectory() as tmp:
+    tmp = _tempdir()
+    try:
         for rel in ("backend/requirements.txt", "requirements.txt"):
             shown = _git("show", f"{tag}:{rel}")
             if shown.returncode == 0:
                 (Path(tmp) / rel).parent.mkdir(parents=True, exist_ok=True)
                 (Path(tmp) / rel).write_text(shown.stdout, encoding="utf-8")
         pip_install(Path(tmp))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
     _step("Programm wird gesichert …")
     head = _git("rev-parse", "HEAD").stdout.strip()
     backup_program([], current_version(), note=f"Zurueck zur vorherigen Version (im Projektordner): git reset --keep {head}\n")
@@ -343,9 +435,8 @@ def start_install():
 def _run_install(release):
     result = {"ok": False, "message": "Update abgebrochen."}
     try:
-        from backup import backup_db  # Datenbank zuerst sichern (wie vor jedem Start)
         _step("Datenbank wird gesichert …")
-        backup_db()
+        backup_db_before_update(current_version())
         (install_git if install_type() == "git" else install_zip)(release)
         if schedule_restart():
             result = {"ok": True, "message": f"Version {release['version']} installiert – der Server startet neu."}

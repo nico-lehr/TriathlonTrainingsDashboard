@@ -66,7 +66,7 @@ Auftrag (2026-10-22): Hinweis auf neue Versionen und Installation nach Bestätig
 | H3 Neustart über den Starter `backend/launcher.py` (start.bat/start.sh) | fertig |
 | H4 Hinweis oben + Karte „Programm-Updates“ (nur Betreiber) | fertig (im Browser mit nachgestelltem GitHub von Anfang bis Ende geprüft: prüfen → installieren → Neustart → Seite mit 2.1.0) |
 | H5 Tests (kein echtes GitHub, kein Netz) + Doku | fertig |
-| H6 Prüfung durch zweiten Prüfer | läuft |
+| H6 Prüfung durch zweiten Prüfer | **PASS** (keine kritischen Funde). Die 7 „sollte behoben werden“-Punkte trotzdem behoben: Abbruch beim Kopieren stellt den alten Stand wieder her, Sicherungen nach Alter aufräumen, Prüf-Thread übersteht kaputte Antworten, git-Weg prüft VERSION im Tag, Schutz unabhängig von Groß-/Kleinschreibung, Zip-Slip-Test wirksam, Doku zu GitHub/PyPI. Dazu: eigene DB-Sicherung vor dem Update, Garmin-Token geschützt, Neuladen wartet auf den neuen Server-Lauf – jeweils mit Tests, die den Fehler erkennen |
 
 ### Offene Fragen zu H
 

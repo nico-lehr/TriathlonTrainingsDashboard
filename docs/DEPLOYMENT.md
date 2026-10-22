@@ -141,15 +141,21 @@ und „Jetzt prüfen“ stehen in den Einstellungen unter **Programm-Updates**.
 
 Beim Installieren passiert automatisch:
 
-1. `training.db` wird gesichert, die zu ersetzenden Programmdateien landen
-   in `backups/programm-<alte Version>-<Zeitpunkt>.zip` (darin steht in
+1. `training.db` wird gesichert (`backups/vor-update-<Version>-<Zeitpunkt>.db`).
+2. Die neue Version wird geladen und geprüft (passt die Versionsnummer?
+   nichts außerhalb des Projektordners?), ihre Bibliotheken werden
+   installiert. Klappt das nicht, bleiben die Programmdateien unverändert
+   (schon installierte neue Bibliotheken stören die alte Version nicht).
+3. Die zu ersetzenden Programmdateien landen in
+   `backups/programm-<alte Version>-<Zeitpunkt>.zip` (darin steht in
    `WIEDERHERSTELLEN.txt`, wie man zurückkehrt).
-2. Die neue Version wird geladen und geprüft, ihre Bibliotheken werden
-   installiert. Klappt das nicht, wird **nichts** geändert.
-3. Die Programmdateien werden ersetzt. **Nie** angefasst werden `.env`,
-   `training.db`, `backups/`, `fit-files/`, `data/`.
-4. Der Server startet neu (etwa 10 Sekunden; Freunde sind kurz getrennt),
-   die Seite lädt sich selbst neu.
+4. Die Programmdateien werden ersetzt. **Nie** angefasst werden `.env`,
+   `training.db`, `backups/`, `fit-files/`, `data/` und Garmin-Token.
+   Lässt sich eine Datei nicht ersetzen (z. B. von einem anderen Programm
+   geöffnet), wird der alte Stand zurückgeschrieben – kein halb altes,
+   halb neues Programm.
+5. Der Server startet neu (meist unter einer Minute; Freunde sind kurz
+   getrennt), die Seite lädt sich selbst neu.
 
 Voraussetzungen: Das Dashboard wurde mit `start.bat`/`start.sh` gestartet
 (sonst steht nach dem Installieren „bitte neu starten“), und der PC ist mit
@@ -193,8 +199,9 @@ Daten bleiben erhalten.
   per `.gitignore` vom Repository ausgeschlossen.
 - Nach außen spricht nur der Server, und nur mit: Ollama (KI), Garmin (Sync
   und „An Garmin senden“, mit dem Schlüssel bzw. Token der jeweiligen
-  Person) und Open-Meteo
-  (Wetter, nur Ortsname bzw. Koordinaten des Heimatorts).
+  Person), Open-Meteo (Wetter, nur Ortsname bzw. Koordinaten des
+  Heimatorts) und GitHub/PyPI (Update-Prüfung einmal am Tag, beim
+  Installieren der Download und die Bibliotheken – ohne persönliche Daten).
 
 ---
 
