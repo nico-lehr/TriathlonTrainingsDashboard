@@ -15,4 +15,5 @@ if ! "$PY" -c "import flask, sqlalchemy, waitress, dotenv" 2>/dev/null; then
   "$PY" -m pip install -r backend/requirements.txt || "$PY" -m pip install --user -r backend/requirements.txt || exit 1
 fi
 
-"$PY" backend/setup_env.py && exec "$PY" backend/app.py
+# Starter: startet den Server nach einem Update automatisch neu.
+"$PY" backend/setup_env.py && exec "$PY" backend/launcher.py

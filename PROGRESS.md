@@ -55,6 +55,27 @@ Auftrag (2026-10-22): Weg A – Lesen über die offizielle Schnittstelle, „An 
 - Garmin sagt, die Personal API sei für eigene Daten gedacht, nicht für Dienste für andere. Hier nutzt jede Person ihren eigenen Schlüssel für ihre eigenen Daten auf deinem PC – bitte Garmins Bedingungen beim Erstellen des Schlüssels selbst lesen.
 - Der Schlüssel liegt wie die bisherigen Garmin-Token als Datei auf dem PC (nur für deinen Computer-Benutzer lesbar), nicht verschlüsselt.
 
+## Zusatz H: Programm-Updates
+
+Auftrag (2026-10-22): Hinweis auf neue Versionen und Installation nach Bestätigung, möglichst automatisch.
+
+| Schritt | Status |
+|---|---|
+| H1 Versionsnummer (`VERSION`), Prüfung der neuesten GitHub-Release (einmal am Tag) | fertig |
+| H2 Installieren: Sicherung, Paket prüfen, Bibliotheken zuerst, Dateien ersetzen (ZIP) bzw. `git merge --ff-only` (git), Nutzerdaten geschützt | fertig |
+| H3 Neustart über den Starter `backend/launcher.py` (start.bat/start.sh) | fertig |
+| H4 Hinweis oben + Karte „Programm-Updates“ (nur Betreiber) | fertig (im Browser mit nachgestelltem GitHub von Anfang bis Ende geprüft: prüfen → installieren → Neustart → Seite mit 2.1.0) |
+| H5 Tests (kein echtes GitHub, kein Netz) + Doku | fertig |
+| H6 Prüfung durch zweiten Prüfer | läuft |
+
+### Offene Fragen zu H
+
+- Auf GitHub gibt es noch **keine Release**. Nach dem Zusammenführen dieses Branches auf `main` bitte die erste Release `v2.0.0` veröffentlichen (Anleitung: `docs/DEPLOYMENT.md`, Abschnitt 7). Bestehende Installationen ohne Update-Funktion brauchen dieses eine Mal ein Update von Hand.
+- „Betreiber“ = die zuerst angelegte Person (änderbar mit `ADMIN_USERS=` in `.env`). Freunde sehen nur die Versionsnummer.
+- Die Prüfung braucht ein öffentliches Repository (GitHub ohne Konto). Bei einem privaten Repository meldet die Karte „GitHub antwortet mit Fehler 404“ bzw. „keine Version veröffentlicht“.
+- Dateien, die eine neue Version löscht, bleiben bei ZIP-Installationen liegen (stören nicht).
+- Mit Windows selbst konnte ich nicht testen (nur Linux). `start.bat` startet den Starter in einer einzigen Zeile, damit Windows die Datei während eines Updates nicht weiterliest. Bitte beim ersten echten Update kurz zuschauen.
+
 ## Offene Fragen
 
 ### Aus dem Abschluss-Check F (nicht behoben, optional)

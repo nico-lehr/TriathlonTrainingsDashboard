@@ -2,7 +2,10 @@
 
 Aufruf im Projektordner:  python -m unittest backend.test_frontend -v
 """
+import collections
+import re
 import unittest
+from pathlib import Path
 
 from backend import create_app
 from backend.config import config
@@ -34,6 +37,17 @@ class FrontendTest(unittest.TestCase):
                     "/css/../.env", "/css/%2e%2e/.env", "/js/..%2f.env", "/js/.hidden"]:
             with self.subTest(url=url):
                 self.assertEqual(self.client.get(url).status_code, 404)
+
+
+    def test_keine_doppelten_element_kennungen(self):
+        # getElementById findet nur das erste Element - eine doppelte Kennung
+        # (z. B. "update-status" im Aktualisieren-Menu UND in den Einstellungen)
+        # laesst eine Anzeige still ins Leere laufen.
+        for page in ("index.html", "login.html"):
+            html = (Path(__file__).resolve().parent.parent / page).read_text(encoding="utf-8")
+            counts = collections.Counter(re.findall(r'(?<![\w-])id="([^"]+)"', html))
+            with self.subTest(page=page):
+                self.assertEqual([k for k, v in counts.items() if v > 1], [])
 
 
 if __name__ == "__main__":

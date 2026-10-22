@@ -67,8 +67,12 @@ if __name__ == "__main__":
     host = os.getenv("DASHBOARD_HOST", "0.0.0.0")
     port = int(os.getenv("DASHBOARD_PORT", "5000"))
 
+    from backend import updater
+    if os.getenv("UPDATE_CHECK", "1") != "0":
+        updater.start_background_check()  # einmal am Tag bei GitHub nach einer neuen Version fragen
+
     print("\n" + "=" * 60)
-    print("Triathlon-Dashboard laeuft")
+    print(f"Triathlon-Dashboard laeuft (Version {updater.current_version()})")
     print("=" * 60)
     print(f"Auf diesem PC:           http://localhost:{port}")
     print(f"Fuer Freunde (Tailscale): http://{socket.gethostname().lower()}:{port}")

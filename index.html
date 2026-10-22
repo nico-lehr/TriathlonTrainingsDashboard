@@ -37,6 +37,7 @@
 </div>
 <div class="page">
 <div class="api-error-banner" id="api-error-banner" role="alert" hidden></div>
+<div class="app-update-banner" id="app-update-banner" role="status" hidden></div>
 
   <header class="top">
     <h1>
@@ -635,6 +636,20 @@
         <button type="button" class="cal-today-btn" id="logout-btn">Abmelden</button>
       </div>
 
+      <div class="card full" id="app-update-card">
+        <h2>Programm-Updates</h2>
+        <p class="card-sub" id="app-update-version">Version …</p>
+        <div id="app-update-admin" hidden>
+          <p class="coach-test-status" id="app-update-status"></p>
+          <div class="app-update-notes" id="app-update-notes" hidden></div>
+          <div class="coach-settings-row app-update-actions">
+            <button type="button" class="cal-today-btn" id="app-update-check-btn">Jetzt prüfen</button>
+            <button type="button" class="update-btn" id="app-update-install-btn" hidden>Installieren</button>
+          </div>
+          <p class="card-sub">Vor dem Installieren werden Datenbank und Programm in <code>backups/</code> gesichert. Deine Daten (Trainings, Einstellungen, <code>.env</code>) werden nie ersetzt. Der Server startet danach kurz neu – Freunde sind etwa eine Minute getrennt.</p>
+        </div>
+      </div>
+
       <div class="card full" id="garmin-settings-card">
         <h2>Garmin-Verbindung
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Offizielle Garmin-Schnittstelle („Personal API“): Mit deinem eigenen Schlüssel holt der Dashboard-Server deine Trainings (als .fit-Datei) und Gesundheitsdaten (Schlaf, HRV, Ruhepuls, Gewicht, Schritte; Body Battery, soweit Garmin sie dort liefert) – nur lesen, ohne dein Garmin-Passwort. Workouts auf die Uhr schicken kann dieser Schlüssel nicht. VO2max und Trainingszustand liefert die Schnittstelle nicht; das Dashboard schätzt VO2max dann selbst.</div></span>
@@ -1079,6 +1094,7 @@
 <script src="js/components/data-import.js"></script>
 <script src="js/components/account.js"></script>
 <script src="js/components/garmin-settings.js"></script>
+<script src="js/components/update.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

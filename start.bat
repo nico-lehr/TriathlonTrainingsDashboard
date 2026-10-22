@@ -23,5 +23,7 @@ where py >nul 2>nul && set PY=py -3
 )
 
 %PY% backend\setup_env.py
-%PY% backend\app.py
-pause
+rem Starter: startet den Server nach einem Update automatisch neu.
+rem Alles in EINER Zeile: Windows liest die Datei waehrenddessen nicht weiter,
+rem auch wenn ein Update sie ersetzt.
+%PY% backend\launcher.py & pause & exit /b

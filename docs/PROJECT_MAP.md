@@ -5,7 +5,7 @@ mit aktualisieren (siehe AI_RULES.md, Abschnitt 26).
 
 ## Einstieg
 
-Der Server (`start.bat` / `start.sh` → `backend/app.py`, waitress) liefert
+Der Server (`start.bat` / `start.sh` → `backend/launcher.py` → `backend/app.py`, waitress) liefert
 unter http://localhost:5000 bzw. http://\<PC-Name\>:5000 (Tailscale) sowohl
 die Webseite als auch die API aus – gleiche Adresse, daher kein CORS.
 Betrieb: `docs/DEPLOYMENT.md`.
@@ -146,6 +146,7 @@ Bedarf schrittweise weiter aufgeteilt werden, sobald es sich lohnt.
 - `equipment.js` — Material-Bereich in den Einstellungen + Hinweis, wenn etwas fällig ist.
 - `data-import.js` — neue `.fit`-Dateien einlesen (Ordner-Scan-Menü + Drag & Drop) und auf dem Server speichern.
 - `account.js` — „Konto“-Karte in den Einstellungen: angemeldeter Benutzer, Abmelden.
+- `update.js` — Hinweis „Neue Version verfügbar“ oben und Karte „Programm-Updates“ in den Einstellungen (nur für den Betreiber; Freunde sehen nur die Versionsnummer).
 - `garmin-settings.js` — „Garmin-Verbindung“-Karte in den Einstellungen: eigenen Personal-API-Schlüssel eintragen/entfernen, Ablaufwarnung, „Jetzt von Garmin holen“.
 
 ### `js/app.js` — Einstiegspunkt
@@ -189,6 +190,9 @@ einmalig `backend/import_workouts_json.py`, siehe `docs/DEPLOYMENT.md`.
 | `dashboard_routes.py` | `/store`, `/workouts/full`, `/wellness/daily`, `/ical-link`. |
 | `ai_routes.py` | `/ai/chat`, `/ai/models` – Weiterleitung an Ollama. |
 | `equipment_routes.py` | `/equipment…` – Material anlegen/ändern/löschen, Zuordnungen, einmaliger Import. |
+| `updater.py` | Programm-Updates: neueste GitHub-Release prüfen (einmal am Tag), Paket prüfen, sichern, installieren (ZIP oder `git`), Neustart anstoßen. Nutzerdaten sind geschützt. |
+| `update_routes.py` | `/update`, `/update/check`, `/update/install` – Details und Installieren nur für den Betreiber (`auth.is_admin`). |
+| `launcher.py` | Starter aus `start.bat`/`start.sh`: startet `app.py` und nach einem Update (Code 3) neu. |
 | `garmin_api_routes.py` | `/garmin/personal-api` (eigenen Garmin-Schlüssel prüfen, speichern, entfernen – der Schlüssel kommt nie zurück) und `/garmin/sync` (Abruf für die angemeldete Person im Hintergrund). |
 | `garmin_workouts.py` | `/planned-workouts/<id>/send-to-garmin` – geplante Einheit als Garmin-Workout hochladen und in den Garmin-Kalender legen (Token des Garmin-Syncs). |
 | `weather_routes.py` | `/weather`, `/weather/geocode` – Open-Meteo-Vorhersage und Ortssuche, 1 Stunde zwischengespeichert. |
@@ -219,7 +223,8 @@ gestartet oder per „Jetzt von Garmin holen“ im Dashboard. Anleitung:
 
 | Datei | Zweck |
 |---|---|
-| `start.bat` / `start.sh` | Startet den Server (installiert beim ersten Mal die Bibliotheken, legt `.env` an). |
+| `start.bat` / `start.sh` | Startet den Server über `backend/launcher.py` (installiert beim ersten Mal die Bibliotheken, legt `.env` an, startet nach einem Update neu). |
+| `VERSION` | Programmversion; muss zum Tag der GitHub-Release passen (`docs/DEPLOYMENT.md`, Abschnitt 7). |
 | `backup.py` / `backup.bat` | Sichert `training.db` nach `backups/` (eine Datei pro Tag, die letzten 14). |
 | `parse_fit.py` | Python-Referenzimplementierung, liest `.fit`-Dateien (Standard: `fit-files/`) in `workouts.json`. Quellordner/Ziel per Argument überschreibbar. |
 | `build_dashboard.py` | Erzeugt `data/workouts-data.js` aus `workouts.json`. |

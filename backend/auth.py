@@ -7,6 +7,7 @@ athlete_id (itsdangerous). Wer SECRET_KEY nicht kennt, kann keinen gueltigen
 Token bauen; nach TOKEN_MAX_AGE_S ist er abgelaufen und es braucht einen
 neuen Login.
 """
+import os
 import threading
 import time
 from collections import defaultdict, deque
@@ -94,6 +95,20 @@ def unclaimed_data_count(session):
         return 0
     return (session.query(Workout).filter_by(athlete_id=athlete.athlete_id).count()
             + session.query(AthleteStore).filter_by(athlete_id=athlete.athlete_id).count())
+
+
+def is_admin(session, athlete_id):
+    """Betreiber des Dashboards (darf Programm-Updates installieren): die
+    Benutzernamen in ADMIN_USERS (.env, durch Komma getrennt) - ohne Eintrag
+    der zuerst angelegte Benutzer."""
+    login = session.query(AthleteLogin).filter_by(athlete_id=athlete_id).first()
+    if login is None:
+        return False
+    configured = [normalize_username(u) for u in os.getenv("ADMIN_USERS", "").split(",") if u.strip()]
+    if configured:
+        return login.username in configured
+    first = session.query(AthleteLogin).order_by(AthleteLogin.id).first()
+    return first is not None and first.id == login.id
 
 
 def create_login(session, username, password):

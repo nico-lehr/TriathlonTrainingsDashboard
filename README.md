@@ -113,6 +113,7 @@ Auf dem Mac in allen Befehlen `python3` statt `python` schreiben.
 | Neue Trainings holen | `python tools/garmin_sync.py` |
 | Benutzer anlegen / Passwort vergessen | `python backend/create_user.py` / `… --reset` |
 | Sicherung machen | `backup.bat` / `python backup.py` (läuft auch automatisch bei jedem Start) |
+| Neue Version installieren | Hinweis oben im Dashboard → „Installieren“ (nur für dich als Betreiber; siehe [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), „Updates“) |
 | Auf dem iPhone | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), Abschnitt 6 |
 
 ---
@@ -183,7 +184,8 @@ Ohne beides funktioniert alles andere normal — nur der Coach-Bereich bleibt le
 ### Ordnerstruktur
 
 ```
-start.bat / start.sh    Server starten (installiert beim ersten Mal alles)
+start.bat / start.sh    Server starten (installiert beim ersten Mal alles, startet nach Updates neu)
+VERSION                 Installierte Programmversion (für die Update-Prüfung)
 backup.py / backup.bat  Datenbank sichern (backups/, die letzten 14)
 
 index.html, login.html  Dashboard und Anmeldung (vom Server ausgeliefert)

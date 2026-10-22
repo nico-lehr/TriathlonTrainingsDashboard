@@ -207,7 +207,7 @@ DEMO_BANNER = """
 DEMO_CSS = """
 <style>
   #update-menu-wrap, #reset-btn, #menu-item-garmin, #menu-item-folder,
-  #menu-item-dnd, #dnd-overlay, #garmin-settings-card { display: none !important; }
+  #menu-item-dnd, #dnd-overlay, #garmin-settings-card, #app-update-card, #app-update-banner { display: none !important; }
 </style>
 """
 

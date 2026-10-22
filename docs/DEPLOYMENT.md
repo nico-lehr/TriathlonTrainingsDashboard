@@ -131,10 +131,36 @@ Adresse mit `http://` beginnt.
   Projektordner kopieren und in `training.db` umbenennen, Server starten.
 - Tipp: `backups/` ab und zu zusätzlich auf einen USB-Stick kopieren.
 
-### Updates
+### Updates (automatisch, nach deiner Bestätigung)
 
-Server beenden → `git pull` → `start.bat`/`start.sh` (installiert fehlende
-Bibliotheken von selbst) → wieder starten. Beim Start wird vorher
+Der Server fragt **einmal am Tag** bei GitHub nach, ob es eine neuere
+Version gibt. Wenn ja, sieht **nur der Betreiber** (die zuerst angelegte
+Person, änderbar mit `ADMIN_USERS=` in `.env`) oben im Dashboard einen
+Hinweis mit „Was ist neu?“, „Installieren“ und „Später“. Dieselben Knöpfe
+und „Jetzt prüfen“ stehen in den Einstellungen unter **Programm-Updates**.
+
+Beim Installieren passiert automatisch:
+
+1. `training.db` wird gesichert, die zu ersetzenden Programmdateien landen
+   in `backups/programm-<alte Version>-<Zeitpunkt>.zip` (darin steht in
+   `WIEDERHERSTELLEN.txt`, wie man zurückkehrt).
+2. Die neue Version wird geladen und geprüft, ihre Bibliotheken werden
+   installiert. Klappt das nicht, wird **nichts** geändert.
+3. Die Programmdateien werden ersetzt. **Nie** angefasst werden `.env`,
+   `training.db`, `backups/`, `fit-files/`, `data/`.
+4. Der Server startet neu (etwa 10 Sekunden; Freunde sind kurz getrennt),
+   die Seite lädt sich selbst neu.
+
+Voraussetzungen: Das Dashboard wurde mit `start.bat`/`start.sh` gestartet
+(sonst steht nach dem Installieren „bitte neu starten“), und der PC ist mit
+dem Internet verbunden. Wurde das Projekt per `git clone` geholt, nutzt das
+Update `git` (eigene Änderungen an Programmdateien → das Update bricht ab
+und sagt, was zu tun ist). Die tägliche Prüfung lässt sich mit
+`UPDATE_CHECK=0` in `.env` abschalten.
+
+**Von Hand** (z. B. bei einer Version ohne Update-Funktion): Dashboard
+beenden → neue ZIP von GitHub entpacken und über den Projektordner kopieren
+(oder `git pull`) → `start.bat`/`start.sh`. Beim Start wird vorher
 automatisch gesichert; neue Tabellen legt der Server selbst an, vorhandene
 Daten bleiben erhalten.
 
@@ -270,3 +296,27 @@ App entfernen).
 | Seite lädt nicht / leere App | PC an? Dashboard-Fenster offen? Tailscale auf dem iPhone an (VPN-Symbol)? Am PC `tailscale serve status` prüfen. |
 | Kein „https“ / Zertifikatsfehler | Schritt 2.1 noch nicht gemacht (HTTPS nicht eingeschaltet). |
 | Wieder abgemeldet | Normal alle 30 Tage oder nach „Abmelden“ – einfach neu anmelden. |
+
+---
+
+## 7. Neue Version veröffentlichen (für dich als Projekt-Besitzer)
+
+Ein Update erreicht die Dashboards erst, wenn du auf GitHub eine **Release**
+veröffentlichst – ein normales Hochladen auf `main` löst bewusst nichts aus.
+
+1. In der Datei `VERSION` die Nummer erhöhen, z. B. `2.0.0` → `2.1.0`
+   (kleine Korrektur: letzte Stelle, neue Funktionen: mittlere Stelle).
+   Die Änderung auf `main` bringen.
+2. Auf GitHub im Projekt rechts auf **Releases** → **Draft a new release**.
+3. **Choose a tag** → `v2.1.0` eintippen → „Create new tag“ (Ziel: `main`).
+   Der Tag muss genau zur Nummer in `VERSION` passen (mit `v` davor) –
+   sonst lehnt das Dashboard das Update ab.
+4. Titel z. B. „Version 2.1.0“, darunter in einfachen Worten, was neu ist –
+   genau dieser Text erscheint im Dashboard unter „Was ist neu?“.
+5. **Publish release**. Innerhalb eines Tages (oder sofort mit „Jetzt
+   prüfen“) sehen alle Dashboards den Hinweis.
+
+Das Repository muss öffentlich sein (die Prüfung fragt GitHub ohne Konto).
+Dateien, die eine neue Version löscht, bleiben bei bestehenden
+Installationen liegen – sie stören nicht.
+

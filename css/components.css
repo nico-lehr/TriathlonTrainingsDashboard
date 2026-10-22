@@ -2042,6 +2042,22 @@
     color: var(--text-primary); font-size: 12.5px;
   }
 
+  /* Hinweis "Neue Version verfügbar" (nur für den Betreiber, js/components/update.js) */
+  .app-update-banner {
+    margin: 0 0 16px; padding: 10px 14px; border-radius: 12px;
+    border: 1px solid var(--accent); background: var(--accent-wash);
+    color: var(--text-primary); font-size: 12.5px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  }
+  .app-update-banner[hidden] { display: none; }
+  .app-update-banner .app-update-banner-text { flex: 1 1 260px; }
+  .app-update-notes {
+    margin: 8px 0 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--surface-1); font-size: 12.5px; white-space: pre-wrap; max-height: 260px; overflow: auto;
+  }
+  .app-update-notes[hidden] { display: none; }
+  .coach-settings-row.app-update-actions { flex-direction: row; flex-wrap: wrap; gap: 10px; }
+
   /* ---------- Analyse-Tab (js/components/analysis.js) ---------- */
 
   /* Höchstens zwei Karten nebeneinander (Schwimmen | Rad), darunter einspaltig */

@@ -25,7 +25,7 @@ from itsdangerous import URLSafeTimedSerializer
 from itsdangerous.timed import TimestampSigner
 
 import tools.garmin_sync
-from backend import auth, create_app, garmin_api_routes, routes
+from backend import auth, create_app, garmin_api_routes, routes, updater
 from tools import garmin_personal_api
 from backend.config import config
 
@@ -88,6 +88,9 @@ class AccessTestBase(unittest.TestCase):
             mock.patch.object(tools.garmin_sync, "TOKEN_DIR", cls.garmin_dir),
             mock.patch.object(tools.garmin_sync, "LOG_PATH", os.path.join(cls.garmin_dir, "garmin-sync.log")),
             mock.patch.object(garmin_api_routes, "threading"),  # nur dort, nicht threading.Thread im ganzen Prozess
+            # Update-Endpunkte: nie wirklich bei GitHub fragen oder installieren.
+            mock.patch.object(updater, "_get", return_value=None),
+            mock.patch.object(updater, "start_install", return_value=False),
         ):
             patcher.start()
             cls.addClassCleanup(patcher.stop)
