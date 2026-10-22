@@ -4,6 +4,7 @@ Aufruf im Projektordner:  python -m unittest backend.test_auth -v
 Laeuft gegen eine Datenbank im Arbeitsspeicher - training.db bleibt unberuehrt.
 """
 import unittest
+from unittest import mock
 
 from itsdangerous import URLSafeTimedSerializer
 
@@ -111,7 +112,7 @@ class AuthTest(unittest.TestCase):
         # naechsten neuen Benutzer zu - unclaimed_data_count() macht das sichtbar,
         # damit create_user.py vorher nachfragen kann.
         from datetime import date
-        from backend.models import Athlete, Workout
+        from backend.models import Athlete, AthleteStore, Workout
         session = session_factory()
         try:
             athlete = Athlete(athlete_id=9001, name="Altbestand")
@@ -119,9 +120,12 @@ class AuthTest(unittest.TestCase):
             session.flush()
             session.add(Workout(athlete_id=9001, date=date(2026, 1, 2), sport="Laufen", duration_min=30))
             session.commit()
-            before = auth.unclaimed_data_count(session)
             self.assertEqual(auth.unclaimed_athlete(session).athlete_id, 9001)
-            self.assertGreaterEqual(before, 1)
+            self.assertEqual(auth.unclaimed_data_count(session), 1)
+            # Auch Ablage-Eintraege (Plan, Ziele ...) zaehlen, nicht nur Trainings.
+            session.add(AthleteStore(athlete_id=9001, key="triathlon_dashboard_goals_v1", value=[]))
+            session.commit()
+            self.assertEqual(auth.unclaimed_data_count(session), 2)
             new_id = auth.create_login(session, "erbe", PASSWORD)
             self.assertEqual(new_id, 9001)
             self.assertEqual(auth.unclaimed_data_count(session), 0)
@@ -133,10 +137,11 @@ class AuthTest(unittest.TestCase):
         # auch ohne Treffer wird ein Hash berechnet.
         session = session_factory()
         try:
-            self.assertIsNone(auth.check_login(session, "gibts-nicht", "irgendwas-langes"))
+            with mock.patch.object(auth, "check_password_hash", wraps=auth.check_password_hash) as check:
+                self.assertIsNone(auth.check_login(session, "gibts-nicht", "irgendwas-langes"))
+            check.assert_called_once_with(auth._dummy_hash, "irgendwas-langes")
         finally:
             session.close()
-        self.assertIsNotNone(auth._dummy_hash)
 
     def test_passwort_zuruecksetzen(self):
         make_user("vergesslich")

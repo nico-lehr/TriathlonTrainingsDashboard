@@ -24,10 +24,10 @@ function todayStr() {
 
 // Auch Anführungszeichen werden ersetzt: der Text steht oft in einem
 // Attribut (value="..."), und ein " darin würde das Attribut vorzeitig beenden.
+// Reine Textersetzung (ohne DOM), damit sie sich ohne Browser testen lässt.
+const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 function escapeHtml(s) {
-  const d = document.createElement("div");
-  d.textContent = s == null ? "" : String(s);
-  return d.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  return (s == null ? "" : String(s)).replace(/[&<>"']/g, c => HTML_ESCAPES[c]);
 }
 
 // Baut den fachlichen Kontext (Form, Historie, Bestzeiten, Athletenprofil,

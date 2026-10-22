@@ -70,7 +70,8 @@ Registrierungsseite gibt es bewusst nicht.
 
 # Deine Trainingsdaten holen
 
-Nach der Einrichtung ist das Dashboard noch leer. Drei Möglichkeiten:
+Nach der Einrichtung ist das Dashboard noch leer. Drei Möglichkeiten.
+(**Mac:** in allen Befehlen hier `python3` statt `python` schreiben.)
 
 ## Möglichkeit A — Automatisch von Garmin Connect
 
@@ -103,6 +104,8 @@ Siehe [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), „Deine bisherigen Daten
 ---
 
 # Der Alltag danach
+
+Auf dem Mac in allen Befehlen `python3` statt `python` schreiben.
 
 | Was du willst | Was du tust |
 |---|---|

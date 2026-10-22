@@ -27,8 +27,8 @@ heißt es meist `python3`. Alle Befehle im Projektordner ausführen.
    python backend/create_user.py
    ```
    **Lege zuerst dich selbst an, danach die Freunde.** Wer zuerst angelegt
-   wird, bekommt alle schon vorhandenen Daten (z. B. deine importierten
-   Trainings). Gibt es solche Daten, fragt das Programm vorher nach, ob das
+   wird, bekommt alle schon vorhandenen Daten ohne Benutzer (z. B. aus der
+   früheren Einzelplatz-Version). Gibt es solche Daten, fragt das Programm vorher nach, ob das
    dein eigenes Konto ist.
    Passwort mindestens 10 Zeichen. Die angezeigte Nummer (`athlete_id`) ist
    die Benutzer-Nummer, die z. B. der Garmin-Sync braucht.

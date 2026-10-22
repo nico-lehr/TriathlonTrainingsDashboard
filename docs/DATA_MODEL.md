@@ -687,7 +687,7 @@ Phasen — Kalender, Coach-Tab, Planregeln und KI-Kontext leiten sich davon ab.
   weeks: [{
     weekStart: "2026-09-14", phase: "aufbau",
     type: "belastung",        // belastung | entlastung | taper | rennwoche | erholung
-    targetPct: 105, targetMin: 441,   // targetMin null ohne Anker
+    targetPct: 1.05, targetMin: 441,  // targetPct = Faktor zum Anker (1.05 = 105 %), targetMin null ohne Anker
     doneMin: 120, plannedMin: 300,
   }],
 }

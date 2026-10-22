@@ -81,8 +81,13 @@ function logout() {
 
 // Sichtbarer Hinweis oben im Dashboard (index.html: #api-error-banner), wenn
 // Laden/Speichern scheitert - ein still verschluckter Fehler wuerde sonst
-// unbemerkt Aenderungen verlieren. null blendet ihn aus.
+// unbemerkt Aenderungen verlieren. null blendet ihn aus - ausser es gilt noch
+// etwas Wichtigeres aus der Ablage (siehe unten): ein ungesicherter Wert oder
+// die Warnung "auf einem anderen Geraet geaendert". Ein anderer Erfolg (z. B.
+// Equipment gespeichert) erledigt beides nicht.
 function showApiError(message) {
+  if (!message && storeStale) return showStoreStaleNotice();
+  if (!message && storeFailed.size) message = storeFailedText;
   const el = document.getElementById("api-error-banner");
   if (!el) return;
   el.textContent = message || "";
@@ -99,12 +104,15 @@ function showApiError(message) {
 let userStore = {};
 const storeSending = new Set(); // Schluessel, die gerade zum Server unterwegs sind
 const storeDirty = new Set();   // Schluessel mit noch nicht gesendeter Aenderung
-let storeSaveFailed = false;    // das letzte Speichern ist gescheitert (der Browser hat dann den neueren Stand)
+const storeFailed = new Set();  // Schluessel, deren letztes Speichern scheiterte (der Browser hat den neueren Stand)
+let storeFailedText = "";
+let storeLoaded = false;
 let storeStale = false;         // auf einem anderen Geraet wurde inzwischen etwas geaendert
 let storeCheckedAt = 0;
 
 async function loadUserStore() {
   userStore = (await apiCall("store")).data || {};
+  storeLoaded = true;
 }
 
 // Kopie statt Referenz - verhaelt sich wie frueher JSON.parse(localStorage...).
@@ -112,8 +120,11 @@ function storeGet(key) {
   return key in userStore ? JSON.parse(JSON.stringify(userStore[key])) : null;
 }
 
+// Abgelegt wird eine Kopie: sonst waere z. B. plannedWorkouts dasselbe Objekt
+// wie der Ablage-Eintrag, und eine noch nicht gespeicherte Aenderung (etwa ein
+// Lade-Merker der KI) saehe beim Vergleich wie eine Aenderung von aussen aus.
 function storeSet(key, value) {
-  userStore[key] = value;
+  userStore[key] = value === undefined ? null : JSON.parse(JSON.stringify(value));
   storeDirty.add(key);
   if (!storeSending.has(key)) sendStoreKey(key);
 }
@@ -126,11 +137,12 @@ async function sendStoreKey(key) {
     storeDirty.delete(key);
     try {
       await apiCall(`store/${key}`, "PUT", { value: userStore[key] });
-      storeSaveFailed = false;
-      if (!storeStale) showApiError(null);
+      storeFailed.delete(key);
+      showApiError(null);
     } catch (e) {
-      storeSaveFailed = true;
-      showApiError(`Speichern fehlgeschlagen (${e.message}). Die letzte Änderung ist evtl. nicht gesichert.`);
+      storeFailed.add(key);
+      storeFailedText = `Speichern fehlgeschlagen (${e.message}). Die letzte Änderung ist evtl. nicht gesichert.`;
+      showApiError(storeFailedText);
     }
   }
   storeSending.delete(key);
@@ -174,9 +186,12 @@ function showStoreStaleNotice() {
   el.hidden = false;
 }
 
+// Ein ungesicherter eigener Wert ist keine Aenderung "von aussen" - solange es
+// einen gibt, wird nicht verglichen (sonst riete der Hinweis zum Neuladen,
+// und die eigene Aenderung waere weg).
 async function checkStoreStale() {
-  const idle = () => !storeSending.size && !storeDirty.size && !storeSaveFailed;
-  if (document.visibilityState !== "visible" || storeStale || !idle() || Date.now() - storeCheckedAt < 30000) return;
+  const idle = () => !storeSending.size && !storeDirty.size && !storeFailed.size;
+  if (!storeLoaded || document.visibilityState !== "visible" || storeStale || !idle() || Date.now() - storeCheckedAt < 30000) return;
   storeCheckedAt = Date.now();
   let server;
   try { server = (await apiCall("store")).data || {}; } catch (e) { return; }
@@ -184,10 +199,12 @@ async function checkStoreStale() {
   if (storeChangedElsewhere(server)) { storeStale = true; showStoreStaleNotice(); }
 }
 document.addEventListener("visibilitychange", checkStoreStale);
+window.addEventListener("focus", checkStoreStale); // zwei Fenster nebeneinander: Wechsel per Klick
 
-// Warnen, wenn die Seite geschlossen wird, waehrend noch gespeichert wird.
+// Warnen, wenn die Seite geschlossen wird, waehrend noch gespeichert wird
+// oder eine Aenderung nicht gesichert werden konnte.
 window.addEventListener("beforeunload", (e) => {
-  if (storeSending.size) { e.preventDefault(); e.returnValue = ""; }
+  if (storeSending.size || storeFailed.size) { e.preventDefault(); e.returnValue = ""; }
 });
 
 class TriathlonApiClient {

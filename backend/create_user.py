@@ -26,7 +26,7 @@ def main():
             session.close()
         if existing:
             print(f"Achtung: Es gibt schon {existing} Eintraege (Trainings, Plan, Ziele ...) ohne Benutzer,")
-            print("z. B. aus dem Import deiner alten Daten. Der Benutzer, den du jetzt anlegst,")
+            print("z. B. aus der frueheren Einzelplatz-Version. Der Benutzer, den du jetzt anlegst,")
             print("bekommt SIE ALLE zu sehen. Lege zuerst dich selbst an, dann deine Freunde.")
             if input("Ist das dein eigenes Konto? (j/n): ").strip().lower() not in ("j", "ja"):
                 sys.exit("Nichts angelegt.")
@@ -47,4 +47,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (KeyboardInterrupt, EOFError):
+        sys.exit("\nAbgebrochen - nichts angelegt oder geaendert.")

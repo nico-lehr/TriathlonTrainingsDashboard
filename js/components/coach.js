@@ -58,7 +58,7 @@ function renderCoachSummary() {
       const p = upcoming[0];
       const d = new Date(p.date + "T00:00:00");
       const dowShort = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
-      chips.push({ label: "Nächstes Training", value: `${escapeHtml(p.sport)}`, sub: `${dowShort[d.getDay()]}, ${escapeHtml(p.title || "")}`.trim() });
+      chips.push({ label: "Nächstes Training", value: `${escapeHtml(p.sport)}`, sub: `${dowShort[d.getDay()]}, ${p.title || ""}`.trim() }); // sub wird beim Ausgeben maskiert
     }
   }
 
