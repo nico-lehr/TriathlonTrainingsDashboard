@@ -73,20 +73,19 @@ Registrierungsseite gibt es bewusst nicht.
 Nach der Einrichtung ist das Dashboard noch leer. Drei Möglichkeiten.
 (**Mac:** in allen Befehlen hier `python3` statt `python` schreiben.)
 
-## Möglichkeit A — Automatisch von Garmin Connect
+## Möglichkeit A — Automatisch von Garmin Connect (offizielle Schnittstelle)
 
-Einmalig die Garmin-Bibliotheken installieren, dann jede Person anmelden
-(die Nummer zeigt `create_user.py` an, bei dir meist `1`):
+1. Einmalig am PC: `python -m pip install -r requirements.txt`
+2. Jede Person erstellt in Garmin Connect ihren eigenen Schlüssel:
+   Einstellungen → **Personal API**
+   (https://connect.garmin.com/app/settings/personalApiToken).
+3. Im Dashboard: Einstellungen → **Garmin-Verbindung** → Schlüssel
+   einfügen → „Schlüssel prüfen & speichern“ → **„Jetzt von Garmin holen“**.
 
-```
-python -m pip install -r requirements.txt
-python tools/garmin_sync.py --login --athlete 1
-```
-
-Garmin-E-Mail und Passwort werden versteckt abgefragt (bei Zwei-Faktor
-zusätzlich der Code). **Das Passwort wird nirgends gespeichert**, nur ein
-Zugangsschlüssel außerhalb des Projektordners. Danach holt
-`python tools/garmin_sync.py` die Daten **aller** angemeldeten Personen.
+Kein Garmin-Passwort nötig, der Schlüssel kann nur lesen. Danach holt auch
+`python tools/garmin_sync.py` am PC die Daten **aller** Personen mit
+Schlüssel. Für „An Garmin senden“ (Workouts auf die Uhr) braucht es
+zusätzlich die alte Anmeldung (`python tools/garmin_sync.py --login --athlete 1`).
 Alle Einzelheiten: [docs/GARMIN_SYNC_GUIDE.md](docs/GARMIN_SYNC_GUIDE.md).
 
 ## Möglichkeit B — Eigene `.fit`-Dateien ohne Garmin-Konto
@@ -142,8 +141,9 @@ belegt, Firewall, Passwort vergessen, KI antwortet nicht) steht in
   deines Heimatorts, falls du einen einstellst).
 - **Jede Person sieht nur ihre eigenen Daten.** Ohne Anmeldung ist nur die
   Login-Seite erreichbar; Passwörter werden nur als Hash gespeichert.
-- **Garmin-Passwörter werden nie gespeichert.** Der Zugangsschlüssel liegt
-  außerhalb des Projektordners (`~/.triathlon/`) und ist nur für dich lesbar.
+- **Garmin-Passwörter werden nie gespeichert.** Garmin-Schlüssel und
+  -Token liegen außerhalb des Projektordners (`~/.triathlon/`) und sind nur
+  für deinen Computer-Benutzer lesbar.
 - `.env`, `training.db`, `backups/` und alle Trainingsdaten sind so
   eingerichtet, dass sie **nicht versehentlich ins Internet hochgeladen**
   werden (`.gitignore`) und der Server sie **nie ausliefert**.

@@ -32,6 +32,27 @@ Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
 
 **Gesamt: 100 % (21 von 21 Schritten)**
 
+## Zusatz G: Offizielle Garmin-API (Personal API)
+
+Auftrag (2026-10-22): Weg A – Lesen über die offizielle Schnittstelle, „An Garmin senden“ bleibt beim alten Weg; jede Person trägt ihren eigenen Schlüssel in den Einstellungen ein.
+
+| Schritt | Status |
+|---|---|
+| G1 Schnittstelle `tools/garmin_personal_api.py` (Schlüssel → 24-h-Token, Abfragen, ohne Zusatz-Bibliothek) | fertig |
+| G2 Sync nutzt den Schlüssel, wenn vorhanden (sonst alter Weg); Aufbereitung versteht beide Antwortformen | fertig |
+| G3 Server: Schlüssel prüfen/speichern/entfernen, „Jetzt von Garmin holen“ im Hintergrund | fertig |
+| G4 Einstellungen-Karte „Garmin-Verbindung“ | fertig (im Browser mit nachgestelltem Garmin von Anfang bis Ende geprüft) |
+| G5 Tests (nur nachgestelltes Garmin) + Doku | fertig |
+| G6 Prüfung durch zweiten Prüfer | läuft |
+
+### Offene Fragen zu G
+
+- **Mit einem echten Schlüssel noch nicht getestet** (nur mit nachgestelltem Garmin). Die Adressen stammen aus Garmins eigenem Beispiel-Client. Bei Schlaf und Gewicht ist das genaue Antwortformat der neuen Schnittstelle nicht dokumentiert; die Aufbereitung liest beide bekannten Formen. Bitte nach dem ersten Abruf prüfen, ob Schlaf, HRV, Ruhepuls, Gewicht und die Trainings stimmen.
+- VO2max und Garmins Trainingszustand liefert die Personal API nicht → bei Personen mit Schlüssel leer; das Dashboard schätzt VO2max selbst.
+- „Gültig bis“ trägt man selbst ein (Garmin verrät das Ablaufdatum über die Schnittstelle nicht). Ohne Eintrag gibt es keine Vorwarnung, nur die Meldung „abgelehnt“, wenn er abgelaufen ist.
+- Garmin sagt, die Personal API sei für eigene Daten gedacht, nicht für Dienste für andere. Hier nutzt jede Person ihren eigenen Schlüssel für ihre eigenen Daten auf deinem PC – bitte Garmins Bedingungen beim Erstellen des Schlüssels selbst lesen.
+- Der Schlüssel liegt wie die bisherigen Garmin-Token als Datei auf dem PC (nur für deinen Computer-Benutzer lesbar), nicht verschlüsselt.
+
 ## Offene Fragen
 
 ### Aus dem Abschluss-Check F (nicht behoben, optional)

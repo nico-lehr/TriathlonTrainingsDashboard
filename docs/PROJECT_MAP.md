@@ -146,6 +146,7 @@ Bedarf schrittweise weiter aufgeteilt werden, sobald es sich lohnt.
 - `equipment.js` — Material-Bereich in den Einstellungen + Hinweis, wenn etwas fällig ist.
 - `data-import.js` — neue `.fit`-Dateien einlesen (Ordner-Scan-Menü + Drag & Drop) und auf dem Server speichern.
 - `account.js` — „Konto“-Karte in den Einstellungen: angemeldeter Benutzer, Abmelden.
+- `garmin-settings.js` — „Garmin-Verbindung“-Karte in den Einstellungen: eigenen Personal-API-Schlüssel eintragen/entfernen, Ablaufwarnung, „Jetzt von Garmin holen“.
 
 ### `js/app.js` — Einstiegspunkt
 Definiert `renderAll()` (ruft die Render-Funktionen aller Tabs auf) und
@@ -188,6 +189,7 @@ einmalig `backend/import_workouts_json.py`, siehe `docs/DEPLOYMENT.md`.
 | `dashboard_routes.py` | `/store`, `/workouts/full`, `/wellness/daily`, `/ical-link`. |
 | `ai_routes.py` | `/ai/chat`, `/ai/models` – Weiterleitung an Ollama. |
 | `equipment_routes.py` | `/equipment…` – Material anlegen/ändern/löschen, Zuordnungen, einmaliger Import. |
+| `garmin_api_routes.py` | `/garmin/personal-api` (eigenen Garmin-Schlüssel prüfen, speichern, entfernen – der Schlüssel kommt nie zurück) und `/garmin/sync` (Abruf für die angemeldete Person im Hintergrund). |
 | `garmin_workouts.py` | `/planned-workouts/<id>/send-to-garmin` – geplante Einheit als Garmin-Workout hochladen und in den Garmin-Kalender legen (Token des Garmin-Syncs). |
 | `weather_routes.py` | `/weather`, `/weather/geocode` – Open-Meteo-Vorhersage und Ortssuche, 1 Stunde zwischengespeichert. |
 | `frontend.py` | Liefert nur die Erlaubt-Liste aus (`index.html`, `login.html`, `manifest.json`, `css/`, `js/`, `icons/`). |
@@ -207,6 +209,7 @@ Trainings und Gesundheitsdaten in die Datenbank. Anleitung:
 | Datei | Zweck |
 |---|---|
 | `tools/garmin_sync.py` | `--athlete <id>` / alle mit Token; `--login --athlete <id>` meldet bei Garmin an (Token unter `~/.triathlon/garmin_<id>.token`, Passwort wird nie gespeichert). Original-.fit-Archiv je Benutzer unter `fit-files/athlete_<id>/`. Eine Log-Zeile je Benutzer in `~/.triathlon/garmin-sync.log`. |
+| `tools/garmin_personal_api.py` | Offizielle Garmin-Schnittstelle (Personal API, nur lesen): Schlüssel je Person, 24-h-Token, dieselben Abfragen wie der alte Weg. Ohne Zusatz-Bibliothek. |
 | `tools/__init__.py` | Macht `tools/` importierbar (der Server nutzt die Garmin-Anmeldung aus `garmin_sync.py` für „An Garmin senden“). |
 | `tools/export-browser-data.html` | Einmal-Export der Daten des alten Doppelklick-Dashboards aus dem Browser (nur per Doppelklick, wird nicht ausgeliefert). |
 | `sync-garmin.command`, `tools/install-url-scheme.command` | Alter Mac-Einzelplatz-Ablauf (Sync → `parse_fit.py` → `build_dashboard.py`); bringt keine Daten mehr ins Server-Dashboard. |

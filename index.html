@@ -636,6 +636,28 @@
       </div>
 
       <div class="card full">
+        <h2>Garmin-Verbindung
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Offizielle Garmin-Schnittstelle („Personal API“): Mit deinem eigenen Schlüssel holt der Dashboard-Server deine Trainings (als .fit-Datei) und Gesundheitsdaten (Schlaf, HRV, Ruhepuls, Body Battery, Gewicht, Schritte) – nur lesen, ohne dein Garmin-Passwort. Workouts auf die Uhr schicken kann dieser Schlüssel nicht. VO2max und Trainingszustand liefert die Schnittstelle nicht; das Dashboard schätzt VO2max dann selbst.</div></span>
+        </h2>
+        <p class="card-sub">Schlüssel in Garmin Connect erstellen: <a href="https://connect.garmin.com/app/settings/personalApiToken" target="_blank" rel="noopener">Einstellungen → Personal API</a>. Er wird nur einmal angezeigt – gleich hier einfügen. Bitte nur am Dashboard-PC oder über Tailscale eintragen.</p>
+        <p class="coach-test-status" id="garmin-api-status"></p>
+        <div class="coach-settings-row">
+          <label for="garmin-api-key">Schlüssel</label>
+          <input type="password" id="garmin-api-key" class="coach-input" autocomplete="off" spellcheck="false" placeholder="Schlüssel einfügen">
+        </div>
+        <div class="coach-settings-row">
+          <label for="garmin-api-expires">Gültig bis (optional)</label>
+          <input type="date" id="garmin-api-expires" class="coach-input">
+        </div>
+        <div class="coach-settings-row">
+          <button type="button" class="cal-today-btn" id="garmin-api-save-btn">Schlüssel prüfen &amp; speichern</button>
+          <button type="button" class="cal-today-btn" id="garmin-api-sync-btn" hidden>Jetzt von Garmin holen</button>
+        </div>
+        <p class="coach-test-status" id="garmin-api-sync-status"></p>
+        <button type="button" class="reset-link" id="garmin-api-delete-btn" hidden>Schlüssel entfernen</button>
+      </div>
+
+      <div class="card full">
         <h2>Ollama-Verbindung</h2>
         <p class="card-sub">Für den KI-Coach (Trainingsempfehlungen, Auswertungen). Ollama läuft auf dem Dashboard-PC, die Anfragen gehen über den Dashboard-Server – deine Daten verlassen das eigene Netz nicht.</p>
         <div class="coach-settings-row" hidden>
@@ -1056,6 +1078,7 @@
 <script src="js/components/compare.js"></script>
 <script src="js/components/data-import.js"></script>
 <script src="js/components/account.js"></script>
+<script src="js/components/garmin-settings.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

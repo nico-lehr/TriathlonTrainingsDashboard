@@ -14,11 +14,17 @@ Pro Benutzer (athlete_id, siehe backend/create_user.py):
      Die Garmin-Rohantworten liegen je Benutzer in
      fit-files/athlete_<id>/garmin-raw-cache.json (inkrementeller Sync).
 
-Anmeldung: Das Passwort wird NIE gespeichert oder geloggt. Es wird einmalig
-mit --login abgefragt, gegen ein Token getauscht und sofort verworfen. Das
-Token liegt je Benutzer unter ~/.triathlon/garmin_<id>.token (ausserhalb des
-Projekts, nur fuer den eigenen Betriebssystem-Benutzer lesbar) und erneuert
-sich danach selbst.
+Zwei Wege zu Garmin, je Benutzer:
+  - Offiziell (bevorzugt): Personal-API-Schluessel, den die Person selbst in
+    Garmin Connect erstellt und in den Dashboard-Einstellungen eintraegt
+    (tools/garmin_personal_api.py). Nur lesen, kein Passwort. Liegt ein
+    Schluessel vor, wird er benutzt.
+  - Bisher: Anmeldung per --login. Das Passwort wird NIE gespeichert oder
+    geloggt. Es wird einmalig abgefragt, gegen ein Token getauscht und sofort
+    verworfen. Das Token liegt je Benutzer unter ~/.triathlon/garmin_<id>.token
+    (ausserhalb des Projekts, nur fuer den eigenen Betriebssystem-Benutzer
+    lesbar) und erneuert sich danach selbst. Wird weiter fuer "An Garmin
+    senden" gebraucht (das kann die offizielle Personal API nicht).
 
 Fehler bei einem Benutzer (Token abgelaufen, Garmin blockt) landen als EINE
 Zeile mit der Benutzer-Nummer in ~/.triathlon/garmin-sync.log - die anderen
@@ -26,7 +32,7 @@ Benutzer laufen trotzdem weiter.
 
 Aufruf:
     python3 tools/garmin_sync.py --login --athlete 2   # einmalig: Garmin-Anmeldung fuer Benutzer 2
-    python3 tools/garmin_sync.py                       # alle Benutzer mit Token, letzte 300 Tage
+    python3 tools/garmin_sync.py                       # alle Benutzer mit Schluessel/Token, letzte 300 Tage
     python3 tools/garmin_sync.py --athlete 2           # nur Benutzer 2
     python3 tools/garmin_sync.py --days 1095           # einmalig mehr Historie nachholen
     python3 tools/garmin_sync.py --since 2024-01-01
@@ -50,6 +56,8 @@ from datetime import date, datetime, timedelta
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE)  # fuer "from backend import ..."
+
+from tools import garmin_personal_api as personal_api  # noqa: E402 - braucht den Pfad oben
 
 # Token und Log liegen ausserhalb des Projekts unter ~/.triathlon (dieselben
 # Orte wie GARMIN_TOKEN_PATH/GARMIN_LOG_PATH in backend/config.py).
@@ -121,6 +129,8 @@ def log_user(athlete_id, msg):
 def describe_error(e, athlete_id):
     """Einzeiliger Fehlertext fuers Log. Enthaelt nie Zugangsdaten - das
     Passwort existiert ohnehin nur waehrend --login im Speicher."""
+    if getattr(e, "user_message", None):  # offizielle API: fertiger deutscher Satz
+        return e.user_message
     name = type(e).__name__
     if "TooManyRequests" in name:
         return "Garmin blockt gerade (zu viele Anfragen). Spaeter erneut starten."
@@ -189,11 +199,18 @@ def safe_filename(activity):
         return f"activity-{activity.get('activityId')}.fit"
 
 
+def download_original(client, aid):
+    """Original-Datei (ZIP mit der .fit) - offizielle API oder garminconnect."""
+    if hasattr(client, "download_original"):
+        return client.download_original(aid)
+    from garminconnect import Garmin
+    return client.download_activity(aid, dl_fmt=Garmin.ActivityDownloadFormat.ORIGINAL)
+
+
 def sync_activities(client, start, end, athlete_id, session):
     """Neue Aktivitaeten eines Benutzers -> Tabelle workouts. Bereits
     gespeicherte (gleiche garmin_activity_id) werden gar nicht erst geladen."""
     from backend.models import Workout
-    from garminconnect import Garmin, GarminConnectTooManyRequestsError
 
     fit_dir = athlete_dir(athlete_id)
     os.makedirs(fit_dir, exist_ok=True)
@@ -217,7 +234,7 @@ def sync_activities(client, start, end, athlete_id, session):
             fetched[fname] = act  # liegt schon im Archiv, fehlt nur in der Datenbank
             continue
         try:
-            blob = client.download_activity(aid, dl_fmt=Garmin.ActivityDownloadFormat.ORIGINAL)
+            blob = download_original(client, aid)
             # Garmin liefert hier ein ZIP, nicht die rohe .fit - entpacken.
             wrote = False
             with zipfile.ZipFile(io.BytesIO(blob)) as z:
@@ -233,19 +250,23 @@ def sync_activities(client, start, end, athlete_id, session):
             else:
                 stats["fehler"] += 1
                 log(f"  [{i}/{len(activities)}] {aid}: keine .fit im Archiv - uebersprungen")
-        except GarminConnectTooManyRequestsError as e:
-            log("  Garmin drosselt die Anfragen (Rate-Limit). Bereits geladene Aktivitaeten\n"
-                "  werden noch gespeichert, spaeter einfach erneut starten.")
-            blocked = e
-            break
         except zipfile.BadZipFile:
             # Manche Aktivitaeten (manuell angelegt, ohne Geraetedatei) liefern
             # kein Archiv. Kein Grund, den ganzen Lauf abzubrechen.
             stats["fehler"] += 1
             log(f"  [{i}/{len(activities)}] {aid}: keine Originaldatei vorhanden (evtl. manuell angelegt)")
         except Exception as e:
+            # Rate-Limit (beide Wege, am Klassennamen erkannt) oder abgelehnter
+            # Schluessel: abbrechen, Bereits-Geladenes aber noch speichern.
+            name = type(e).__name__
+            if "TooManyRequests" in name or "Authentication" in name:
+                log("  Garmin drosselt die Anfragen (Rate-Limit). Bereits geladene Aktivitaeten\n"
+                    "  werden noch gespeichert, spaeter einfach erneut starten."
+                    if "TooManyRequests" in name else f"  {describe_error(e, athlete_id)}")
+                blocked = e
+                break
             stats["fehler"] += 1
-            log(f"  [{i}/{len(activities)}] {aid}: {type(e).__name__}: {e}")
+            log(f"  [{i}/{len(activities)}] {aid}: {describe_error(e, athlete_id)}")
         time.sleep(REQUEST_PAUSE_S)
 
     store_workouts(session, athlete_id, fit_dir, fetched, stats)
@@ -432,7 +453,10 @@ def normalize(cache):
     out = {}
 
     for ds, raw in (cache.get("days") or {}).items():
-        sleep_dto = dig(raw, "sleep", "dailySleepDTO") or {}
+        # Schlaf: garminconnect liefert {"dailySleepDTO": {...}}; bei der
+        # offiziellen API stehen die Werte evtl. direkt oben - beides lesen.
+        sleep_raw = raw.get("sleep") if isinstance(raw.get("sleep"), dict) else {}
+        sleep_dto = sleep_raw.get("dailySleepDTO") or (sleep_raw if "sleepTimeSeconds" in sleep_raw else {})
         hrv_sum = dig(raw, "hrv", "hrvSummary") or {}
         rhr_raw = raw.get("rhr") or {}
         rhr_metrics = (dig(rhr_raw, "allMetrics", "metricsMap", "WELLNESS_RESTING_HEART_RATE") or [])
@@ -514,9 +538,15 @@ def normalize(cache):
             e["body_battery_high"] = max(levels)
             e["body_battery_low"] = min(levels)
 
-    # Gewicht/Koerperzusammensetzung
+    # Gewicht/Koerperzusammensetzung. garminconnect (dateRange): dateWeightList;
+    # offizielle API (weight/range): dailyWeightSummaries[].latestWeight.
     bc = dig(cache, "ranges", "body_composition") or {}
-    for item in (bc.get("dateWeightList") or []):
+    weights = list(bc.get("dateWeightList") or [])
+    for summ in (bc.get("dailyWeightSummaries") or []):
+        latest = summ.get("latestWeight") if isinstance(summ, dict) else None
+        if isinstance(latest, dict):
+            weights.append({**latest, "calendarDate": latest.get("calendarDate") or summ.get("summaryDate")})
+    for item in weights:
         ds = item.get("calendarDate")
         grams = num(item.get("weight"))
         if ds and grams:
@@ -572,12 +602,26 @@ def open_db():
 
 
 def athletes_with_token():
-    ids = []
+    """Alle Benutzer mit Garmin-Zugang: altes Token ODER offizieller Schluessel."""
+    ids = set()
     for path in glob.glob(os.path.join(TOKEN_DIR, "garmin_*.token")):
         m = re.fullmatch(r"garmin_(\d+)\.token", os.path.basename(path))
         if m:
-            ids.append(int(m.group(1)))
+            ids.add(int(m.group(1)))
+    for path in glob.glob(os.path.join(personal_api.KEY_DIR, "garmin_api_*.json")):
+        m = re.fullmatch(r"garmin_api_(\d+)\.json", os.path.basename(path))
+        if m:
+            ids.add(int(m.group(1)))
     return sorted(ids)
+
+
+def client_for(athlete_id, fresh_login=False):
+    """Offizielle API, wenn die Person einen Schluessel hinterlegt hat - sonst
+    der bisherige Weg (gespeichertes Token bzw. --login)."""
+    if not fresh_login and personal_api.has_key(athlete_id):
+        log("Offizielle Garmin-Schnittstelle (Personal-API-Schluessel).")
+        return personal_api.PersonalApiClient(athlete_id)
+    return connect(athlete_id, fresh_login=fresh_login)
 
 
 def sync_user(athlete_id, session_factory, start, end, args):
@@ -588,17 +632,19 @@ def sync_user(athlete_id, session_factory, start, end, args):
         if not session.query(Athlete).filter_by(athlete_id=athlete_id).first():
             raise LookupError(f"Benutzer {athlete_id} gibt es nicht (anlegen mit: python3 backend/create_user.py)")
         log(f"\n=== Benutzer {athlete_id} ===")
-        client = connect(athlete_id, fresh_login=args.login)
+        client = client_for(athlete_id, fresh_login=args.login)
 
         parts = []
         if not args.wellness_only:
             st = sync_activities(client, start, end, athlete_id, session)
-            parts.append(f"Aktivitaeten {st['neu']} neu, {st['vorhanden']} vorhanden, {st['fehler']} Fehler")
+            parts.append(f"Aktivitäten {st['neu']} neu, {st['vorhanden']} vorhanden, {st['fehler']} Fehler")
         if not args.activities_only:
             daily = normalize(sync_wellness(client, start, end, cache_path(athlete_id)))
             store_wellness(session, athlete_id, daily)
             parts.append(f"Gesundheitsdaten {len(daily)} Tage")
-        log_user(athlete_id, "OK - " + ", ".join(parts))
+        summary = ", ".join(parts)
+        log_user(athlete_id, "OK - " + summary)
+        return summary
     finally:
         session.close()
 
@@ -606,7 +652,7 @@ def sync_user(athlete_id, session_factory, start, end, args):
 def main():
     ap = argparse.ArgumentParser(description="Synchronisiert Garmin Connect mit dem Dashboard (je Benutzer)")
     ap.add_argument("--athlete", type=int, metavar="ID",
-                    help="nur dieser Benutzer (athlete_id); ohne Angabe alle mit Garmin-Token")
+                    help="nur dieser Benutzer (athlete_id); ohne Angabe alle mit Garmin-Schluessel oder -Token")
     ap.add_argument("--login", action="store_true",
                     help="Garmin-Anmeldung fuer --athlete einrichten (fragt E-Mail, Passwort und ggf. 2FA-Code)")
     ap.add_argument("--days", type=int, default=DEFAULT_DAYS,
@@ -630,7 +676,8 @@ def main():
     session_factory = open_db()
     athlete_ids = [args.athlete] if args.athlete is not None else athletes_with_token()
     if not athlete_ids:
-        raise SystemExit("Noch kein Benutzer mit Garmin-Anmeldung. Einrichten mit:\n"
+        raise SystemExit("Noch kein Benutzer mit Garmin-Zugang. Einrichten: Garmin-Schluessel in den\n"
+                         "Dashboard-Einstellungen eintragen (empfohlen) oder\n"
                          "  python3 tools/garmin_sync.py --login --athlete <id>")
 
     failed = []

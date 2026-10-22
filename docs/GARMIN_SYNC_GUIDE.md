@@ -8,7 +8,58 @@ sieht im Dashboard nur seine eigenen Daten.
 Im Folgenden steht `python`. Auf dem Mac heißt der Befehl meist `python3`.
 Alle Befehle werden im Projektordner ausgeführt.
 
-## Einmalig: vorbereiten
+Es gibt **zwei Wege** zu Garmin, je Person wählbar:
+
+| | Offizieller Schlüssel (empfohlen) | Alte Anmeldung (`--login`) |
+|---|---|---|
+| Was nötig ist | eigener „Personal API“-Schlüssel aus Garmin Connect | Garmin-E-Mail + Passwort einmalig am PC |
+| Wer richtet es ein | jede Person selbst, im Dashboard (Einstellungen → Garmin-Verbindung) | du am Dashboard-PC |
+| Lesen (Trainings, Gesundheitsdaten) | ja | ja |
+| VO2max, Trainingszustand von Garmin | nein (das Dashboard schätzt VO2max selbst) | ja |
+| „An Garmin senden“ (Workouts auf die Uhr) | **nein** | ja |
+| Stabilität | offizielle Schnittstelle | inoffiziell, kann bei Garmin-Änderungen brechen |
+
+Hat eine Person einen Schlüssel hinterlegt, benutzt der Sync ihn – auch wenn
+sie zusätzlich die alte Anmeldung hat. Die alte Anmeldung bleibt dann nur
+noch für „An Garmin senden“ in Gebrauch.
+
+## Offizieller Weg: Personal-API-Schlüssel
+
+1. **Schlüssel erstellen** (jede Person in ihrem eigenen Garmin-Konto):
+   Garmin Connect im Browser → Einstellungen → **Personal API**
+   (https://connect.garmin.com/app/settings/personalApiToken) → Laufzeit
+   wählen (30 Tage bis 1 Jahr) → Schlüssel kopieren. Er wird nur **einmal**
+   angezeigt.
+2. **Im Dashboard eintragen:** Einstellungen → **Garmin-Verbindung** →
+   Schlüssel einfügen, optional „Gültig bis“ setzen → „Schlüssel prüfen &
+   speichern“. Der Server fragt Garmin, ob der Schlüssel gilt, und legt ihn
+   erst dann ab. Bitte nur am Dashboard-PC selbst oder über Tailscale
+   eintragen (nicht über ein fremdes WLAN).
+3. **„Jetzt von Garmin holen“** drücken. Beim ersten Mal dauert es einige
+   Minuten (300 Tage Gesundheitsdaten), danach nur Sekunden. Danach die Seite
+   neu laden. Der Sync am PC (`python tools/garmin_sync.py`, siehe unten)
+   holt die Daten dieser Person ab jetzt ebenfalls mit.
+
+Einmalig auf dem Dashboard-PC: `python -m pip install -r requirements.txt`
+(darin steckt der Leser für die `.fit`-Dateien).
+
+**Sicherheit:** Der Schlüssel kann nur lesen. Er liegt auf dem PC unter
+`~/.triathlon/garmin_api_<Nummer>.json` (nur für deinen Computer-Benutzer
+lesbar), daneben ein 24 Stunden gültiger Zugangs-Token. Das Dashboard zeigt
+ihn nie wieder an. Zurückziehen: im Dashboard „Schlüssel entfernen“ **und**
+in Garmin Connect löschen. Läuft er bald ab, warnt die Karte in den
+Einstellungen (wenn „Gültig bis“ eingetragen ist); ein abgelaufener
+Schlüssel erscheint im Log als „Garmin hat den Schlüssel abgelehnt“.
+
+**Was fehlt:** VO2max und Garmins „Trainingszustand“ liefert die Personal
+API nicht; das Dashboard schätzt VO2max dann selbst. Ob Garmin in den
+`.fit`-Dateien der Schnittstelle einzelne Werte weglässt, ist noch nicht
+bestätigt – bitte beim ersten Abruf mit dem Training in Garmin Connect
+vergleichen.
+
+## Alter Weg: Anmeldung mit Passwort (für „An Garmin senden“)
+
+### Einmalig: vorbereiten
 
 1. Bibliotheken installieren (Garmin-Teil und Datenbank-Teil):
    ```
@@ -23,7 +74,7 @@ Alle Befehle werden im Projektordner ausgeführt.
    Am Ende steht z. B. `Benutzer 'anna' angelegt (athlete_id=2)`. Die Zahl
    ist die **Benutzer-Nummer** – die braucht der Sync.
 
-## Einmalig pro Person: bei Garmin anmelden
+### Einmalig pro Person: bei Garmin anmelden
 
 ```
 python tools/garmin_sync.py --login --athlete 2
@@ -62,7 +113,7 @@ geht für sie nicht mehr.
 
 | Befehl | Was passiert |
 |---|---|
-| `python tools/garmin_sync.py` | alle Personen, die ein Token haben, nacheinander |
+| `python tools/garmin_sync.py` | alle Personen mit Schlüssel oder Token, nacheinander |
 | `python tools/garmin_sync.py --athlete 2` | nur Person 2 |
 | `python tools/garmin_sync.py --days 1095` | einmalig mehr Vergangenheit holen (Standard: 300 Tage) |
 | `python tools/garmin_sync.py --since 2024-01-01` | ab einem bestimmten Datum |
@@ -92,6 +143,7 @@ automatisch gestartete Läufe).
 | Meldung | Was tun |
 |---|---|
 | Garmin-Anmeldung fehlt oder ist abgelaufen | Person erneut anmelden: `--login --athlete <Nummer>` |
+| Garmin hat den Schlüssel abgelehnt | Schlüssel abgelaufen oder in Garmin Connect gelöscht: neuen erstellen und in den Einstellungen eintragen |
 | Garmin blockt gerade (zu viele Anfragen) | Ein paar Stunden warten, dann erneut starten. Bis dahin Geladenes bleibt gespeichert. |
 | Benutzer X gibt es nicht | Benutzer mit `backend/create_user.py` anlegen oder Token-Ordner `garmin_X.token` löschen |
 | Anmeldefehler trotz richtigem Passwort | Garmin ändert gelegentlich seine Anmeldung: `python -m pip install -U garminconnect curl_cffi` |
@@ -103,7 +155,8 @@ automatisch gestartete Läufe).
 | `training.db`, Tabelle `workouts` | Trainings je Person. Das komplette Ergebnis von `parse_fit.py` (inkl. Kurven) steht in der Spalte `fit_data`. |
 | `training.db`, Tabelle `wellness` | Gesundheitsdaten je Person und Tag. Alle Werte in `garmin_wellness_data`. |
 | `fit-files/athlete_<Nummer>/` | Original-.fit-Dateien (Archiv) und `garmin-raw-cache.json` (Garmin-Rohantworten, macht den Sync schnell). Nicht im Repository. |
-| `~/.triathlon/garmin_<Nummer>.token` | Garmin-Token je Person. |
+| `~/.triathlon/garmin_<Nummer>.token` | Garmin-Token je Person (alter Weg). |
+| `~/.triathlon/garmin_api_<Nummer>.json` | Personal-API-Schlüssel je Person (offizieller Weg), dazu `….bearer.json` mit dem 24-h-Token. |
 | `~/.triathlon/garmin-sync.log` | eine Zeile je Person und Lauf. |
 
 ## Umstieg vom bisherigen Einzel-Sync

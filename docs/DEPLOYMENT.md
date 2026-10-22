@@ -58,10 +58,16 @@ heißt es meist `python3`. Alle Befehle im Projektordner ausführen.
 ### Garmin, KI und Wetter (optional)
 
 - **Garmin-Sync** für alle Benutzer: siehe `docs/GARMIN_SYNC_GUIDE.md`.
+  Empfohlen ist der **offizielle Weg**: Jede Person erstellt in Garmin
+  Connect ihren eigenen „Personal API“-Schlüssel und trägt ihn im Dashboard
+  ein (Einstellungen → Garmin-Verbindung). Kein Garmin-Passwort nötig, und
+  jede Person kann ihre Daten selbst mit „Jetzt von Garmin holen“ abrufen.
+  Einmalig auf dem PC: `python -m pip install -r requirements.txt`.
 - **„An Garmin senden“** (geplante Einheit direkt in den Garmin-Kalender):
   braucht einmalig die Garmin-Bibliotheken (`python -m pip install -r requirements.txt`)
-  und für die jeweilige Person **einmal** die Garmin-Anmeldung des Syncs
-  (`python tools/garmin_sync.py --login --athlete <nummer>`). Das Dashboard
+  und für die jeweilige Person **einmal** die alte Garmin-Anmeldung des Syncs
+  (`python tools/garmin_sync.py --login --athlete <nummer>`) – der offizielle
+  Schlüssel kann nur lesen, keine Workouts senden. Das Dashboard
   fragt nie nach einem Garmin-Passwort. Ohne Anmeldung zeigt der Knopf eine
   Meldung; der `.fit`-Download geht immer. Bitte einmal mit dem echten Konto
   ausprobieren – Garmin kann seine Schnittstelle jederzeit ändern.
@@ -160,7 +166,8 @@ Daten bleiben erhalten.
 - `.env`, `training.db`, `backups/`, Token-Dateien und Trainingsdaten sind
   per `.gitignore` vom Repository ausgeschlossen.
 - Nach außen spricht nur der Server, und nur mit: Ollama (KI), Garmin (Sync
-  und „An Garmin senden“, mit dem Token der jeweiligen Person) und Open-Meteo
+  und „An Garmin senden“, mit dem Schlüssel bzw. Token der jeweiligen
+  Person) und Open-Meteo
   (Wetter, nur Ortsname bzw. Koordinaten des Heimatorts).
 
 ---

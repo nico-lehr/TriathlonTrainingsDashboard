@@ -271,7 +271,12 @@ Regression halbieren und die Schätzung verschlechtern.
 ## Gesundheitsdaten (`GET /api/v1/wellness/daily` → `WELLNESS`)
 
 Geschrieben von `tools/garmin_sync.py` in die Tabelle `wellness` (je Person
-und Tag), gelesen über `loadWellness()` in `js/data/garmin-wellness.js`. Der
+und Tag), gelesen über `loadWellness()` in `js/data/garmin-wellness.js`.
+Quelle ist je Person die offizielle Personal API (Schlüssel,
+`tools/garmin_personal_api.py`) oder der alte Login; die Aufbereitung
+(`normalize()`) ist dieselbe. Über die Personal API bleiben `vo2max`,
+`vo2max_cycling`, `training_status` und `training_load_week` `null` (liefert
+sie nicht). Der
 Server liefert dieselbe Form wie früher die Datei `data/wellness-data.js`,
 deshalb blieben die Auswertungen unverändert. `sync.at` ist der Zeitpunkt
 der letzten Änderung.
