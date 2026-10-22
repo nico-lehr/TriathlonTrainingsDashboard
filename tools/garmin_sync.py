@@ -102,6 +102,7 @@ def cache_path(athlete_id):
 DEFAULT_DAYS = 300
 
 REQUEST_PAUSE_S = 1.0   # Hoeflichkeitspause zwischen Anfragen (Rate-Limit)
+MAX_SECTION_FAILS = 3   # so oft scheitert ein Abschnitt eines Tages, bevor er als "keine Daten" gilt
 RECENT_REFETCH_DAYS = 3  # letzte n Tage immer neu holen - Garmin traegt Werte nach
 
 # Abschnitte, die je Tag abgefragt werden. Fehlt einer im Zwischenspeicher,
@@ -134,6 +135,12 @@ def is_rate_limited(e):
 
 def is_auth_error(e):
     return "Authentication" in type(e).__name__
+
+
+def stops_run(e):
+    """Jede weitere Anfrage wuerde genauso scheitern: Rate-Limit, abgelehnte
+    Anmeldung oder (offizielle API) Garmin gar nicht erreichbar."""
+    return is_rate_limited(e) or is_auth_error(e) or "Unreachable" in type(e).__name__
 
 
 def describe_error(e, athlete_id):
@@ -361,7 +368,7 @@ def call(client, method, *args):
     try:
         return fn(*args)
     except Exception as e:
-        if is_rate_limited(e) or is_auth_error(e):
+        if stops_run(e):
             raise
         log(f"    {method}: {type(e).__name__}")
         return FAILED
@@ -404,10 +411,26 @@ def sync_wellness(client, start, end, path):
     try:
         for i, ds in enumerate(todo, 1):
             entry = days.get(ds, {})
+            # Die letzten Tage komplett neu (Garmin traegt nach), aeltere nur die
+            # fehlenden Abschnitte. Ein gescheiterter Abschnitt wird beim
+            # naechsten Lauf erneut versucht, nach MAX_SECTION_FAILS Fehlschlaegen
+            # aber als "keine Daten" abgelegt - sonst fragte ein dauerhaft
+            # kaputter Endpunkt bei jedem Lauf alle 300 Tage neu ab.
+            fails = entry.setdefault("_failed", {})
             for key, method in sections:
+                if key in entry and ds < refetch_from:
+                    continue
                 result = call(client, method, ds)
                 if result is not FAILED:
                     entry[key] = result
+                    fails.pop(key, None)
+                else:
+                    fails[key] = fails.get(key, 0) + 1
+                    if fails[key] >= MAX_SECTION_FAILS:
+                        entry.setdefault(key, None)  # vorhandene Werte (letzte Tage) bleiben
+                        fails.pop(key)
+            if not fails:
+                entry.pop("_failed")
             days[ds] = entry
             if i % 10 == 0 or i == len(todo):
                 log(f"  {i}/{len(todo)} Tage")
@@ -415,11 +438,12 @@ def sync_wellness(client, start, end, path):
             time.sleep(REQUEST_PAUSE_S)
 
         # Zeitraum-Abfragen: ein Aufruf fuer die ganze Spanne statt Tagesschleife.
+        # daily_summaries gibt es nur bei der offiziellen API (Body Battery).
         s, e = start.isoformat(), end.isoformat()
         ranges = cache.setdefault("ranges", {})
         log("  Body Battery, Gewicht, Schritte ...")
         for key, method in (("body_battery", "get_body_battery"), ("body_composition", "get_body_composition"),
-                            ("daily_steps", "get_daily_steps")):
+                            ("daily_steps", "get_daily_steps"), ("daily_summaries", "get_daily_summaries")):
             result = call(client, method, s, e)
             if result is not FAILED and result:  # leer/fehlgeschlagen: alten Stand behalten
                 ranges[key] = result
@@ -530,12 +554,16 @@ def normalize(cache):
     def day_entry(ds):
         return out.setdefault(ds, {})
 
-    # Body Battery aus der Tageszusammenfassung (get_user_summary). Bei der
-    # offiziellen API ist die Antwort verschachtelt - dieselben Feldnamen
-    # werden deshalb auch eine Ebene tiefer gesucht.
-    for ds, raw in (cache.get("days") or {}).items():
-        summ = raw.get("summary") or {}
-        if not isinstance(summ, dict):
+    # Body Battery aus der Tageszusammenfassung: alter Weg je Tag
+    # (get_user_summary), offizielle API fuer den ganzen Zeitraum
+    # (get_daily_summaries, {"data": [...]}, verschachtelt - dieselben
+    # Feldnamen werden deshalb auch tiefer gesucht).
+    summaries = [(ds, raw.get("summary")) for ds, raw in (cache.get("days") or {}).items()]
+    ds_list = dig(cache, "ranges", "daily_summaries")
+    ds_list = ds_list.get("data") if isinstance(ds_list, dict) else ds_list
+    summaries += [(item.get("calendarDate"), item) for item in (ds_list or []) if isinstance(item, dict)]
+    for ds, summ in summaries:
+        if not ds or not isinstance(summ, dict):
             continue
         hi = num(find_key(summ, "bodyBatteryHighestValue"), find_key(summ, "bodyBatteryMostRecentValue"))
         lo = num(find_key(summ, "bodyBatteryLowestValue"))
@@ -674,7 +702,13 @@ def sync_user(athlete_id, session_factory, start, end, args):
             st = sync_activities(client, start, end, athlete_id, session)
             parts.append(f"Aktivitäten {st['neu']} neu, {st['vorhanden']} vorhanden, {st['fehler']} Fehler")
         if not args.activities_only:
-            daily = normalize(sync_wellness(client, start, end, cache_path(athlete_id)))
+            try:
+                cache = sync_wellness(client, start, end, cache_path(athlete_id))
+            except Exception:
+                # Abbruch (Rate-Limit ...): das bis dahin Geholte trotzdem speichern.
+                store_wellness(session, athlete_id, normalize(load_cache(cache_path(athlete_id))))
+                raise
+            daily = normalize(cache)
             store_wellness(session, athlete_id, daily)
             parts.append(f"Gesundheitsdaten {len(daily)} Tage")
         summary = ", ".join(parts)

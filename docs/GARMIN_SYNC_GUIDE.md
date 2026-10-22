@@ -56,9 +56,11 @@ API nicht; das Dashboard schätzt VO2max dann selbst. Ob **Body Battery**
 ankommt, ist offen (Garmin hat das Format der Tageszusammenfassung nicht
 dokumentiert).
 
-Klappt eine einzelne Abfrage nicht, holt der nächste Lauf genau diesen Tag
-nach. Bei „zu viele Anfragen“ oder einem abgelehnten Schlüssel bricht der
-Lauf ab und sichert das bis dahin Geladene. Ob Garmin in den
+Klappt eine einzelne Abfrage nicht, holt der nächste Lauf genau diesen Wert
+nach – nach drei Fehlversuchen gilt er als „keine Daten“, damit ein
+dauerhaft kaputter Garmin-Dienst nicht jeden Lauf ausbremst. Bei „zu viele
+Anfragen“, einem abgelehnten Schlüssel oder wenn Garmin nicht erreichbar ist,
+bricht der Lauf ab und speichert das bis dahin Geladene. Ob Garmin in den
 `.fit`-Dateien der Schnittstelle einzelne Werte weglässt, ist noch nicht
 bestätigt – bitte beim ersten Abruf mit dem Training in Garmin Connect
 vergleichen.

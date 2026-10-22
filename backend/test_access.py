@@ -80,23 +80,22 @@ class AccessTestBase(unittest.TestCase):
         # Die Durchsicht ruft JEDEN Endpunkt auf - auch "Garmin-Schluessel entfernen"
         # und "Abruf starten". Nie den echten ~/.triathlon des Nutzers anfassen und
         # keinen echten Abruf-Thread starten.
+        # addClassCleanup statt tearDownClass: laeuft auch, wenn setUpClass scheitert.
         cls.garmin_dir = tempfile.mkdtemp()
-        cls.garmin_patchers = [
+        cls.addClassCleanup(shutil.rmtree, cls.garmin_dir, ignore_errors=True)
+        for patcher in (
             mock.patch.object(garmin_personal_api, "KEY_DIR", cls.garmin_dir),
             mock.patch.object(tools.garmin_sync, "TOKEN_DIR", cls.garmin_dir),
             mock.patch.object(tools.garmin_sync, "LOG_PATH", os.path.join(cls.garmin_dir, "garmin-sync.log")),
-            mock.patch.object(garmin_api_routes.threading, "Thread"),
-        ]
-        for patcher in cls.garmin_patchers:
+            mock.patch.object(garmin_api_routes, "threading"),  # nur dort, nicht threading.Thread im ganzen Prozess
+        ):
             patcher.start()
+            cls.addClassCleanup(patcher.stop)
         cls.app, cls.session_factory = create_app()
 
     @classmethod
     def tearDownClass(cls):
         config.OLLAMA_URL, config.OPEN_METEO_URL, config.OPEN_METEO_GEOCODING_URL = cls.old_urls
-        for patcher in cls.garmin_patchers:
-            patcher.stop()
-        shutil.rmtree(cls.garmin_dir, ignore_errors=True)
 
     def setUp(self):
         auth._failed_logins.clear()

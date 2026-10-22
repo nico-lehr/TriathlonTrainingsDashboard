@@ -53,6 +53,10 @@ class GarminApiTooManyRequestsError(GarminApiError):
     pass
 
 
+class GarminApiUnreachableError(GarminApiError):
+    pass
+
+
 KEY_REJECTED = ("Garmin hat den Schlüssel abgelehnt (abgelaufen oder in Garmin Connect gelöscht). "
                 "Bitte in den Dashboard-Einstellungen einen neuen eintragen.")
 
@@ -149,10 +153,11 @@ def _open(req):
     return _OPENER.open(req, timeout=TIMEOUT_S)
 
 
-def _request(method, path, *, token=None, api_key=None, params=None, accept="application/json"):
-    """Eine Anfrage an die Personal API -> Bytes der Antwort, None bei 404
-    (keine Daten fuer diesen Tag). Fehlermeldungen nennen nur den Pfad, nie
-    Schluessel oder Token."""
+def _request(method, path, *, token=None, api_key=None, params=None, accept="application/json", missing_ok=False):
+    """Eine Anfrage an die Personal API -> Bytes der Antwort. Mit missing_ok
+    (Tageswerte) heisst 404 "keine Daten" -> None; sonst ist 404 ein Fehler
+    (z. B. geaenderter Pfad - nie still "0 Aktivitaeten"). Fehlermeldungen
+    nennen nur den Pfad, nie Schluessel oder Token."""
     url = BASE_URL + path + ("?" + urllib.parse.urlencode(params) if params else "")
     headers = {"Accept": accept, "User-Agent": "TriathlonDashboard"}
     if api_key:
@@ -170,11 +175,11 @@ def _request(method, path, *, token=None, api_key=None, params=None, accept="app
             raise GarminApiAuthenticationError(KEY_REJECTED) from None
         if e.code == 429:
             raise GarminApiTooManyRequestsError("Garmin blockt gerade (zu viele Anfragen). Später erneut versuchen.") from None
-        if e.code == 404 and method == "GET":
+        if e.code == 404 and missing_ok:
             return None
         raise GarminApiError(f"Garmin antwortet mit Fehler {e.code} ({path.split('?')[0]}).") from None
     except (urllib.error.URLError, TimeoutError, OSError):
-        raise GarminApiError("Garmin ist nicht erreichbar – Internetverbindung prüfen und später erneut versuchen.") from None
+        raise GarminApiUnreachableError("Garmin ist nicht erreichbar – Internetverbindung prüfen und später erneut versuchen.") from None
 
 
 def _jwt_expiration(token):
@@ -234,19 +239,20 @@ class PersonalApiClient:
         self.athlete_id = athlete_id
         self._token = None
 
-    def _get_bytes(self, path, params=None, accept="application/json"):
+    def _get_bytes(self, path, params=None, accept="application/json", missing_ok=False):
         if self._token is None:
             self._token = obtain_token(self.athlete_id)
+        kwargs = {"params": params, "accept": accept, "missing_ok": missing_ok}
         try:
-            return _request("GET", path, token=self._token, params=params, accept=accept)
+            return _request("GET", path, token=self._token, **kwargs)
         except GarminApiAuthenticationError:
             # Token vorzeitig ungueltig (z. B. widerrufen): einmal neu holen.
             self._token = obtain_token(self.athlete_id, force=True)
-            return _request("GET", path, token=self._token, params=params, accept=accept)
+            return _request("GET", path, token=self._token, **kwargs)
 
-    def _get(self, path, params=None):
-        body = self._get_bytes(path, params)
-        return json.loads(body) if body else None  # None: keine Daten (leer oder 404)
+    def _get(self, path, params=None, missing_ok=False):
+        body = self._get_bytes(path, params, missing_ok=missing_ok)
+        return json.loads(body) if body else None  # None: keine Daten (leer, bzw. 404 bei missing_ok)
 
     # Aktivitaeten
     def get_activities_by_date(self, startdate, enddate):
@@ -270,25 +276,16 @@ class PersonalApiClient:
         return self._get_bytes(f"/download-service/files/activity/{activity_id}",
                                accept="application/zip, application/x-zip-compressed, application/octet-stream")
 
-    # Gesundheitsdaten je Tag
-    def get_user_summary(self, cdate):
-        """Tageszusammenfassung (u. a. Body Battery) - der erste Eintrag aus
-        dailysummaries. Feldnamen der neuen Schnittstelle sind nicht
-        dokumentiert; normalize() sucht die Body-Battery-Werte deshalb auch
-        verschachtelt. Die Rohantwort bleibt im Zwischenspeicher."""
-        data = self._get("/usersummary-service/v2/dailysummaries", {"startDate": cdate, "endDate": cdate})
-        items = data.get("data") if isinstance(data, dict) else None
-        return items[0] if isinstance(items, list) and items and isinstance(items[0], dict) else data
-
+    # Gesundheitsdaten je Tag (404 = an diesem Tag keine Daten)
     def get_sleep_data(self, cdate):
-        return self._get("/sleep-service/sleep/dailySleep", {"date": cdate})
+        return self._get("/sleep-service/sleep/dailySleep", {"date": cdate}, missing_ok=True)
 
     def get_hrv_data(self, cdate):
-        return self._get(f"/hrv-service/hrv/{cdate}")
+        return self._get(f"/hrv-service/hrv/{cdate}", missing_ok=True)
 
     def get_rhr_day(self, cdate):
         # Tages-Herzfrequenz; enthaelt restingHeartRate (liest normalize() direkt)
-        return self._get("/wellness-service/wellness/dailyHeartRate", {"date": cdate})
+        return self._get("/wellness-service/wellness/dailyHeartRate", {"date": cdate}, missing_ok=True)
 
     # Gesundheitsdaten fuer einen Zeitraum
     def get_body_battery(self, startdate, enddate):
@@ -298,11 +295,25 @@ class PersonalApiClient:
     def get_body_composition(self, startdate, enddate):
         return self._get(f"/weight-service/weight/range/{startdate}/{enddate}", {"includeAll": "true"})
 
-    def get_daily_steps(self, startdate, enddate):
+    def _chunked(self, startdate, enddate, fetch):
+        """Zeitraum in Stuecken von STEPS_CHUNK_DAYS Tagen abfragen, Listen aneinanderhaengen."""
         out = []
         cur, end = date.fromisoformat(startdate), date.fromisoformat(enddate)
         while cur <= end:
             chunk_end = min(cur + timedelta(days=STEPS_CHUNK_DAYS - 1), end)
-            out.extend(self._get(f"/usersummary-service/stats/steps/daily/{cur.isoformat()}/{chunk_end.isoformat()}") or [])
+            out.extend(fetch(cur.isoformat(), chunk_end.isoformat()) or [])
             cur = chunk_end + timedelta(days=1)
         return out
+
+    def get_daily_steps(self, startdate, enddate):
+        return self._chunked(startdate, enddate, lambda s, e: self._get(f"/usersummary-service/stats/steps/daily/{s}/{e}"))
+
+    def get_daily_summaries(self, startdate, enddate):
+        """Tageszusammenfassungen (u. a. Body Battery) fuer einen Zeitraum - eine
+        Anfrage je 28 Tage statt einer je Tag. Feldnamen sind nicht dokumentiert;
+        normalize() sucht die Body-Battery-Werte deshalb auch verschachtelt."""
+        def fetch(s, e):
+            data = self._get("/usersummary-service/v2/dailysummaries", {"startDate": s, "endDate": e})
+            items = data.get("data") if isinstance(data, dict) else data
+            return items if isinstance(items, list) else []
+        return {"data": self._chunked(startdate, enddate, fetch)}

@@ -148,32 +148,41 @@ class SchluesselUndTokenTest(TempDirsMixin, unittest.TestCase):
         self.assertEqual(len(garmin.requests), 1)
 
     def test_weiterleitung_wird_nicht_gefolgt(self):
-        # Der Schluessel darf nie per Weiterleitung an eine andere Adresse gehen.
+        # Schluessel/Token duerfen nie per Weiterleitung an eine andere Adresse
+        # gehen. 302 bei POST und 307 bei GET folgt der normale urllib-Opener -
+        # mit Header. Hier darf das Ziel nie angesprochen werden.
         seen = []
 
         class Target(BaseHTTPRequestHandler):
             def log_message(self, *a): pass
-            def do_POST(self):
+            def answer(self):
                 seen.append(self.headers.get("Authorization"))
                 self.send_response(200); self.end_headers(); self.wfile.write(jwt(time.time() + 86400).encode())
+            do_GET = do_POST = answer
 
         target = HTTPServer(("127.0.0.1", 0), Target)
 
         class Redirect(BaseHTTPRequestHandler):
             def log_message(self, *a): pass
-            def do_POST(self):
-                self.send_response(307)
+            def redirect(self, code):
+                self.send_response(code)
                 self.send_header("Location", f"http://127.0.0.1:{target.server_port}/anderswo")
                 self.end_headers()
+            def do_POST(self): self.redirect(302)
+            def do_GET(self): self.redirect(307)
 
         origin = HTTPServer(("127.0.0.1", 0), Redirect)
         for srv in (target, origin):
             threading.Thread(target=srv.serve_forever, daemon=True).start()
             self.addCleanup(srv.server_close)
             self.addCleanup(srv.shutdown)
+        personal_api.save_key(1, API_KEY)
+        personal_api.cache_token(1, API_KEY, jwt(time.time() + 86400), time.time() + 86400)
         with mock.patch.object(personal_api, "BASE_URL", f"http://127.0.0.1:{origin.server_port}"):
             with self.assertRaises(personal_api.GarminApiError):
-                personal_api.exchange_key(API_KEY)
+                personal_api.exchange_key(API_KEY)          # POST -> 302
+            with self.assertRaises(personal_api.GarminApiError):
+                personal_api.PersonalApiClient(1).get_activities_by_date("2026-10-01", "2026-10-02")  # GET -> 307
         self.assertEqual(seen, [])
 
     def test_dateien_nur_fuer_den_eigenen_benutzer_und_ohne_schluessel_im_status(self):
@@ -226,6 +235,19 @@ class ClientTest(TempDirsMixin, unittest.TestCase):
         self.assertEqual([p.split("?")[0] for p in garmin.paths()],
                          ["/hrv-service/hrv/2026-10-01", personal_api.TOKEN_PATH, "/hrv-service/hrv/2026-10-01"])
 
+    def test_404_bei_der_aktivitaetsliste_ist_ein_fehler(self):
+        # Geaenderter Pfad bei Garmin darf nie still "0 Aktivitaeten" ergeben.
+        self.fake({"/activitylist-service/activities/search/activities": 404})
+        with self.assertRaises(personal_api.GarminApiError):
+            personal_api.PersonalApiClient(1).get_activities_by_date("2026-10-01", "2026-10-02")
+
+    def test_tageszusammenfassungen_fuer_den_zeitraum(self):
+        garmin = self.fake({"/usersummary-service/v2/dailysummaries":
+                            json.dumps({"data": [{"calendarDate": "2026-10-01"}]}).encode()})
+        out = personal_api.PersonalApiClient(1).get_daily_summaries("2026-09-01", "2026-10-01")  # 31 Tage
+        self.assertEqual(len(garmin.requests), 2)  # 28 + 3 Tage statt 31 Einzelanfragen
+        self.assertEqual(len(out["data"]), 2)
+
     def test_aktivitaets_nummer_wird_geprueft(self):
         garmin = self.fake()
         for bad in ("0", "-1", "12a", "١٢", "../x"):
@@ -266,10 +288,16 @@ class SyncMitApiTest(TempDirsMixin, unittest.TestCase):
         self.assertIsNone(day["vo2max"])  # liefert die Personal API nicht - nie geraten
 
     def test_body_battery_aus_verschachtelter_tageszusammenfassung(self):
-        cache = {"days": {"2026-10-02": {"summary": {"calendarDate": "2026-10-02",
-                                                       "bodyBattery": {"bodyBatteryHighestValue": 91, "bodyBatteryLowestValue": 22}}}}}
+        cache = {"days": {}, "ranges": {"daily_summaries": {"data": [
+            {"calendarDate": "2026-10-02", "bodyBattery": {"bodyBatteryHighestValue": 91, "bodyBatteryLowestValue": 22}}]}}}
         day = garmin_sync.normalize(cache)["2026-10-02"]
         self.assertEqual((day["body_battery_high"], day["body_battery_low"]), (91, 22))
+
+    def test_body_battery_alter_weg_flache_antwort(self):
+        cache = {"days": {"2026-10-03": {"summary": {"bodyBatteryHighestValue": 80, "bodyBatteryLowestValue": 20,
+                                                       "totalSteps": 1000}}}}
+        day = garmin_sync.normalize(cache)["2026-10-03"]
+        self.assertEqual((day["body_battery_high"], day["body_battery_low"], day["steps"]), (80, 20, 1000))
 
     def test_gesundheitsdaten_luecken_werden_spaeter_nachgeholt(self):
         # Gescheiterte Abfragen werden nicht als "keine Daten" gespeichert,
@@ -282,9 +310,40 @@ class SyncMitApiTest(TempDirsMixin, unittest.TestCase):
         path = os.path.join(self.key_dir, "cache.json")
         with mock.patch.object(garmin_sync, "REQUEST_PAUSE_S", 0):
             day = garmin_sync.sync_wellness(client, date(2026, 10, 1), date(2026, 10, 1), path)["days"]["2026-10-01"]
-        self.assertNotIn("hrv", day)
-        self.assertIsNone(day["max_metrics"])
-        self.assertEqual(day["rhr"], {"restingHeartRate": 50})
+            self.assertNotIn("hrv", day)
+            self.assertIsNone(day["max_metrics"])
+            self.assertEqual(day["rhr"], {"restingHeartRate": 50})
+            # Naechste Laeufe: nur der fehlende Abschnitt wird erneut versucht ...
+            client.get_sleep_data.reset_mock()
+            garmin_sync.sync_wellness(client, date(2026, 10, 1), date(2026, 10, 1), path)
+            client.get_sleep_data.assert_not_called()
+            self.assertEqual(client.get_hrv_data.call_count, 2)
+            # ... und nach MAX_SECTION_FAILS Fehlschlaegen gilt er als "keine Daten".
+            day = garmin_sync.sync_wellness(client, date(2026, 10, 1), date(2026, 10, 1), path)["days"]["2026-10-01"]
+            self.assertIsNone(day["hrv"])
+            self.assertNotIn("_failed", day)
+            garmin_sync.sync_wellness(client, date(2026, 10, 1), date(2026, 10, 1), path)
+            self.assertEqual(client.get_hrv_data.call_count, garmin_sync.MAX_SECTION_FAILS)
+
+    def test_dauerhafter_fehler_ueberschreibt_vorhandene_werte_nicht(self):
+        # Die letzten Tage werden immer neu geholt - ein Fehler dort darf
+        # schon gespeicherte Werte nicht durch "keine Daten" ersetzen.
+        today = date.today().isoformat()
+        path = os.path.join(self.key_dir, "cache.json")
+        garmin_sync.save_cache({"days": {today: {k: {"alt": 1} for k in garmin_sync.DAY_SECTIONS}}}, path)
+        client = mock.Mock(spec=["get_hrv_data"])
+        client.get_hrv_data.side_effect = personal_api.GarminApiError("Fehler 500")
+        with mock.patch.object(garmin_sync, "REQUEST_PAUSE_S", 0):
+            for _ in range(garmin_sync.MAX_SECTION_FAILS + 1):
+                day = garmin_sync.sync_wellness(client, date.today(), date.today(), path)["days"][today]
+        self.assertEqual(day["hrv"], {"alt": 1})
+
+    def test_garmin_nicht_erreichbar_bricht_ab(self):
+        client = mock.Mock(spec=["get_sleep_data"])
+        client.get_sleep_data.side_effect = personal_api.GarminApiUnreachableError("weg")
+        with mock.patch.object(garmin_sync, "REQUEST_PAUSE_S", 0), self.assertRaises(personal_api.GarminApiUnreachableError):
+            garmin_sync.sync_wellness(client, date(2026, 10, 1), date(2026, 10, 5), os.path.join(self.key_dir, "c.json"))
+        self.assertEqual(client.get_sleep_data.call_count, 1)
 
     def test_rate_limit_bei_gesundheitsdaten_bricht_ab_und_sichert(self):
         client = mock.Mock(spec=["get_sleep_data"])
@@ -427,6 +486,16 @@ class EinstellungenTest(TempDirsMixin, unittest.TestCase):
         self.assertIn("garminconnect", st["message"])
         with mock.patch("threading.Thread"):
             self.assertEqual(self.client.post("/api/v1/garmin/sync", headers=self.h["garmin-anna"]).status_code, 202)
+
+    def test_auch_ein_harter_abbruch_laesst_den_abruf_nicht_auf_laeuft(self):
+        personal_api.save_key(self.ids["garmin-anna"], API_KEY)
+        with mock.patch.object(garmin_sync, "sync_user", side_effect=KeyboardInterrupt), \
+                mock.patch("threading.Thread") as thread:
+            self.client.post("/api/v1/garmin/sync", headers=self.h["garmin-anna"])
+            with self.assertRaises(KeyboardInterrupt):
+                thread.call_args.kwargs["target"](*thread.call_args.kwargs["args"])
+        st = self.client.get("/api/v1/garmin/personal-api", headers=self.h["garmin-anna"]).get_json()["data"]["sync"]
+        self.assertEqual((st["running"], st["ok"]), (False, False))
 
     def test_fehler_beim_abruf_als_klare_meldung(self):
         personal_api.save_key(self.ids["garmin-anna"], API_KEY)
