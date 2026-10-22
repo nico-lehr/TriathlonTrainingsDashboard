@@ -316,4 +316,5 @@ class PersonalApiClient:
             data = self._get("/usersummary-service/v2/dailysummaries", {"startDate": s, "endDate": e})
             items = data.get("data") if isinstance(data, dict) else data
             return items if isinstance(items, list) else []
-        return {"data": self._chunked(startdate, enddate, fetch)}
+        items = self._chunked(startdate, enddate, fetch)
+        return {"data": items} if items else None  # leer: alten Stand im Zwischenspeicher behalten

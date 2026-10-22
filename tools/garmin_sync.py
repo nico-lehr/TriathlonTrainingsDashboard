@@ -139,8 +139,10 @@ def is_auth_error(e):
 
 def stops_run(e):
     """Jede weitere Anfrage wuerde genauso scheitern: Rate-Limit, abgelehnte
-    Anmeldung oder (offizielle API) Garmin gar nicht erreichbar."""
-    return is_rate_limited(e) or is_auth_error(e) or "Unreachable" in type(e).__name__
+    Anmeldung oder Garmin gar nicht erreichbar (offizielle API: eigene Klasse,
+    garminconnect: "Connection error: ..." im Text)."""
+    return (is_rate_limited(e) or is_auth_error(e) or "Unreachable" in type(e).__name__
+            or str(e).startswith("Connection error"))
 
 
 def describe_error(e, athlete_id):
@@ -275,7 +277,7 @@ def sync_activities(client, start, end, athlete_id, session):
         except Exception as e:
             # Rate-Limit oder abgelehnter Schluessel: abbrechen (jede weitere
             # Anfrage scheitert genauso), Bereits-Geladenes aber noch speichern.
-            if is_rate_limited(e) or is_auth_error(e):
+            if stops_run(e):
                 log("  Garmin drosselt die Anfragen (Rate-Limit). Bereits geladene Aktivitaeten\n"
                     "  werden noch gespeichert, spaeter einfach erneut starten."
                     if is_rate_limited(e) else f"  {describe_error(e, athlete_id)}")
@@ -463,6 +465,16 @@ def num(*candidates):
     return None
 
 
+def as_dict(value):
+    return value if isinstance(value, dict) else {}
+
+
+def as_list(value):
+    """Zeitraum-Antworten sind Listen - kommt etwas anderes (Format der
+    offiziellen API nicht dokumentiert), wird es ignoriert statt abzustuerzen."""
+    return value if isinstance(value, list) else []
+
+
 def find_key(obj, key, depth=3):
     """Wert eines Feldes - oben oder bis zu `depth` Ebenen tiefer."""
     if not isinstance(obj, dict) or depth < 0:
@@ -512,17 +524,18 @@ def normalize(cache):
     for ds, raw in (cache.get("days") or {}).items():
         # Schlaf: garminconnect liefert {"dailySleepDTO": {...}}; bei der
         # offiziellen API stehen die Werte evtl. direkt oben - beides lesen.
-        sleep_raw = raw.get("sleep") if isinstance(raw.get("sleep"), dict) else {}
-        sleep_dto = sleep_raw.get("dailySleepDTO") or (sleep_raw if "sleepTimeSeconds" in sleep_raw else {})
-        hrv_sum = dig(raw, "hrv", "hrvSummary") or {}
-        rhr_raw = raw.get("rhr") or {}
-        rhr_metrics = (dig(rhr_raw, "allMetrics", "metricsMap", "WELLNESS_RESTING_HEART_RATE") or [])
+        # Unerwartete Formen (Liste statt Objekt ...) zaehlen als "keine Daten".
+        sleep_raw = as_dict(raw.get("sleep"))
+        sleep_dto = as_dict(sleep_raw.get("dailySleepDTO")) or (sleep_raw if "sleepTimeSeconds" in sleep_raw else {})
+        hrv_sum = as_dict(dig(raw, "hrv", "hrvSummary"))
+        rhr_raw = as_dict(raw.get("rhr"))
+        rhr_metrics = as_list(dig(rhr_raw, "allMetrics", "metricsMap", "WELLNESS_RESTING_HEART_RATE"))
         # VO2max steht in der Praxis NICHT in max_metrics (das kam leer zurueck),
         # sondern im training_status unter mostRecentVO2Max - an echten Daten geprueft.
-        vo2_generic = (dig(raw, "training_status", "mostRecentVO2Max", "generic")
-                       or dig(raw, "max_metrics", "generic") or {})
-        vo2_cycling = (dig(raw, "training_status", "mostRecentVO2Max", "cycling")
-                       or dig(raw, "max_metrics", "cycling") or {})
+        vo2_generic = as_dict(dig(raw, "training_status", "mostRecentVO2Max", "generic")
+                              or dig(raw, "max_metrics", "generic"))
+        vo2_cycling = as_dict(dig(raw, "training_status", "mostRecentVO2Max", "cycling")
+                              or dig(raw, "max_metrics", "cycling"))
         ts = dig(raw, "training_status", "mostRecentTrainingStatus", "latestTrainingStatusData") or {}
         ts_first = next(iter(ts.values()), {}) if isinstance(ts, dict) else {}
 
@@ -537,7 +550,7 @@ def normalize(cache):
             "hrv_baseline_low": num(dig(hrv_sum, "baseline", "lowUpper")),
             "hrv_baseline_high": num(dig(hrv_sum, "baseline", "balancedUpper")),
             "resting_hr": num(rhr_raw.get("restingHeartRate"),
-                              (rhr_metrics[0] or {}).get("value") if rhr_metrics else None),
+                              as_dict(rhr_metrics[0]).get("value") if rhr_metrics else None),
             "vo2max": num(vo2_generic.get("vo2MaxPreciseValue"), vo2_generic.get("vo2MaxValue")),
             "vo2max_cycling": num(vo2_cycling.get("vo2MaxPreciseValue"), vo2_cycling.get("vo2MaxValue")),
             # trainingStatus ist ein Zahlencode, dessen Bedeutung Garmin nicht
@@ -561,7 +574,7 @@ def normalize(cache):
     summaries = [(ds, raw.get("summary")) for ds, raw in (cache.get("days") or {}).items()]
     ds_list = dig(cache, "ranges", "daily_summaries")
     ds_list = ds_list.get("data") if isinstance(ds_list, dict) else ds_list
-    summaries += [(item.get("calendarDate"), item) for item in (ds_list or []) if isinstance(item, dict)]
+    summaries += [(item.get("calendarDate"), item) for item in as_list(ds_list) if isinstance(item, dict)]
     for ds, summ in summaries:
         if not ds or not isinstance(summ, dict):
             continue
@@ -579,7 +592,9 @@ def normalize(cache):
             day_entry(ds).setdefault("steps", st)
 
     # Body Battery: hoechster/niedrigster Wert des Tages
-    for item in (dig(cache, "ranges", "body_battery") or []):
+    for item in as_list(dig(cache, "ranges", "body_battery")):
+        if not isinstance(item, dict):
+            continue
         ds = item.get("date") or item.get("calendarDate")
         if not ds:
             continue
@@ -603,9 +618,10 @@ def normalize(cache):
 
     # Gewicht/Koerperzusammensetzung. garminconnect (dateRange): dateWeightList;
     # offizielle API (weight/range): dailyWeightSummaries[].latestWeight.
-    bc = dig(cache, "ranges", "body_composition") or {}
-    weights = list(bc.get("dateWeightList") or [])
-    for summ in (bc.get("dailyWeightSummaries") or []):
+    bc = dig(cache, "ranges", "body_composition")
+    bc = bc if isinstance(bc, dict) else {}
+    weights = [w for w in as_list(bc.get("dateWeightList")) if isinstance(w, dict)]
+    for summ in as_list(bc.get("dailyWeightSummaries")):
         latest = summ.get("latestWeight") if isinstance(summ, dict) else None
         if isinstance(latest, dict):
             weights.append({**latest, "calendarDate": latest.get("calendarDate") or summ.get("summaryDate")})
@@ -619,7 +635,9 @@ def normalize(cache):
             e["muscle_mass_kg"] = (lambda v: round(v / 1000.0, 2) if v else None)(num(item.get("muscleMass")))
 
     # Schritte
-    for item in (dig(cache, "ranges", "daily_steps") or []):
+    for item in as_list(dig(cache, "ranges", "daily_steps")):
+        if not isinstance(item, dict):
+            continue
         ds = item.get("calendarDate")
         steps = num(item.get("totalSteps"))
         if ds and steps is not None:

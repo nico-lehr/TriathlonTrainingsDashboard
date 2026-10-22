@@ -247,6 +247,8 @@ class ClientTest(TempDirsMixin, unittest.TestCase):
         out = personal_api.PersonalApiClient(1).get_daily_summaries("2026-09-01", "2026-10-01")  # 31 Tage
         self.assertEqual(len(garmin.requests), 2)  # 28 + 3 Tage statt 31 Einzelanfragen
         self.assertEqual(len(out["data"]), 2)
+        self.fake({"/usersummary-service/v2/dailysummaries": b'{"data": []}'})
+        self.assertIsNone(personal_api.PersonalApiClient(1).get_daily_summaries("2026-09-01", "2026-09-02"))  # alten Stand behalten
 
     def test_aktivitaets_nummer_wird_geprueft(self):
         garmin = self.fake()
@@ -357,6 +359,59 @@ class SyncMitApiTest(TempDirsMixin, unittest.TestCase):
             days = json.load(f)["days"]
         self.assertEqual(days["2026-10-01"]["sleep"], {"sleepTimeSeconds": 3600})
         self.assertNotIn("sleep", days.get("2026-10-02", {}))  # wird beim naechsten Lauf geholt
+
+    def test_unerwartete_antwortformen_stoppen_die_aufbereitung_nicht(self):
+        cache = {"days": {"2026-10-04": {"sleep": [1, 2], "hrv": {"hrvSummary": [1]}, "rhr": [48],
+                                           "summary": "kaputt", "max_metrics": [{"generic": {}}]},
+                          "2026-10-05": {"rhr": {"restingHeartRate": 49}}},
+                 "ranges": {"body_battery": {"oops": 1}, "daily_steps": {"x": 1}, "body_composition": [1],
+                            "daily_summaries": {"data": "kaputt"}}}
+        out = garmin_sync.normalize(cache)
+        self.assertEqual(out["2026-10-05"]["resting_hr"], 49)  # gute Werte kommen trotzdem an
+        self.assertNotIn("2026-10-04", out)
+
+    def test_fehlerzaehler_wird_nach_erfolg_geloescht(self):
+        client = mock.Mock(spec=["get_hrv_data"])
+        client.get_hrv_data.side_effect = [personal_api.GarminApiError("Fehler 500"), {"hrvSummary": {"lastNightAvg": 55}}]
+        path = os.path.join(self.key_dir, "cache.json")
+        with mock.patch.object(garmin_sync, "REQUEST_PAUSE_S", 0):
+            garmin_sync.sync_wellness(client, date(2026, 10, 1), date(2026, 10, 1), path)
+            day = garmin_sync.sync_wellness(client, date(2026, 10, 1), date(2026, 10, 1), path)["days"]["2026-10-01"]
+        self.assertEqual(day["hrv"], {"hrvSummary": {"lastNightAvg": 55}})
+        self.assertNotIn("_failed", day)
+
+    def test_tageszusammenfassungen_landen_im_zwischenspeicher(self):
+        client = mock.Mock(spec=["get_daily_summaries"])
+        client.get_daily_summaries.return_value = {"data": [{"calendarDate": "2026-10-01"}]}
+        with mock.patch.object(garmin_sync, "REQUEST_PAUSE_S", 0):
+            cache = garmin_sync.sync_wellness(client, date(2026, 10, 1), date(2026, 10, 1), os.path.join(self.key_dir, "c.json"))
+        client.get_daily_summaries.assert_called_once_with("2026-10-01", "2026-10-01")
+        self.assertEqual(cache["ranges"]["daily_summaries"], {"data": [{"calendarDate": "2026-10-01"}]})
+
+    def test_abbruch_speichert_das_geladene_trotzdem(self):
+        session = mock.MagicMock()
+        args = mock.Mock(login=False, activities_only=False, wellness_only=True)
+        cache = {"days": {"2026-10-01": {"rhr": {"restingHeartRate": 47}}}}
+        with mock.patch.object(garmin_sync, "client_for"), \
+                mock.patch.object(garmin_sync, "sync_wellness", side_effect=personal_api.GarminApiTooManyRequestsError("blockt")), \
+                mock.patch.object(garmin_sync, "load_cache", return_value=cache), \
+                mock.patch.object(garmin_sync, "store_wellness") as store:
+            with self.assertRaises(personal_api.GarminApiTooManyRequestsError):
+                garmin_sync.sync_user(1, lambda: session, date(2026, 10, 1), date(2026, 10, 1), args)
+        self.assertEqual(store.call_args[0][2]["2026-10-01"]["resting_hr"], 47)
+
+    def test_garmin_nicht_erreichbar_bricht_auch_downloads_ab(self):
+        client = mock.Mock(spec=["get_activities_by_date", "download_original"])
+        client.get_activities_by_date.return_value = [{"activityId": i} for i in (1, 2, 3)]
+        client.download_original.side_effect = personal_api.GarminApiUnreachableError("weg")
+        session = mock.MagicMock()
+        session.query.return_value.filter_by.return_value = []
+        with mock.patch.object(garmin_sync, "athlete_dir", return_value=self.key_dir), \
+                mock.patch.object(garmin_sync, "store_workouts"), mock.patch.object(garmin_sync, "REQUEST_PAUSE_S", 0):
+            with self.assertRaises(personal_api.GarminApiUnreachableError):
+                garmin_sync.sync_activities(client, date(2026, 9, 1), date(2026, 10, 1), 1, session)
+        self.assertEqual(client.download_original.call_count, 1)
+        self.assertTrue(garmin_sync.stops_run(Exception("Connection error: timed out")))  # garminconnect-Form
 
     def test_rate_limit_auch_als_text_von_garminconnect(self):
         self.assertTrue(garmin_sync.is_rate_limited(Exception("API Error 429 - Too Many Requests")))

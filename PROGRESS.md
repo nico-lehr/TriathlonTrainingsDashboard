@@ -43,7 +43,7 @@ Auftrag (2026-10-22): Weg A – Lesen über die offizielle Schnittstelle, „An 
 | G3 Server: Schlüssel prüfen/speichern/entfernen, „Jetzt von Garmin holen“ im Hintergrund | fertig |
 | G4 Einstellungen-Karte „Garmin-Verbindung“ | fertig (im Browser mit nachgestelltem Garmin von Anfang bis Ende geprüft) |
 | G5 Tests (nur nachgestelltes Garmin) + Doku | fertig |
-| G6 Prüfung durch zweiten Prüfer | 1. Runde FAIL (u. a. KRITISCH: die Tests hätten den echten Schlüssel auf dem PC gelöscht), 2. Runde FAIL (ein dauerhaft scheiternder Garmin-Dienst hätte jeden Abruf auf 300 Tage × alle Abfragen aufgebläht; Weiterleitungs-Test wirkungslos) – alles behoben, dritte Prüfung läuft |
+| G6 Prüfung durch zweiten Prüfer | fertig: 1. Runde FAIL (u. a. KRITISCH: die Tests hätten den echten Schlüssel auf dem PC gelöscht), 2. Runde FAIL (ein dauerhaft scheiternder Garmin-Dienst hätte jeden Abruf auf 300 Tage × alle Abfragen aufgebläht; Weiterleitungs-Test wirkungslos), 3. Runde **PASS**. Danach noch die optionalen Hinweise eingebaut (unerwartete Antwortformen stoppen die Aufbereitung nicht, „nicht erreichbar“ bricht auch Downloads ab) – mit Tests, die jeden dieser Fehler erkennen |
 
 ### Offene Fragen zu G
 
