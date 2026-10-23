@@ -15,14 +15,17 @@ Kontext-Builder (js/ai/context-builder.js) — buildCompactContext()
     ↓
 Prompt (js/ai/prompts.js) — buildCoachPrompt()
     ↓
-LLM (js/ai/ollama.js) — aktuell Ollama/lokal; so gebaut, dass später auch
-                          eine Remote-API angeschlossen werden kann, ohne
-                          dass context-builder.js/prompts.js sich ändern
-                          müssten.
+LLM (js/ai/provider.js) — je Aufgabe Ollama (Standard, lokal) oder die
+                          Claude API (js/ai/claude.js, bewusst pro Aufgabe
+                          zu aktivieren). Ollama wird nie direkt vom Browser
+                          gefragt, sondern über den eigenen Server:
+                          POST /api/v1/ai/chat (backend/ai_routes.py), der
+                          Server kennt die Adresse aus .env (OLLAMA_URL).
 ```
 
-Der Rest der App kennt keine LLM-Details — nur `js/ai/ollama.js` weiß,
-dass es gerade Ollama ist.
+Der Rest der App kennt keine LLM-Details — nur `js/ai/provider.js`,
+`ollama.js` und `claude.js` wissen, wer antwortet. Context-Builder und
+Prompts bleiben dafür unverändert.
 
 ## Warum kompakter Text statt Rohdaten
 
@@ -97,7 +100,12 @@ Dritter Kontext/Prompt-Pfad neben Ziel-Tipps und Workout-Auswertung:
 `buildPlanContext(goal, windowDates)` (`context-builder.js`) baut auf
 `buildCompactContext()` auf (spart doppelten Kontextaufbau) und ergänzt:
 
-* die berechnete Trainingsphase (`computeTrainingPhase`, `training-plan.js`)
+* die Periodisierung (`js/analytics/periodization.js`): Phase heute mit
+  Erklärung, je Woche des Planungsfensters Wochentyp (Belastung/Entlastung/
+  Taper/Rennwoche/Erholung), Zielumfang in Minuten und was davon schon
+  absolviert/geplant ist, der aktuelle Wochenumfang (bzw. „Wiedereinstieg
+  nach n leichteren Wochen“) und der nächste Phasenwechsel. Die KI plant den
+  Rest bis zum Ziel, statt eigene Umfänge zu erfinden.
 * das konkrete, zu planende Zeitfenster (rollierend, siehe `computePlanningWindow`)
 * ob Kraft-/Mobility-Einheiten gewünscht sind (`athleteProfile.includeStrength/includeMobility`)
 * die letzten tatsächlich absolvierten Einheiten (granularer als die
@@ -119,6 +127,35 @@ keine Duplikate) und verwirft ungültige Einträge einzeln, statt die ganze
 Antwort zu verwerfen oder ungeprüft zu übernehmen — die KI liefert hier
 zwar konkrete Trainingsinhalte (das ist ihre Aufgabe), aber nie ungeprüft
 in die App.
+
+**Regelwerk statt KI-Urteil.** Ob ein Plan zu hart oder zu viel ist,
+entscheidet nicht die KI, sondern `validatePlan()`
+(`js/analytics/plan-rules.js`, 7 Regeln, siehe `docs/DATA_MODEL.md`):
+
+* Der Prompt enthält die Regeln als Text (`buildPlanRulesPrompt()` →
+  `planRulesText(goal)`, dieselben Zahlen wie die Prüfung) und die festen
+  Terminwünsche (`buildPlanWishesPrompt()`).
+* Jeder KI-Plan wird zusammen mit den schon geplanten und den zuletzt
+  absolvierten Einheiten geprüft (`checkedPlanFromAi()`). Verstöße mit
+  fertigem Vorschlag werden automatisch korrigiert; sonst wird die KI
+  höchstens 2-mal mit der Liste der Verstöße neu gefragt
+  (`buildPlanRetryPrompt()`). Bleibt ein „block“-Verstoß, wird nichts
+  übernommen und der alte Plan bleibt erhalten.
+* Mit Hauptevent kommen Regel 4 (Zielumfang der Phase: Taper-, Renn- und
+  Erholungswochen haben einen festen Zielumfang) und Regel 7 (nach dem
+  Wettkampf nur lockere Einheiten) dazu.
+
+## Empfehlungen Heute / Diese Woche / Nächste Woche (vierter Anwendungsfall)
+
+`buildOutlookFacts()` (`context-builder.js`) sammelt fertige Sätze aus den
+vorhandenen Berechnungen: Form/ACWR/Fitness (`computePerformanceState()`),
+heutiger Erholungs-Check, HRV/Ruhepuls als Abweichung vom eigenen Mittel,
+Umfang bisher/geplant, Wettkampf und Phase, Periodisierung der Woche, und
+bis zu 6 Hinweise des Regelwerks zum aktuellen Plan. `buildOutlookPrompt()`
+(`prompts.js`) gibt dazu die festen Regeln mit und verlangt JSON mit je
+Empfehlung + Begründung. Die Begründung darf nur Zahlen aus den Fakten
+nutzen; dieselben Fakten sieht der Athlet unter jeder Empfehlung
+(„Grundlage“).
 
 ## Priorität, falls der Kontext eingekürzt werden muss
 

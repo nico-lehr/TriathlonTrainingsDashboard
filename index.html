@@ -2,7 +2,16 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f5f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#101010" media="(prefers-color-scheme: dark)">
+<!-- iPhone/Android: als App auf dem Home-Bildschirm (Safari: Teilen > Zum Home-Bildschirm) -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="TriDashboard">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>TriDashboard</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23101010'/%3E%3Ccircle cx='24' cy='23' r='15' fill='%231baf7a' fill-opacity='0.92'/%3E%3Ccircle cx='40' cy='23' r='15' fill='%232a78d6' fill-opacity='0.92'/%3E%3Ccircle cx='32' cy='41' r='15' fill='%23eb6834' fill-opacity='0.92'/%3E%3C/svg%3E">
 <script>
@@ -27,6 +36,8 @@
   <div class="glow-orb glow-3" id="glow3"></div>
 </div>
 <div class="page">
+<div class="api-error-banner" id="api-error-banner" role="alert" hidden></div>
+<div class="app-update-banner" id="app-update-banner" role="status" hidden></div>
 
   <header class="top">
     <h1>
@@ -43,6 +54,7 @@
       <button class="tab-btn" data-view="coach">Coach</button>
       <button class="tab-btn" data-view="nutrition">Ernährung</button>
       <button class="tab-btn" data-view="records">Rekorde</button>
+      <button class="tab-btn" data-view="analysis">Analyse</button>
     </div>
     <div class="search-wrap" id="search-wrap">
       <button type="button" class="search-icon-btn" id="search-icon-btn" aria-label="Dashboard durchsuchen" title="Dashboard durchsuchen (auch Einstellungen)">🔍</button>
@@ -66,7 +78,7 @@
           <button class="update-menu-item" id="menu-item-folder" type="button"><span class="menu-item-icon">📁</span> Aktualisieren</button>
           <button class="update-menu-item" id="menu-item-dnd" type="button"><span class="menu-item-icon">⬆️</span> Drag &amp; Drop zur Auswahl</button>
           <div class="update-menu-divider"></div>
-          <button class="update-menu-item update-menu-item-muted" id="reset-btn" type="button" title="Setzt den im Browser gespeicherten Update-Stand zurück auf den zuletzt von Claude gebauten, vollständigen Datenstand"><span class="menu-item-icon">↺</span> Datenstand zurücksetzen</button>
+          <button class="update-menu-item update-menu-item-muted" id="reset-btn" type="button" title="Lädt den auf dem Server gespeicherten Datenstand neu"><span class="menu-item-icon">↺</span> Datenstand zurücksetzen</button>
         </div>
       </div>
     </div>
@@ -274,6 +286,7 @@
           <button class="update-btn" id="cal-add-workout-btn" type="button" title="Workout manuell für den gerade fokussierten Tag anlegen">+ Workout</button>
         </div>
       </div>
+      <p class="card-sub cal-weather-note" id="cal-weather-note" hidden></p>
       <div class="cal-grid-scroll">
         <div class="cal-grid-month" id="calendar-grid"></div>
       </div>
@@ -337,6 +350,24 @@
             <input type="text" id="recovery-injury-note" class="coach-input" placeholder="z.B. rechtes Knie, seit 2 Tagen">
           </div>
         </div>
+      </div>
+
+      <div class="card full" data-card-id="race-countdown">
+        <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+        <h2>Wettkampf-Countdown
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Zählt die Tage bis zu deinem Hauptevent (★ bei „Deine Ziele“) und zeigt, in welcher Trainingsphase du gerade bist: Grundlage, Aufbau (8 Wochen), Spezifisch (6 Wochen), Taper (Rennwoche und die Woche davor), danach eine Woche Erholung. Der Zielumfang dieser Woche ist ein Anteil deiner letzten normalen Trainingswoche (eine Entlastungswoche zählt nicht); nach drei Belastungswochen folgt eine Entlastungswoche. Nach zwei oder mehr leichteren Wochen in Folge (z. B. Krankheit, Urlaub) startet der Wiedereinstieg vorsichtiger: von der stärksten dieser Wochen aus, mindestens der Hälfte der letzten normalen Woche. Der Wettkampf selbst zählt nicht zum Wochenumfang.</div></span>
+        </h2>
+        <p class="card-sub">Tage bis zum Start · Trainingsphase · Wochenumfang</p>
+        <div id="race-countdown-body"></div>
+      </div>
+
+      <div class="card full" data-card-id="coach-outlook">
+        <span class="card-drag-handle" title="Karte verschieben">⠿</span>
+        <h2>Empfehlungen
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Was heute, diese Woche und nächste Woche sinnvoll ist – mit kurzer Begründung. Alle Zahlen kommen aus deinen Daten (Form, ACWR, Erholungs-Check, Garmin, Trainingsplan, Hauptevent) und stehen unter „Grundlage“; die KI ordnet sie nur ein. Eine Begründung mit einer Zahl, die nicht aus deinen Daten stammt, wird nicht angezeigt.</div></span>
+        </h2>
+        <p class="card-sub">Heute · Diese Woche · Nächste Woche</p>
+        <div id="coach-outlook-body"></div>
       </div>
 
       <div class="card" data-card-id="new-goal" id="new-goal-card" hidden>
@@ -419,6 +450,17 @@
               <button type="button" class="update-btn" id="trainingplan-wishes-save-btn">Speichern</button>
               <span class="coach-test-status" id="trainingplan-wishes-status"></span>
             </div>
+            <p class="workouts-columns-title plan-wish-title">Terminwünsche</p>
+            <p class="card-sub plan-wish-sub">Ein fester Wunsch wie „Donnerstag schwimmen“ – die nächste Planung baut ihn ein.</p>
+            <div class="plan-wish-form">
+              <input type="date" id="plan-wish-date" class="coach-input" aria-label="Datum">
+              <select id="plan-wish-sport" class="coach-input" aria-label="Sportart"></select>
+              <input type="number" id="plan-wish-duration" class="coach-input" min="1" max="480" step="5" placeholder="Minuten" aria-label="Dauer in Minuten">
+              <input type="text" id="plan-wish-note" class="coach-input" maxlength="200" placeholder="Notiz (optional)" aria-label="Notiz">
+              <button type="button" class="update-btn" id="plan-wish-add-btn">+ Wunsch</button>
+            </div>
+            <span class="coach-test-status" id="plan-wish-status"></span>
+            <div id="plan-wish-list" class="plan-wish-list"></div>
           </div></span>
         </h2>
         <div id="plan-timeline"></div>
@@ -520,18 +562,120 @@
     </section>
   </div>
 
+  <div id="view-analysis" class="view">
+    <div class="dash-grid ana-grid">
+      <div class="card full">
+        <h2>Sport-Balance
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Wie sich deine Trainingszeit je Woche bzw. Monat auf Schwimmen, Rad und Laufen verteilt — im Vergleich zu deiner Zielverteilung (Standard 15/50/35 %, änderbar in den Einstellungen). Liegt eine Sportart mehr als 5 Prozentpunkte unter ihrem Ziel, wird sie markiert. Sonstige Einheiten (z.B. Kraft) zählen nicht mit. Nutzt immer die volle Historie, unabhängig vom Zeitraum-Filter der Übersicht.</div></span>
+        </h2>
+        <p class="card-sub">Anteil an der Trainingszeit im Vergleich zu deiner Zielverteilung</p>
+        <div class="ana-toolbar">
+          <div class="filter-group" id="analysis-balance-mode">
+            <button type="button" class="chip active" data-mode="week">Wochen</button>
+            <button type="button" class="chip" data-mode="month">Monate</button>
+          </div>
+          <button type="button" class="reset-link" data-ana-settings="profile-balance-card">Zielverteilung ändern</button>
+        </div>
+        <div class="chart-wrap" id="analysis-balance-body"></div>
+      </div>
+
+      <div class="card">
+        <h2>Schwimmen
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover"><b>Pace</b> je 100 m aus deinen Schwimmeinheiten. Der Trend vergleicht den Ø der letzten 6 Wochen mit den 6 Wochen davor (je mindestens 2 Einheiten). Becken und Freiwasser werden nicht vermischt — ausgewertet wird die Gruppe deiner letzten Einheit. <b>SWOLF</b> (Bahnzeit in Sekunden + Züge, kleiner ist besser) gibt es nur aus Garmin-Beckenaufzeichnungen mit Bahnen; Werte aus 25-m- und 50-m-Becken sind nicht vergleichbar. <b>CSS</b> (Critical Swim Speed) = 200 m ÷ (Zeit 400 m − Zeit 200 m), angegeben als Pace je 100 m — ungefähr deine Schwellenpace im Wasser.</div></span>
+        </h2>
+        <p class="card-sub" id="analysis-swim-sub">Pace je 100 m, SWOLF und Critical Swim Speed (CSS)</p>
+        <div id="analysis-swim-body"></div>
+        <div class="chart-wrap" id="analysis-swim-chart"></div>
+        <h3 class="ana-subhead">CSS-Test eintragen</h3>
+        <p class="card-sub">Gut einschwimmen, dann 400 m und nach einer Pause 200 m jeweils so schnell wie möglich.</p>
+        <div class="goal-form">
+          <div class="goal-form-row">
+            <label for="analysis-css-400">400 m (m:ss)</label>
+            <input type="text" id="analysis-css-400" class="coach-input" placeholder="z.B. 7:10" autocomplete="off">
+          </div>
+          <div class="goal-form-row">
+            <label for="analysis-css-200">200 m (m:ss)</label>
+            <input type="text" id="analysis-css-200" class="coach-input" placeholder="z.B. 3:25" autocomplete="off">
+          </div>
+          <div class="goal-form-row">
+            <button type="button" class="update-btn ana-form-btn" id="analysis-css-save-btn">CSS berechnen</button>
+          </div>
+        </div>
+        <p class="coach-test-status ana-status" id="analysis-css-status"></p>
+      </div>
+
+      <div class="card">
+        <h2>Rad
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover"><b>FTP</b> (Functional Threshold Power) ist die Leistung, die du etwa eine Stunde halten kannst. Neben deinem Wert aus den Einstellungen wird sie als 95 % deiner besten 20 Minuten am Stück der letzten 90 Tage geschätzt — das passt nur, wenn darin ein harter 20-Minuten-Abschnitt steckt, sonst fällt die Schätzung zu niedrig aus. Die Leistungskurven sind auf ca. 200 Punkte je Einheit verdichtet, kurze Spitzen werden dabei geglättet. <b>Zonen</b>: Anteile der FTP (dasselbe 5-Zonen-Modell wie im Trainingsplan), die Zeit in den Zonen stammt aus den letzten 4 Wochen. Indoor und Outdoor zählen gemeinsam — Watt sind auf der Rolle und auf der Straße vergleichbar.</div></span>
+        </h2>
+        <p class="card-sub">FTP, Leistungszonen und FTP-Verlauf aus deinen Leistungsdaten</p>
+        <div class="chart-wrap" id="analysis-bike-body"></div>
+      </div>
+
+      <div class="card full">
+        <h2>Koppeltraining
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Als Koppeleinheit zählt ein Lauf, der höchstens 30 Minuten nach dem Ende einer Radeinheit beginnt. Verglichen werden die ersten 10 Minuten des Laufs (Pace in Bewegung und Ø-Puls aus den Sekundendaten) mit denselben ersten 10 Minuten deiner normalen Läufe aus den 90 Tagen davor — auch ein normaler Lauf beginnt meist ruhiger, so wird Gleiches mit Gleichem verglichen. Für einen Vergleich braucht es mindestens 3 normale Läufe. Klick auf eine Zeile öffnet den Lauf.</div></span>
+        </h2>
+        <p class="card-sub">Läufe direkt nach dem Rad: die ersten 10 Minuten im Vergleich zu deinen normalen Läufen</p>
+        <div id="analysis-brick-body"></div>
+      </div>
+    </div>
+  </div>
+
   <div id="view-settings" class="view">
     <section class="card full settings-page-head">
       <button type="button" class="reset-link settings-back-btn" id="settings-back-btn">← Zurück</button>
       <h2>Einstellungen</h2>
-      <p class="card-sub">Gelten für das ganze Dashboard, nicht nur den Coach-Tab. Bleiben nur lokal auf diesem Gerät gespeichert.</p>
+      <p class="card-sub">Gelten für das ganze Dashboard, nicht nur den Coach-Tab. Profil und Trainingsdaten liegen auf dem Dashboard-Server (nur für dich sichtbar), die Verbindungs-Einstellungen nur auf diesem Gerät.</p>
     </section>
 
     <div class="dash-grid">
       <div class="card full">
-        <h2>Ollama-Verbindung</h2>
-        <p class="card-sub">Für den KI-Coach (Trainingsempfehlungen, Auswertungen). Läuft lokal, deine Daten bleiben auf deinem Rechner.</p>
+        <h2>Konto</h2>
+        <p class="card-sub">Angemeldet als <b id="account-username">…</b>. Beim Abmelden wird alles Persönliche aus diesem Browser entfernt.</p>
+        <button type="button" class="cal-today-btn" id="logout-btn">Abmelden</button>
+      </div>
+
+      <div class="card full" id="app-update-card">
+        <h2>Programm-Updates</h2>
+        <p class="card-sub" id="app-update-version">Version …</p>
+        <div id="app-update-admin" hidden>
+          <p class="coach-test-status" id="app-update-status"></p>
+          <div class="app-update-notes" id="app-update-notes" hidden></div>
+          <div class="coach-settings-row app-update-actions">
+            <button type="button" class="cal-today-btn" id="app-update-check-btn">Jetzt prüfen</button>
+            <button type="button" class="update-btn" id="app-update-install-btn" hidden>Installieren</button>
+          </div>
+          <p class="card-sub">Vor dem Installieren werden Datenbank und Programm in <code>backups/</code> gesichert. Deine Daten (Trainings, Einstellungen, <code>.env</code>) werden nie ersetzt. Der Server startet danach neu – Freunde sind kurz getrennt (meist unter einer Minute).</p>
+        </div>
+      </div>
+
+      <div class="card full" id="garmin-settings-card">
+        <h2>Garmin-Verbindung
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Offizielle Garmin-Schnittstelle („Personal API“): Mit deinem eigenen Schlüssel holt der Dashboard-Server deine Trainings (als .fit-Datei) und Gesundheitsdaten (Schlaf, HRV, Ruhepuls, Gewicht, Schritte; Body Battery, soweit Garmin sie dort liefert) – nur lesen, ohne dein Garmin-Passwort. Workouts auf die Uhr schicken kann dieser Schlüssel nicht. VO2max und Trainingszustand liefert die Schnittstelle nicht; das Dashboard schätzt VO2max dann selbst.</div></span>
+        </h2>
+        <p class="card-sub">Schlüssel in Garmin Connect erstellen: <a href="https://connect.garmin.com/app/settings/personalApiToken" target="_blank" rel="noopener">Einstellungen → Personal API</a>. Er wird nur einmal angezeigt – gleich hier einfügen. Bitte nur am Dashboard-PC oder über Tailscale eintragen.</p>
+        <p class="coach-test-status" id="garmin-api-status"></p>
         <div class="coach-settings-row">
+          <label for="garmin-api-key">Schlüssel</label>
+          <input type="password" id="garmin-api-key" class="coach-input" autocomplete="off" spellcheck="false" placeholder="Schlüssel einfügen">
+        </div>
+        <div class="coach-settings-row">
+          <label for="garmin-api-expires">Gültig bis (optional)</label>
+          <input type="date" id="garmin-api-expires" class="coach-input">
+        </div>
+        <div class="coach-settings-row">
+          <button type="button" class="cal-today-btn" id="garmin-api-save-btn">Schlüssel prüfen &amp; speichern</button>
+          <button type="button" class="cal-today-btn" id="garmin-api-sync-btn" hidden>Jetzt von Garmin holen</button>
+        </div>
+        <p class="coach-test-status" id="garmin-api-sync-status"></p>
+        <button type="button" class="reset-link" id="garmin-api-delete-btn" hidden>Schlüssel entfernen</button>
+      </div>
+
+      <div class="card full">
+        <h2>Ollama-Verbindung</h2>
+        <p class="card-sub">Für den KI-Coach (Trainingsempfehlungen, Auswertungen). Ollama läuft auf dem Dashboard-PC, die Anfragen gehen über den Dashboard-Server – deine Daten verlassen das eigene Netz nicht.</p>
+        <div class="coach-settings-row" hidden>
           <label for="coach-ollama-url">Adresse</label>
           <input type="text" id="coach-ollama-url" class="coach-input" placeholder="http://localhost:11434">
         </div>
@@ -547,9 +691,9 @@
           <button class="cal-today-btn" id="ollama-setup-btn" type="button">⚙️ Ollama Setup</button>
         </div>
         <p class="card-sub coach-setup-hint">
-          Einmalig einrichten: <a href="https://ollama.com/download" target="_blank" rel="noopener">Ollama installieren</a>,
-          ein Modell laden (Terminal: <code>ollama pull llama3.1</code>), Ollama für den Zugriff aus dieser Datei freischalten
-          (Terminal: <code>launchctl setenv OLLAMA_ORIGINS "*"</code>, dann Ollama neu starten) — Details in der README.
+          Einmalig auf dem Dashboard-PC einrichten: <a href="https://ollama.com/download" target="_blank" rel="noopener">Ollama installieren</a>
+          und ein Modell laden (Terminal: <code>ollama pull llama3.1</code>). Läuft Ollama auf einem anderen Rechner,
+          die Adresse in der Datei <code>.env</code> eintragen (<code>OLLAMA_URL</code>) — Details in docs/DEPLOYMENT.md.
         </p>
       </div>
 
@@ -693,12 +837,37 @@
         </div>
       </div>
 
+      <div class="card" id="profile-balance-card">
+        <h2>Sport-Balance
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Zielverteilung deiner Trainingszeit für die Karte „Sport-Balance" im Analyse-Tab. Gespeichert wird nur, wenn die drei Werte zusammen 100 % ergeben.</div></span>
+        </h2>
+        <p class="card-sub">Ziel-Anteil der Trainingszeit je Sportart (zusammen 100 %).</p>
+        <div class="goal-form">
+          <div class="goal-form-row">
+            <label for="profile-balance-swim">Schwimmen (%)</label>
+            <input type="number" id="profile-balance-swim" class="coach-input" min="0" max="100" step="1" data-balance-sport="Schwimmen">
+          </div>
+          <div class="goal-form-row">
+            <label for="profile-balance-bike">Rad (%)</label>
+            <input type="number" id="profile-balance-bike" class="coach-input" min="0" max="100" step="1" data-balance-sport="Rad">
+          </div>
+          <div class="goal-form-row">
+            <label for="profile-balance-run">Laufen (%)</label>
+            <input type="number" id="profile-balance-run" class="coach-input" min="0" max="100" step="1" data-balance-sport="Laufen">
+          </div>
+        </div>
+        <div class="ana-settings-actions">
+          <button type="button" class="cal-today-btn" id="profile-balance-reset-btn">Standard 15/50/35</button>
+          <span class="coach-test-status" id="profile-balance-status"></span>
+        </div>
+      </div>
+
       <div class="card">
         <h2>Kalender-Abo (iCal)
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Geplante Einheiten als abonnierbaren Kalender-Feed (webcal), z.B. für Apple/Google Kalender. Braucht den lokalen Backend-Server (siehe DEPLOYMENT.md) - funktioniert nur, während "python backend/app.py" auf diesem Rechner läuft, noch nicht "online" von unterwegs.</div></span>
         </h2>
         <p class="card-sub" id="ical-status-hint">Optional: Trainingsplan als Kalender-Abo.</p>
-        <button type="button" class="update-btn" id="ical-check-btn" hidden style="margin-bottom:8px;">Backend-Verbindung prüfen</button>
+        <button type="button" class="update-btn" id="ical-check-btn" hidden style="margin-bottom:8px;">Abo-Adresse anzeigen</button>
         <div class="goal-form-row goal-form-row-wide" id="ical-url-row" hidden>
           <label for="ical-url-input">Abo-Adresse (in Kalender-App als Internetkalender/webcal hinzufügen)</label>
           <div class="wd-rating-elevation-inputs">
@@ -709,8 +878,25 @@
       </div>
 
       <div class="card">
+        <h2>Wetter im Kalender
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">7-Tage-Vorhersage von Open-Meteo (kostenlos, ohne Konto) für deinen Heimatort. Sie steht im Kalender an Outdoor-Einheiten: Rad und Laufen, außer der Titel nennt Indoor, Rolle, Ergometer, Laufband, Halle o. Ä.; Schwimmen nur mit „Freiwasser“, „Open Water“, „See“ oder „Meer“ im Titel. Die Vorhersage holt der Dashboard-Server, gespeichert wird nur der Ort.</div></span>
+        </h2>
+        <p class="card-sub">Optional — Wetter an Outdoor-Einheiten der nächsten 7 Tage.</p>
+        <div class="coach-settings-row">
+          <label for="weather-location-input">Heimatort suchen</label>
+          <div class="weather-search-row">
+            <input type="text" id="weather-location-input" class="coach-input" maxlength="100" placeholder="z.B. Heidelberg">
+            <button type="button" class="cal-today-btn" id="weather-location-search-btn">Suchen</button>
+          </div>
+        </div>
+        <p class="coach-test-status weather-status" id="weather-location-status"></p>
+        <div class="weather-place-list" id="weather-place-list"></div>
+        <button type="button" class="reset-link weather-clear-btn" id="weather-location-clear-btn" hidden>Heimatort entfernen</button>
+      </div>
+
+      <div class="card">
         <h2>Equipment
-          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Kilometerstand von Laufschuhen/Rad wird automatisch aus deinen Trainings gezählt, solange ein Item als "Standard" für die Sportart markiert ist. Verschleißteile (Kette, Reifen, Bremsbeläge) teilen sich die Kilometer des zugehörigen Rads. Warnt hier, im Kalender und auf dem Dashboard, sobald ein Service-/Austausch-Intervall erreicht ist.</div></span>
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Kilometerstand von Laufschuhen/Rad wird automatisch aus deinen Trainings gezählt, solange ein Item als "Standard" für die Sportart markiert ist. Verschleißteile (Kette, Reifen, Bremsbeläge) teilen sich die Kilometer des zugehörigen Rads. Zeigt "bald fällig", sobald 90 % eines Service-/Austausch-Intervalls erreicht sind. Einzelne Trainings kannst du in deren Detailansicht ausdrücklich einem Schuh/Rad zuordnen.</div></span>
         </h2>
         <p class="card-sub">Optional — nur sichtbar, wenn du Equipment hinterlegst.</p>
         <div id="equipment-list"></div>
@@ -845,10 +1031,6 @@
 <!-- Reihenfolge ist wichtig: jede Datei darf beim Laden nur auf bereits
      geladene Dateien zugreifen (siehe docs/PROJECT_MAP.md). -->
 <script src="js/data/api-client.js"></script>
-<script src="data/workouts-data.js"></script>
-<script src="data/wellness-data.js"></script>
-<script src="js/data/training-effects.js"></script>
-<script src="js/data/idb-store.js"></script>
 <script src="js/utils/dates.js"></script>
 <script src="js/utils/formatting.js"></script>
 <script src="js/utils/calculations.js"></script>
@@ -858,9 +1040,11 @@
 <script src="js/data/goals.js"></script>
 <script src="js/data/gpx-parser.js"></script>
 <script src="js/data/athlete.js"></script>
+<script src="js/data/weather.js"></script>
 <script src="js/data/health.js"></script>
 <script src="js/data/garmin-wellness.js"></script>
 <script src="js/data/planned-workouts.js"></script>
+<script src="js/data/plan-wishes.js"></script>
 <script src="js/data/fit-workout-writer.js"></script>
 <script src="js/data/weight-log.js"></script>
 <script src="js/data/equipment.js"></script>
@@ -873,10 +1057,14 @@
 <script src="js/analytics/hr-distribution.js"></script>
 <script src="js/analytics/workout-profile.js"></script>
 <script src="js/analytics/training-plan.js"></script>
+<script src="js/analytics/plan-rules.js"></script>
+<script src="js/analytics/periodization.js"></script>
+<script src="js/analytics/race-plan.js"></script>
 <script src="js/analytics/zones.js"></script>
 <script src="js/analytics/nutrition.js"></script>
 <script src="js/analytics/streak.js"></script>
 <script src="js/analytics/achievements.js"></script>
+<script src="js/analytics/triathlon.js"></script>
 <script src="js/ai/context-builder.js"></script>
 <script src="js/ai/prompts.js"></script>
 <script src="js/ai/ollama.js"></script>
@@ -888,18 +1076,25 @@
 <script src="js/components/dashboard.js"></script>
 <script src="js/components/recovery.js"></script>
 <script src="js/components/calendar.js"></script>
+<script src="js/components/weather.js"></script>
 <script src="js/components/records.js"></script>
 <script src="js/components/equipment.js"></script>
 <script src="js/components/health-status.js"></script>
 <script src="js/components/coach.js"></script>
 <script src="js/components/training-plan.js"></script>
+<script src="js/components/race-countdown.js"></script>
+<script src="js/components/race-plan.js"></script>
 <script src="js/components/risk-adjust.js"></script>
 <script src="js/components/ollama-setup.js"></script>
 <script src="js/components/nutrition.js"></script>
 <script src="js/components/achievements.js"></script>
+<script src="js/components/analysis.js"></script>
 <script src="js/components/workout-card.js"></script>
 <script src="js/components/compare.js"></script>
 <script src="js/components/data-import.js"></script>
+<script src="js/components/account.js"></script>
+<script src="js/components/garmin-settings.js"></script>
+<script src="js/components/update.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

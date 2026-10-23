@@ -1,55 +1,89 @@
 #!/usr/bin/env python3
 """
-Laedt Aktivitaeten und Gesundheitsdaten aus Garmin Connect herunter.
+Laedt Aktivitaeten und Gesundheitsdaten aus Garmin Connect herunter - fuer
+jeden Dashboard-Benutzer getrennt, direkt in die Datenbank (training.db).
 
-Zwei Ausgaben:
-  1. fit-files/*.fit      - die ORIGINAL-.fit-Dateien je Aktivitaet. Sie laufen
-                            anschliessend durch den vorhandenen Parser
-                            (parse_fit.py bzw. den JS-Parser im Browser), womit
-                            saemtliche Details erhalten bleiben: Sekundenkurven,
-                            Schwimmbahnen, Laufdynamik, Leistung. Genau deshalb
-                            wird bewusst NICHT die Aktivitaets-Zusammenfassung
-                            aus der JSON-Antwort uebernommen - die waere flach.
-  2. data/wellness-data.js - Gesundheitsdaten als "const GARMIN_WELLNESS = {...}".
-                            Kein JSON, weil der Browser beim Doppelklick-Aufruf
-                            (file://) kein fetch() auf lokale Dateien erlaubt,
-                            ein <script src> aber problemlos laedt. Dasselbe
-                            Muster wie data/workouts-data.js (siehe
-                            build_dashboard.py).
+Pro Benutzer (athlete_id, siehe backend/create_user.py):
+  1. Aktivitaeten -> Tabelle workouts. Geladen wird die ORIGINAL-.fit-Datei und
+     vom vorhandenen Parser (parse_fit.py) gelesen, damit saemtliche Details
+     erhalten bleiben: Sekundenkurven, Schwimmbahnen, Laufdynamik, Leistung.
+     Das komplette Parser-Ergebnis steht in workouts.fit_data. Die .fit-Datei
+     bleibt als Archiv unter fit-files/athlete_<id>/ liegen.
+     Doppelte Aktivitaeten verhindert UNIQUE(athlete_id, garmin_activity_id).
+  2. Gesundheitsdaten -> Tabelle wellness (ein Eintrag je Tag und Benutzer).
+     Die Garmin-Rohantworten liegen je Benutzer in
+     fit-files/athlete_<id>/garmin-raw-cache.json (inkrementeller Sync).
 
-Anmeldung: Das Passwort wird NICHT gespeichert. Es wird einmalig abgefragt,
-gegen ein Token getauscht und sofort verworfen. Das Token liegt unter
-~/.garminconnect (lokale Platte, NICHT iCloud - es soll nicht durch die Cloud
-synchronisiert werden) und erneuert sich danach selbst.
+Zwei Wege zu Garmin, je Benutzer:
+  - Offiziell (bevorzugt): Personal-API-Schluessel, den die Person selbst in
+    Garmin Connect erstellt und in den Dashboard-Einstellungen eintraegt
+    (tools/garmin_personal_api.py). Nur lesen, kein Passwort. Liegt ein
+    Schluessel vor, wird er benutzt.
+  - Bisher: Anmeldung per --login. Das Passwort wird NIE gespeichert oder
+    geloggt. Es wird einmalig abgefragt, gegen ein Token getauscht und sofort
+    verworfen. Das Token liegt je Benutzer unter ~/.triathlon/garmin_<id>.token
+    (ausserhalb des Projekts, nur fuer den eigenen Betriebssystem-Benutzer
+    lesbar) und erneuert sich danach selbst. Wird weiter fuer "An Garmin
+    senden" gebraucht (das kann die offizielle Personal API nicht).
+
+Fehler bei einem Benutzer (Token abgelaufen, Garmin blockt) landen als EINE
+Zeile mit der Benutzer-Nummer in ~/.triathlon/garmin-sync.log - die anderen
+Benutzer laufen trotzdem weiter.
 
 Aufruf:
-    python3 tools/garmin_sync.py                # letzte 300 Tage (Standard)
-    python3 tools/garmin_sync.py --days 1095    # einmalig mehr Historie nachholen
+    python3 tools/garmin_sync.py --login --athlete 2   # einmalig: Garmin-Anmeldung fuer Benutzer 2
+    python3 tools/garmin_sync.py                       # alle Benutzer mit Schluessel/Token, letzte 300 Tage
+    python3 tools/garmin_sync.py --athlete 2           # nur Benutzer 2
+    python3 tools/garmin_sync.py --days 1095           # einmalig mehr Historie nachholen
     python3 tools/garmin_sync.py --since 2024-01-01
     python3 tools/garmin_sync.py --activities-only
     python3 tools/garmin_sync.py --wellness-only
 """
 import argparse
 import getpass
+import glob
 import io
 import json
 import os
+import re
+import shutil
+import subprocess
 import sys
+import tempfile
 import time
 import zipfile
 from datetime import date, datetime, timedelta
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FIT_DIR = os.path.join(BASE, "fit-files")
-DATA_DIR = os.path.join(BASE, "data")
-WELLNESS_JS = os.path.join(DATA_DIR, "wellness-data.js")
-# Roh-Zwischenspeicher: enthaelt die unveraenderten Garmin-Antworten je Tag.
+sys.path.insert(0, BASE)  # fuer "from backend import ..."
+
+from tools import garmin_personal_api as personal_api  # noqa: E402 - braucht den Pfad oben
+
+# Token und Log liegen ausserhalb des Projekts unter ~/.triathlon (dieselben
+# Orte wie GARMIN_TOKEN_PATH/GARMIN_LOG_PATH in backend/config.py).
+TOKEN_DIR = os.path.expanduser("~/.triathlon")
+LOG_PATH = os.path.join(TOKEN_DIR, "garmin-sync.log")
+
+
+def token_path(athlete_id):
+    # Die Garmin-Bibliothek legt hier einen kleinen Ordner mit garmin_tokens.json
+    # an (Rechte 0700/0600) - so schreibt sie Tokens sicher und atomar.
+    return os.path.join(TOKEN_DIR, f"garmin_{athlete_id}.token")
+
+
+def athlete_dir(athlete_id):
+    """Archiv je Benutzer: Original-.fit-Dateien + Roh-Zwischenspeicher. Liegt
+    unter fit-files/, das per .gitignore nie ins Repository gelangt."""
+    return os.path.join(BASE, "fit-files", f"athlete_{athlete_id}")
+
+
+# Roh-Zwischenspeicher je Benutzer: enthaelt die unveraenderten Garmin-Antworten je Tag.
 # Zweck 1 - inkrementell: bereits geholte Tage werden nie erneut abgefragt.
 # Zweck 2 - Formataenderungen: Garmins interne Formate aendern sich
 # gelegentlich; mit den Rohdaten laesst sich die Aufbereitung spaeter
 # wiederholen, ohne alles neu herunterladen zu muessen.
-CACHE_PATH = os.path.join(DATA_DIR, "garmin-raw-cache.json")
-TOKEN_DIR = os.path.expanduser("~/.garminconnect")
+def cache_path(athlete_id):
+    return os.path.join(athlete_dir(athlete_id), "garmin-raw-cache.json")
 
 # Standard-Zeitraum. 300 Tage decken ALLE Auswertungen des Dashboards ab - das
 # laengste analytische Fenster ist der VO2max-Trend mit 240 Tagen (120 Tage
@@ -68,6 +102,7 @@ TOKEN_DIR = os.path.expanduser("~/.garminconnect")
 DEFAULT_DAYS = 300
 
 REQUEST_PAUSE_S = 1.0   # Hoeflichkeitspause zwischen Anfragen (Rate-Limit)
+MAX_SECTION_FAILS = 3   # so oft scheitert ein Abschnitt eines Tages, bevor er als "keine Daten" gilt
 RECENT_REFETCH_DAYS = 3  # letzte n Tage immer neu holen - Garmin traegt Werte nach
 
 # Abschnitte, die je Tag abgefragt werden. Fehlt einer im Zwischenspeicher,
@@ -80,51 +115,92 @@ def log(msg):
     print(msg, flush=True)
 
 
+def log_user(athlete_id, msg):
+    """Genau eine Zeile je Benutzer und Lauf in LOG_PATH (und auf dem Bildschirm)."""
+    line = f"{datetime.now():%Y-%m-%d %H:%M:%S} Nutzer {athlete_id}: {msg}"
+    log(line)
+    try:
+        os.makedirs(TOKEN_DIR, exist_ok=True)
+        with open(LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except OSError:
+        pass  # Log nicht beschreibbar - die Zeile steht trotzdem auf dem Bildschirm
+
+
+def is_rate_limited(e):
+    """Garmin drosselt: eigene Fehlerklasse (beide Wege) oder garminconnects
+    "API Error 429" im Text."""
+    return "TooManyRequests" in type(e).__name__ or re.search(r"API Error 429\b", str(e)) is not None
+
+
+def is_auth_error(e):
+    return "Authentication" in type(e).__name__
+
+
+def stops_run(e):
+    """Jede weitere Anfrage wuerde genauso scheitern: Rate-Limit, abgelehnte
+    Anmeldung oder Garmin gar nicht erreichbar (offizielle API: eigene Klasse,
+    garminconnect: "Connection error: ..." im Text)."""
+    return (is_rate_limited(e) or is_auth_error(e) or "Unreachable" in type(e).__name__
+            or str(e).startswith("Connection error"))
+
+
+def describe_error(e, athlete_id):
+    """Einzeiliger Fehlertext fuers Log. Enthaelt nie Zugangsdaten - das
+    Passwort existiert ohnehin nur waehrend --login im Speicher."""
+    if getattr(e, "user_message", None):  # offizielle API: fertiger deutscher Satz
+        return e.user_message
+    name = type(e).__name__
+    if "TooManyRequests" in name:
+        return "Garmin blockt gerade (zu viele Anfragen). Spaeter erneut starten."
+    if "Authentication" in name:
+        return ("Garmin-Anmeldung fehlt oder ist abgelaufen. Neu anmelden: "
+                f"python3 tools/garmin_sync.py --login --athlete {athlete_id}")
+    text = " ".join(str(e).split())[:200]
+    return f"{name}: {text}" if text else name
+
+
 # ---------------------------------------------------------------- Anmeldung
 
-def connect():
-    """Meldet sich an - bevorzugt mit gespeichertem Token, sonst per Passwort."""
+def connect(athlete_id, fresh_login=False):
+    """Meldet einen Benutzer bei Garmin an: normal mit seinem gespeicherten
+    Token, mit fresh_login=True (--login) per E-Mail/Passwort."""
     try:
-        from garminconnect import Garmin
+        from garminconnect import Garmin, GarminConnectAuthenticationError
     except ImportError:
         raise SystemExit(
             "Die Bibliothek 'garminconnect' fehlt.\n"
             "  python3 -m pip install -r requirements.txt"
         )
 
-    # Versuch 1: vorhandenes Token. Das ist der Normalfall - ohne jede Eingabe.
-    if os.path.isdir(TOKEN_DIR):
-        try:
-            client = Garmin()
-            client.login(TOKEN_DIR)
-            log("Angemeldet (gespeichertes Token).")
-            return client
-        except Exception as e:
-            log(f"Gespeichertes Token nicht mehr gueltig ({type(e).__name__}) - neue Anmeldung noetig.")
+    tokens = token_path(athlete_id)
+    if not fresh_login:
+        # Normalfall - ohne jede Eingabe, damit der Sync auch unbeaufsichtigt
+        # fuer alle Benutzer nacheinander laufen kann.
+        if not os.path.isdir(tokens):
+            raise GarminConnectAuthenticationError("kein Garmin-Token")
+        client = Garmin()
+        client.login(tokens)
+        log("Angemeldet (gespeichertes Token).")
+        return client
 
-    # Versuch 2: Passwort-Anmeldung. Passwort wird nur im Speicher gehalten.
-    log("\nAnmeldung bei Garmin Connect")
+    # --login: Passwort wird nur im Speicher gehalten, nie gespeichert oder geloggt.
+    log(f"\nGarmin-Anmeldung fuer Benutzer {athlete_id}")
     log("Das Passwort wird NICHT gespeichert - nur ein Token, das sich danach selbst erneuert.")
-    email = os.environ.get("GARMIN_EMAIL") or input("E-Mail: ").strip()
-    password = os.environ.get("GARMIN_PASSWORD") or getpass.getpass("Passwort: ")
-
+    email = input("Garmin-E-Mail: ").strip()
+    password = getpass.getpass("Garmin-Passwort (wird beim Tippen nicht angezeigt): ")
     client = Garmin(email, password, prompt_mfa=lambda: input("Code der Zwei-Faktor-Authentifizierung: ").strip())
-
-    # Das Token-Verzeichnis MUSS hier uebergeben werden - login() speichert die
-    # Tokens nur dann selbst ab ("Persist tokens so next run restores without
-    # re-login/MFA"). Ohne das Argument waere bei jedem Lauf das Passwort noetig.
-    os.makedirs(TOKEN_DIR, exist_ok=True)
-    os.chmod(TOKEN_DIR, 0o700)
-    try:
-        client.login(TOKEN_DIR)
-    except Exception as e:
-        raise SystemExit(f"\nAnmeldung fehlgeschlagen: {e}\n"
-                         "Bei wiederholten Fehlern hilft meist ein Update:\n"
-                         "  python3 -m pip install -U garminconnect curl_cffi")
     del password
 
-    saved = os.path.isdir(TOKEN_DIR) and any(os.scandir(TOKEN_DIR))
-    log(f"Angemeldet. {'Token gespeichert unter ' + TOKEN_DIR + ' (kuenftig ohne Passwort).' if saved else 'ACHTUNG: es wurde kein Token abgelegt - beim naechsten Lauf ist das Passwort wieder noetig.'}")
+    # Altes Token weg, sonst wuerde login() es wiederverwenden statt neu anzumelden.
+    shutil.rmtree(tokens, ignore_errors=True)
+    os.makedirs(TOKEN_DIR, exist_ok=True)
+    # Der Token-Pfad MUSS hier uebergeben werden - login() speichert die Tokens
+    # nur dann selbst ab. Ohne ihn waere bei jedem Lauf das Passwort noetig.
+    client.login(tokens)
+
+    saved = os.path.isfile(os.path.join(tokens, "garmin_tokens.json"))
+    log(f"Angemeldet. {'Token gespeichert unter ' + tokens + ' (kuenftig ohne Passwort).' if saved else 'ACHTUNG: es wurde kein Token abgelegt - beim naechsten Lauf ist --login wieder noetig.'}")
     return client
 
 
@@ -142,29 +218,42 @@ def safe_filename(activity):
         return f"activity-{activity.get('activityId')}.fit"
 
 
-def sync_activities(client, start, end):
-    os.makedirs(FIT_DIR, exist_ok=True)
+def download_original(client, aid):
+    """Original-Datei (ZIP mit der .fit) - offizielle API oder garminconnect."""
+    if hasattr(client, "download_original"):
+        return client.download_original(aid)
+    from garminconnect import Garmin
+    return client.download_activity(aid, dl_fmt=Garmin.ActivityDownloadFormat.ORIGINAL)
+
+
+def sync_activities(client, start, end, athlete_id, session):
+    """Neue Aktivitaeten eines Benutzers -> Tabelle workouts. Bereits
+    gespeicherte (gleiche garmin_activity_id) werden gar nicht erst geladen."""
+    from backend.models import Workout
+
+    fit_dir = athlete_dir(athlete_id)
+    os.makedirs(fit_dir, exist_ok=True)
     log(f"\nAktivitaeten von {start} bis {end} ...")
-    try:
-        activities = client.get_activities_by_date(start.isoformat(), end.isoformat())
-    except Exception as e:
-        log(f"  Aktivitaetsliste konnte nicht geladen werden: {e}")
-        return {"neu": 0, "vorhanden": 0, "fehler": 1, "gesamt": 0}
-
+    activities = client.get_activities_by_date(start.isoformat(), end.isoformat())
     log(f"  {len(activities)} Aktivitaeten gefunden.")
-    stats = {"neu": 0, "vorhanden": 0, "fehler": 0, "gesamt": len(activities)}
 
-    from garminconnect import Garmin, GarminConnectTooManyRequestsError
+    known = {aid for (aid,) in session.query(Workout.garmin_activity_id).filter_by(athlete_id=athlete_id)}
+    stats = {"neu": 0, "vorhanden": 0, "fehler": 0, "gesamt": len(activities)}
+    fetched = {}  # Dateiname -> Garmin-Aktivitaet, wird danach in die Datenbank geschrieben
+    blocked = None
 
     for i, act in enumerate(activities, 1):
         aid = act.get("activityId")
-        fname = safe_filename(act)
-        target = os.path.join(FIT_DIR, fname)
-        if os.path.exists(target) and os.path.getsize(target) > 0:
+        if aid in known:
             stats["vorhanden"] += 1
             continue
+        fname = safe_filename(act)
+        target = os.path.join(fit_dir, fname)
+        if os.path.exists(target) and os.path.getsize(target) > 0:
+            fetched[fname] = act  # liegt schon im Archiv, fehlt nur in der Datenbank
+            continue
         try:
-            blob = client.download_activity(aid, dl_fmt=Garmin.ActivityDownloadFormat.ORIGINAL)
+            blob = download_original(client, aid)
             # Garmin liefert hier ein ZIP, nicht die rohe .fit - entpacken.
             wrote = False
             with zipfile.ZipFile(io.BytesIO(blob)) as z:
@@ -175,65 +264,122 @@ def sync_activities(client, start, end):
                         wrote = True
                         break
             if wrote:
-                stats["neu"] += 1
+                fetched[fname] = act
                 log(f"  [{i}/{len(activities)}] {fname}")
             else:
                 stats["fehler"] += 1
                 log(f"  [{i}/{len(activities)}] {aid}: keine .fit im Archiv - uebersprungen")
-        except GarminConnectTooManyRequestsError:
-            log("  Garmin drosselt die Anfragen (Rate-Limit). Abbruch der Aktivitaeten -\n"
-                "  bereits geladene Dateien bleiben erhalten, spaeter einfach erneut starten.")
-            stats["fehler"] += 1
-            break
         except zipfile.BadZipFile:
             # Manche Aktivitaeten (manuell angelegt, ohne Geraetedatei) liefern
             # kein Archiv. Kein Grund, den ganzen Lauf abzubrechen.
             stats["fehler"] += 1
             log(f"  [{i}/{len(activities)}] {aid}: keine Originaldatei vorhanden (evtl. manuell angelegt)")
         except Exception as e:
+            # Rate-Limit oder abgelehnter Schluessel: abbrechen (jede weitere
+            # Anfrage scheitert genauso), Bereits-Geladenes aber noch speichern.
+            if stops_run(e):
+                log("  Garmin drosselt die Anfragen (Rate-Limit). Bereits geladene Aktivitaeten\n"
+                    "  werden noch gespeichert, spaeter einfach erneut starten."
+                    if is_rate_limited(e) else f"  {describe_error(e, athlete_id)}")
+                blocked = e
+                break
             stats["fehler"] += 1
-            log(f"  [{i}/{len(activities)}] {aid}: {type(e).__name__}: {e}")
+            log(f"  [{i}/{len(activities)}] {aid}: {describe_error(e, athlete_id)}")
         time.sleep(REQUEST_PAUSE_S)
 
+    store_workouts(session, athlete_id, fit_dir, fetched, stats)
+    if blocked:
+        raise blocked  # -> eine Fehlerzeile fuer diesen Benutzer, die anderen laufen weiter
     return stats
+
+
+def store_workouts(session, athlete_id, fit_dir, fetched, stats):
+    """Liest die neuen .fit-Dateien mit dem vorhandenen parse_fit.py und
+    speichert sie unter der athlete_id dieses Benutzers."""
+    if not fetched:
+        return
+    from backend.workout_store import find_same_workout, workout_from_parsed
+    from sqlalchemy.exc import IntegrityError
+
+    # parse_fit.py liest einen ganzen Ordner - deshalb nur die neuen Dateien
+    # in einen Zwischenordner kopieren, statt jedes Mal das ganze Archiv zu lesen.
+    with tempfile.TemporaryDirectory() as tmp:
+        for fname in fetched:
+            shutil.copy2(os.path.join(fit_dir, fname), tmp)
+        out = os.path.join(tmp, "workouts.json")
+        subprocess.run([sys.executable, os.path.join(BASE, "parse_fit.py"), tmp, "-o", out],
+                       check=True, stdout=subprocess.DEVNULL)
+        with open(out, encoding="utf-8") as f:
+            parsed = [w for w in json.load(f)["workouts"] if w.get("file") in fetched]
+    stats["fehler"] += len(fetched) - len(parsed)  # Dateien, die parse_fit.py nicht lesen konnte
+
+    for w in parsed:
+        act = fetched[w["file"]]
+        day = date.fromisoformat((act.get("startTimeLocal") or w.get("date") or "")[:10])
+
+        # Dieselbe Einheit kann schon OHNE Garmin-Nummer da sein (z.B. frueher
+        # aus workouts.json importiert). Dann nur die Nummer nachtragen - sonst
+        # gaebe es sie doppelt, und jeder Lauf wuerde sie erneut herunterladen.
+        twin = find_same_workout(session, athlete_id, day, w, only_without_garmin_id=True)
+        if twin:
+            twin.garmin_activity_id = act["activityId"]
+            session.commit()
+            stats["vorhanden"] += 1
+            continue
+
+        # fit_data = komplettes Parser-Ergebnis inkl. Kurven - das liest das Dashboard
+        session.add(workout_from_parsed(athlete_id, w, day, "garmin", garmin_activity_id=act["activityId"]))
+        try:
+            session.commit()
+            stats["neu"] += 1
+        except IntegrityError:  # UNIQUE(athlete_id, garmin_activity_id): schon gespeichert
+            session.rollback()
+            stats["vorhanden"] += 1
 
 
 # --------------------------------------------------------- Gesundheitsdaten
 
-def load_cache():
-    if os.path.exists(CACHE_PATH):
+def load_cache(path):
+    if os.path.exists(path):
         try:
-            with open(CACHE_PATH, encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
             pass
     return {"days": {}, "ranges": {}}
 
 
-def save_cache(cache):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(CACHE_PATH, "w", encoding="utf-8") as f:
+def save_cache(cache, path):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(cache, f, ensure_ascii=False)
 
 
+FAILED = object()  # Abfrage gescheitert -> Abschnitt NICHT speichern, beim naechsten Lauf erneut holen
+
+
 def call(client, method, *args):
-    """Ruft eine Client-Methode auf, falls sie in der installierten Version
-    existiert. Die Bibliothek benennt Methoden zwischen Versionen um - ein
-    fehlender Endpunkt darf nie den ganzen Sync stoppen."""
+    """Ruft eine Client-Methode auf, falls es sie gibt. Fehlt sie (andere
+    Bibliotheksversion, oder die offizielle API bietet das nicht an), ist das
+    Ergebnis None - endgueltig "keine Daten". Scheitert die Abfrage, kommt
+    FAILED zurueck. Rate-Limit und abgelehnte Anmeldung werden weitergereicht:
+    dann scheitert jede weitere Anfrage genauso, der Lauf bricht ab."""
     fn = getattr(client, method, None)
     if fn is None:
         return None
     try:
         return fn(*args)
     except Exception as e:
+        if stops_run(e):
+            raise
         log(f"    {method}: {type(e).__name__}")
-        return None
+        return FAILED
 
 
-def sync_wellness(client, start, end):
+def sync_wellness(client, start, end, path):
     """Holt Tageswerte inkrementell: nur Tage, die noch nicht im Zwischen-
-    speicher liegen (plus die letzten Tage, weil Garmin Werte nachtraegt)."""
-    cache = load_cache()
+    speicher `path` liegen (plus die letzten Tage, weil Garmin Werte nachtraegt)."""
+    cache = load_cache(path)
     days = cache.setdefault("days", {})
 
     all_days = []
@@ -258,32 +404,53 @@ def sync_wellness(client, start, end):
     log(f"\nGesundheitsdaten: {len(all_days)} Tage im Zeitraum, {len(todo)} abzurufen "
         f"({len(all_days) - len(todo)} bereits vorhanden).")
 
-    for i, ds in enumerate(todo, 1):
-        entry = days.get(ds, {})
-        entry["sleep"] = call(client, "get_sleep_data", ds)  # Abschnitte s. DAY_SECTIONS
-        entry["hrv"] = call(client, "get_hrv_data", ds)
-        entry["rhr"] = call(client, "get_rhr_day", ds)
-        entry["max_metrics"] = call(client, "get_max_metrics", ds)
-        entry["training_status"] = call(client, "get_training_status", ds)
-        # Tageszusammenfassung: liefert u.a. Body Battery (Hoch/Tief). Der
-        # Zeitraum-Endpunkt get_body_battery lieferte im Praxistest nichts,
-        # deshalb wird der Wert hier je Tag mitgenommen.
-        entry["summary"] = call(client, "get_user_summary", ds)
-        days[ds] = entry
-        if i % 10 == 0 or i == len(todo):
-            log(f"  {i}/{len(todo)} Tage")
-            save_cache(cache)   # Zwischenstand sichern - ein Abbruch verliert nichts
-        time.sleep(REQUEST_PAUSE_S)
+    # Abschnitte je Tag (s. DAY_SECTIONS). Tageszusammenfassung "summary":
+    # liefert u.a. Body Battery (Hoch/Tief) - der Zeitraum-Endpunkt
+    # get_body_battery lieferte im Praxistest nichts, deshalb je Tag.
+    sections = (("sleep", "get_sleep_data"), ("hrv", "get_hrv_data"), ("rhr", "get_rhr_day"),
+                ("max_metrics", "get_max_metrics"), ("training_status", "get_training_status"),
+                ("summary", "get_user_summary"))
+    try:
+        for i, ds in enumerate(todo, 1):
+            entry = days.get(ds, {})
+            # Die letzten Tage komplett neu (Garmin traegt nach), aeltere nur die
+            # fehlenden Abschnitte. Ein gescheiterter Abschnitt wird beim
+            # naechsten Lauf erneut versucht, nach MAX_SECTION_FAILS Fehlschlaegen
+            # aber als "keine Daten" abgelegt - sonst fragte ein dauerhaft
+            # kaputter Endpunkt bei jedem Lauf alle 300 Tage neu ab.
+            fails = entry.setdefault("_failed", {})
+            for key, method in sections:
+                if key in entry and ds < refetch_from:
+                    continue
+                result = call(client, method, ds)
+                if result is not FAILED:
+                    entry[key] = result
+                    fails.pop(key, None)
+                else:
+                    fails[key] = fails.get(key, 0) + 1
+                    if fails[key] >= MAX_SECTION_FAILS:
+                        entry.setdefault(key, None)  # vorhandene Werte (letzte Tage) bleiben
+                        fails.pop(key)
+            if not fails:
+                entry.pop("_failed")
+            days[ds] = entry
+            if i % 10 == 0 or i == len(todo):
+                log(f"  {i}/{len(todo)} Tage")
+                save_cache(cache, path)   # Zwischenstand sichern - ein Abbruch verliert nichts
+            time.sleep(REQUEST_PAUSE_S)
 
-    # Zeitraum-Abfragen: ein Aufruf fuer die ganze Spanne statt Tagesschleife.
-    s, e = start.isoformat(), end.isoformat()
-    ranges = cache.setdefault("ranges", {})
-    log("  Body Battery, Gewicht, Schritte ...")
-    ranges["body_battery"] = call(client, "get_body_battery", s, e) or ranges.get("body_battery")
-    ranges["body_composition"] = call(client, "get_body_composition", s, e) or ranges.get("body_composition")
-    ranges["daily_steps"] = call(client, "get_daily_steps", s, e) or ranges.get("daily_steps")
-
-    save_cache(cache)
+        # Zeitraum-Abfragen: ein Aufruf fuer die ganze Spanne statt Tagesschleife.
+        # daily_summaries gibt es nur bei der offiziellen API (Body Battery).
+        s, e = start.isoformat(), end.isoformat()
+        ranges = cache.setdefault("ranges", {})
+        log("  Body Battery, Gewicht, Schritte ...")
+        for key, method in (("body_battery", "get_body_battery"), ("body_composition", "get_body_composition"),
+                            ("daily_steps", "get_daily_steps"), ("daily_summaries", "get_daily_summaries")):
+            result = call(client, method, s, e)
+            if result is not FAILED and result:  # leer/fehlgeschlagen: alten Stand behalten
+                ranges[key] = result
+    finally:
+        save_cache(cache, path)   # auch beim Abbruch (Rate-Limit, Schluessel abgelehnt)
     return cache
 
 
@@ -295,6 +462,29 @@ def num(*candidates):
     for v in candidates:
         if isinstance(v, (int, float)) and not isinstance(v, bool):
             return v
+    return None
+
+
+def as_dict(value):
+    return value if isinstance(value, dict) else {}
+
+
+def as_list(value):
+    """Zeitraum-Antworten sind Listen - kommt etwas anderes (Format der
+    offiziellen API nicht dokumentiert), wird es ignoriert statt abzustuerzen."""
+    return value if isinstance(value, list) else []
+
+
+def find_key(obj, key, depth=3):
+    """Wert eines Feldes - oben oder bis zu `depth` Ebenen tiefer."""
+    if not isinstance(obj, dict) or depth < 0:
+        return None
+    if key in obj:
+        return obj[key]
+    for value in obj.values():
+        found = find_key(value, key, depth - 1)
+        if found is not None:
+            return found
     return None
 
 
@@ -332,16 +522,20 @@ def normalize(cache):
     out = {}
 
     for ds, raw in (cache.get("days") or {}).items():
-        sleep_dto = dig(raw, "sleep", "dailySleepDTO") or {}
-        hrv_sum = dig(raw, "hrv", "hrvSummary") or {}
-        rhr_raw = raw.get("rhr") or {}
-        rhr_metrics = (dig(rhr_raw, "allMetrics", "metricsMap", "WELLNESS_RESTING_HEART_RATE") or [])
+        # Schlaf: garminconnect liefert {"dailySleepDTO": {...}}; bei der
+        # offiziellen API stehen die Werte evtl. direkt oben - beides lesen.
+        # Unerwartete Formen (Liste statt Objekt ...) zaehlen als "keine Daten".
+        sleep_raw = as_dict(raw.get("sleep"))
+        sleep_dto = as_dict(sleep_raw.get("dailySleepDTO")) or (sleep_raw if "sleepTimeSeconds" in sleep_raw else {})
+        hrv_sum = as_dict(dig(raw, "hrv", "hrvSummary"))
+        rhr_raw = as_dict(raw.get("rhr"))
+        rhr_metrics = as_list(dig(rhr_raw, "allMetrics", "metricsMap", "WELLNESS_RESTING_HEART_RATE"))
         # VO2max steht in der Praxis NICHT in max_metrics (das kam leer zurueck),
         # sondern im training_status unter mostRecentVO2Max - an echten Daten geprueft.
-        vo2_generic = (dig(raw, "training_status", "mostRecentVO2Max", "generic")
-                       or dig(raw, "max_metrics", "generic") or {})
-        vo2_cycling = (dig(raw, "training_status", "mostRecentVO2Max", "cycling")
-                       or dig(raw, "max_metrics", "cycling") or {})
+        vo2_generic = as_dict(dig(raw, "training_status", "mostRecentVO2Max", "generic")
+                              or dig(raw, "max_metrics", "generic"))
+        vo2_cycling = as_dict(dig(raw, "training_status", "mostRecentVO2Max", "cycling")
+                              or dig(raw, "max_metrics", "cycling"))
         ts = dig(raw, "training_status", "mostRecentTrainingStatus", "latestTrainingStatusData") or {}
         ts_first = next(iter(ts.values()), {}) if isinstance(ts, dict) else {}
 
@@ -356,7 +550,7 @@ def normalize(cache):
             "hrv_baseline_low": num(dig(hrv_sum, "baseline", "lowUpper")),
             "hrv_baseline_high": num(dig(hrv_sum, "baseline", "balancedUpper")),
             "resting_hr": num(rhr_raw.get("restingHeartRate"),
-                              (rhr_metrics[0] or {}).get("value") if rhr_metrics else None),
+                              as_dict(rhr_metrics[0]).get("value") if rhr_metrics else None),
             "vo2max": num(vo2_generic.get("vo2MaxPreciseValue"), vo2_generic.get("vo2MaxValue")),
             "vo2max_cycling": num(vo2_cycling.get("vo2MaxPreciseValue"), vo2_cycling.get("vo2MaxValue")),
             # trainingStatus ist ein Zahlencode, dessen Bedeutung Garmin nicht
@@ -373,13 +567,19 @@ def normalize(cache):
     def day_entry(ds):
         return out.setdefault(ds, {})
 
-    # Body Battery aus der Tageszusammenfassung (get_user_summary).
-    for ds, raw in (cache.get("days") or {}).items():
-        summ = raw.get("summary") or {}
-        if not isinstance(summ, dict):
+    # Body Battery aus der Tageszusammenfassung: alter Weg je Tag
+    # (get_user_summary), offizielle API fuer den ganzen Zeitraum
+    # (get_daily_summaries, {"data": [...]}, verschachtelt - dieselben
+    # Feldnamen werden deshalb auch tiefer gesucht).
+    summaries = [(ds, raw.get("summary")) for ds, raw in (cache.get("days") or {}).items()]
+    ds_list = dig(cache, "ranges", "daily_summaries")
+    ds_list = ds_list.get("data") if isinstance(ds_list, dict) else ds_list
+    summaries += [(item.get("calendarDate"), item) for item in as_list(ds_list) if isinstance(item, dict)]
+    for ds, summ in summaries:
+        if not ds or not isinstance(summ, dict):
             continue
-        hi = num(summ.get("bodyBatteryHighestValue"), summ.get("bodyBatteryMostRecentValue"))
-        lo = num(summ.get("bodyBatteryLowestValue"))
+        hi = num(find_key(summ, "bodyBatteryHighestValue"), find_key(summ, "bodyBatteryMostRecentValue"))
+        lo = num(find_key(summ, "bodyBatteryLowestValue"))
         if hi is not None or lo is not None:
             e = day_entry(ds)
             if hi is not None:
@@ -392,7 +592,9 @@ def normalize(cache):
             day_entry(ds).setdefault("steps", st)
 
     # Body Battery: hoechster/niedrigster Wert des Tages
-    for item in (dig(cache, "ranges", "body_battery") or []):
+    for item in as_list(dig(cache, "ranges", "body_battery")):
+        if not isinstance(item, dict):
+            continue
         ds = item.get("date") or item.get("calendarDate")
         if not ds:
             continue
@@ -414,9 +616,16 @@ def normalize(cache):
             e["body_battery_high"] = max(levels)
             e["body_battery_low"] = min(levels)
 
-    # Gewicht/Koerperzusammensetzung
-    bc = dig(cache, "ranges", "body_composition") or {}
-    for item in (bc.get("dateWeightList") or []):
+    # Gewicht/Koerperzusammensetzung. garminconnect (dateRange): dateWeightList;
+    # offizielle API (weight/range): dailyWeightSummaries[].latestWeight.
+    bc = dig(cache, "ranges", "body_composition")
+    bc = bc if isinstance(bc, dict) else {}
+    weights = [w for w in as_list(bc.get("dateWeightList")) if isinstance(w, dict)]
+    for summ in as_list(bc.get("dailyWeightSummaries")):
+        latest = summ.get("latestWeight") if isinstance(summ, dict) else None
+        if isinstance(latest, dict):
+            weights.append({**latest, "calendarDate": latest.get("calendarDate") or summ.get("summaryDate")})
+    for item in weights:
         ds = item.get("calendarDate")
         grams = num(item.get("weight"))
         if ds and grams:
@@ -426,7 +635,9 @@ def normalize(cache):
             e["muscle_mass_kg"] = (lambda v: round(v / 1000.0, 2) if v else None)(num(item.get("muscleMass")))
 
     # Schritte
-    for item in (dig(cache, "ranges", "daily_steps") or []):
+    for item in as_list(dig(cache, "ranges", "daily_steps")):
+        if not isinstance(item, dict):
+            continue
         ds = item.get("calendarDate")
         steps = num(item.get("totalSteps"))
         if ds and steps is not None:
@@ -435,33 +646,110 @@ def normalize(cache):
     return {ds: v for ds, v in sorted(out.items()) if any(x is not None for x in v.values())}
 
 
-def write_wellness_js(daily, sync_info):
-    os.makedirs(DATA_DIR, exist_ok=True)
-    payload = {"generated_at": datetime.now().astimezone().isoformat(),
-               "sync": sync_info, "daily": daily}
-    body = json.dumps(payload, ensure_ascii=False)
-    with open(WELLNESS_JS, "w", encoding="utf-8") as f:
-        f.write(
-            "// Automatisch erzeugt von tools/garmin_sync.py - nicht von Hand bearbeiten.\n"
-            "// Enthaelt persoenliche Gesundheitsdaten und ist deshalb ueber .gitignore\n"
-            "// vom Repository ausgeschlossen. Als .js (nicht .json), weil der Browser\n"
-            "// beim Doppelklick-Aufruf (file://) kein fetch() auf lokale Dateien\n"
-            "// erlaubt - ein <script src> laedt aber normal (wie workouts-data.js).\n"
-            f"const GARMIN_WELLNESS = {body};\n"
-        )
-    log(f"\ndata/wellness-data.js geschrieben ({len(daily)} Tage mit Werten).")
+def store_wellness(session, athlete_id, daily):
+    """Tageswerte eines Benutzers -> Tabelle wellness. Vorhandene Tage werden
+    aktualisiert, weil Garmin Werte nachtraegt. Alle Felder stehen in
+    garmin_wellness_data (wie bisher je Tag in data/wellness-data.js); die
+    passenden Einzelspalten werden zusaetzlich gefuellt."""
+    from backend.models import Wellness
+    existing = {r.date: r for r in session.query(Wellness).filter_by(athlete_id=athlete_id)}
+    for ds, values in daily.items():
+        day = date.fromisoformat(ds)
+        row = existing.get(day) or Wellness(athlete_id=athlete_id, date=day)
+        row.sleep_min = values.get("sleep_min")
+        row.hrv_ms = values.get("hrv_ms")
+        row.resting_hr = values.get("resting_hr")
+        row.steps = values.get("steps")
+        row.garmin_wellness_data = values
+        session.add(row)
+    session.commit()
 
 
 # --------------------------------------------------------------------- CLI
 
+def open_db():
+    """Datenbank ueber das vorhandene Backend oeffnen - dieselbe training.db
+    und dieselben Tabellen wie der Server."""
+    try:
+        from backend import create_app
+    except ImportError as e:
+        raise SystemExit(f"Es fehlt die Bibliothek '{e.name}'.\n"
+                         "  python3 -m pip install -r backend/requirements.txt")
+    try:
+        _, session_factory = create_app()
+    except RuntimeError as e:  # z.B. SECRET_KEY fehlt in .env
+        raise SystemExit(str(e))
+    return session_factory
+
+
+def athletes_with_token():
+    """Alle Benutzer mit Garmin-Zugang: altes Token ODER offizieller Schluessel."""
+    ids = set()
+    for path in glob.glob(os.path.join(TOKEN_DIR, "garmin_*.token")):
+        m = re.fullmatch(r"garmin_(\d+)\.token", os.path.basename(path))
+        if m:
+            ids.add(int(m.group(1)))
+    for path in glob.glob(os.path.join(personal_api.KEY_DIR, "garmin_api_*.json")):
+        m = re.fullmatch(r"garmin_api_(\d+)\.json", os.path.basename(path))
+        if m:
+            ids.add(int(m.group(1)))
+    return sorted(ids)
+
+
+def client_for(athlete_id, fresh_login=False):
+    """Offizielle API, wenn die Person einen Schluessel hinterlegt hat - sonst
+    der bisherige Weg (gespeichertes Token bzw. --login)."""
+    if not fresh_login and personal_api.has_key(athlete_id):
+        log("Offizielle Garmin-Schnittstelle (Personal-API-Schluessel).")
+        return personal_api.PersonalApiClient(athlete_id)
+    return connect(athlete_id, fresh_login=fresh_login)
+
+
+def sync_user(athlete_id, session_factory, start, end, args):
+    """Kompletter Sync EINES Benutzers. Jeder Schreibzugriff nutzt seine athlete_id."""
+    from backend.models import Athlete
+    session = session_factory()
+    try:
+        if not session.query(Athlete).filter_by(athlete_id=athlete_id).first():
+            raise LookupError(f"Benutzer {athlete_id} gibt es nicht (anlegen mit: python3 backend/create_user.py)")
+        log(f"\n=== Benutzer {athlete_id} ===")
+        client = client_for(athlete_id, fresh_login=args.login)
+
+        parts = []
+        if not args.wellness_only:
+            st = sync_activities(client, start, end, athlete_id, session)
+            parts.append(f"Aktivitäten {st['neu']} neu, {st['vorhanden']} vorhanden, {st['fehler']} Fehler")
+        if not args.activities_only:
+            try:
+                cache = sync_wellness(client, start, end, cache_path(athlete_id))
+            except Exception:
+                # Abbruch (Rate-Limit ...): das bis dahin Geholte trotzdem speichern.
+                store_wellness(session, athlete_id, normalize(load_cache(cache_path(athlete_id))))
+                raise
+            daily = normalize(cache)
+            store_wellness(session, athlete_id, daily)
+            parts.append(f"Gesundheitsdaten {len(daily)} Tage")
+        summary = ", ".join(parts)
+        log_user(athlete_id, "OK - " + summary)
+        return summary
+    finally:
+        session.close()
+
+
 def main():
-    ap = argparse.ArgumentParser(description="Synchronisiert Garmin Connect mit dem Dashboard")
+    ap = argparse.ArgumentParser(description="Synchronisiert Garmin Connect mit dem Dashboard (je Benutzer)")
+    ap.add_argument("--athlete", type=int, metavar="ID",
+                    help="nur dieser Benutzer (athlete_id); ohne Angabe alle mit Garmin-Schluessel oder -Token")
+    ap.add_argument("--login", action="store_true",
+                    help="Garmin-Anmeldung fuer --athlete einrichten (fragt E-Mail, Passwort und ggf. 2FA-Code)")
     ap.add_argument("--days", type=int, default=DEFAULT_DAYS,
                     help=f"Zeitraum in Tagen rueckwaerts (Standard: {DEFAULT_DAYS})")
     ap.add_argument("--since", help="Startdatum YYYY-MM-DD (hat Vorrang vor --days)")
-    ap.add_argument("--activities-only", action="store_true", help="nur .fit-Dateien laden")
+    ap.add_argument("--activities-only", action="store_true", help="nur Aktivitaeten laden")
     ap.add_argument("--wellness-only", action="store_true", help="nur Gesundheitsdaten laden")
     args = ap.parse_args()
+    if args.login and args.athlete is None:
+        raise SystemExit("--login braucht --athlete, z.B.:  python3 tools/garmin_sync.py --login --athlete 2")
 
     end = date.today()
     if args.since:
@@ -472,34 +760,24 @@ def main():
     else:
         start = end - timedelta(days=args.days)
 
-    client = connect()
+    session_factory = open_db()
+    athlete_ids = [args.athlete] if args.athlete is not None else athletes_with_token()
+    if not athlete_ids:
+        raise SystemExit("Noch kein Benutzer mit Garmin-Zugang. Einrichten: Garmin-Schluessel in den\n"
+                         "Dashboard-Einstellungen eintragen (empfohlen) oder\n"
+                         "  python3 tools/garmin_sync.py --login --athlete <id>")
 
-    act_stats, daily = None, {}
-    if not args.wellness_only:
-        act_stats = sync_activities(client, start, end)
+    failed = []
+    for athlete_id in athlete_ids:
+        try:
+            sync_user(athlete_id, session_factory, start, end, args)
+        except Exception as e:  # ein Benutzer darf die anderen nie stoppen
+            failed.append(athlete_id)
+            log_user(athlete_id, f"FEHLER - {describe_error(e, athlete_id)}")
 
-    if not args.activities_only:
-        cache = sync_wellness(client, start, end)
-        daily = normalize(cache)
-    else:
-        daily = normalize(load_cache())
-
-    sync_info = {
-        "at": datetime.now().astimezone().isoformat(),
-        "von": start.isoformat(), "bis": end.isoformat(),
-        "aktivitaeten": act_stats,
-    }
-    write_wellness_js(daily, sync_info)
-
-    log("\nFertig.")
-    if act_stats:
-        log(f"  Aktivitaeten: {act_stats['neu']} neu, {act_stats['vorhanden']} bereits vorhanden, "
-            f"{act_stats['fehler']} Fehler (von {act_stats['gesamt']}).")
-    if not args.activities_only:
-        log(f"  Gesundheitsdaten: {len(daily)} Tage.")
-    if act_stats and act_stats["neu"]:
-        log("\nNaechster Schritt (macht sync-garmin.command automatisch):")
-        log("  python3 parse_fit.py && python3 build_dashboard.py")
+    log(f"\nFertig: {len(athlete_ids) - len(failed)} von {len(athlete_ids)} Benutzern ohne Fehler. Log: {LOG_PATH}")
+    if failed:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

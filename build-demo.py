@@ -207,8 +207,28 @@ DEMO_BANNER = """
 DEMO_CSS = """
 <style>
   #update-menu-wrap, #reset-btn, #menu-item-garmin, #menu-item-folder,
-  #menu-item-dnd, #dnd-overlay { display: none !important; }
+  #menu-item-dnd, #dnd-overlay, #garmin-settings-card, #app-update-card, #app-update-banner { display: none !important; }
 </style>
+"""
+
+
+# Die echte App holt alles vom Server (js/data/api-client.js). Die Demo laeuft
+# ohne Server per Doppelklick: kein Login, Daten aus den eingebetteten
+# Demodaten, Aenderungen bleiben nur bis zum Neuladen erhalten.
+DEMO_API = """
+function requireLogin() { return true; }
+async function loadUserStore() { userStore = {}; }
+function storeSet(key, value) { userStore[key] = value; }
+let demoEquipmentId = 0;
+async function apiCall(endpoint, method, body) {
+  if (endpoint.startsWith("workouts/full")) return { data: EMBEDDED_DATA.workouts };
+  // Equipment: nur die Ids vergeben, gemerkt wird nichts (Demo, bis zum Neuladen)
+  if (endpoint === "equipment" && method === "POST") return { data: { ...body, id: ++demoEquipmentId } };
+  if (endpoint.startsWith("equipment")) return { data: endpoint === "equipment" || endpoint === "equipment/assignments" ? [] : {} };
+  if (endpoint === "wellness/daily") return { data: GARMIN_WELLNESS };
+  if (endpoint === "auth/me") return { data: { username: "demo" } };
+  throw new Error("In der Demo nicht verfügbar");
+}
 """
 
 
@@ -230,7 +250,10 @@ def inline(html):
         if not os.path.exists(pfad):
             return ""
         with open(pfad, encoding="utf-8") as f:
-            return "<script>\n" + f.read() + "\n</script>"
+            inhalt = f.read()
+        if rel == "js/data/api-client.js":
+            inhalt += DEMO_API
+        return "<script>\n" + inhalt + "\n</script>"
 
     html = re.sub(r'<link[^>]*href="(css/[^"]+)"[^>]*>', css_ersetzen, html)
     html = re.sub(r'<script src="([^"]+)"></script>', js_ersetzen, html)

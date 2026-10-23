@@ -21,6 +21,9 @@ let athleteProfile = {
   name: null, gender: null, birthDate: null,
   raceExperience: null, // Wettkampferfahrung (Chips: none/few/some/many) - Kontext für die KI-Trainingsplan-Erstellung
   limitations: null, // Verletzungen/Einschränkungen (Freitext) - wird im KI-Trainingsplan-Kontext berücksichtigt
+  swimCssTest: null, // { t400: "7:10", t200: "3:25", date: "YYYY-MM-DD" } - CSS-Test aus dem Analyse-Tab; das Ergebnis steht in swimCss (dasselbe Feld wie in den Einstellungen)
+  homeLocation: null, // Heimatort für das Wetter im Kalender { name, lat, lon } - gesucht in den Einstellungen (js/data/weather.js)
+  sportBalanceTarget: null, // Ziel-Anteile der Trainingszeit { Schwimmen, Rad, Laufen } in % (zusammen 100) - Analyse-Tab "Sport-Balance", null = Standard 15/50/35 (js/analytics/triathlon.js)
 };
 
 const WEEKDAYS = [["mo", "Mo"], ["di", "Di"], ["mi", "Mi"], ["do", "Do"], ["fr", "Fr"], ["sa", "Sa"], ["so", "So"]];
@@ -35,15 +38,14 @@ const WEEKDAY_LABELS = Object.fromEntries(WEEKDAYS);
 
 const ONB_EXP_LABELS = { "<1": "< 1 Jahr", "1-3": "1–3 Jahre", ">3": "> 3 Jahre" };
 
+// Gespeichert in der Ablage pro Person auf dem Server (js/data/api-client.js).
 function loadAthleteProfile() {
-  try {
-    const raw = localStorage.getItem(ATHLETE_PROFILE_KEY);
-    if (raw) athleteProfile = { ...athleteProfile, ...JSON.parse(raw) };
-  } catch (e) { /* Default beibehalten */ }
+  const saved = storeGet(ATHLETE_PROFILE_KEY);
+  if (saved) athleteProfile = { ...athleteProfile, ...saved };
 }
 
 function saveAthleteProfile() {
-  try { localStorage.setItem(ATHLETE_PROFILE_KEY, JSON.stringify(athleteProfile)); } catch (e) {}
+  storeSet(ATHLETE_PROFILE_KEY, athleteProfile);
 }
 
 // Prüft nur Monat+Tag (nicht das Jahr) gegen das hinterlegte Geburtsdatum -

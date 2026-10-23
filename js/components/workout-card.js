@@ -239,7 +239,7 @@ function buildWorkoutDetailHtml(w) {
       <div class="st"><div class="l">Load</div><div class="v">${w.training_load != null ? fmtNum(w.training_load, 0) : "–"}</div></div>
       <div class="st"><div class="l">Kalorien</div><div class="v">${w.calories != null ? Math.round(w.calories) + " kcal" : "–"}</div></div>
       ${extraStatsHtml}
-      <div class="st"><div class="l">Datei</div><div class="v" style="font-size:11px; font-weight:500; word-break:break-all;">${w.file}</div></div>
+      <div class="st"><div class="l">Datei</div><div class="v" style="font-size:11px; font-weight:500; word-break:break-all;">${escapeHtml(w.file)}</div></div>
     </div>
     <div class="modal-charts">
       <div>
@@ -260,6 +260,7 @@ function buildWorkoutDetailHtml(w) {
       <div><h4>Belastungsprofil</h4><div class="chart-wrap wd-radar-chart"></div></div>
     </div>
     ${buildWorkoutLoadStatsHtml(w)}
+    ${buildWorkoutEquipmentHtml(w)}
     ${buildWorkoutRatingHtml(w)}
     ${buildWorkoutAnalysisHtml(w)}`;
 }
@@ -546,6 +547,7 @@ function renderWorkoutDetailCharts(w, rootEl) {
 
   const analysisBtn = rootEl.querySelector(".wd-analysis-btn");
   if (analysisBtn) analysisBtn.addEventListener("click", () => generateWorkoutAnalysis(w.file));
+  wireWorkoutEquipmentBlock(rootEl, w.file);
   wireWorkoutRatingBlock(rootEl, w.file);
 }
 

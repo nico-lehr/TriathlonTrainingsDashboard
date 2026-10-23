@@ -150,8 +150,8 @@ function renderPreWorkoutTiming() {
 }
 
 // Ab wie vielen Tagen vor dem Event die Wettkampf-Verpflegungs-Kachel
-// ausführlich wird - dieselbe Schwelle wie der Beginn der Taper-Phase
-// (computeTrainingPhase "taper-beginn", js/analytics/training-plan.js), da
+// ausführlich wird - spätestens ab Beginn der Taper-Phase (Rennwoche + Woche
+// davor = 7-13 Tage, getPhase in js/analytics/periodization.js), da
 // sich Zielzeiten/Renneinteilung vorher noch ändern können und konkrete
 // Verpflegungsangaben so früh eher verwirren als helfen.
 const RACE_FUELING_TAPER_DAYS = 14;
@@ -173,7 +173,7 @@ function renderRaceFueling() {
         ? "Kein Zieldatum beim Hauptevent hinterlegt."
         : daysUntil < 0
           ? "Das Hauptevent liegt in der Vergangenheit."
-          : `Erscheint automatisch ab der Taper-Phase, ${RACE_FUELING_TAPER_DAYS} Tage vor „${escapeHtml(goal.name)}" (noch ${daysUntil} ${daysUntil === 1 ? "Tag" : "Tage"}).`;
+          : `Erscheint automatisch ${RACE_FUELING_TAPER_DAYS} Tage vor „${escapeHtml(goal.name)}" (noch ${daysUntil} ${daysUntil === 1 ? "Tag" : "Tage"}).`;
     host.innerHTML = `<p class="empty-note racefueling-waiting">${note}</p>`;
     return;
   }

@@ -13,13 +13,15 @@
 const WORKOUT_NOTES_KEY = "triathlon_dashboard_workout_notes_v1";
 
 let workoutNotes = {};
-try {
-  const raw = localStorage.getItem(WORKOUT_NOTES_KEY);
-  if (raw) workoutNotes = JSON.parse(raw) || {};
-} catch (e) { /* Cache leer starten */ }
+
+// Gespeichert in der Ablage pro Person auf dem Server (js/data/api-client.js);
+// app.js ruft das nach loadUserStore() auf.
+function loadWorkoutNotes() {
+  workoutNotes = storeGet(WORKOUT_NOTES_KEY) || {};
+}
 
 function saveWorkoutNotes() {
-  try { localStorage.setItem(WORKOUT_NOTES_KEY, JSON.stringify(workoutNotes)); } catch (e) { /* ignorieren */ }
+  storeSet(WORKOUT_NOTES_KEY, workoutNotes);
 }
 
 function getWorkoutNote(file) {

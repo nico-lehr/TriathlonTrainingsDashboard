@@ -1,7 +1,8 @@
 """API routes for triathlon dashboard.
 
-Phase 1: All endpoints filter by athlete_id=1 (single user).
-Phase 2: Will filter by JWT token's athlete_id.
+Jeder Endpunkt filtert nach der athlete_id aus dem Login-Token
+(get_current_athlete_id); ohne gueltigen Token gibt es 401 (require_login),
+ausser bei /health und /auth/login.
 
 Response format: {"data": [...], "meta": {}} or {"error": "...", "code": "...", "status": 404}
 """
@@ -10,10 +11,26 @@ from datetime import datetime, date
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as SessionType
 
-from . import get_current_athlete_id, Session
-from .models import Athlete, Workout, Wellness, PlannedWorkout, RecoveryCheck, Goal, IcalPlannedWorkout
+from . import get_current_athlete_id
+from .auth import athlete_id_from_ical_key, check_login, make_token, note_failed_login, too_many_failed_logins
+from .models import Athlete, AthleteLogin, Workout, Wellness, PlannedWorkout, RecoveryCheck, Goal, IcalPlannedWorkout
+from .workout_store import find_same_workout
 
 api_bp = Blueprint("api", __name__)
+
+# Die einzigen Endpunkte, die ohne Login erreichbar sind. Der Kalender-Feed
+# prueft selbst: Login-Token ODER geheimer Kalender-Schluessel (?key=...).
+PUBLIC_ENDPOINTS = {"api.health_check", "api.login", "api.get_ical_feed"}
+
+
+@api_bp.before_request
+def require_login():
+    """Ohne gueltigen Bearer-Token: 401 fuer alles ausser PUBLIC_ENDPOINTS."""
+    if request.endpoint in PUBLIC_ENDPOINTS:
+        return None
+    if get_current_athlete_id() is None:
+        return response_error("Nicht angemeldet", "unauthorized", 401)
+    return None
 
 
 def response_success(data, meta=None, status=200):
@@ -34,7 +51,9 @@ def response_error(error, code, status=400):
 
 
 def get_session():
-    """Get database session."""
+    """Get database session - bei jedem Aufruf die aktuelle Fabrik aus
+    create_app(), nicht eine beim Import festgehaltene."""
+    from . import Session
     return Session()
 
 
@@ -146,6 +165,45 @@ def serialize_goal(g: Goal) -> dict:
 
 
 # ============================================================================
+# AUTH ENDPOINTS (Benutzer legt nur backend/create_user.py an)
+# ============================================================================
+
+@api_bp.route("/auth/login", methods=["POST"])
+def login():
+    """POST /api/v1/auth/login - {username, password} -> {token, athlete}."""
+    ip = request.remote_addr or "unknown"
+    if too_many_failed_logins(ip):
+        return response_error("Zu viele Fehlversuche - bitte eine Minute warten", "too_many_attempts", 429)
+
+    data = request.get_json(silent=True) or {}
+    session = get_session()
+    try:
+        athlete_id = check_login(session, data.get("username"), data.get("password"))
+        if athlete_id is None:
+            note_failed_login(ip)
+            return response_error("Benutzername oder Passwort falsch", "invalid_credentials", 401)
+        athlete = session.query(Athlete).filter_by(athlete_id=athlete_id).first()
+        return response_success({"token": make_token(athlete_id), "athlete": serialize_athlete(athlete)})
+    finally:
+        session.close()
+
+
+@api_bp.route("/auth/me", methods=["GET"])
+def auth_me():
+    """GET /api/v1/auth/me - Der angemeldete Athlet (inkl. Benutzername)."""
+    session = get_session()
+    try:
+        athlete_id = get_current_athlete_id()
+        athlete = session.query(Athlete).filter_by(athlete_id=athlete_id).first()
+        if not athlete:
+            return response_error("Athlete not found", "athlete_not_found", 404)
+        login_row = session.query(AthleteLogin).filter_by(athlete_id=athlete_id).first()
+        return response_success({**serialize_athlete(athlete), "username": login_row.username if login_row else None})
+    finally:
+        session.close()
+
+
+# ============================================================================
 # ATHLETE ENDPOINTS
 # ============================================================================
 
@@ -237,11 +295,23 @@ def get_workouts():
 
 @api_bp.route("/workouts", methods=["POST"])
 def create_workout():
-    """POST /api/v1/workouts - Create or update workout."""
+    """POST /api/v1/workouts - Create or update workout.
+
+    Optional fit_data = komplettes Parser-Ergebnis (Browser-Import). Ohne
+    garmin_activity_id wird dieselbe Einheit (Datum + Startzeit + Sportart)
+    nicht doppelt angelegt: Antwort 200 mit dem vorhandenen Eintrag und
+    meta.duplicate = true."""
     session = get_session()
     try:
         athlete_id = get_current_athlete_id()
         data = request.get_json()
+        fit_data = data.get("fit_data") if isinstance(data.get("fit_data"), dict) else None
+        workout_date = datetime.fromisoformat(data["date"]).date() if isinstance(data["date"], str) else data["date"]
+
+        if fit_data and not data.get("garmin_activity_id"):
+            same = find_same_workout(session, athlete_id, workout_date, fit_data)
+            if same:
+                return response_success(serialize_workout(same), meta={"duplicate": True})
 
         # Check for UNIQUE constraint (athlete_id, garmin_activity_id)
         if data.get("garmin_activity_id"):
@@ -263,7 +333,7 @@ def create_workout():
         # Create new
         workout = Workout(
             athlete_id=athlete_id,
-            date=datetime.fromisoformat(data["date"]).date() if isinstance(data["date"], str) else data["date"],
+            date=workout_date,
             sport=data.get("sport", "running"),
             sub_sport=data.get("sub_sport"),
             duration_min=data.get("duration_min", 0),
@@ -279,6 +349,7 @@ def create_workout():
             source=data.get("source", "manual"),
             garmin_activity_id=data.get("garmin_activity_id"),
             notes=data.get("notes"),
+            fit_data=fit_data,
         )
         session.add(workout)
         session.commit()
@@ -404,6 +475,10 @@ def create_planned_workout():
     try:
         athlete_id = get_current_athlete_id()
         data = request.get_json()
+
+        # Nur an ein EIGENES Ziel haengen, nie an das eines anderen Athleten.
+        if data.get("goal_id") and not session.query(Goal).filter_by(id=data["goal_id"], athlete_id=athlete_id).first():
+            return response_error("Goal not found", "goal_not_found", 404)
 
         workout = PlannedWorkout(
             athlete_id=athlete_id,
@@ -560,14 +635,16 @@ def sync_ical_planned_workouts():
     if not isinstance(workouts, list):
         return response_error("'workouts' muss ein Array sein", "VALIDATION_ERROR", 400)
 
-    session: SessionType = Session()
+    session: SessionType = get_session()
     try:
         session.query(IcalPlannedWorkout).filter_by(athlete_id=athlete_id).delete()
         for w in workouts:
             if not w.get("id") or not w.get("date") or w.get("status") != "geplant":
                 continue  # erledigte/uebersprungene Einheiten gehoeren nicht in einen Vorschau-Kalender
             session.add(IcalPlannedWorkout(
-                id=str(w["id"]),
+                # Die Spalte id ist tabellenweit eindeutig: ohne die Nummer der
+                # Person kollidieren zwei Personen mit derselben Plan-Kennung.
+                id=f"{athlete_id}-{w['id']}"[:64],
                 athlete_id=athlete_id,
                 date=w["date"],
                 sport=w.get("sport"),
@@ -616,8 +693,12 @@ def get_ical_feed(athlete_id):
     """GET /api/v1/ical/<athlete_id>.ics - Abonnierbarer Kalender-Feed
     (webcal://.../api/v1/ical/1.ics bzw. http:// als Fallback) mit allen noch
     geplanten Einheiten. Ganztaegige Termine (VALUE=DATE), da geplante
-    Einheiten keine Uhrzeit haben (siehe DATA_MODEL.md)."""
-    session: SessionType = Session()
+    Einheiten keine Uhrzeit haben (siehe DATA_MODEL.md). Nur der eigene Feed
+    ist abrufbar - mit Login-Token oder mit dem geheimen Schluessel aus
+    GET /api/v1/ical-link; fremde athlete_ids sehen aus wie nicht vorhanden."""
+    if athlete_id not in (get_current_athlete_id(), athlete_id_from_ical_key(request.args.get("key"))):
+        return response_error("Kalender nicht gefunden", "not_found", 404)
+    session: SessionType = get_session()
     try:
         rows = session.query(IcalPlannedWorkout).filter_by(athlete_id=athlete_id).order_by(IcalPlannedWorkout.date).all()
         lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Triathlon Dashboard//iCal Export//DE", "CALSCALE:GREGORIAN"]

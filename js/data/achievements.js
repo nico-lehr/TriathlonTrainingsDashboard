@@ -14,17 +14,16 @@ let achievementsState = {
 };
 
 function loadAchievements() {
-  try {
-    const raw = localStorage.getItem(ACHIEVEMENTS_KEY);
-    if (raw) achievementsState = { ...achievementsState, ...JSON.parse(raw) };
-    if (!Array.isArray(achievementsState.unlocked)) achievementsState.unlocked = [];
-    if (!achievementsState.snapshot) achievementsState.snapshot = { pbSeconds: {} };
-    if (!achievementsState.snapshot.pbSeconds) achievementsState.snapshot.pbSeconds = {};
-  } catch (e) { /* Default beibehalten */ }
+  // Gespeichert in der Ablage pro Person auf dem Server (js/data/api-client.js).
+  const saved = storeGet(ACHIEVEMENTS_KEY);
+  if (saved) achievementsState = { ...achievementsState, ...saved };
+  if (!Array.isArray(achievementsState.unlocked)) achievementsState.unlocked = [];
+  if (!achievementsState.snapshot) achievementsState.snapshot = { pbSeconds: {} };
+  if (!achievementsState.snapshot.pbSeconds) achievementsState.snapshot.pbSeconds = {};
 }
 
 function saveAchievements() {
-  try { localStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(achievementsState)); } catch (e) { /* Speicher evtl. voll/deaktiviert */ }
+  storeSet(ACHIEVEMENTS_KEY, achievementsState);
 }
 
 // Merkt neu unlockte Erfolge als "gesehen" (z.B. sobald die Erfolge-Karte

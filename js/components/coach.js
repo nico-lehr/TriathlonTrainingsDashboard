@@ -11,6 +11,10 @@
 function renderCoachSummary() {
   const host = document.getElementById("coach-summary-body");
   if (!host) return;
+  // Die "Grundlage" der Empfehlungs-Karte hängt an denselben Daten (Form,
+  // Plan, Erholung) - deshalb hier mit auffrischen, wie renderPerformanceSummary.
+  if (typeof renderOutlook === "function") renderOutlook();
+  if (typeof renderRaceCountdown === "function") renderRaceCountdown(); // Wettkampf-Countdown hängt an Ziel + Plan
 
   const chips = [];
 
@@ -54,7 +58,7 @@ function renderCoachSummary() {
       const p = upcoming[0];
       const d = new Date(p.date + "T00:00:00");
       const dowShort = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
-      chips.push({ label: "Nächstes Training", value: `${escapeHtml(p.sport)}`, sub: `${dowShort[d.getDay()]}, ${escapeHtml(p.title || "")}`.trim() });
+      chips.push({ label: "Nächstes Training", value: `${escapeHtml(p.sport)}`, sub: `${dowShort[d.getDay()]}, ${p.title || ""}`.trim() }); // sub wird beim Ausgeben maskiert
     }
   }
 
@@ -98,6 +102,39 @@ function renderPerformanceSummary() {
   host.innerHTML = buildPerformanceSummaryHtml();
   const btn = document.getElementById("perf-summary-btn");
   if (btn) btn.addEventListener("click", () => generatePerformanceSummary());
+}
+
+// Empfehlungen "Heute / Diese Woche / Nächste Woche" (eigene Karte im
+// Coach-Tab) - gleiches Muster wie buildPerformanceSummaryHtml (Button +
+// Ergebnis/Fehler/Lade-Zustand, outlook in js/ai/ollama.js). Unter jeder
+// Empfehlung stehen die Fakten, aus denen sie entstanden ist
+// (buildOutlookFacts) - vor dem ersten Abruf die aktuellen.
+function renderOutlook() {
+  const host = document.getElementById("coach-outlook-body");
+  if (!host) return;
+  const r = outlook.result;
+  const facts = (r && outlook.facts) || buildOutlookFacts();
+  const btnLabel = outlook.loading ? "Analysiere …" : (r ? "Neu einschätzen" : "Empfehlungen abrufen");
+  host.innerHTML = `
+    <div class="goal-actions">
+      <button type="button" class="chip" id="coach-outlook-btn" ${outlook.loading ? "disabled" : ""}>${btnLabel}</button>
+      ${outlook.at ? `<span class="goal-rec-date">Stand: ${fmtDateFull(new Date(outlook.at))}</span>` : ""}
+    </div>
+    ${outlook.error ? `<p class="goal-error">${escapeHtml(outlook.error)}</p>` : ""}
+    <div class="outlook-grid">
+      ${OUTLOOK_HORIZONS.map(h => {
+        const item = r && r[h.key];
+        return `
+        <div class="outlook-item">
+          <h3 class="outlook-title">${h.label}</h3>
+          ${item && item.empfehlung ? `<p class="outlook-text">${escapeHtml(item.empfehlung)}</p>` : ""}
+          ${item && item.begruendung ? `<p class="outlook-reason"><b>Warum:</b> ${escapeHtml(item.begruendung)}</p>` : ""}
+          <p class="workouts-columns-title outlook-facts-title">Grundlage</p>
+          <ul class="outlook-facts">${facts[h.facts].map(f => `<li>${escapeHtml(f)}</li>`).join("")}</ul>
+        </div>`;
+      }).join("")}
+    </div>`;
+  host.querySelector("#coach-outlook-btn").addEventListener("click", () => generateOutlook());
 }
 
 // Minimalistische Karten: pro Ziel nur Name/Datum/Countdown + kompakte
@@ -266,6 +303,7 @@ function renderGoals() {
           ${goal.notes ? `<div class="goal-notes">${escapeHtml(goal.notes)}</div>` : ""}
           ${readinessDetailHtml}
           ${buildGoalAdvancedHtml(goal)}
+          ${buildRacePlanHtml(goal)}
           <div class="goal-actions">
             <button class="chip goal-generate-btn" data-id="${goal.id}" ${goal._loading ? "disabled" : ""}>${btnLabel}</button>
             ${goal.recommendationAt ? `<span class="goal-rec-date">Stand: ${fmtDateFull(new Date(goal.recommendationAt))}</span>` : ""}
@@ -330,6 +368,7 @@ function renderGoals() {
       renderGoals();
     }
   }));
+  wireRacePlan(el);
 
   renderCoachSummary();
   applyGoalsCardCollapseState();
@@ -808,6 +847,7 @@ function initCoach() {
   loadAthleteProfile();
   loadGoals();
   loadPlannedWorkouts();
+  loadPlanWishes();
   initGoalsCardCollapse();
   applyCoachGateState();
   const urlInput = document.getElementById("coach-ollama-url");
@@ -920,6 +960,7 @@ function initCoach() {
 
   initPlanEditOverlay();
   initTrainingPlanWishes();
+  initPlanWishForm();
   initIcalSettings();
   renderGoals();
   renderTrainingPlanCard();
@@ -934,10 +975,11 @@ function initCoach() {
   }
 }
 
-// "Kalender-Abo (iCal)"-Karte in den Einstellungen: zeigt die Abo-Adresse
-// nur an, wenn der lokale Backend-Server tatsächlich erreichbar ist (sonst
-// wäre die URL nutzlos/irreführend) - prüft per /api/v1/health, demselben
-// Endpoint wie TriathlonApiClient.checkAvailability() (js/data/api-client.js).
+// "Kalender-Abo (iCal)"-Karte in den Einstellungen: zeigt auf Klick die
+// persoenliche Abo-Adresse (GET /api/v1/ical-link). Sie enthaelt einen
+// geheimen Schluessel statt eines Logins, weil Kalender-Apps sich nicht
+// anmelden koennen - und nutzt die Adresse, unter der das Dashboard gerade
+// laeuft (localhost, PC-Name oder Tailscale).
 function initIcalSettings() {
   const hint = document.getElementById("ical-status-hint");
   const row = document.getElementById("ical-url-row");
@@ -945,38 +987,25 @@ function initIcalSettings() {
   const copyBtn = document.getElementById("ical-copy-btn");
   if (!hint || !row || !urlInput) return;
 
-  const icalUrl = "http://localhost:5000/api/v1/ical/1.ics";
-
-  // Die Prueffung laeuft NICHT mehr automatisch bei jedem Laden, sondern erst
-  // auf Klick. Grund: Der Kalender-Export ist optional und bei den meisten
-  // Nutzern gar nicht eingerichtet - der automatische Versuch erzeugte dann bei
-  // JEDEM Seitenaufruf eine rote Fehlermeldung in der Browser-Konsole, die wie
-  // ein echter Defekt aussieht, obwohl nur ein optionaler Dienst fehlt.
   const pruefBtn = document.getElementById("ical-check-btn");
-  hint.textContent = "Optional: Trainingsplan als Kalender-Abo. Dafuer muss der Backend-Server laufen.";
+  hint.textContent = "Optional: dein Trainingsplan als Kalender-Abo.";
   row.hidden = true;
   if (pruefBtn) pruefBtn.hidden = false;
 
-  function pruefeBackend() {
-    hint.textContent = "Pruefe ...";
-    fetch("http://localhost:5000/api/v1/health", { signal: AbortSignal.timeout ? AbortSignal.timeout(2500) : undefined })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(() => {
-        hint.textContent = "Backend-Server erreichbar — diese Adresse in deiner Kalender-App als Internetkalender-Abo hinzufügen:";
-        urlInput.value = icalUrl;
+  function zeigeAboAdresse() {
+    hint.textContent = "Lade ...";
+    apiCall("ical-link")
+      .then(r => {
+        hint.textContent = "Diese persönliche Adresse in deiner Kalender-App als Internetkalender-Abo hinzufügen. Nicht weitergeben – wer sie kennt, sieht deinen Plan.";
+        urlInput.value = new URL(r.data.path, window.location.href).href;
         row.hidden = false;
       })
-      .catch(() => {
-        // Haeufigste Ursache auf dem Mac: Port 5000 ist bereits vom
-        // AirPlay-Empfaenger belegt (Systemeinstellungen ▸ Allgemein ▸
-        // AirDrop & Handoff ▸ AirPlay-Empfaenger). Dann startet der Server
-        // zwar, ist aber nicht erreichbar.
-        hint.textContent = "Backend-Server nicht erreichbar. Starte ihn mit \"python3 backend/app.py\" im Projektordner. "
-          + "Falls das nicht hilft: Port 5000 ist auf dem Mac oft vom AirPlay-Empfaenger belegt — diesen in den Systemeinstellungen deaktivieren.";
+      .catch(e => {
+        hint.textContent = e.message;
         row.hidden = true;
       });
   }
-  if (pruefBtn) pruefBtn.addEventListener("click", pruefeBackend);
+  if (pruefBtn) pruefBtn.addEventListener("click", zeigeAboAdresse);
 
   if (copyBtn) {
     copyBtn.addEventListener("click", async () => {

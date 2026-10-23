@@ -1,0 +1,133 @@
+# PROGRESS – Arbeitspaket
+
+Zweig: `feature/arbeitspaket` (enthält auch `feature/login-tailscale`). `main` bleibt unverändert.
+Ein Schritt zählt erst als erledigt, wenn Tests und Prüfung bestanden sind.
+
+## Vorarbeiten (Voraussetzung für das Paket, nicht in den 21 Schritten)
+
+| Vorarbeit | Status | Letzte Änderung |
+|---|---|---|
+| Tailscale Etappe 1 – Login (Backend) | fertig | 2026-10-12 |
+| Tailscale Etappe 2 – Frontend ausliefern | fertig | 2026-10-12 |
+| Tailscale Etappe 3 – Frontend auf API | fertig | 2026-10-12 |
+| Tailscale Etappe 4 – Import | fertig | 2026-10-12 |
+| Tailscale Etappe 5 – KI über Backend | fertig | 2026-10-12 |
+| Tailscale Etappe 6 – Betrieb | fertig | 2026-10-12 |
+| Tailscale Etappe 7 – Garmin mehrere Nutzer | fertig | 2026-10-12 |
+| Layout (breitere Seite) | fertig | 2026-10-12 |
+| Trainingsplaner 1 – Regelwerk plan-rules.js | fertig | 2026-10-12 |
+| Trainingsplaner 2 – Verschieben & Wünsche | fertig | 2026-10-12 |
+| Trainingsplaner 3 – KI-Empfehlungen | fertig | 2026-10-12 |
+
+## Arbeitspaket (21 Schritte)
+
+| Aufgabe | Status | Erledigte Schritte | Prozent | Letzte Änderung |
+|---|---|---|---|---|
+| A Wettkampf-Countdown & Periodisierung | fertig (geprüft in 3 Runden, zuletzt PASS) | 3 / 3 | 100 % | 2026-10-12 |
+| B Triathlon-Auswertungen | fertig (geprüft: erst FAIL, nach Korrektur PASS) | 4 / 4 | 100 % | 2026-10-12 |
+| C Garmin-Workouts auf die Uhr | fertig (geprüft: PASS; kleine Nachbesserungen) | 3 / 3 | 100 % | 2026-10-12 |
+| D Handy / iPhone | fertig (geprüft: PASS; kleine CSS-Nachbesserungen eingebaut) | 4 / 4 | 100 % | 2026-10-12 |
+| E Equipment, Wetter, Rennplan | fertig (E1 erst FAIL dann PASS; E2 PASS; E3 erst FAIL dann PASS) | 3 / 3 | 100 % | 2026-10-12 |
+| F Abschluss-Check | fertig (Korrekturen: zweiter Prüfer erst FAIL, nach Nachbesserung PASS) | 4 / 4 | 100 % | 2026-10-22 |
+
+**Gesamt: 100 % (21 von 21 Schritten)**
+
+## Zusatz G: Offizielle Garmin-API (Personal API)
+
+Auftrag (2026-10-22): Weg A – Lesen über die offizielle Schnittstelle, „An Garmin senden“ bleibt beim alten Weg; jede Person trägt ihren eigenen Schlüssel in den Einstellungen ein.
+
+| Schritt | Status |
+|---|---|
+| G1 Schnittstelle `tools/garmin_personal_api.py` (Schlüssel → 24-h-Token, Abfragen, ohne Zusatz-Bibliothek) | fertig |
+| G2 Sync nutzt den Schlüssel, wenn vorhanden (sonst alter Weg); Aufbereitung versteht beide Antwortformen | fertig |
+| G3 Server: Schlüssel prüfen/speichern/entfernen, „Jetzt von Garmin holen“ im Hintergrund | fertig |
+| G4 Einstellungen-Karte „Garmin-Verbindung“ | fertig (im Browser mit nachgestelltem Garmin von Anfang bis Ende geprüft) |
+| G5 Tests (nur nachgestelltes Garmin) + Doku | fertig |
+| G6 Prüfung durch zweiten Prüfer | fertig: 1. Runde FAIL (u. a. KRITISCH: die Tests hätten den echten Schlüssel auf dem PC gelöscht), 2. Runde FAIL (ein dauerhaft scheiternder Garmin-Dienst hätte jeden Abruf auf 300 Tage × alle Abfragen aufgebläht; Weiterleitungs-Test wirkungslos), 3. Runde **PASS**. Danach noch die optionalen Hinweise eingebaut (unerwartete Antwortformen stoppen die Aufbereitung nicht, „nicht erreichbar“ bricht auch Downloads ab) – mit Tests, die jeden dieser Fehler erkennen |
+
+### Offene Fragen zu G
+
+- **Mit einem echten Schlüssel noch nicht getestet** (nur mit nachgestelltem Garmin). Die Adressen stammen aus Garmins eigenem Beispiel-Client. Bei Schlaf und Gewicht ist das genaue Antwortformat der neuen Schnittstelle nicht dokumentiert; die Aufbereitung liest beide bekannten Formen. Bitte nach dem ersten Abruf prüfen, ob Schlaf, HRV, Ruhepuls, Gewicht und die Trainings stimmen.
+- VO2max und Garmins Trainingszustand liefert die Personal API nicht → bei Personen mit Schlüssel leer; das Dashboard schätzt VO2max selbst.
+- Body Battery: Ob sie über die Personal API ankommt, ist offen (Format der Tageszusammenfassung nicht dokumentiert; die Aufbereitung sucht die bekannten Feldnamen auch verschachtelt). Die Rohantworten bleiben im Zwischenspeicher, damit sich das nachbessern lässt.
+- Neu für beide Wege: Eine gescheiterte Abfrage wird nicht sofort als „keine Daten“ gespeichert, sondern bis zu dreimal in späteren Läufen nachgeholt (nur der fehlende Wert, nicht der ganze Tag); bei „zu viele Anfragen“, abgelehntem Schlüssel oder nicht erreichbarem Garmin bricht der Lauf ab und speichert das Geladene (vorher blieben solche Lücken für immer).
+- „Gültig bis“ trägt man selbst ein (Garmin verrät das Ablaufdatum über die Schnittstelle nicht). Ohne Eintrag gibt es keine Vorwarnung, nur die Meldung „abgelehnt“, wenn er abgelaufen ist.
+- Garmin sagt, die Personal API sei für eigene Daten gedacht, nicht für Dienste für andere. Hier nutzt jede Person ihren eigenen Schlüssel für ihre eigenen Daten auf deinem PC – bitte Garmins Bedingungen beim Erstellen des Schlüssels selbst lesen.
+- Der Schlüssel liegt wie die bisherigen Garmin-Token als Datei auf dem PC (nur für deinen Computer-Benutzer lesbar), nicht verschlüsselt.
+
+## Zusatz H: Programm-Updates
+
+Auftrag (2026-10-22): Hinweis auf neue Versionen und Installation nach Bestätigung, möglichst automatisch.
+
+| Schritt | Status |
+|---|---|
+| H1 Versionsnummer (`VERSION`), Prüfung der neuesten GitHub-Release (einmal am Tag) | fertig |
+| H2 Installieren: Sicherung, Paket prüfen, Bibliotheken zuerst, Dateien ersetzen (ZIP) bzw. `git merge --ff-only` (git), Nutzerdaten geschützt | fertig |
+| H3 Neustart über den Starter `backend/launcher.py` (start.bat/start.sh) | fertig |
+| H4 Hinweis oben + Karte „Programm-Updates“ (nur Betreiber) | fertig (im Browser mit nachgestelltem GitHub von Anfang bis Ende geprüft: prüfen → installieren → Neustart → Seite mit 2.1.0) |
+| H5 Tests (kein echtes GitHub, kein Netz) + Doku | fertig |
+| H6 Prüfung durch zweiten Prüfer | **PASS** (keine kritischen Funde). Die 7 „sollte behoben werden“-Punkte trotzdem behoben: Abbruch beim Kopieren stellt den alten Stand wieder her, Sicherungen nach Alter aufräumen, Prüf-Thread übersteht kaputte Antworten, git-Weg prüft VERSION im Tag, Schutz unabhängig von Groß-/Kleinschreibung, Zip-Slip-Test wirksam, Doku zu GitHub/PyPI. Dazu: eigene DB-Sicherung vor dem Update, Garmin-Token geschützt, Neuladen wartet auf den neuen Server-Lauf – jeweils mit Tests, die den Fehler erkennen |
+
+### Offene Fragen zu H
+
+- Auf GitHub gibt es noch **keine Release**. Nach dem Zusammenführen dieses Branches auf `main` bitte die erste Release `v2.0.0` veröffentlichen (Anleitung: `docs/DEPLOYMENT.md`, Abschnitt 7). Bestehende Installationen ohne Update-Funktion brauchen dieses eine Mal ein Update von Hand.
+- „Betreiber“ = die zuerst angelegte Person (änderbar mit `ADMIN_USERS=` in `.env`). Freunde sehen nur die Versionsnummer.
+- Die Prüfung braucht ein öffentliches Repository (GitHub ohne Konto). Bei einem privaten Repository meldet die Karte „GitHub antwortet mit Fehler 404“ bzw. „keine Version veröffentlicht“.
+- Dateien, die eine neue Version löscht, bleiben bei ZIP-Installationen liegen (stören nicht).
+- Mit Windows selbst konnte ich nicht testen (nur Linux). `start.bat` startet den Starter in einer einzigen Zeile, damit Windows die Datei während eines Updates nicht weiterliest. Bitte beim ersten echten Update kurz zuschauen.
+
+## Offene Fragen
+
+### Aus dem Abschluss-Check F (nicht behoben, optional)
+
+- Alte Endpunkte in `backend/routes.py` (Bestand, Zeilen ~261, 362, 440, 503, 556, 602, 659) geben bei Fehlern den Fehlertext/SQL nach außen und liefern bei kaputter Eingabe 500 statt 400. Sie sind jetzt nur noch nach Anmeldung erreichbar. Standard: so gelassen (alte Endpunkte nicht ändern).
+- Login-Bremse nutzt die IP-Adresse; hinter `tailscale serve` (HTTPS) sehen alle `127.0.0.1` und teilen sich die Bremse (siehe unten).
+- Doppelte Hilfsfunktionen: Tage bis zum Rennen (`context-builder.js` rechnet selbst, `daysUntilGoal()` in `nutrition.js` gibt es schon), lokale `shift`-Funktionen in `context-builder.js` und `periodization.js` (gibt es als `planShiftDay`). Funktioniert, nur doppelt.
+- `race-plan.js` setzt eine Farbe per `style="background:…"` im HTML (wie schon die Sport-Punkte). Optional: CSS-Klasse je Sportart.
+- Geteiltes Gerät: `riskCheckLastDate` gilt pro Gerät statt pro Person; ein Claude-API-Schlüssel bleibt nach Ablauf des Logins im Browser stehen (nur „Abmelden“ löscht ihn).
+- Die alten Playwright-Skripte (`test_*.py` im Hauptordner) öffnen `index.html` per `file://` und laufen nicht mehr. Nicht gelöscht, in `docs/PROJECT_MAP.md` als veraltet markiert. Löschen oder auf den Server umbauen?
+- `sync-garmin.command` (Mac, alter Ablauf) bringt keine Daten mehr ins Dashboard; Ersatz: `python tools/garmin_sync.py`. Nicht angefasst.
+- Ein einzelner Login lässt sich nicht zurückziehen (gilt bis zu 30 Tage); alle abmelden geht über einen neuen `SECRET_KEY` in `.env`. In `docs/DEPLOYMENT.md` beschrieben.
+
+### Im Abschluss-Check behoben
+
+- README.md/README.txt beschrieben noch den alten Doppelklick-Ablauf → README neu geschrieben (Start über `start.bat`/`start.sh`, Benutzer anlegen, Garmin, Tailscale-Verweis).
+- `escapeHtml()` maskierte keine Anführungszeichen: ein Titel wie `Lauf "locker" 5x1km` wurde im Bearbeiten-Fenster abgeschnitten (und war ein Einfallstor für eingeschleusten Code in den eigenen Daten). Jetzt maskiert (im Browser nachgeprüft).
+- Ablage pro Person: Ein lange offener Tab konnte neuere Änderungen vom Handy still überschreiben → jetzt erscheint beim Zurückkehren in den Tab ein Hinweis mit „Neu laden“ (im Browser mit zwei Geräten nachgestellt und geprüft).
+- Kalender-Abgleich scheiterte mit Fehler 500, wenn zwei Personen dieselbe Plan-Kennung hatten → Kennung bekommt die Nummer der Person vorangestellt.
+- Wer zuerst angelegt wird, bekam alle alten Daten → `create_user.py` fragt vorher nach, `docs/DEPLOYMENT.md` sagt „zuerst dich selbst anlegen“.
+- Upload-Grenze 64 MB (vorher keine), 16 statt 8 Server-Threads, Benutzernamen sind über die Antwortzeit nicht mehr erratbar, Start bricht mit klarer Meldung ab, wenn die Sicherung nicht klappt, `.gitignore` und Werkzeug-Version ergänzt.
+
+- Prüfung der Korrekturen (zweiter Prüfer): erst FAIL – die neue Warnung „anderes Gerät“ ließ sich durch andere Erfolgsmeldungen verstecken, eine eigene ungesicherte Änderung wurde als „anderes Gerät“ gemeldet (Neuladen hätte sie gelöscht), Fehlalarm während KI-Anfragen, doppelte Maskierung im Coach-Chip. Alles behoben, mit Tests für jeden Fund; danach PASS.
+- Nicht gemacht (optional): Ein gescheitertes Speichern wird nicht automatisch wiederholt. Der Hinweis bleibt stehen und der Browser warnt beim Schließen, bis die Änderung erneut gespeichert ist (so war es auch vorher).
+
+### Weitere
+
+- Zählfehler korrigiert: A–E sind 17 Schritte (3+4+3+4+3), nicht 18. Mit der fertigen Doku (F4) sind es jetzt 18 von 21.
+- iPhone über HTTPS (`tailscale serve`): Der Server sieht dann alle Anfragen von `127.0.0.1`. Die Login-Bremse (5 Fehlversuche/Minute) gilt damit für alle HTTPS-Nutzer gemeinsam – tippt einer 5-mal falsch, müssen alle über HTTPS eine Minute warten. Standard: so gelassen (selten, nach 1 Minute vorbei). Änderbar, indem der Server bei Anfragen von `127.0.0.1` die von Tailscale mitgeschickte echte Adresse nimmt.
+- `.btn-primary` / `.btn-secondary` gibt es im CSS nicht. Standard: Hauptknopf = `.update-btn`, Nebenknopf = `.cal-today-btn` (beide vorhanden).
+- Einen „Analyse“-Tab gab es nicht. Standard: Aufgabe B legt ihn neu an (ein Tab-Knopf + eine Ansicht).
+- Layout: Mit der gewünschten Mindestbreite 420 px stehen bei 1680 px drei Karten nebeneinander; weil die Übersicht-Karten in Zweier-/Vierergruppen kommen, bleiben in manchen Reihen Lücken. Wer keine Lücken will: Mindestbreite in `.dash-grid` auf ca. 540 px setzen (dann 2 Spalten bis ca. 2000 px). Vorerst wie gewünscht 420 px.
+- Layout: Diagramm-Beschriftungen wachsen auf sehr breiten Karten mit (SVG wird skaliert); Eingabefelder in den Einstellungen werden sehr breit. Optional später.
+- Trainingsplaner: Eine Verschiebung oder ein KI-Plan wird nur an den Verstößen gemessen, die er NEU erzeugt (vorhandene Probleme blockieren nichts). Bleibt nach Selbstkorrektur und 2. KI-Versuch ein „block“, wird der KI-Plan nicht gespeichert und der alte Plan bleibt erhalten.
+- B: Der neue Tab „Analyse“ steht hinten (nach „Rekorde“) und nutzt immer die ganze Historie (der Zeitraum-Filter gibt es nur in der Übersicht). Koppeltraining ist nur mit erfundenen Daten getestet – mit echten Multisport-Dateien noch einmal ansehen.
+- A: Die Phasen-Angaben (Taper 7–14 Tage, Spezifisch 4–6 Wochen, Aufbau 6–8 Wochen) überschneiden sich, wenn man sie als Abstand zum Rennen liest. Standard: als Phasen-LÄNGEN gelesen – Taper 2 Wochen (inkl. Rennwoche), Spezifisch 6, Aufbau 8, davor Grundlage; Wechsel immer montags. Änderbar über Konstanten in `js/analytics/periodization.js`.
+- A: Plan-Einheiten nutzen das vorhandene Feld `phase` (statt eines zweiten Felds `training_phase`). Neue Regel 7 „Erholungswoche nach dem Rennen“ ist eine Warnung, kein Block.
+- D: iPhone-Layout braucht iOS 16 oder neuer; Kalender-Monatsansicht scrollt auf dem Handy innerhalb der Karte; Kopieren-Knöpfe gehen auf dem iPhone nur über HTTPS (`tailscale serve`).
+- A: Wochenziel = letzte normale Trainingswoche × Wachstum (Grundlage +3 %, Aufbau +5 %, max. +30 %); nach 2+ leichten Wochen (z. B. krank) startet die Kurve vorsichtig bei höchstens der Hälfte des alten Umfangs. Taper 70 %, Rennwoche 50 %, Erholung 40 %.
+- E1: Die „Fällig“-Banner in Übersicht/Kalender hattest du im September entfernt; die 90-%-Warnung erscheint deshalb nur als Hinweis „bald fällig“ in den Einstellungen. Banner wieder einbauen? (zwei Zeilen)
+- C: Mit einem echten Garmin-Konto ist „An Garmin senden“ noch NICHT getestet (nur mit nachgebautem Garmin) – bitte selbst ausprobieren. Schwimm-Workouts könnte Garmin ablehnen; dann bietet das Dashboard den .fit-Download an. Erneutes Senden legt in Garmin ein zweites Workout an.
+- C: „An Garmin senden“ braucht auf dem Dashboard-PC die Garmin-Bibliotheken (`python -m pip install -r requirements.txt`) und eine einmalige Garmin-Anmeldung je Person (`tools/garmin_sync.py --login --athlete <Nummer>`). Ohne sie erklärt das Dashboard, was fehlt, und bietet den .fit-Download an.
+- E3: Zielzeiten werden überall als Std:Min(:Sek) gelesen („3:30“ = 3 h 30 min) – so geben es die Eingabefelder vor. Der Ernährungs-Tab las „3:30“ vorher als 3 min 30 s (alter Fehler, jetzt behoben).
+- E2: „See“/„Meer“ zählen nur als eigenes Wort als Freiwasser („Seeschwimmen“ zählt deshalb als Becken). Wetter gibt es nur an Tagen mit Draußen-Einheit innerhalb der 7-Tage-Vorhersage.
+- E3: Ziele lassen sich nach dem Anlegen nicht bearbeiten – fehlt die Zielzeit, steht im Rennplan „fehlt“, bis das Ziel neu angelegt wird. Ziele bearbeitbar machen?
+- C1: Die Plan-Einheiten liegen in der Ablage pro Person, nicht in der alten Tabelle `planned_workouts` (die das Dashboard nicht nutzt). Standard: `steps` wird ein Feld der Plan-Einheit statt einer neuen Spalte – damit ist keine Datenbank-Änderung nötig.
+- C2: Hochgeladen wird mit dem Garmin-Token aus dem Garmin-Sync (`~/.triathlon/garmin_<Nummer>.token`). Ohne Token gibt es eine Anleitung statt einer Passwort-Abfrage.
+- E1: Equipment gab es schon im Browser. Es wird auf die neue Tabelle umgestellt; vorhandene Einträge werden einmalig übernommen.
+- Welle 2 startete auf einer gemeinsamen Basis (Arbeitsstand + A vor Korrektur), damit weniger Konflikte entstehen.
+- Reihenfolge: A startet erst nach Trainingsplaner 2/3 (gleiche Dateien), D erst nach dem Layout (gleiches CSS).
+- Passwort vergessen: zusätzlich `backend/create_user.py --reset` gebaut (sonst gäbe es keinen Weg zurück).
+- Altes Doppelklick-Dashboard: Daten lassen sich mit `tools/export-browser-data.html` exportieren und mit `backend/import_workouts_json.py --browser-export` übernehmen.
+
+- Die Regeldateien AI_RULES.md, DESIGN_GUIDE.md und docs/TECH_DESIGN_2026.md gibt es nicht. Entscheidung (mit dir abgestimmt): Regeln aus deinen Nachrichten; Farben, Radien und Schatten aus `css/variables.css`.
+- Tailscale-Fragen 2, 3 und 5: Empfehlungen übernommen (geheimer Kalender-Link, Ablage pro Person, alle Browser-Daten auf den Server).

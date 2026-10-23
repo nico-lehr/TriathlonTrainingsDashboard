@@ -1,267 +1,211 @@
 # Triathlon Trainings-Dashboard
 
-Ein Trainings-Tagebuch für Triathleten, das auf deinem eigenen Mac läuft.
-Es liest die Trainingsdateien deiner Garmin-Uhr ein und macht daraus
-übersichtliche Auswertungen — Wochenumfang, Form, Bestzeiten, Erholung.
+Ein Trainings-Tagebuch für Triathleten, das auf deinem eigenen PC (Windows
+oder Mac) läuft. Es liest die Trainingsdateien deiner Garmin-Uhr ein und
+macht daraus übersichtliche Auswertungen — Wochenumfang, Form, Bestzeiten,
+Erholung, Trainingsplan mit Regel-Prüfung, Wettkampf-Countdown.
 
-**Alles bleibt auf deinem Rechner.** Kein Konto, keine Cloud, keine
-monatlichen Kosten. Es gibt auch nichts zu programmieren — du klickst
-das Dashboard einfach auf wie eine normale Datei.
+**Alles bleibt auf deinem Rechner.** Kein Cloud-Konto, keine monatlichen
+Kosten. Bis zu ein paar Freunde können sich über **Tailscale** (ein privates
+Netz nur für eure Geräte) mit eigenem Benutzernamen anmelden — jede Person
+sieht nur ihre eigenen Daten. Auch am Handy (iPhone: „Zum Home-Bildschirm“).
+
+> **Wichtig:** `index.html` lässt sich nicht mehr per Doppelklick öffnen.
+> Das Dashboard läuft jetzt als kleiner Server auf deinem PC: du startest
+> ihn (`start.bat` / `start.sh`) und öffnest dann http://localhost:5000 im
+> Browser. Die Demo-Version (`build-demo.py`) geht weiterhin ohne Server.
 
 ---
 
 # Einrichtung — Schritt für Schritt
 
-Dauert etwa 10 Minuten. Du brauchst nur einen Mac und eine
-Internetverbindung. **Vorkenntnisse sind nicht nötig** — jeder Schritt
-wird unten genau erklärt.
+Dauert etwa 10 Minuten. **Vorkenntnisse sind nicht nötig.** Die
+ausführliche Anleitung (Tailscale, Freunde, Backups, iPhone, Probleme) steht
+in **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** — hier nur die Kurzfassung.
 
-> Diese Anleitung ist für **Mac**. Für Windows gibt es die Einrichtung
-> noch nicht.
+## Schritt 1 — Python installieren
 
-## Schritt 1 — Die Dateien herunterladen
+Von [python.org](https://www.python.org/downloads/) herunterladen und
+installieren (normaler Installer). **Windows:** im Installer unbedingt
+„Add python.exe to PATH“ ankreuzen. Mac: ist es oft schon da.
 
-1. Öffne diese Seite im Browser:
-   **https://github.com/nico-lehr/TriathlonTrainingsDashboard**
-2. Klicke rechts oben auf den grünen Knopf **`< > Code`**.
-3. Wähle im Menü ganz unten **`Download ZIP`**.
-4. Die Datei landet in deinem Ordner **Downloads**.
+## Schritt 2 — Die Dateien herunterladen
 
-## Schritt 2 — Die Dateien entpacken
+1. Öffne **https://github.com/nico-lehr/TriathlonTrainingsDashboard**
+2. Klicke auf den grünen Knopf **`< > Code`** → **`Download ZIP`**.
+3. Die ZIP-Datei entpacken (Doppelklick). Den entstandenen Ordner dorthin
+   legen, wo du ihn wiederfindest (z. B. „Dokumente“).
 
-Doppelklicke die heruntergeladene Datei
-`TriathlonTrainingsDashboard-main.zip`.
+## Schritt 3 — Starten
 
-Daneben entsteht ein Ordner mit demselben Namen. **Lass ihn ruhig in
-Downloads liegen** — oder ziehe ihn irgendwohin, wo du ihn wiederfindest,
-zum Beispiel in „Dokumente". Merk dir nur, wohin.
+- **Windows:** im Ordner `start.bat` doppelklicken.
+- **Mac:** Terminal öffnen (`⌘` + Leertaste, „Terminal“, Enter), dort
+  `bash ` tippen (mit Leerzeichen!), die Datei `start.sh` aus dem Ordner in
+  das Fenster ziehen und Enter drücken.
 
-## Schritt 3 — Das Terminal öffnen
+Beim ersten Start werden die nötigen Bibliotheken installiert und die Datei
+`.env` mit einem geheimen Schlüssel angelegt. **Das Fenster muss offen
+bleiben**, solange das Dashboard laufen soll.
 
-> **Was ist das Terminal?** Ein Programm, das bei jedem Mac dabei ist. Statt
-> zu klicken, tippt man dort Befehle ein. Klingt technischer als es ist —
-> du brauchst genau **einen** Befehl, und den musst du nicht einmal
-> abtippen. Danach nie wieder.
+## Schritt 4 — Dich selbst als Benutzer anlegen
 
-So öffnest du es:
+In einem **zweiten** Fenster (Windows: Eingabeaufforderung im Projektordner,
+Mac: Terminal) eingeben:
 
-1. Drücke **`⌘` (Command) und die Leertaste** gleichzeitig. Oben in der
-   Mitte erscheint ein Suchfeld.
-2. Tippe **`Terminal`**.
-3. Drücke **Enter**.
+```
+python backend/create_user.py
+```
 
-Es öffnet sich ein meist weißes oder schwarzes Fenster mit etwas Text und
-einem blinkenden Strich. Das ist richtig so.
+(Mac: `python3`.) Benutzername und Passwort (mindestens 10 Zeichen)
+eingeben. **Lege zuerst dich selbst an, danach deine Freunde** — wer zuerst
+angelegt wird, bekommt alle schon vorhandenen Daten zu sehen. Eine
+Registrierungsseite gibt es bewusst nicht.
 
-## Schritt 4 — Die Einrichtung starten
+## Schritt 5 — Im Browser öffnen
 
-Jetzt kommt der einzige Befehl. Du tippst nur den ersten Teil — den Rest
-erledigt ein Trick:
-
-1. Tippe im Terminal-Fenster:
-
-   ```
-   bash 
-   ```
-
-   **Wichtig: mit einem Leerzeichen am Ende.** Drücke noch NICHT Enter.
-
-2. Öffne den entpackten Ordner aus Schritt 2 im Finder.
-
-3. **Ziehe die Datei `setup.command` mit der Maus in das Terminal-Fenster**
-   und lass sie dort los.
-
-   Der Mac trägt daraufhin automatisch den kompletten Pfad ein. Die Zeile
-   sieht dann ungefähr so aus:
-
-   ```
-   bash /Users/deinname/Downloads/TriathlonTrainingsDashboard-main/setup.command
-   ```
-
-4. Jetzt **Enter** drücken.
-
-Die Einrichtung läuft los und meldet jeden Schritt mit einem grünen Haken.
-Am Ende öffnet sich das Dashboard von selbst im Browser.
-
-> **Warum über das Terminal und nicht per Doppelklick?** Weil macOS bei
-> Dateien aus dem Internet zuerst eine Sicherheitswarnung zeigt. Über das
-> Terminal umgehst du diese Warnung auf saubere Weise — und die Einrichtung
-> hebt die Sperre danach für dich auf. **Ab dann funktionieren Doppelklicks
-> ganz normal**, und du brauchst das Terminal nie wieder.
-
-### Was passiert, wenn Python fehlt?
-
-Die Einrichtung sagt dir das und bietet an, die Download-Seite zu öffnen.
-Installiere Python von dort (normaler Installer, „Weiter, Weiter, Fertig"),
-und starte dann Schritt 4 noch einmal.
-
-Python wird **nur** für die automatische Garmin-Synchronisierung gebraucht.
-Das Dashboard selbst funktioniert auch ohne.
+**http://localhost:5000** → anmelden. Fertig. Freunde dazuholen:
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), Abschnitt 2.
 
 ---
 
 # Deine Trainingsdaten holen
 
-Nach der Einrichtung ist das Dashboard noch leer. Zwei Möglichkeiten:
+Nach der Einrichtung ist das Dashboard noch leer. Drei Möglichkeiten.
+(**Mac:** in allen Befehlen hier `python3` statt `python` schreiben.)
 
-## Möglichkeit A — Automatisch von Garmin Connect
+## Möglichkeit A — Automatisch von Garmin Connect (offizielle Schnittstelle)
 
-Doppelklicke im Projektordner auf **`sync-garmin.command`**.
+1. Einmalig am PC: `python -m pip install -r requirements.txt`
+2. Jede Person erstellt in Garmin Connect ihren eigenen Schlüssel:
+   Einstellungen → **Personal API**
+   (https://connect.garmin.com/app/settings/personalApiToken).
+3. Im Dashboard: Einstellungen → **Garmin-Verbindung** → Schlüssel
+   einfügen → „Schlüssel prüfen & speichern“ → **„Jetzt von Garmin holen“**.
 
-Beim ersten Mal wirst du nach deiner Garmin-E-Mail und deinem Passwort
-gefragt. Tippe sie ein und drücke Enter. Falls du die Bestätigung in zwei
-Schritten nutzt, wird zusätzlich der Code abgefragt.
+Kein Garmin-Passwort nötig, der Schlüssel kann nur lesen. Danach holt auch
+`python tools/garmin_sync.py` am PC die Daten **aller** Personen mit
+Schlüssel. Für „An Garmin senden“ (Workouts auf die Uhr) braucht es
+zusätzlich die alte Anmeldung (`python tools/garmin_sync.py --login --athlete 1`).
+Alle Einzelheiten: [docs/GARMIN_SYNC_GUIDE.md](docs/GARMIN_SYNC_GUIDE.md).
 
-> **Dein Passwort wird nirgends gespeichert.** Es wird einmal verwendet, um
-> einen Zugangsschlüssel zu erhalten, und dann sofort verworfen. Ab dem
-> zweiten Mal musst du gar nichts mehr eingeben — es läuft einfach durch.
+## Möglichkeit B — Eigene `.fit`-Dateien ohne Garmin-Konto
 
-Der erste Durchlauf holt die letzten 300 Tage und dauert ein paar Minuten.
-Danach öffnet sich dein fertiges Dashboard. Jeder weitere Durchlauf holt
-nur noch Neues und ist in Sekunden fertig.
+Im Dashboard oben rechts auf **Aktualisieren** klicken und den Ordner mit
+den `.fit`-Dateien auswählen (oder einzelne Dateien hineinziehen). Sie
+werden auf dem Server gespeichert; Doppeltes wird ignoriert.
+Dafür brauchst du kein Garmin-Konto.
 
-**Ab jetzt ist es ganz einfach:** Wenn du neue Trainings sehen willst,
-doppelklickst du `sync-garmin.command`. Mehr nicht.
+## Möglichkeit C — Daten vom alten Doppelklick-Dashboard übernehmen
 
-## Möglichkeit B — Eigene Dateien ohne Garmin-Konto
-
-Hast du deine `.fit`-Dateien schon irgendwo auf dem Rechner (zum Beispiel
-über die App HealthFit in iCloud)?
-
-1. Öffne das Dashboard (`index.html` doppelklicken).
-2. Klicke oben rechts auf **Aktualisieren**.
-3. Wähle im Menü **📁 Aktualisieren**.
-4. Such den Ordner mit deinen `.fit`-Dateien aus.
-
-Dafür brauchst du kein Python und kein Garmin-Konto.
+Siehe [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), „Deine bisherigen Daten
+übernehmen“ (einmaliger Export + Import).
 
 ---
 
 # Der Alltag danach
 
+Auf dem Mac in allen Befehlen `python3` statt `python` schreiben.
+
 | Was du willst | Was du tust |
 |---|---|
-| Dashboard ansehen | `index.html` doppelklicken |
-| Neue Trainings holen | `sync-garmin.command` doppelklicken |
-| Dashboard griffbereit haben | `index.html` ins Dock ziehen oder ein Lesezeichen anlegen |
+| Dashboard starten | `start.bat` (Windows) / `start.sh` (Mac) |
+| Dashboard ansehen | http://localhost:5000 (Freunde: `http://<PC-Name>:5000`) |
+| Neue Trainings holen | `python tools/garmin_sync.py` |
+| Benutzer anlegen / Passwort vergessen | `python backend/create_user.py` / `… --reset` |
+| Sicherung machen | `backup.bat` / `python backup.py` (läuft auch automatisch bei jedem Start) |
+| Neue Version installieren | Hinweis oben im Dashboard → „Installieren“ (nur für dich als Betreiber; siehe [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), „Updates“) |
+| Auf dem iPhone | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), Abschnitt 6 |
 
 ---
 
 # Wenn etwas nicht klappt
 
-### „... kann nicht geöffnet werden, da es von einem nicht verifizierten Entwickler stammt"
+Eine Tabelle mit den häufigsten Problemen (Server nicht erreichbar, Port
+belegt, Firewall, Passwort vergessen, KI antwortet nicht) steht in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), Abschnitt 5. Zwei Klassiker:
 
-Das passiert, wenn du eine Datei **vor** der Einrichtung doppelklickst.
-Führe zuerst Schritt 4 aus (über das Terminal) — danach tritt die Meldung
-nicht mehr auf.
-
-Kommt sie trotzdem noch einmal:
-1. Klicke im Fenster auf **Fertig**.
-2. Öffne **Systemeinstellungen ▸ Datenschutz & Sicherheit**.
-3. Scrolle nach unten. Dort steht, dass eine Datei blockiert wurde.
-4. Klicke daneben auf **Trotzdem öffnen** und bestätige.
-
-### Das Terminal sagt „command not found: bash"
-
-Dann hast du vermutlich das Leerzeichen nach `bash` vergessen oder einen
-Tippfehler. Schreib die Zeile noch einmal neu — erst `bash`, dann
-Leerzeichen, dann die Datei hineinziehen.
-
-### Das Dashboard ist leer
-
-Es sind noch keine Trainingsdaten da. Siehe „Deine Trainingsdaten holen".
-Ob und wann zuletzt synchronisiert wurde, steht im Menü **Aktualisieren**.
-
-### Die Synchronisierung bricht mit einem Anmeldefehler ab
-
-Garmin ändert gelegentlich etwas an seiner Schnittstelle. Meistens hilft
-ein Update. Öffne dafür das Terminal (Schritt 3) und gib ein:
-
-```
-python3 -m pip install -U garminconnect curl_cffi
-```
-
-### Der Knopf „Mit Garmin Connect synchronisieren" im Dashboard tut nichts
-
-Doppelklicke stattdessen `sync-garmin.command` im Projektordner — das
-funktioniert immer.
+- **„Server nicht erreichbar“ beim Anmelden:** Das Start-Fenster ist
+  geschlossen, oder du hast `index.html` per Doppelklick geöffnet. Starte
+  den Server (Schritt 3) und rufe http://localhost:5000 auf.
+- **Die Synchronisierung bricht mit einem Anmeldefehler ab:** Garmin ändert
+  gelegentlich etwas an seiner Schnittstelle. Meistens hilft ein Update:
+  `python -m pip install -U garminconnect curl_cffi`
 
 ---
 
 # Was mit deinen Daten passiert
 
-- **Alles bleibt auf deinem Mac.** Das Dashboard hat keine Verbindung nach
-  außen und kennt keine Zugangsdaten.
-- Die Synchronisierung ist ein **eigenes kleines Programm**, das du bewusst
-  startest. Es lädt nur herunter, nie hoch.
-- **Passwörter werden nie gespeichert.** Der Zugangsschlüssel liegt
-  außerhalb des Projektordners und ist nur für dich lesbar.
-- Deine Trainings- und Gesundheitsdaten sind so eingerichtet, dass sie
-  **nicht versehentlich ins Internet hochgeladen** werden können.
-- Nutzt du den KI-Coach mit einem Anthropic-Schlüssel, gehen deine
-  zusammengefassten Kennzahlen an diesen Dienst. Mit Ollama (siehe unten)
-  bleibt auch das komplett lokal.
+- **Alles bleibt auf deinem PC** (Datei `training.db`). Nach außen spricht
+  der Server nur mit: Ollama (KI, normalerweise auf demselben PC), Garmin
+  (Sync und „An Garmin senden“, mit dem Zugangsschlüssel der jeweiligen
+  Person), Open-Meteo (Wetter, nur der Ortsname bzw. die Koordinaten
+  deines Heimatorts, falls du einen einstellst) und GitHub (einmal am Tag
+  „gibt es eine neue Version?“, beim Installieren der Download – dazu
+  Python-Bibliotheken von PyPI). An GitHub und PyPI gehen keine
+  persönlichen Daten.
+- **Jede Person sieht nur ihre eigenen Daten.** Ohne Anmeldung ist nur die
+  Login-Seite erreichbar; Passwörter werden nur als Hash gespeichert.
+- **Garmin-Passwörter werden nie gespeichert.** Garmin-Schlüssel und
+  -Token liegen außerhalb des Projektordners (`~/.triathlon/`) und sind nur
+  für deinen Computer-Benutzer lesbar.
+- `.env`, `training.db`, `backups/` und alle Trainingsdaten sind so
+  eingerichtet, dass sie **nicht versehentlich ins Internet hochgeladen**
+  werden (`.gitignore`) und der Server sie **nie ausliefert**.
+- Nutzt du den KI-Coach mit einem Anthropic-Schlüssel (optional), gehen
+  zusammengefasste Kennzahlen an diesen Dienst. Mit Ollama bleibt auch das
+  komplett lokal.
 
 ---
 
 # Für Fortgeschrittene
 
-### Alternative: per Terminal klonen
-
-Wer `git` hat, kann Schritt 1 und 2 ersetzen durch:
-
-```bash
-git clone https://github.com/nico-lehr/TriathlonTrainingsDashboard.git Dashboard
-cd Dashboard && bash setup.command
-```
-
-Vorteil: keine Sicherheitswarnung, weil die Dateien nicht als
-„aus dem Internet geladen" markiert werden.
-
 ### Voraussetzungen im Überblick
 
 | Wofür | Was nötig ist | Pflicht? |
 |---|---|---|
-| Dashboard ansehen, eigene `.fit`-Dateien | Nur ein Browser | **ja** |
-| Automatische Garmin-Synchronisierung | Python 3.9+ (Einrichtung installiert den Rest) | nur für Möglichkeit A |
-| KI-Coach | Ollama (lokal) **oder** ein Anthropic-Schlüssel | optional |
-| Trainingsplan als Kalender-Abo | Das Backend in `backend/` | optional |
+| Dashboard betreiben | Python 3 (aktuelle Version; `start.bat`/`start.sh` installieren den Rest) und ein Browser | **ja** |
+| Freunde / Handy | Tailscale (kostenlos) | optional |
+| Automatische Garmin-Synchronisierung, „An Garmin senden“ | Garmin-Konto und einmalig `python -m pip install -r requirements.txt` | optional |
+| KI-Coach | Ollama auf dem Dashboard-PC **oder** ein Anthropic-Schlüssel | optional |
 
 ### KI-Coach einrichten (optional)
 
-Der Coach-Bereich wertet einzelne Einheiten aus und erstellt
-Trainingspläne. Dafür braucht er ein Sprachmodell:
+Der Coach-Bereich wertet einzelne Einheiten aus und erstellt Trainingspläne
+und Empfehlungen (heute / diese Woche / nächste Woche). Jeder KI-Plan wird
+zusätzlich vom Regelwerk des Dashboards geprüft (siehe unten).
 
 - **Lokal mit Ollama** (kostenlos, nichts verlässt den Rechner):
-  [ollama.com](https://ollama.com) installieren, dann im Terminal
-  `ollama pull llama3.1` ausführen. Das Dashboard erwartet Ollama unter
-  `http://localhost:11434`; die Adresse lässt sich im Coach-Tab hinter dem
-  Zahnrad ändern.
-- **Anthropic-Schlüssel**: ebenfalls im Coach-Tab hinterlegbar.
+  [ollama.com](https://ollama.com) auf dem Dashboard-PC installieren, dann
+  `ollama pull llama3.1`. Die Freunde brauchen kein eigenes Ollama — ihr
+  Browser fragt den Dashboard-Server, der fragt Ollama. Anderer Rechner:
+  `OLLAMA_URL=http://…:11434` in `.env` eintragen.
+- **Anthropic-Schlüssel**: im Coach-Tab hinterlegbar (bleibt nur in diesem
+  Browser; „Abmelden“ löscht ihn).
 
-Ohne beides funktioniert alles andere ganz normal — nur der Coach-Bereich
-bleibt leer.
+Ohne beides funktioniert alles andere normal — nur der Coach-Bereich bleibt leer.
 
 ### Ordnerstruktur
 
 ```
-index.html              Das Dashboard — zum Ansehen doppelklicken
-setup.command           Einmalige Einrichtung
-sync-garmin.command     Neue Trainings holen
+start.bat / start.sh    Server starten (installiert beim ersten Mal alles, startet nach Updates neu)
+VERSION                 Installierte Programmversion (für die Update-Prüfung)
+backup.py / backup.bat  Datenbank sichern (backups/, die letzten 14)
 
-css/  js/               Der Programmcode des Dashboards
-tools/garmin_sync.py    Holt die Daten von Garmin
-parse_fit.py            Liest .fit-Dateien ein   → workouts.json
-build_dashboard.py      Erzeugt daraus           → data/workouts-data.js
-docs/                   Technische Dokumentation
+index.html, login.html  Dashboard und Anmeldung (vom Server ausgeliefert)
+css/  js/               Der Programmcode im Browser
+manifest.json, icons/   „Zum Home-Bildschirm“ (iPhone/Android)
 
-fit-files/              Deine heruntergeladenen Trainingsdateien
-data/                   Die aufbereiteten Daten fürs Dashboard
+backend/                Server (Flask + SQLite): Login, API, Datenbank
+tools/garmin_sync.py    Holt die Daten von Garmin (alle Benutzer)
+docs/                   Anleitungen und technische Dokumentation
+tests/js/               Tests der Rechenlogik (node --test tests/js/)
+
+training.db             Deine Daten (entsteht beim Start, nie im Repository)
+.env                    Geheimer Schlüssel (entsteht beim Start, nie im Repository)
 ```
 
-Beim Synchronisieren läuft immer dieselbe Kette:
-**Garmin → `fit-files/` → `parse_fit.py` → `build_dashboard.py` → Dashboard.**
-`sync-garmin.command` erledigt das alles zusammen.
+Weitere Tests: `python -m unittest discover -s backend -t .` (Server, Login,
+Datentrennung). Die Datei-Übersicht steht in `docs/PROJECT_MAP.md`.
 
 ---
 
@@ -323,7 +267,7 @@ Beim Synchronisieren läuft immer dieselbe Kette:
   Einheiten, "Alle anzeigen"-Button bei Bedarf).
 - Übersicht- und Coach-Karten (je eigenes Layout) per Drag & Drop frei
   umsortierbar (Griff oben rechts an jeder Karte), Reihenfolge wird pro
-  Browser gespeichert, mit "Layout zurücksetzen".
+  Gerät gespeichert, mit "Layout zurücksetzen".
 - Erholungs-Check im Coach-Tab (Muskelkater inkl. Lokalisierung, Energie,
   Verletzung), fließt automatisch in die nächste Trainingsempfehlung ein
   und wird täglich zurückgesetzt — die Werte des Vortags landen in einem
@@ -331,38 +275,49 @@ Beim Synchronisieren läuft immer dieselbe Kette:
   Verfügung steht.
 - Design: dezenter Parallax-Effekt im Kopfbereich, Gradient-Titel/Logo und
   3D-Tilt-Effekt auf den Kennzahlen-Kacheln in der Übersicht.
+- **Trainingsplaner mit Regelwerk**: Der Plan (KI oder von Hand) wird gegen
+  7 feste Regeln geprüft — nie zwei harte Tage hintereinander, höchstens 3
+  harte Einheiten pro Woche und ~80 % locker, mindestens ein freier Tag,
+  Wochenumfang höchstens +10 % mit Entlastungswoche, nach Belastungsspitze
+  oder schlechter Erholung nur locker, lockere Grundlage je Ziel-Sportart,
+  nach dem Wettkampf nur locker. Beim Verschieben im Kalender erscheint ein
+  Hinweis („Trotzdem verschieben“ bzw. ein Vorschlag per Klick); KI-Pläne
+  werden korrigiert oder abgelehnt. Terminwünsche („Donnerstag schwimmen“)
+  plant die KI fest ein.
+- **Wettkampf-Countdown & Periodisierung**: Tage bis zum Hauptevent, aktuelle
+  Phase (Grundlage / Aufbau / Spezifisch / Taper / Erholung) mit Erklärung und
+  Zielumfang je Woche.
+- **Analyse-Tab**: Sport-Balance (Schwimmen/Rad/Laufen gegen Ziel), Schwimm-CSS
+  und Trend, Rad-FTP-Schätzung mit Leistungszonen, Koppeltraining.
+- **Rennplan** je Ziel: Tempo je Disziplin aus der Zielzeit, Checklisten
+  (Wechselzone, Verpflegung), Rennwoche.
+- **„An Garmin senden“**: geplante Lauf-/Rad-/Schwimmeinheit mit Schritten
+  direkt in den Garmin-Kalender (Uhr holt sie beim nächsten Sync); `.fit`-Export
+  als Plan B.
+- **Wetter im Kalender** (7-Tage-Vorhersage für deinen Heimatort),
+  **Material** (Schuhe, Rad, Verschleißteile mit Kilometerstand).
+- **Handy**: Layout für iPhone/Android, als App auf den Home-Bildschirm legbar.
 
 ## Funktionsweise
 
-`index.html` ist reiner Code (kein Platzhalter, keine eingebetteten Daten)
-und liegt normal im Repository. Nur die Trainingsdaten selbst werden lokal
-generiert — siehe `docs/PROJECT_MAP.md` für die vollständige Datei-Übersicht:
+`start.bat` / `start.sh` startet über `backend/launcher.py` den Server
+`backend/app.py` (waitress; nach einem Update startet der Starter ihn neu). Der Server
+liefert die Webseite (`index.html`, `login.html`, `css/`, `js/`, `icons/`) und
+die API unter derselben Adresse aus — nur diese Erlaubt-Liste, nichts sonst.
+Alle persönlichen Daten liegen in `training.db` (SQLite), jede Zeile mit der
+Nummer der Person; jede Anfrage prüft den Login und filtert danach. Der
+Browser hält nur Login-Token, Hell/Dunkel-Design und Geräte-Einstellungen.
 
 | Datei | Zweck |
 |---|---|
-| `index.html`, `css/`, `js/` | Der eigentliche Quelltext des Dashboards (Struktur, Styles, Logik) — reiner Code, keine persönlichen Daten. |
-| `parse_fit.py` | Python-Referenzimplementierung (`fitdecode`), liest `.fit`-Dateien in ein zentrales `workouts.json`. Dient auch als Vergleichsbasis für den JS-Parser. |
-| `build_dashboard.py` | Erzeugt `data/workouts-data.js` aus `workouts.json` (Daten werden dort als JS-Konstante eingebettet, damit `index.html` sie auch bei `file://`-Aufruf laden kann). |
+| `index.html`, `css/`, `js/` | Der Quelltext des Dashboards (Struktur, Styles, Logik) — reiner Code, keine persönlichen Daten. |
+| `backend/` | Server: Login (`auth.py`), API (`routes.py`, `dashboard_routes.py`, …), Tabellen (`models.py`). |
+| `tools/garmin_sync.py` | Garmin-Sync für alle Benutzer, schreibt in die Datenbank. |
+| `parse_fit.py`, `build_dashboard.py` | Altes Einzelplatz-Werkzeug: `.fit`-Ordner → `workouts.json`; dessen Inhalt übernimmt `backend/import_workouts_json.py` einmalig in die Datenbank. |
 | `verify_parser.py` | Playwright-Test, der den JS-Parser im Browser Feld für Feld gegen die Python-Referenz vergleicht. |
 
-`workouts.json` und die generierte `data/workouts-data.js` enthalten die
-**echten persönlichen Trainingsdaten** (Herzfrequenz, Zeiten, Distanzen,
-Kalorien) und sind deshalb bewusst über `.gitignore` von diesem Repository
-ausgeschlossen. Wer das Dashboard selbst nutzen will, generiert beide
-Dateien lokal aus den eigenen `.fit`-Dateien:
-
-```bash
-pip install fitdecode
-python3 parse_fit.py        # liest fit-files/ ein -> workouts.json
-python3 build_dashboard.py  # erzeugt data/workouts-data.js daraus
-
-# Beides zusammen mit dem Download erledigt sync-garmin.command automatisch.
-```
-
-Danach `index.html` einfach im Browser öffnen. Über den
-"Aktualisieren"-Button lassen sich später weitere `.fit`-Dateien direkt im
-Browser nachladen (Merge, nichts wird ersetzt) — ganz ohne die Python-Skripte
-erneut auszuführen.
+Die Datei-Übersicht steht in `docs/PROJECT_MAP.md`, die Datenformen in
+`docs/DATA_MODEL.md`, der Betrieb in `docs/DEPLOYMENT.md`.
 
 ## Hintergrund der Kennzahlen
 
@@ -376,14 +331,14 @@ erneut auszuführen.
 
 ## Technik
 
-Reines Vanilla JavaScript/HTML/CSS, keine Frameworks, kein Build-Step für das
-Dashboard selbst (nur die Trainingsdaten werden einmalig mit
-`build_dashboard.py` generiert, siehe oben). Modular aufgeteilt nach
-Verantwortlichkeit (Struktur/Styling/Logik/Daten/Analytics/KI/Komponenten,
-siehe `docs/PROJECT_MAP.md`) statt einer einzelnen
-HTML-Datei. Der FIT-Binärparser (inkl. komprimierter Zeitstempel und
-Developer-Feldern) ist von Hand geschrieben, damit das Dashboard ganz ohne
-externe Abhängigkeiten offline läuft.
+Im Browser reines Vanilla JavaScript/HTML/CSS ohne Frameworks und ohne
+Build-Step; dahinter ein kleiner Python-Server (Flask + SQLite, waitress).
+Modular aufgeteilt nach Verantwortlichkeit (Struktur/Styling/Logik/Daten/
+Analytics/KI/Komponenten, siehe `docs/PROJECT_MAP.md`). Berechnungen
+(Belastung, Planregeln, Periodisierung) sind reine Funktionen ohne Browser-
+Zugriff und deshalb per `node --test tests/js/` testbar. Der FIT-Binärparser
+(inkl. komprimierter Zeitstempel und Developer-Feldern) ist von Hand
+geschrieben, damit der Browser keine externen Abhängigkeiten braucht.
 
 ## Lizenz
 

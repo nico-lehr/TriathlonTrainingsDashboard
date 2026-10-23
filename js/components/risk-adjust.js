@@ -87,10 +87,12 @@ function renderRiskAdjustBanner() {
   document.getElementById("rab-dismiss-btn").addEventListener("click", () => dismissRiskAdjustSuggestion());
 }
 
-function applyRiskAdjustSuggestion() {
+// Der KI-Vorschlag läuft vor dem Speichern durch das Regelwerk
+// (commitCheckedPlanChange, training-plan.js) - bei Abbruch bleibt der Banner.
+async function applyRiskAdjustSuggestion() {
   const { pw, suggestion } = riskAdjustState;
   if (!pw || !suggestion) return;
-  updatePlannedWorkout(pw.id, {
+  const next = patchedPlannedWorkouts(plannedWorkouts, pw.id, {
     sport: suggestion.sport || pw.sport,
     title: suggestion.title || pw.title,
     duration_min: suggestion.duration_min != null ? Number(suggestion.duration_min) : pw.duration_min,
@@ -98,6 +100,7 @@ function applyRiskAdjustSuggestion() {
     description: suggestion.description || pw.description,
     exercises: Array.isArray(suggestion.exercises) && suggestion.exercises.length ? suggestion.exercises : pw.exercises,
   });
+  if (!(await commitCheckedPlanChange(next, "Trotzdem übernehmen"))) return;
   dismissRiskAdjustSuggestion();
   if (typeof renderCalendar === "function") renderCalendar();
   if (typeof renderTrainingPlanCard === "function") renderTrainingPlanCard();

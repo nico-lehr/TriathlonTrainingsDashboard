@@ -1,6 +1,5 @@
 """Triathlon Dashboard Backend - Phase 1 (Local)."""
-from flask import Flask
-from flask_cors import CORS
+from flask import Flask, request
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from .config import config
@@ -11,11 +10,14 @@ Session = None
 
 def create_app():
     """Create and configure Flask application."""
-    app = Flask(__name__)
+    # static_folder=None: Dateien liefert nur frontend.py aus (Erlaubt-Liste).
+    app = Flask(__name__, static_folder=None)
     app.config.from_object(config)
-
-    # Enable CORS for localhost frontend
-    CORS(app, origins=["http://localhost:3000", "http://localhost:8000", "file://"])
+    if not app.config.get("SECRET_KEY"):
+        raise RuntimeError(
+            "SECRET_KEY fehlt. Lege im Projektordner eine Datei .env an "
+            "(Vorlage: .env.example) und trage dort einen langen Zufallswert ein."
+        )
 
     # Initialize database
     global db, Session
@@ -30,11 +32,23 @@ def create_app():
 
     # Register blueprints
     from .routes import api_bp
+    from . import dashboard_routes, ai_routes, equipment_routes, garmin_workouts, weather_routes, garmin_api_routes, update_routes  # noqa: F401 - haengen weitere Endpunkte an api_bp
+    from .frontend import frontend_bp
     app.register_blueprint(api_bp, url_prefix="/api/v1")
+    # Dashboard unter derselben Adresse wie die API - deshalb kein CORS noetig.
+    app.register_blueprint(frontend_bp)
 
     return app, Session
 
 
 def get_current_athlete_id():
-    """Phase 1: Always return athlete_id=1 (single user)."""
-    return config.CURRENT_ATHLETE_ID
+    """athlete_id aus dem Bearer-Token der laufenden Anfrage, None ohne gueltigen Token.
+
+    Ohne Token blockt routes.require_login() jede Anfrage ausser /health und
+    /auth/login mit 401 - die Endpunkte bekommen hier also immer eine echte id.
+    """
+    from .auth import athlete_id_from_token
+    header = request.headers.get("Authorization", "")
+    if not header.startswith("Bearer "):
+        return None
+    return athlete_id_from_token(header[len("Bearer "):].strip())

@@ -19,11 +19,13 @@ function renderAll() {
   renderRecovery(); // Garmin-Erholungsdaten; blendet sich selbst aus, solange nichts synchronisiert wurde
   renderTable(filtered);
   renderCoachWorkoutsMini(filtered);
+  renderRaceCountdown(); // Ist-Minuten dieser Woche hängen an den Trainings (volle Historie)
   renderCalendar(); // nutzt immer die volle Historie
   renderEquipmentBanner(); // Hinweis in Kalender + Übersicht, falls Equipment fällig ist
   renderRecords(); // nutzt immer die volle Historie
   renderNutrition(); // nutzt Trainingsplan/Ziel-Daten, nicht den Zeitraum-Filter oben
   renderAchievements(); // nutzt immer die volle Historie
+  renderAnalysis(); // Analyse-Tab, nutzt immer die volle Historie
   showAchievementToast(checkAndUnlockAchievements());
   checkAndShowBirthdayMessage();
 }
@@ -51,14 +53,23 @@ function checkAutoReplan() {
 /* ======================================================================
    6) INIT
    ====================================================================== */
-// Als async IIFE, weil das Laden der Workout-Rohdaten jetzt aus IndexedDB
-// kommt (loadPersistedWorkouts(), js/data/workouts.js) statt wie bisher
-// synchron aus localStorage - renderAll() muss darauf warten, sonst würde
-// beim allerersten Laden kurz der (unvollständige) eingebettete Datenstand
-// gerendert. Alle anderen Init-Schritte bleiben unverändert in derselben
-// Reihenfolge, nur einmal await davor.
+// Als async IIFE, weil alle Daten vom Server kommen (js/data/api-client.js):
+// Ablage pro Person (Profil, Ziele, Plan, ...), Workouts und Gesundheitsdaten.
+// renderAll() und alle init...() muessen darauf warten. Ohne Login geht es
+// direkt zur Login-Seite. Scheitert das Laden, startet die App bewusst NICHT
+// mit leerem Stand - das erste Speichern wuerde sonst die echten Daten auf
+// dem Server ueberschreiben.
 (async function initApp() {
-  await loadPersistedWorkouts();
+  if (!requireLogin()) return;
+  try {
+    await Promise.all([loadUserStore(), loadPersistedWorkouts(), loadWellness()]);
+  } catch (e) {
+    showApiError(`Daten konnten nicht geladen werden (${e.message}). Bitte die Seite neu laden.`);
+    return;
+  }
+  await loadEquipmentItems(); // nach der Ablage: übernimmt ggf. die alte Equipment-Liste daraus
+  loadWorkoutNotes();
+  loadWorkoutAnalysisCache();
   // Garmin-Waagedaten ins Gewichts-Log uebernehmen, bevor irgendetwas
   // gerendert wird - sonst zeigt die erste Darstellung noch das alte Gewicht.
   // Ergaenzt nur fehlende Tage, ueberschreibt keine manuellen Eintraege.
@@ -72,6 +83,11 @@ function checkAutoReplan() {
   loadAchievements();
   initInfoPopovers();
   initCardSearch();
+  initAccount();
+  initGarminSettings();
+  initUpdates();
+  initWeatherSettings();
+  initAnalysis();
   renderAll();
   checkAutoReplan();
   // Automatische Risiko-Kontrolle (ACWR/TSB/Monotonie + Erholungs-Check) für

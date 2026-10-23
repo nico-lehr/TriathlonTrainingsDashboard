@@ -9,16 +9,14 @@ const WEIGHT_LOG_KEY = "triathlon_dashboard_weight_log_v1";
 
 let weightLog = []; // [{ date: "YYYY-MM-DD", weightKg: 72.3 }, ...], aufsteigend nach Datum sortiert
 
+// Gespeichert in der Ablage pro Person auf dem Server (js/data/api-client.js).
 function loadWeightLog() {
-  try {
-    const raw = localStorage.getItem(WEIGHT_LOG_KEY);
-    weightLog = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(weightLog)) weightLog = [];
-  } catch (e) { weightLog = []; }
+  weightLog = storeGet(WEIGHT_LOG_KEY) || [];
+  if (!Array.isArray(weightLog)) weightLog = [];
 }
 
 function saveWeightLog() {
-  try { localStorage.setItem(WEIGHT_LOG_KEY, JSON.stringify(weightLog)); } catch (e) { /* Speicher evtl. voll/deaktiviert */ }
+  storeSet(WEIGHT_LOG_KEY, weightLog);
 }
 
 // Trägt einen Gewichtswert für ein Datum ein (Standard: heute). Existiert für

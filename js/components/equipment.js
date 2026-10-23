@@ -14,7 +14,7 @@ function equipmentStatusBadgeHtml(status) {
 
 function equipmentKmLabel(item, status) {
   const km = fmtNum(status.km, item.parentId ? 0 : 1);
-  return item.serviceIntervalKm ? `${km} / ${item.serviceIntervalKm} km` : `${km} km`;
+  return item.serviceIntervalKm ? `${km} / ${item.serviceIntervalKm} km · ${Math.round(status.km / item.serviceIntervalKm * 100)} %` : `${km} km`;
 }
 
 /* ---------- Liste in den Einstellungen ---------- */
@@ -129,6 +129,36 @@ function renderEquipmentBanner() {
   });
 }
 
+/* ---------- Zuordnung in der Trainings-Detailansicht ---------- */
+
+// "Equipment"-Auswahl für EINE Einheit (eingebunden in buildWorkoutDetailHtml(),
+// js/components/workout-card.js): ausdrücklich einem Schuh/Rad zuordnen oder
+// "Automatisch" lassen. Nur sichtbar, wenn Equipment der passenden Sportart existiert.
+function buildWorkoutEquipmentHtml(w) {
+  const choices = equipmentChoicesForWorkout(w);
+  if (!choices.length) return "";
+  const assigned = equipmentAssignments.get(w.file);
+  const auto = automaticEquipmentForWorkout(w);
+  const options = choices.map(x => `<option value="${x.id}"${x.id === assigned ? " selected" : ""}>${escapeHtml(x.name)}</option>`).join("");
+  return `
+    <div class="wd-equipment" data-file="${encodeURIComponent(w.file)}">
+      <h4>Equipment</h4>
+      <select class="coach-input wd-equipment-select" aria-label="Equipment für diese Einheit">
+        <option value="">Automatisch${auto ? ": " + escapeHtml(auto.name) : " (kein Standard zu diesem Datum)"}</option>
+        ${options}
+      </select>
+    </div>`;
+}
+
+function wireWorkoutEquipmentBlock(rootEl, file) {
+  const select = rootEl.querySelector(`.wd-equipment[data-file="${encodeURIComponent(file)}"] .wd-equipment-select`);
+  if (!select) return;
+  select.addEventListener("change", () => {
+    assignWorkoutToEquipment(file, select.value || null);
+    renderEquipmentList(); // Kilometerstände + Warnbanner neu
+  });
+}
+
 /* ---------- Anlage-Formular ---------- */
 
 function equipmentParentOptionsHtml() {
@@ -137,8 +167,8 @@ function equipmentParentOptionsHtml() {
   return parents.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
 }
 
+// Die Liste wird vorher von js/app.js geladen (loadEquipmentItems()).
 function initEquipment() {
-  loadEquipmentItems();
   renderEquipmentList();
 
   const toggleBtn = document.getElementById("equipment-add-toggle-btn");
@@ -172,10 +202,12 @@ function initEquipment() {
   if (categorySelect) categorySelect.addEventListener("change", updateFormRows);
 
   if (form) {
-    form.addEventListener("submit", e => {
+    form.addEventListener("submit", async e => {
       e.preventDefault();
       const isPart = categorySelect.value === "Verschleißteil";
-      addEquipmentItem({
+      const submitBtn = form.querySelector('[type="submit"]');
+      submitBtn.disabled = true; // kein Doppelklick = kein doppeltes Item
+      const item = await addEquipmentItem({
         name: document.getElementById("equipment-name").value,
         category: categorySelect.value,
         sport: isPart ? null : (sportSelect.value || null),
@@ -184,6 +216,8 @@ function initEquipment() {
         startKm: document.getElementById("equipment-startkm").value || 0,
         note: document.getElementById("equipment-note").value,
       });
+      submitBtn.disabled = false;
+      if (!item) return; // Speichern fehlgeschlagen (Hinweisbanner): Eingaben bleiben stehen
       form.reset();
       addCard.hidden = true;
       renderEquipmentList();

@@ -11,6 +11,7 @@ const PLAN_INTENSITY_LABELS = { leicht: "leicht", mittel: "mittel", hart: "hart"
 const PLAN_STATUS_LABELS = { geplant: "geplant", erledigt: "erledigt", uebersprungen: "übersprungen" };
 
 function renderTrainingPlanCard() {
+  renderPlanWishList(); // Status offen/eingeplant hängt am Plan
   const host = document.getElementById("trainingplan-body");
   if (!host) return;
   const timelineHost = document.getElementById("plan-timeline");
@@ -52,8 +53,10 @@ function renderTrainingPlanCard() {
           </div>
           <div class="plan-item-meta">${p.duration_min != null ? Math.round(p.duration_min) + " min" : ""}${p.status !== "geplant" ? " · " + PLAN_STATUS_LABELS[p.status] : ""}</div>
         </div>
+        ${planItemGarminHtml(p)}
         <button type="button" class="plan-item-export" data-id="${p.id}" title="Als .fit für Garmin exportieren">⬇</button>
         <button type="button" class="plan-item-edit" data-id="${p.id}" title="Bearbeiten">✎</button>
+        ${garminSendErrorHtml(p)}
       </div>`;
   }).join("") : `<p class="empty-note">Noch kein Trainingsplan erstellt.</p>`;
 
@@ -74,13 +77,14 @@ function renderTrainingPlanCard() {
       </div>
     </div>
     ${goal._planError ? `<p class="goal-error">${escapeHtml(goal._planError)}</p>` : ""}
+    ${planCheckNotesHtml(goal)}
     <div class="plan-item-list">${listHtml}</div>
   `;
 
   host.querySelector(".plan-generate-btn").addEventListener("click", () => generateTrainingPlan(goal.id));
   const replaceBtn = host.querySelector(".plan-replace-btn");
   if (replaceBtn) replaceBtn.addEventListener("click", () => generateTrainingPlan(goal.id, { replace: true }));
-  host.querySelector(".plan-add-btn").addEventListener("click", () => openPlanEdit(null, { goalId: goal.id, phase: phase.key }));
+  host.querySelector(".plan-add-btn").addEventListener("click", () => openPlanEdit(null, { goalId: goal.id }));
   host.querySelectorAll(".plan-item-edit").forEach(btn => btn.addEventListener("click", () => openPlanEdit(btn.dataset.id)));
   host.querySelectorAll(".plan-item-export").forEach(btn => btn.addEventListener("click", e => { e.stopPropagation(); exportPlannedWorkoutAsFit(btn.dataset.id); }));
   // Ganze Zeile klickbar (wie ein Trainings-Punkt im Kalender) - öffnet
@@ -91,18 +95,109 @@ function renderTrainingPlanCard() {
       openPlanEdit(row.dataset.id);
     });
     row.addEventListener("keydown", e => {
+      if (e.target.closest("button")) return; // Knöpfe in der Zeile behalten ihre eigene Tastatur-Bedienung
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPlanEdit(row.dataset.id); }
     });
   });
   const exportAllBtn = host.querySelector(".plan-export-all-btn");
   if (exportAllBtn) exportAllBtn.addEventListener("click", () => exportPlannedWorkoutsAsFit(upcoming));
+  wireGarminSend(host);
 
   if (typeof renderCoachSummary === "function") renderCoachSummary();
 }
 
+/* ---------- "An Garmin senden" (Trainingsplan-Liste + Bearbeiten-Overlay) ----------
+   Versand: sendPlannedWorkoutToGarmin (js/data/fit-workout-writer.js). Der
+   Zustand während/nach dem Senden lebt nur hier im Speicher; gespeichert
+   wird nur garminSentAt/garminWorkoutId am Eintrag. Scheitert der Versand,
+   gibt es direkt daneben den .fit-Download (Plan B). */
+const garminSendState = new Map(); // id -> { loading } | { error } | { scheduled }
+
+function planItemGarminHtml(p) {
+  if (!canSendToGarmin(p)) return "";
+  const st = garminSendState.get(p.id) || {};
+  const inner = p.garminSentAt && !st.loading && !st.error
+    ? `<span class="plan-garmin-sent" title="An Garmin gesendet am ${fmtDateFull(new Date(p.garminSentAt))}">✓ gesendet ${fmtDate(new Date(p.garminSentAt))}</span>`
+    : `<button type="button" class="cal-today-btn plan-garmin-send" data-id="${p.id}"${st.loading ? " disabled" : ""}>${st.loading ? "Sende …" : "An Garmin senden"}</button>`;
+  return `<div class="plan-item-garmin">${inner}</div>`;
+}
+
+function garminSendErrorHtml(p) {
+  const st = garminSendState.get(p.id);
+  if (!st || !st.error) return "";
+  return `
+    <div class="plan-garmin-error">
+      <p class="goal-error">${escapeHtml(st.error)}</p>
+      <button type="button" class="cal-today-btn plan-garmin-fit" data-id="${p.id}">Stattdessen als .fit herunterladen</button>
+    </div>`;
+}
+
+// Hinweis unter den Knöpfen im Bearbeiten-Overlay.
+function planEditGarminNoteHtml(p) {
+  const st = garminSendState.get(p.id) || {};
+  if (st.error) return garminSendErrorHtml(p);
+  if (st.loading || !p.garminSentAt) return "";
+  const when = new Date(p.garminSentAt);
+  const where = !("scheduled" in st) ? ""
+    : st.scheduled ? ` Es liegt im Garmin-Kalender am ${fmtDateWeekday(new Date(st.scheduled + "T00:00:00"))} und ist nach dem nächsten Sync auf der Uhr.`
+      : " Es liegt in Garmin Connect unter „Workouts“ (der Kalender-Eintrag hat nicht geklappt).";
+  return `<p class="plan-garmin-sent">✓ An Garmin gesendet am ${fmtDateFull(when)}, ${when.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr.${where}</p>`;
+}
+
+function garminSendLabel(p) {
+  const st = garminSendState.get(p.id) || {};
+  return st.loading ? "Sende …" : (p.garminSentAt ? "Erneut an Garmin senden" : "An Garmin senden");
+}
+
+function wireGarminSend(rootEl) {
+  rootEl.querySelectorAll(".plan-garmin-send").forEach(btn => btn.addEventListener("click", e => { e.stopPropagation(); sendToGarminFromUi(btn.dataset.id); }));
+  rootEl.querySelectorAll(".plan-garmin-fit").forEach(btn => btn.addEventListener("click", e => { e.stopPropagation(); exportPlannedWorkoutAsFit(btn.dataset.id); }));
+}
+
+// Kachel neu zeichnen und im offenen Overlay nur Knopf + Hinweis anpassen
+// (ein Neuaufbau würde ungespeicherte Eingaben verwerfen).
+function refreshGarminSendUi(id) {
+  renderTrainingPlanCard();
+  const p = plannedWorkouts.find(x => x.id === id);
+  const note = document.querySelector(`.pe-garmin-note[data-id="${id}"]`);
+  if (!p || !note) return;
+  const btn = document.querySelector(`.plan-edit-actions .plan-garmin-send[data-id="${id}"]`);
+  if (btn) { btn.textContent = garminSendLabel(p); btn.disabled = !!(garminSendState.get(id) || {}).loading || btn.dataset.unsaved === "1"; }
+  note.innerHTML = planEditGarminNoteHtml(p);
+  wireGarminSend(note);
+}
+
+async function sendToGarminFromUi(id) {
+  const p = plannedWorkouts.find(x => x.id === id);
+  if (!p || (garminSendState.get(id) || {}).loading) return;
+  if (p.garminSentAt && !(await confirmDialog(`Diese Einheit wurde am ${fmtDateFull(new Date(p.garminSentAt))} schon an Garmin gesendet. Nochmal senden? In Garmin Connect steht sie dann zweimal.`, { okLabel: "Nochmal senden", danger: false }))) return;
+  garminSendState.set(id, { loading: true });
+  refreshGarminSendUi(id);
+  try {
+    const result = await sendPlannedWorkoutToGarmin(id);
+    garminSendState.set(id, { scheduled: result.scheduled_date });
+  } catch (e) {
+    garminSendState.set(id, { error: e.message });
+  }
+  refreshGarminSendUi(id);
+}
+
+// Was die Regelprüfung nach der letzten KI-Planung automatisch angepasst hat
+// und welche Hinweise ("warn") geblieben sind (planCheckNotes, js/ai/ollama.js).
+function planCheckNotesHtml(goal) {
+  const n = planCheckNotes;
+  if (!n || n.goalId !== goal.id || (!n.corrected.length && !n.hints.length)) return "";
+  const list = items => `<ul>${items.map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>`;
+  return `
+    <div class="plan-check-notes">
+      ${n.corrected.length ? `<p>Vom Regelwerk angepasst</p>${list(n.corrected)}` : ""}
+      ${n.hints.length ? `<p>Hinweise zum neuen Plan</p>${list(n.hints)}` : ""}
+    </div>`;
+}
+
 /* ---------- Trainingsplan-Zeitleiste: grobe Periodisierungs-Übersicht ----------
    Zeigt als Balken die Trainingsphasen (Grundlage/Aufbau/Spezifisch/Taper,
-   siehe computeTrainingPhase in js/analytics/training-plan.js) von heute bis
+   siehe getPhaseTimeline in js/analytics/periodization.js) von heute bis
    zum Zieldatum, damit auf einen Blick klar wird, was in den nächsten
    Wochen/Monaten grob ansteht und in welcher Phase man sich gerade befindet
    - unabhängig davon, wie weit die konkrete Einheiten-Planung (rollierendes
@@ -111,20 +206,11 @@ function renderTrainingPlanCard() {
 // Dieselbe 5-stufige Zonen-Farbskala wie die Herzfrequenz-Zonen-Charts
 // (--c-z1..z5, css/variables.css) - dort schon als klar unterscheidbare
 // Eskalationsskala erprobt und passt inhaltlich gut (Grundlage = ruhig,
-// Wettkampfwoche = "heißeste" Zone). Vorher nutzten "Spezifisch" und
+// Taper vor dem Wettkampf = "heißeste" Zone). Vorher nutzten "Spezifisch" und
 // "Taper" beide --c-warn (dasselbe Orange) und waren nicht zu unterscheiden.
 const PLAN_PHASE_COLOR_VARS = {
-  grundlage: "--c-z1", aufbau: "--c-z2", spezifisch: "--c-z3",
-  "taper-beginn": "--c-z4", "taper-final": "--c-z5",
+  grundlage: "--c-z1", aufbau: "--c-z2", spezifisch: "--c-z3", taper: "--c-z5",
 };
-// Segment-Grenzen in "Tage bis Event" (absteigend) - dieselben Schwellen wie computeTrainingPhase.
-const PLAN_PHASE_SEGMENTS = [
-  { key: "grundlage", label: "Grundlage", untilMax: Infinity, untilMin: 85 },
-  { key: "aufbau", label: "Aufbau", untilMax: 84, untilMin: 29 },
-  { key: "spezifisch", label: "Spezifisch", untilMax: 28, untilMin: 15 },
-  { key: "taper-beginn", label: "Taper", untilMax: 14, untilMin: 7 },
-  { key: "taper-final", label: "Wettkampfwoche", untilMax: 6, untilMin: 0 },
-];
 
 function renderPlanTimeline(hostEl, goal, phase, daysUntil, upcoming) {
   if (!goal.date) {
@@ -137,25 +223,28 @@ function renderPlanTimeline(hostEl, goal, phase, daysUntil, upcoming) {
   }
   const totalDays = Math.max(daysUntil, 1);
 
-  // Sehr kurze Segmente (z.B. die 1-wöchige "Wettkampfwoche" bei einem noch
-  // weit entfernten Ziel) bekommen eine Mindestbreite, damit sie als eigene
-  // Farbe erkennbar/hoverbar bleiben - flex-shrink gleicht die Differenz bei
-  // den übrigen Segmenten wieder aus (siehe .plan-timeline-bar CSS), die
-  // Reihenfolge/Proportionen bleiben dabei erhalten.
+  // Abschnitte von heute bis zum Wettkampftag (die Erholung danach liegt
+  // hinter dem Ende der Leiste), als Tagesoffsets ab heute. Sehr kurze
+  // Segmente (z.B. der Taper bei einem noch weit entfernten Ziel) bekommen
+  // eine Mindestbreite, damit sie als eigene Farbe erkennbar/hoverbar
+  // bleiben - flex-shrink gleicht die Differenz bei den übrigen Segmenten
+  // wieder aus (siehe .plan-timeline-bar CSS), die Reihenfolge/Proportionen
+  // bleiben dabei erhalten.
   const MIN_SEG_PCT = 6;
-  const segments = PLAN_PHASE_SEGMENTS
-    .filter(seg => seg.untilMin <= totalDays)
+  const todayMid = new Date(); todayMid.setHours(0, 0, 0, 0);
+  const dayOffset = key => Math.round((new Date(key + "T00:00:00") - todayMid) / 86400000);
+  const segments = getPhaseTimeline(todayMid, goal)
+    .filter(seg => seg.phase !== "erholung")
     .map(seg => {
-      const offsetStart = totalDays - Math.min(totalDays, seg.untilMax);
-      const offsetEnd = totalDays - seg.untilMin;
-      return { ...seg, offsetStart, offsetEnd, widthPct: Math.max(MIN_SEG_PCT, ((offsetEnd - offsetStart) / totalDays) * 100) };
+      const offsetStart = dayOffset(seg.from);
+      const offsetEnd = Math.min(totalDays, dayOffset(seg.to) + 1);
+      return { ...seg, key: seg.phase, label: PERIOD_PHASES[seg.phase].label, offsetStart, offsetEnd, widthPct: Math.max(MIN_SEG_PCT, ((offsetEnd - offsetStart) / totalDays) * 100) };
     })
     .filter(seg => seg.offsetEnd > seg.offsetStart);
 
   // Kalenderwochen mit bereits geplanten Einheiten -> als Punkt auf der
   // Zeitleiste markieren (Tagesoffset ihres Montags, damit mehrere Einheiten
   // derselben Woche nicht mehrfach Punkte erzeugen).
-  const todayMid = new Date(); todayMid.setHours(0, 0, 0, 0);
   const plannedWeekOffsets = [...new Set(upcoming.map(p => {
     const d = Math.round((new Date(p.date + "T00:00:00") - todayMid) / 86400000);
     return Math.floor(d / 7) * 7;
@@ -187,9 +276,10 @@ function renderPlanTimeline(hostEl, goal, phase, daysUntil, upcoming) {
 
   hostEl.querySelectorAll(".plan-timeline-seg").forEach(el => {
     el.addEventListener("mousemove", e => {
-      const seg = PLAN_PHASE_SEGMENTS.find(s => s.key === el.dataset.seg);
+      const seg = segments.find(s => s.key === el.dataset.seg);
       const isCurrent = seg.key === phase.key;
-      showTip(e, `<b>${escapeHtml(seg.label)}</b>${isCurrent ? " · aktuell" : ""}`, hostEl);
+      const range = `${fmtDate(new Date(seg.from + "T00:00:00"))}–${fmtDate(new Date(seg.to + "T00:00:00"))}`;
+      showTip(e, `<b>${escapeHtml(seg.label)}</b> · ${range}${isCurrent ? " · aktuell" : ""}`, hostEl);
     });
     el.addEventListener("mouseleave", hideTip);
   });
@@ -226,7 +316,8 @@ function planEditNutritionHtml(p, isNew) {
 // `defaults` (nur bei Neuanlage relevant): { date, goalId, phase } - z.B.
 // vorbelegtes Datum aus dem Kalendertag, oder das Hauptevent-Ziel aus der
 // Trainingsplan-Kachel, damit die manuell angelegte Einheit dort genauso
-// erscheint wie eine von der KI erstellte.
+// erscheint wie eine von der KI erstellte. Ohne `phase` ergibt sie sich beim
+// Anlegen aus dem gewählten Datum (buildPlannedWorkout).
 // "Lessons Learned"-Block (Button + Ergebnis/Fehler/Lade-Zustand) fuer eine
 // bereits gespeicherte geplante Einheit - vorausschauende KI-Einordnung
 // basierend auf aehnlichen frueheren Einheiten (siehe generateLessons,
@@ -257,6 +348,85 @@ function renderPlanEditLessons(pw) {
   });
 }
 
+/* ---------- Schritte für die Uhr (Bearbeiten-Overlay) ----------
+   Ohne eigene Schritte zeigt das Overlay nur die Standard-Schritte aus Dauer
+   + Intensität (defaultWorkoutSteps, js/data/planned-workouts.js) - sie
+   folgen jeder Änderung von Dauer/Intensität. "Schritte anpassen" macht
+   daraus bearbeitbare Zeilen, die als `steps` gespeichert werden. */
+
+function workoutStepText(s) {
+  if (s.type === "repeat") return `${s.count}× (${s.steps.map(workoutStepText).join(" / ")})`;
+  const amount = s.duration_min ? `${fmtNum(s.duration_min, 2)} min` : s.distance_km ? `${fmtNum(s.distance_km, 2)} km` : "bis Lap-Taste";
+  const target = s.target && s.target.kind !== "none" ? ` · ${WORKOUT_TARGET_LABELS[s.target.kind]} ${s.target.zone}` : "";
+  return `${WORKOUT_STEP_LABELS[s.type]} · ${amount}${target}`;
+}
+
+const stepOptionHtml = (value, label, selected) => `<option value="${value}"${selected ? " selected" : ""}>${label}</option>`;
+
+function stepRowHtml(s) {
+  const t = s.target || { kind: "none" };
+  const unit = s.distance_km != null ? "km" : "min";
+  return `
+    <div class="pe-step-row">
+      <select class="coach-input pe-step-type" aria-label="Art">${WORKOUT_STEP_TYPES.filter(x => x !== "repeat").map(x => stepOptionHtml(x, WORKOUT_STEP_LABELS[x], s.type === x)).join("")}</select>
+      <input type="number" class="coach-input pe-step-value" min="0" step="any" value="${s.distance_km ?? s.duration_min ?? ""}" placeholder="offen" aria-label="Dauer oder Distanz">
+      <select class="coach-input pe-step-unit" aria-label="Einheit">${stepOptionHtml("min", "min", unit === "min")}${stepOptionHtml("km", "km", unit === "km")}</select>
+      <select class="coach-input pe-step-target" aria-label="Ziel">${WORKOUT_TARGET_KINDS.map(k => stepOptionHtml(k, WORKOUT_TARGET_LABELS[k], t.kind === k)).join("")}</select>
+      <select class="coach-input pe-step-zone" aria-label="Zone"${t.kind === "none" ? " hidden" : ""}>${[1, 2, 3, 4, 5].map(z => stepOptionHtml(z, `Zone ${z}`, t.zone === z)).join("")}</select>
+      <button type="button" class="plan-ex-remove pe-step-remove" title="Schritt entfernen" aria-label="Schritt entfernen">✕</button>
+    </div>`;
+}
+
+function stepRepeatHtml(s) {
+  return `
+    <div class="pe-step-repeat">
+      <div class="pe-repeat-head">
+        <input type="number" class="coach-input pe-repeat-count" min="1" max="50" step="1" value="${s.count}" aria-label="Anzahl Wiederholungen"><span>× wiederholen</span>
+        <button type="button" class="plan-ex-remove pe-step-remove" title="Wiederholung entfernen" aria-label="Wiederholung entfernen">✕</button>
+      </div>
+      <div class="pe-repeat-steps">${s.steps.map(stepRowHtml).join("")}</div>
+      <button type="button" class="chip pe-repeat-add">+ Schritt</button>
+    </div>`;
+}
+
+function planEditStepsHtml(custom, steps) {
+  if (!custom) return `
+    <ol class="pe-steps-preview">${steps.map(s => `<li>${escapeHtml(workoutStepText(s))}</li>`).join("")}</ol>
+    <div class="pe-steps-actions"><span class="wd-analysis-hint">Standard aus Dauer und Intensität</span><button type="button" class="chip pe-steps-customize">Schritte anpassen</button></div>`;
+  return `
+    <div class="pe-steps-list">${steps.map(s => (s.type === "repeat" ? stepRepeatHtml(s) : stepRowHtml(s))).join("")}</div>
+    <div class="pe-steps-actions">
+      <button type="button" class="chip pe-steps-add">+ Schritt</button>
+      <button type="button" class="chip pe-steps-add-repeat">+ Wiederholung</button>
+      <button type="button" class="chip pe-steps-reset">Standard verwenden</button>
+    </div>`;
+}
+
+function readStepRow(row) {
+  const raw = row.querySelector(".pe-step-value").value.trim();
+  const kind = row.querySelector(".pe-step-target").value;
+  const step = { type: row.querySelector(".pe-step-type").value };
+  if (raw !== "") step[row.querySelector(".pe-step-unit").value === "km" ? "distance_km" : "duration_min"] = Number(raw);
+  step.target = kind === "none" ? { kind } : { kind, zone: Number(row.querySelector(".pe-step-zone").value) };
+  return step;
+}
+
+function readStepsEditor(listEl) {
+  return [...listEl.children].map(el => (el.classList.contains("pe-step-repeat")
+    ? { type: "repeat", count: Number(el.querySelector(".pe-repeat-count").value), steps: [...el.querySelectorAll(".pe-step-row")].map(readStepRow) }
+    : readStepRow(el)));
+}
+
+// Prüft die bearbeiteten Schritte für die Sportart. { steps, errors } wie validateWorkoutSteps.
+function checkEditedSteps(listEl, sport) {
+  const res = validateWorkoutSteps(readStepsEditor(listEl));
+  const flat = res.steps ? res.steps.flatMap(s => (s.type === "repeat" ? s.steps : [s])) : [];
+  if (flat.some(s => s.target.kind === "pace_zone" && !paceZoneMps(sport, s.target.zone))) {
+    return { steps: null, errors: ["Pace-Zonen gehen nur bei Laufen (Schwellenpace im Profil) und Schwimmen (CSS im Profil) - bitte dort eintragen oder ein anderes Ziel wählen."] };
+  }
+  return res;
+}
+
 function openPlanEdit(id, defaults) {
   const isNew = !id;
   const p = isNew ? {
@@ -284,6 +454,13 @@ function openPlanEdit(id, defaults) {
         </div>`).join("")}</div>
       <button type="button" class="chip" id="plan-ex-add">+ Übung</button>
     </div>`;
+  let stepsCustom = !!(p.steps && validateWorkoutSteps(p.steps).steps);
+  const stepsHtml = `
+    <div class="onb-field" id="plan-edit-steps-field"${isStrengthLike ? " hidden" : ""}>
+      <label>Schritte für die Uhr <span class="wd-analysis-hint">für „An Garmin senden“ und den .fit-Export</span></label>
+      <div id="plan-edit-steps">${planEditStepsHtml(stepsCustom, plannedWorkoutSteps(p))}</div>
+      <p class="goal-error pe-steps-error" hidden></p>
+    </div>`;
 
   host.innerHTML = `
     <div class="onb-step">
@@ -310,6 +487,7 @@ function openPlanEdit(id, defaults) {
       </div>
       <div class="onb-field"><label for="plan-edit-desc">Beschreibung / Struktur</label><textarea id="plan-edit-desc" class="coach-input plan-edit-textarea" rows="3" placeholder="z.B. 10min Einrollen, 6x400m zügig mit 90s Pause, 10min Auslaufen">${escapeHtml(p.description || "")}</textarea></div>
       ${exercisesHtml}
+      ${stepsHtml}
       ${isNew ? "" : `
       <div class="onb-field">
         <label>Status</label>
@@ -327,10 +505,13 @@ function openPlanEdit(id, defaults) {
       <div class="plan-edit-actions">
         ${isNew ? "" : `<button type="button" class="chip plan-edit-delete" style="color:var(--c-crit);">Löschen</button>`}
         <div class="plan-edit-actions-right">
+          ${isNew ? "" : `<span class="wd-analysis-hint pe-unsaved-hint" hidden>Erst speichern</span>`}
           ${isNew ? "" : `<button type="button" class="chip plan-edit-export">Als .fit exportieren</button>`}
+          ${!isNew && canSendToGarmin(p) ? `<button type="button" class="cal-today-btn plan-garmin-send" data-id="${p.id}"${(garminSendState.get(p.id) || {}).loading ? " disabled" : ""}>${garminSendLabel(p)}</button>` : ""}
           <button type="button" class="update-btn plan-edit-save">${isNew ? "Anlegen" : "Speichern"}</button>
         </div>
       </div>
+      ${isNew ? "" : `<div class="pe-garmin-note" data-id="${p.id}">${planEditGarminNoteHtml(p)}</div>`}
     </div>`;
 
   // Ernährungsvorschau live nachziehen, sobald Sportart/Dauer/Intensität im
@@ -338,26 +519,72 @@ function openPlanEdit(id, defaults) {
   // Dauer auf >=90min erhöht -> zusätzlicher Fueling-Schritt erscheint) -
   // arbeitet mit dem AKTUELLEN Formularstand, nicht mit den gespeicherten
   // Werten von p, damit die Vorschau schon vor dem Speichern stimmt.
+  const formDraft = () => ({
+    sport: host.querySelector("#plan-edit-sport").value,
+    duration_min: Number(host.querySelector("#plan-edit-duration").value) || null,
+    intensity: host.querySelector("#plan-edit-intensity").value || null,
+  });
   const refreshPlanEditNutrition = () => {
-    const draft = {
-      sport: host.querySelector("#plan-edit-sport").value,
-      duration_min: Number(host.querySelector("#plan-edit-duration").value) || null,
-      intensity: host.querySelector("#plan-edit-intensity").value || null,
-    };
     const wrap = host.querySelector("#plan-edit-nutrition");
     if (!wrap) return;
-    const inner = planEditNutritionInnerHtml(draft, isNew);
+    const inner = planEditNutritionInnerHtml(formDraft(), isNew);
     wrap.innerHTML = inner;
     wrap.style.display = inner ? "" : "none";
   };
 
+  // Schritte: Vorschau der Standard-Schritte folgt dem Formular; eigene
+  // Schritte werden direkt in den Zeilen bearbeitet (Klicks per Delegation).
+  const stepsField = host.querySelector("#plan-edit-steps-field");
+  const stepsHost = host.querySelector("#plan-edit-steps");
+  const stepsError = host.querySelector(".pe-steps-error");
+  const renderSteps = steps => { stepsHost.innerHTML = planEditStepsHtml(stepsCustom, steps); stepsError.hidden = true; };
+  const refreshPlanEditSteps = () => { if (!stepsCustom) renderSteps(defaultWorkoutSteps(formDraft())); };
+  stepsField.addEventListener("click", e => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    const list = stepsHost.querySelector(".pe-steps-list");
+    if (btn.classList.contains("pe-steps-customize")) { stepsCustom = true; renderSteps(defaultWorkoutSteps(formDraft())); }
+    else if (btn.classList.contains("pe-steps-reset")) { stepsCustom = false; refreshPlanEditSteps(); }
+    else if (btn.classList.contains("pe-steps-add")) list.insertAdjacentHTML("beforeend", stepRowHtml({ type: "interval", duration_min: 10 }));
+    else if (btn.classList.contains("pe-steps-add-repeat")) list.insertAdjacentHTML("beforeend", stepRepeatHtml({ type: "repeat", count: 4, steps: [{ type: "interval", duration_min: 4 }, { type: "recovery", duration_min: 2 }] }));
+    else if (btn.classList.contains("pe-repeat-add")) btn.previousElementSibling.insertAdjacentHTML("beforeend", stepRowHtml({ type: "interval", duration_min: 4 }));
+    else if (btn.classList.contains("pe-step-remove")) btn.closest(".pe-step-row, .pe-step-repeat").remove();
+  });
+  stepsField.addEventListener("change", e => {
+    if (e.target.classList.contains("pe-step-target")) e.target.parentElement.querySelector(".pe-step-zone").hidden = e.target.value === "none";
+  });
+
   host.querySelector("#plan-edit-sport").addEventListener("change", e => {
     const strengthLike = e.target.value === "Kraft" || e.target.value === "Mobility";
     host.querySelector("#plan-edit-exercises-field").style.display = strengthLike ? "" : "none";
+    stepsField.hidden = strengthLike;
     refreshPlanEditNutrition();
+    refreshPlanEditSteps();
   });
-  host.querySelector("#plan-edit-duration").addEventListener("input", refreshPlanEditNutrition);
-  host.querySelector("#plan-edit-intensity").addEventListener("change", refreshPlanEditNutrition);
+  host.querySelector("#plan-edit-duration").addEventListener("input", () => { refreshPlanEditNutrition(); refreshPlanEditSteps(); });
+  host.querySelector("#plan-edit-intensity").addEventListener("change", () => { refreshPlanEditNutrition(); refreshPlanEditSteps(); });
+
+  // .fit-Export und "An Garmin senden" nehmen die GESPEICHERTE Einheit -
+  // solange das Formular davon abweicht, sind beide gesperrt ("Erst speichern").
+  const exportBtn = host.querySelector(".plan-edit-export");
+  const garminBtn = host.querySelector(".plan-edit-actions .plan-garmin-send");
+  const formState = () => JSON.stringify([
+    ...["#plan-edit-date", "#plan-edit-sport", "#plan-edit-title", "#plan-edit-duration", "#plan-edit-intensity", "#plan-edit-desc"].map(sel => host.querySelector(sel).value),
+    stepsCustom ? readStepsEditor(stepsHost.querySelector(".pe-steps-list")) : null,
+  ]);
+  const savedState = formState();
+  const refreshUnsaved = () => {
+    if (isNew) return;
+    const dirty = formState() !== savedState;
+    host.querySelector(".pe-unsaved-hint").hidden = !dirty;
+    exportBtn.disabled = dirty;
+    if (garminBtn) {
+      garminBtn.dataset.unsaved = dirty ? "1" : "";
+      garminBtn.disabled = dirty || !!(garminSendState.get(id) || {}).loading;
+    }
+  };
+  const formRoot = host.querySelector(".onb-step");
+  ["input", "change", "click"].forEach(type => formRoot.addEventListener(type, refreshUnsaved)); // click: Schritt-Zeilen hinzufügen/entfernen
 
   let statusVal = p.status;
   host.querySelectorAll("#plan-edit-status .onb-radio-chip").forEach(btn => {
@@ -418,6 +645,8 @@ function openPlanEdit(id, defaults) {
         wireExerciseRemove();
       }
       refreshPlanEditNutrition();
+      refreshPlanEditSteps();
+      refreshUnsaved();
     } catch (e) {
       regenError.textContent = describeAiError(e, "plan");
       regenError.style.display = "";
@@ -427,8 +656,8 @@ function openPlanEdit(id, defaults) {
     }
   });
 
-  const exportBtn = host.querySelector(".plan-edit-export");
   if (exportBtn) exportBtn.addEventListener("click", () => exportPlannedWorkoutAsFit(id));
+  wireGarminSend(host);
 
   const lessonsBtn = host.querySelector(".pe-lessons-btn");
   if (lessonsBtn) lessonsBtn.addEventListener("click", () => generateLessons(id));
@@ -441,7 +670,7 @@ function openPlanEdit(id, defaults) {
     renderCalendar();
   });
 
-  host.querySelector(".plan-edit-save").addEventListener("click", () => {
+  host.querySelector(".plan-edit-save").addEventListener("click", async () => {
     // Live-Sportart-Auswahl entscheidet, nicht die beim Öffnen erfasste
     // isStrengthLike - die kann sich per Sportart-Wechsel geändert haben (s.o.).
     const currentSport = document.getElementById("plan-edit-sport").value;
@@ -452,6 +681,17 @@ function openPlanEdit(id, defaults) {
       reps: row.querySelector(".plan-ex-reps").value.trim() || null,
       note: null,
     })).filter(ex => ex.name) : null;
+    let steps = null;
+    if (stepsCustom && !currentlyStrengthLike) {
+      const checked = checkEditedSteps(stepsHost.querySelector(".pe-steps-list"), currentSport);
+      if (!checked.steps) {
+        stepsError.textContent = checked.errors.join(" ");
+        stepsError.hidden = false;
+        stepsError.scrollIntoView({ block: "nearest" });
+        return;
+      }
+      steps = checked.steps;
+    }
     const patch = {
       date: document.getElementById("plan-edit-date").value || p.date,
       sport: currentSport,
@@ -460,12 +700,17 @@ function openPlanEdit(id, defaults) {
       intensity: document.getElementById("plan-edit-intensity").value || null,
       description: document.getElementById("plan-edit-desc").value.trim() || null,
       exercises: exercises && exercises.length ? exercises : null,
+      steps,
     };
     if (isNew) {
       addPlannedWorkout({ ...patch, goalId: p.goalId, phase: p.phase, source: "manual" });
     } else {
       patch.status = statusVal;
-      updatePlannedWorkout(id, patch);
+      // Jede Änderung einer bestehenden Einheit (neues Datum, aber auch ein
+      // übernommener "Alternativer Vorschlag" der KI) läuft durch das
+      // Regelwerk; bei Abbruch bleibt der Dialog offen.
+      const label = patch.date !== p.date ? "Trotzdem verschieben" : "Trotzdem speichern";
+      if (!(await commitCheckedPlanChange(patchedPlannedWorkouts(plannedWorkouts, id, patch), label))) return;
     }
     closePlanEdit();
     renderTrainingPlanCard();
@@ -477,6 +722,95 @@ function openPlanEdit(id, defaults) {
 
 function closePlanEdit() {
   document.getElementById("plan-edit-overlay").classList.remove("open");
+}
+
+/* ---------- Regelprüfung bei Änderungen (Verschieben, Bearbeiten) ----------
+   Eine geänderte Planliste wird erst nach validatePlan() (js/analytics/
+   plan-rules.js) übernommen. Gezeigt wird nur, was die Änderung NEU
+   verursacht: "warn" -> Rückfrage mit `okLabel` (z. B. "Trotzdem
+   verschieben"); "block" -> so wird nichts gespeichert, der Knopf bietet
+   stattdessen den Vorschlag des Regelwerks an (applyPlanSuggestion) und
+   danach wird erneut geprüft. true = übernommen und gespeichert. */
+const PLAN_CHANGE_MAX_ROUNDS = 4;
+
+async function commitCheckedPlanChange(nextList, okLabel = "Trotzdem verschieben") {
+  const before = planRuleViolations(plannedWorkouts);
+  const goal = getPrimaryGoal();
+  let next = nextList;
+  for (let round = 0; ; round++) {
+    const fresh = newPlanViolations(before, planRuleViolations(next));
+    if (!fresh.length) break;
+    const block = fresh.find(v => v.severity === "block");
+    if (block && round >= PLAN_CHANGE_MAX_ROUNDS) return false;
+    const intro = block ? "Das verstößt gegen eine Trainingsregel:" : "Bitte beachten:";
+    const ordered = [...fresh].sort((a, b) => (a.severity === "block" ? 0 : 1) - (b.severity === "block" ? 0 : 1));
+    const ok = await confirmDialog([intro, ...ordered.map(v => v.text)].join("\n\n"), { okLabel: block ? block.suggestion.text.replace(/\.$/, "") : okLabel, danger: false });
+    if (!ok) return false;
+    if (!block) break;
+    next = applyPlanSuggestion(next, block.suggestion, { goalId: goal ? goal.id : null, source: "manual" });
+    if (!next) return false;
+  }
+  replacePlannedWorkouts(next);
+  return true;
+}
+
+/* ---------- Terminwünsche ("Ich möchte Donnerstag schwimmen") ----------
+   Neben dem freien Wunschtext im ⚙-Menü der Trainingsplan-Kachel, Daten in
+   js/data/plan-wishes.js. Der Status (offen/eingeplant) kommt aus dem Plan,
+   deshalb zeichnet renderTrainingPlanCard() die Liste jedes Mal mit. */
+function renderPlanWishList() {
+  const host = document.getElementById("plan-wish-list");
+  if (!host) return;
+  const list = upcomingPlanWishes();
+  if (!list.length) {
+    host.innerHTML = `<p class="plan-wish-empty">Noch keine Terminwünsche.</p>`;
+    return;
+  }
+  host.innerHTML = list.map(w => {
+    const planned = isPlanWishPlanned(w);
+    return `
+      <div class="plan-wish-item">
+        <div class="plan-wish-main">
+          <span class="plan-wish-what">${fmtDateWeekday(new Date(w.date + "T00:00:00"))} · ${escapeHtml(w.sport)} · ${w.duration_min} min</span>
+          ${w.note ? `<span class="plan-wish-note">${escapeHtml(w.note)}</span>` : ""}
+        </div>
+        <span class="plan-wish-state${planned ? " planned" : ""}">${planned ? "eingeplant" : "offen"}</span>
+        <button type="button" class="plan-ex-remove plan-wish-delete" data-id="${w.id}" title="Wunsch löschen" aria-label="Wunsch löschen">✕</button>
+      </div>`;
+  }).join("");
+  host.querySelectorAll(".plan-wish-delete").forEach(btn => btn.addEventListener("click", e => {
+    // Sonst schließt der Klick das ⚙-Menü (der Knopf ist nach dem Neuzeichnen
+    // nicht mehr im Popover, siehe initInfoPopovers).
+    e.stopPropagation();
+    deletePlanWish(btn.dataset.id);
+    renderPlanWishList();
+  }));
+}
+
+function initPlanWishForm() {
+  const sportSelect = document.getElementById("plan-wish-sport");
+  const addBtn = document.getElementById("plan-wish-add-btn");
+  if (!sportSelect || !addBtn) return;
+  sportSelect.innerHTML = PLAN_ALLOWED_SPORTS.map(s => `<option value="${s}">${s}</option>`).join("");
+  const dateInput = document.getElementById("plan-wish-date");
+  dateInput.min = todayStr();
+  addBtn.addEventListener("click", () => {
+    const status = document.getElementById("plan-wish-status");
+    const wish = addPlanWish({
+      date: dateInput.value,
+      sport: sportSelect.value,
+      duration_min: document.getElementById("plan-wish-duration").value,
+      note: document.getElementById("plan-wish-note").value,
+    });
+    status.textContent = wish ? "✓ Gespeichert – kommt in die nächste Planung" : `Bitte Datum (ab heute), Sportart und Dauer (1–${PLAN_WISH_MAX_MIN} min) angeben.`;
+    status.className = "coach-test-status " + (wish ? "ok" : "err");
+    if (!wish) return;
+    setTimeout(() => { status.textContent = ""; status.className = "coach-test-status"; }, 2500);
+    document.getElementById("plan-wish-duration").value = "";
+    document.getElementById("plan-wish-note").value = "";
+    renderPlanWishList();
+  });
+  renderPlanWishList();
 }
 
 // "Erweiterte Einstellungen" (⚙ an der Trainingsplan-Kartenüberschrift) -
