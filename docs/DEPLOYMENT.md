@@ -228,6 +228,9 @@ sich wie eine App öffnet (ohne Safari-Leisten).
 dein PC an ist, das Dashboard-Fenster offen ist und Tailscale auf dem iPhone
 verbunden ist. Auf dem iPhone wird nichts zwischengespeichert.
 
+Ohne Tailscale geht es auch über die Port-Weiterleitung von VS Code – siehe
+Abschnitt 8.
+
 ### Schritt 1: Tailscale auf dem iPhone
 
 1. **Tailscale** aus dem App Store laden und mit **demselben Konto** wie am PC
@@ -335,3 +338,75 @@ Titel und Text → **Publish release**. Der Tag muss genau zur Nummer in
 Das Repository muss öffentlich sein (die Prüfung fragt GitHub ohne Konto).
 Dateien, die eine neue Version löscht, bleiben bei bestehenden
 Installationen liegen – sie stören nicht.
+
+---
+
+## 8. Handy über VS Code (Port-Weiterleitung, ohne Tailscale)
+
+Wenn auf deinem PC ohnehin VS Code läuft, kann VS Code das Dashboard unter
+einer eigenen **https-Adresse** ins Internet weiterreichen. Auf dem Handy
+brauchst du dann **kein Tailscale** – nur einen Browser. Am Dashboard muss
+dafür nichts umgestellt werden.
+
+### Einrichten
+
+1. Das Dashboard wie gewohnt starten (`start.bat` bzw. `start.sh`) und am PC
+   prüfen, dass http://localhost:5000 geht.
+2. In VS Code unten das Panel **Ports** öffnen (neben „Terminal“; oder
+   Befehlspalette ⌘/Strg+Umschalt+P → „Ports: Focus on Ports View“).
+3. **Port weiterleiten** („Forward a Port“) → `5000` eingeben → Enter.
+   Beim ersten Mal fragt VS Code nach deiner Anmeldung mit GitHub – zustimmen.
+4. In der Zeile erscheint die **weitergeleitete Adresse**, z. B.
+   `https://abc123-5000.euw.devtunnels.ms`. Mit Rechtsklick → **Adresse
+   kopieren** (oder das Globus-Symbol zum Testen).
+5. Die Adresse auf dem Handy öffnen. Beim ersten Mal zeigt Microsoft eine
+   Warnseite („Developer Tunnel“) → **Weiter**. Dann erscheint die
+   Dashboard-Anmeldung.
+6. Als App auf den Home-Bildschirm: in Safari **Teilen** → **„Zum
+   Home-Bildschirm“**. In der App meldest du dich noch einmal an (sie hat
+   einen eigenen Speicher, getrennt von Safari).
+
+### Sichtbarkeit: „Privat“ lassen
+
+Mit Rechtsklick auf den Port → **Port-Sichtbarkeit** („Port Visibility“):
+
+| Einstellung | Wer kommt bis zur Dashboard-Anmeldung? | Empfehlung |
+|---|---|---|
+| **Privat** (Standard) | nur wer sich vorher mit **deinem** GitHub-Konto anmeldet | **für dich allein** – doppelt geschützt (GitHub + Dashboard-Login) |
+| **Öffentlich** | jeder, der die Adresse kennt | nur, wenn Freunde ohne Tailscale zugreifen sollen; dann schützt allein das Dashboard-Passwort |
+
+Mit „Privat“ fragt das Handy vor dem Dashboard zusätzlich nach der
+GitHub-Anmeldung – das ist gewollt.
+
+### Gut zu wissen
+
+- **VS Code muss auf dem PC offen bleiben** (und das Dashboard-Fenster
+  laufen). Schließt du VS Code oder geht der PC in den Ruhezustand, ist das
+  Handy getrennt. Tailscale (Abschnitt 2 und 6) läuft dagegen im Hintergrund.
+- Die Adresse bleibt meist dieselbe, solange du denselben Port weiterleitest.
+  Ändert sie sich, die neue kopieren und das Lesezeichen bzw. die
+  Home-Bildschirm-App neu anlegen.
+- **Weil die Adresse https ist**, funktionieren auf dem iPhone auch die
+  Kopieren-Knöpfe (z. B. Kalender-Abo-Link) und die Home-Bildschirm-App.
+- **Freunde:** „Privat“ gilt nur für dein eigenes GitHub-Konto. Für Freunde
+  bleibt Tailscale (Abschnitt 2) die bessere Lösung.
+- **Login-Bremse:** Alle Anfragen über die Weiterleitung kommen für den
+  Server von `127.0.0.1`. Die Bremse (5 Fehlversuche pro Minute) gilt dann
+  für alle gemeinsam – bei „Öffentlich“ kann also ein Fremder mit falschen
+  Passwörtern alle für jeweils eine Minute aussperren. Ein weiterer Grund
+  für „Privat“.
+- Hast du in `.env` `DASHBOARD_HOST` auf die Tailscale-IP gesetzt, erreicht
+  VS Code den Server unter `localhost` nicht. Dann die Zeile entfernen oder
+  `DASHBOARD_HOST=0.0.0.0` setzen und neu starten.
+- **Abschalten:** im Ports-Panel Rechtsklick auf den Port → **Port-Weiterleitung
+  beenden** („Stop Forwarding Port“).
+
+### Wenn es nicht klappt
+
+| Problem | Lösung |
+|---|---|
+| Seite lädt nicht | Läuft das Dashboard (http://localhost:5000 am PC)? Ist VS Code offen und der Port im Ports-Panel aufgeführt? PC im Ruhezustand? |
+| Handy fragt nach GitHub-Anmeldung | Normal bei „Privat“ – mit **deinem** GitHub-Konto anmelden. |
+| „Developer Tunnel“-Warnseite kommt immer wieder | Einmal „Weiter“ – in einer neu angelegten Home-Bildschirm-App kommt sie noch einmal. |
+| Nach einem Update kurz „nicht erreichbar“ | Der Server startet neu; nach etwa einer Minute die Seite neu laden. |
+

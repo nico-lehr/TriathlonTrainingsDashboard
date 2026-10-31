@@ -70,7 +70,7 @@ Auftrag (2026-10-22): Hinweis auf neue Versionen und Installation nach Bestätig
 
 ### Offene Fragen zu H
 
-- Auf GitHub gibt es noch **keine Release**. Nach dem Zusammenführen dieses Branches auf `main` bitte die erste Release `v2.0.0` veröffentlichen (Anleitung: `docs/DEPLOYMENT.md`, Abschnitt 7). Bestehende Installationen ohne Update-Funktion brauchen dieses eine Mal ein Update von Hand.
+- Release `v2.0.0` ist veröffentlicht (2026-10-31) – angelegt von der GitHub-Automatik `.github/workflows/release.yml` aus `VERSION` und `CHANGELOG.md` (Anleitung: `docs/DEPLOYMENT.md`, Abschnitt 7). Bestehende Installationen ohne Update-Funktion brauchen dieses eine Mal ein Update von Hand.
 - „Betreiber“ = die zuerst angelegte Person (änderbar mit `ADMIN_USERS=` in `.env`). Freunde sehen nur die Versionsnummer.
 - Die Prüfung braucht ein öffentliches Repository (GitHub ohne Konto). Bei einem privaten Repository meldet die Karte „GitHub antwortet mit Fehler 404“ bzw. „keine Version veröffentlicht“.
 - Dateien, die eine neue Version löscht, bleiben bei ZIP-Installationen liegen (stören nicht).
