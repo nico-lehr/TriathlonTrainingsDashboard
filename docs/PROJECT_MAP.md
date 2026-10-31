@@ -225,6 +225,8 @@ gestartet oder per „Jetzt von Garmin holen“ im Dashboard. Anleitung:
 |---|---|
 | `start.bat` / `start.sh` | Startet den Server über `backend/launcher.py` (installiert beim ersten Mal die Bibliotheken, legt `.env` an, startet nach einem Update neu). |
 | `VERSION` | Programmversion; muss zum Tag der GitHub-Release passen (`docs/DEPLOYMENT.md`, Abschnitt 7). |
+| `CHANGELOG.md` | „Was ist neu“ je Version (`## <Version>`) – Text der GitHub-Release und des Update-Hinweises. |
+| `.github/workflows/release.yml` | GitHub Action: legt Tag und Release automatisch an, sobald auf `main` eine neue Nummer in `VERSION` steht. |
 | `backup.py` / `backup.bat` | Sichert `training.db` nach `backups/` (eine Datei pro Tag, die letzten 14). |
 | `parse_fit.py` | Python-Referenzimplementierung, liest `.fit`-Dateien (Standard: `fit-files/`) in `workouts.json`. Quellordner/Ziel per Argument überschreibbar. |
 | `build_dashboard.py` | Erzeugt `data/workouts-data.js` aus `workouts.json`. |

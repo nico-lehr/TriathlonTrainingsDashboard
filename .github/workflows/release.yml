@@ -1,0 +1,63 @@
+# Legt automatisch eine GitHub-Release an, sobald auf main eine neue
+# Versionsnummer in VERSION steht. Der Release-Text kommt aus CHANGELOG.md
+# (Abschnitt "## <Version>"). Gibt es die Release schon, passiert nichts.
+# Die Dashboards finden die neue Version dann ueber backend/updater.py.
+name: Release aus VERSION
+
+on:
+  push:
+    branches: [main]
+    paths: [VERSION, CHANGELOG.md, .github/workflows/release.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Versionsnummer lesen
+        id: v
+        run: |
+          v="$(tr -d '[:space:]' < VERSION)"
+          if ! printf '%s' "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::VERSION enthaelt keine Versionsnummer wie 2.1.0 (gelesen: '$v')"
+            exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Gibt es die Release schon?
+        id: exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "Release v$VERSION gibt es schon - nichts zu tun."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Text aus CHANGELOG.md holen
+        if: steps.exists.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '/^## / { if (found) exit; if ($2 == v) { found = 1; next } } found { print }' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error::In CHANGELOG.md fehlt der Abschnitt '## $VERSION' (mit Text darunter)"
+            exit 1
+          fi
+          cat notes.md
+
+      - name: Release anlegen
+        if: steps.exists.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "Version $VERSION" --notes-file notes.md

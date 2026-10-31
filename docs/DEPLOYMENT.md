@@ -308,22 +308,30 @@ App entfernen).
 
 ## 7. Neue Version veröffentlichen (für dich als Projekt-Besitzer)
 
-Ein Update erreicht die Dashboards erst, wenn du auf GitHub eine **Release**
-veröffentlichst – ein normales Hochladen auf `main` löst bewusst nichts aus.
+Ein Update erreicht die Dashboards erst, wenn es auf GitHub eine **Release**
+gibt – ein normales Hochladen auf `main` löst bewusst nichts aus. Die Release
+legt GitHub **automatisch** an (`.github/workflows/release.yml`), sobald auf
+`main` eine neue Nummer in `VERSION` steht:
 
 1. In der Datei `VERSION` die Nummer erhöhen, z. B. `2.0.0` → `2.1.0`
    (kleine Korrektur: letzte Stelle, neue Funktionen: mittlere Stelle).
-   Die Änderung auf `main` bringen.
-2. Auf GitHub im Projekt rechts auf **Releases** → **Draft a new release**.
-3. **Choose a tag** → `v2.1.0` eintippen → „Create new tag“ (Ziel: `main`).
-   Der Tag muss genau zur Nummer in `VERSION` passen (mit `v` davor) –
-   sonst lehnt das Dashboard das Update ab.
-4. Titel z. B. „Version 2.1.0“, darunter in einfachen Worten, was neu ist –
-   genau dieser Text erscheint im Dashboard unter „Was ist neu?“.
-5. **Publish release**. Innerhalb eines Tages (oder sofort mit „Jetzt
-   prüfen“) sehen alle Dashboards den Hinweis.
+2. In `CHANGELOG.md` oben einen Abschnitt `## 2.1.0` ergänzen und darunter in
+   einfachen Worten schreiben, was neu ist – genau dieser Text erscheint als
+   Release-Text und im Dashboard unter „Was ist neu?“.
+3. Beides auf `main` bringen. GitHub legt dann den Tag `v2.1.0` und die
+   Release an (im Projekt unter **Actions** zu sehen, dauert etwa eine Minute).
+   Innerhalb eines Tages (oder sofort mit „Jetzt prüfen“) sehen alle
+   Dashboards den Hinweis.
+
+Fehlt der Abschnitt in `CHANGELOG.md` oder steht in `VERSION` keine
+Versionsnummer, legt die Automatik nichts an und meldet den Fehler unter
+**Actions** (rotes Kreuz). Gibt es die Release schon, passiert nichts.
+
+**Von Hand** geht es auch: im Projekt rechts **Releases** → **Draft a new
+release** → **Choose a tag** `v2.1.0` → „Create new tag“ (Ziel: `main`) →
+Titel und Text → **Publish release**. Der Tag muss genau zur Nummer in
+`VERSION` passen (mit `v` davor) – sonst lehnt das Dashboard das Update ab.
 
 Das Repository muss öffentlich sein (die Prüfung fragt GitHub ohne Konto).
 Dateien, die eine neue Version löscht, bleiben bei bestehenden
 Installationen liegen – sie stören nicht.
-

@@ -189,6 +189,7 @@ Ohne beides funktioniert alles andere normal — nur der Coach-Bereich bleibt le
 ```
 start.bat / start.sh    Server starten (installiert beim ersten Mal alles, startet nach Updates neu)
 VERSION                 Installierte Programmversion (für die Update-Prüfung)
+CHANGELOG.md            Was ist neu – je Version
 backup.py / backup.bat  Datenbank sichern (backups/, die letzten 14)
 
 index.html, login.html  Dashboard und Anmeldung (vom Server ausgeliefert)
