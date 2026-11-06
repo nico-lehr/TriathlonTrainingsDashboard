@@ -4,6 +4,10 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.1
+
+Die Handy-Ansicht aus 2.4.0 ist wieder entfernt – das Dashboard sieht auf dem Handy wieder aus wie in 2.3.0.
+
 ## 2.3.0
 
 Garmin nur noch über die offizielle Schnittstelle, Werte aus Garmin übernehmen und Updates ganz automatisch.
