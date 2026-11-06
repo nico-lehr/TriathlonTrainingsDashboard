@@ -373,3 +373,42 @@ class BetreiberTest(TempInstallMixin, unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PipOhneClaudeTest(unittest.TestCase):
+    """Laesst sich das Claude-Paket nicht installieren (alte 32-Bit-Systeme),
+    blockiert das nicht das ganze Update - es geht ohne Claude weiter."""
+
+    def test_zweiter_versuch_ohne_anthropic(self):
+        import subprocess
+        import tempfile
+        from pathlib import Path
+        root = Path(tempfile.mkdtemp())
+        (root / "backend").mkdir()
+        (root / "backend" / "requirements.txt").write_text("Flask==2.3.3\nanthropic>=2.6,<3  # Claude\n", encoding="utf-8")
+        seen = []
+
+        def fake_run(cmd, **kw):
+            content = Path(cmd[-1]).read_text(encoding="utf-8")
+            seen.append(content)
+            return subprocess.CompletedProcess(cmd, 1 if "anthropic" in content else 0, "", "kein Rad fuer armv7l")
+
+        with mock.patch.object(updater.subprocess, "run", side_effect=fake_run), \
+                mock.patch("importlib.util.find_spec", return_value=None):
+            updater.pip_install(root)
+        self.assertEqual(len(seen), 2)
+        self.assertNotIn("anthropic", seen[1])
+        self.assertIn("Flask", seen[1])
+        self.assertFalse((root / "backend" / "requirements-ohne-claude.txt").exists())
+
+    def test_anderer_fehler_bleibt_ein_fehler(self):
+        import subprocess
+        import tempfile
+        from pathlib import Path
+        root = Path(tempfile.mkdtemp())
+        (root / "backend").mkdir()
+        (root / "backend" / "requirements.txt").write_text("Flask==2.3.3\nanthropic>=2.6\n", encoding="utf-8")
+        fail = subprocess.CompletedProcess([], 1, "", "kein Internet")
+        with mock.patch.object(updater.subprocess, "run", return_value=fail), \
+                mock.patch("importlib.util.find_spec", return_value=None), self.assertRaises(updater.UpdateError):
+            updater.pip_install(root)

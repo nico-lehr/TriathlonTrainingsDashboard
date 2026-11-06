@@ -23,6 +23,16 @@ TOKEN_MAX_AGE_S = 30 * 24 * 3600  # 30 Tage
 MIN_PASSWORD_LENGTH = 10
 LOGIN_MAX_FAILS = 5   # Fehlversuche ...
 LOGIN_WINDOW_S = 60   # ... pro Minute und IP
+# Zusaetzlich je Benutzername (gegen Raten von vielen Adressen aus, wichtig
+# bei oeffentlicher Adresse): nach 10 Fehlversuchen 15 Minuten Pause fuer
+# dieses Konto. Der richtige Besitzer wartet hoechstens 15 Minuten.
+USER_MAX_FAILS = 10
+USER_WINDOW_S = 15 * 60
+# Nur diese Absender duerfen die echte Besucher-Adresse im Kopf
+# X-Forwarded-For mitschicken: Tailscale serve/funnel laeuft auf dem
+# Dashboard-Rechner selbst. Von allen anderen wird der Kopf ignoriert -
+# sonst koennte jeder ihn faelschen und die Sperre umgehen.
+TRUSTED_PROXIES = {"127.0.0.1", "::1"}
 
 
 def _serializer():
@@ -154,20 +164,42 @@ def reset_password(session, username, password):
     return login.athlete_id
 
 
-# Fehlversuche je IP, nur im Arbeitsspeicher (nach einem Neustart wieder leer).
+# Fehlversuche je IP und je Benutzername, nur im Arbeitsspeicher (nach
+# einem Neustart wieder leer).
 _failed_logins = defaultdict(deque)
+_failed_users = defaultdict(deque)
 _failed_logins_lock = threading.Lock()
 
 
-def too_many_failed_logins(ip):
+def client_ip(remote_addr, forwarded_for):
+    """Adresse des Besuchers. Kommt die Anfrage ueber Tailscale (lokaler
+    Proxy), steht die echte Adresse im letzten X-Forwarded-For-Eintrag."""
+    if remote_addr in TRUSTED_PROXIES and forwarded_for:
+        last = forwarded_for.split(",")[-1].strip()
+        if last:
+            return last
+    return remote_addr or "unknown"
+
+
+def _count(store, key, window):
     now = time.monotonic()
+    attempts = store[key]
+    while attempts and now - attempts[0] > window:
+        attempts.popleft()
+    return len(attempts)
+
+
+def too_many_failed_logins(ip, username=None):
     with _failed_logins_lock:
-        attempts = _failed_logins[ip]
-        while attempts and now - attempts[0] > LOGIN_WINDOW_S:
-            attempts.popleft()
-        return len(attempts) >= LOGIN_MAX_FAILS
+        if _count(_failed_logins, ip, LOGIN_WINDOW_S) >= LOGIN_MAX_FAILS:
+            return True
+        user = normalize_username(username) if isinstance(username, str) else ""
+        return bool(user) and _count(_failed_users, user, USER_WINDOW_S) >= USER_MAX_FAILS
 
 
-def note_failed_login(ip):
+def note_failed_login(ip, username=None):
     with _failed_logins_lock:
         _failed_logins[ip].append(time.monotonic())
+        user = normalize_username(username) if isinstance(username, str) else ""
+        if user:
+            _failed_users[user].append(time.monotonic())

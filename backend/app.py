@@ -86,4 +86,9 @@ if __name__ == "__main__":
     # 16 Threads: eine KI-Anfrage blockiert bis zu 10 Minuten einen davon.
     # Anfragen ueber 64 MB lehnt der Server ab (auch ohne Login), sonst koennte
     # jemand im WLAN die Platte fuellen.
-    serve(app, host=host, port=port, threads=16, max_request_body_size=config.MAX_CONTENT_LENGTH)
+    # Tailscale serve/funnel (oeffentliche Adresse) laeuft auf diesem Rechner
+    # und reicht die echte Besucher-Adresse und "https" weiter. Nur ihm wird
+    # das geglaubt; von allen anderen verwirft waitress diese Kopfzeilen.
+    serve(app, host=host, port=port, threads=16, max_request_body_size=config.MAX_CONTENT_LENGTH,
+          trusted_proxy="127.0.0.1", trusted_proxy_count=1,
+          trusted_proxy_headers={"x-forwarded-for", "x-forwarded-proto"})

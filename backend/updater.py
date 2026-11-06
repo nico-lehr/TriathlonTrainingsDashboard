@@ -294,6 +294,15 @@ def pip_install(root):
             continue
         proc = subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", str(req)],
                               capture_output=True, text=True, timeout=900)
+        if proc.returncode != 0 and req.name == "requirements.txt" and req.parent.name == "backend":
+            # Das Claude-Paket ist optional (auf alten 32-Bit-Systemen nicht
+            # installierbar) - ohne es noch einmal, statt das Update zu blockieren.
+            lines = [l for l in req.read_text(encoding="utf-8").splitlines() if not l.strip().lower().startswith("anthropic")]
+            slim = req.parent / "requirements-ohne-claude.txt"
+            slim.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            proc = subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", str(slim)],
+                                  capture_output=True, text=True, timeout=900)
+            slim.unlink(missing_ok=True)
         if proc.returncode != 0:
             last = " ".join((proc.stderr or proc.stdout or "").strip().splitlines()[-2:])[:300]
             raise UpdateError(f"Bibliotheken konnten nicht installiert werden ({last}). Es wurde nichts geändert.")

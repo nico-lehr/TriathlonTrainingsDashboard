@@ -33,7 +33,16 @@ fi
 say "Python-Umgebung .venv ..."
 [ -x .venv/bin/python ] || python3 -m venv .venv
 .venv/bin/python -m pip install -q --upgrade pip
-.venv/bin/python -m pip install -q -r backend/requirements.txt
+if ! .venv/bin/python -m pip install -q -r backend/requirements.txt; then
+  # Claude-Paket (anthropic) braucht Bausteine, die es auf alten 32-Bit-
+  # Systemen evtl. nicht gibt - das Dashboard laeuft trotzdem, nur ohne Claude.
+  echo "Hinweis: nicht alle Bibliotheken liessen sich installieren - ohne Claude-Paket noch einmal."
+  .venv/bin/python -m pip install -q -r <(grep -v '^anthropic' backend/requirements.txt)
+  echo "Hinweis: Claude (KI-Coach) geht so nicht. Abhilfe: Raspberry Pi OS (64-bit) verwenden."
+fi
+if [ "$(getconf LONG_BIT)" != "64" ]; then
+  echo "Hinweis: Dies ist ein 32-Bit-System. Empfohlen ist Raspberry Pi OS (64-bit)."
+fi
 # Garmin und .fit-Leser: auf alten 32-Bit-Systemen fehlt evtl. ein Baustein
 # (curl_cffi) - das Dashboard laeuft trotzdem, nur der alte Garmin-Login nicht.
 if ! .venv/bin/python -m pip install -q -r requirements.txt; then

@@ -1,4 +1,9 @@
-# Betrieb: Dashboard auf dem eigenen PC, Freunde über Tailscale
+# Betrieb: Dashboard auf dem eigenen Server, Freunde über Tailscale
+
+> **Empfohlen: Raspberry Pi als Server.** Einsteiger-Anleitung Schritt für
+> Schritt: **[RASPBERRY_PI_ANLEITUNG.md](RASPBERRY_PI_ANLEITUNG.md)** – vom
+> ersten Verbinden bis zur festen https-Adresse für dich und deine Freunde.
+> Die Abschnitte unten beschreiben auch den Betrieb auf einem Mac/PC.
 
 Das Dashboard läuft auf **einem** PC (deinem). Dieser PC ist gleichzeitig
 Webseite und Datenbank. Bis zu ein paar Freunde erreichen ihn über
@@ -186,7 +191,15 @@ Daten bleiben erhalten.
 - Ohne Anmeldung ist nur die Login-Seite erreichbar. Jede Anfrage prüft den
   Login und liefert nur die Daten der angemeldeten Person.
 - Passwörter werden nur als Hash gespeichert. Nach 5 Fehlversuchen pro
-  Minute sperrt der Server die Adresse kurz.
+  Minute sperrt der Server die Adresse kurz, nach 10 Fehlversuchen für ein
+  Konto dieses Konto für 15 Minuten (gegen Raten von vielen Adressen aus).
+- **Öffentliche Adresse (Tailscale Funnel, `deploy/raspberry-pi/oeffentlich.sh`):**
+  Dann ist die Login-Seite aus dem Internet erreichbar, immer über https.
+  Der Server glaubt die echte Besucher-Adresse nur dem Tailscale-Proxy auf
+  demselben Rechner (127.0.0.1); gefälschte Weiterleitungs-Kopfzeilen von
+  anderswo werden verworfen. Dazu Schutz-Kopfzeilen (kein Einbetten in fremde
+  Seiten, nur noch https nach dem ersten https-Besuch). Lange Passwörter
+  verwenden. Abschalten: `bash deploy/raspberry-pi/oeffentlich.sh aus`.
 - Der Server liefert nur die Webseite aus (`index.html`, `login.html`,
   `css/`, `js/` …) – `.env`, `training.db`, `backups/`, `data/`, `backend/`
   und Garmin-Token sind von außen nicht abrufbar.
@@ -464,7 +477,7 @@ von selbst neu.
 
 **Neu anfangen** (oder zusätzlich Freunde anlegen), auf dem Pi:
 ```
-.venv/bin/python backend/create_user.py
+bash deploy/raspberry-pi/benutzer.sh
 ```
 
 **Bisherige Daten vom Mac/PC übernehmen** (Trainings, Benutzer, Garmin-
@@ -490,7 +503,15 @@ starten** – sonst gibt es zwei getrennte Datenstände.
   auf einem Gerät nicht, die IP-Adresse nehmen (zeigt das
   Installationsprogramm an; im Router dem Pi eine feste IP geben, damit sie
   sich nicht ändert).
-- **Unterwegs und für Freunde:** Tailscale auf dem Pi installieren:
+- **Unterwegs und für Freunde ohne App (empfohlen):** feste https-Adresse
+  über Tailscale Funnel:
+  ```
+  bash deploy/raspberry-pi/oeffentlich.sh
+  ```
+  Das Skript installiert Tailscale, führt durch die Anmeldung und zeigt am
+  Ende die Adresse (`https://<pi-name>.<netz>.ts.net`). Status:
+  `… oeffentlich.sh status`, abschalten: `… oeffentlich.sh aus`.
+- **Nur privat über die Tailscale-App:** Tailscale auf dem Pi installieren:
   ```
   curl -fsSL https://tailscale.com/install.sh | sh
   sudo tailscale up
@@ -526,7 +547,8 @@ starten** – sonst gibt es zwei getrennte Datenstände.
 | Neu starten | `sudo systemctl restart triathlon-dashboard` |
 | Anhalten / wieder starten | `sudo systemctl stop …` / `sudo systemctl start triathlon-dashboard` |
 | Garmin jetzt holen (alle) | `sudo systemctl start triathlon-dashboard-garmin` |
-| Benutzer anlegen / Passwort neu | `.venv/bin/python backend/create_user.py` / `… --reset` |
+| Benutzer anlegen / Passwort neu | `bash deploy/raspberry-pi/benutzer.sh` / `… benutzer.sh passwort` |
+| Öffentliche Adresse an / Status / aus | `bash deploy/raspberry-pi/oeffentlich.sh` / `… status` / `… aus` |
 | Installation auffrischen | `bash deploy/raspberry-pi/install.sh` (harmlos, beliebig oft) |
 
 **Sicherungen nicht nur auf der Speicherkarte lassen** – SD-Karten gehen

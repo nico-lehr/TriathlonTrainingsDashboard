@@ -39,6 +39,7 @@ def make_user(name):
 class AuthTest(unittest.TestCase):
     def setUp(self):
         auth._failed_logins.clear()
+        auth._failed_users.clear()
         self.client = app.test_client()
 
     def login(self, username, password=PASSWORD):
@@ -163,6 +164,49 @@ class AuthTest(unittest.TestCase):
             self.assertEqual(self.login("bremse", "falsch-falsch").status_code, 401)
         # Der 6. Versuch wird abgewiesen - selbst mit richtigem Passwort.
         self.assertEqual(self.login("bremse").status_code, 429)
+
+    def via_proxy(self, username, ip, password="falsch-falsch"):
+        # So kommt eine Anfrage ueber Tailscale Funnel an: vom lokalen Proxy,
+        # die echte Besucher-Adresse im X-Forwarded-For-Kopf.
+        return self.client.post("/api/v1/auth/login", json={"username": username, "password": password},
+                                headers={"X-Forwarded-For": ip, "X-Forwarded-Proto": "https"},
+                                environ_base={"REMOTE_ADDR": "127.0.0.1"})
+
+    def test_hinter_oeffentlicher_adresse_zaehlt_die_echte_besucher_adresse(self):
+        make_user("proxy-a")
+        make_user("proxy-b")
+        for _ in range(5):
+            self.assertEqual(self.via_proxy("proxy-a", "203.0.113.7").status_code, 401)
+        self.assertEqual(self.via_proxy("proxy-a", "203.0.113.7", PASSWORD).status_code, 429)
+        # Eine andere Person ueber denselben Proxy ist davon nicht betroffen.
+        self.assertEqual(self.via_proxy("proxy-b", "198.51.100.4", PASSWORD).status_code, 200)
+
+    def test_gefaelschter_weiterleitungs_kopf_hilft_nicht(self):
+        make_user("faelscher")
+        for i in range(5):
+            r = self.client.post("/api/v1/auth/login", json={"username": "faelscher", "password": "falsch-falsch"},
+                                 headers={"X-Forwarded-For": f"10.0.0.{i}"}, environ_base={"REMOTE_ADDR": "192.168.1.50"})
+            self.assertEqual(r.status_code, 401)
+        r = self.client.post("/api/v1/auth/login", json={"username": "faelscher", "password": PASSWORD},
+                             headers={"X-Forwarded-For": "10.0.0.99"}, environ_base={"REMOTE_ADDR": "192.168.1.50"})
+        self.assertEqual(r.status_code, 429)
+
+    def test_konto_sperre_auch_bei_wechselnden_adressen(self):
+        make_user("ziel")
+        for i in range(10):
+            self.assertEqual(self.via_proxy("ziel", f"203.0.113.{i}").status_code, 401)
+        self.assertEqual(self.via_proxy("Ziel", "198.51.100.200", PASSWORD).status_code, 429)
+        # Andere Konten bleiben erreichbar.
+        make_user("andere")
+        self.assertEqual(self.via_proxy("andere", "198.51.100.200", PASSWORD).status_code, 200)
+
+    def test_schutz_kopfzeilen(self):
+        r = self.client.get("/api/v1/health")
+        self.assertEqual(r.headers["X-Content-Type-Options"], "nosniff")
+        self.assertEqual(r.headers["X-Frame-Options"], "DENY")
+        self.assertNotIn("Strict-Transport-Security", r.headers)  # im Heimnetz ohne HTTPS
+        r = self.client.get("/api/v1/health", headers={"X-Forwarded-Proto": "https"}, environ_base={"REMOTE_ADDR": "127.0.0.1"})
+        self.assertIn("Strict-Transport-Security", r.headers)
 
     def test_user_b_sieht_nichts_von_user_a(self):
         a_id = make_user("user-a")

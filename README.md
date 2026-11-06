@@ -10,6 +10,13 @@ Kosten. Bis zu ein paar Freunde können sich über **Tailscale** (ein privates
 Netz nur für eure Geräte) mit eigenem Benutzernamen anmelden — jede Person
 sieht nur ihre eigenen Daten. Auch am Handy (iPhone: „Zum Home-Bildschirm“).
 
+> **Empfohlen: auf einem Raspberry Pi betreiben.** Dann läuft das
+> Dashboard Tag und Nacht bei dir zu Hause, ist unter einer festen
+> https-Adresse von überall erreichbar, und jede Person hat ihr eigenes
+> Konto. Anleitung für Einsteiger:
+> **[docs/RASPBERRY_PI_ANLEITUNG.md](docs/RASPBERRY_PI_ANLEITUNG.md)**.
+> Die Kurzfassung unten beschreibt den Betrieb auf einem Mac/PC.
+
 > **Wichtig:** `index.html` lässt sich nicht mehr per Doppelklick öffnen.
 > Das Dashboard läuft jetzt als kleiner Server auf deinem PC: du startest
 > ihn (`start.bat` / `start.sh`) und öffnest dann http://localhost:5000 im

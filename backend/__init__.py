@@ -38,6 +38,21 @@ def create_app():
     # Dashboard unter derselben Adresse wie die API - deshalb kein CORS noetig.
     app.register_blueprint(frontend_bp)
 
+    @app.after_request
+    def security_headers(response):
+        """Schutz-Kopfzeilen fuer jede Antwort - wichtig, sobald das Dashboard
+        ueber eine oeffentliche Adresse (Tailscale Funnel) erreichbar ist:
+        nicht in fremde Seiten einbetten, Dateityp nicht raten, keine
+        Adressen an fremde Seiten weitergeben, nur noch HTTPS nach dem
+        ersten HTTPS-Besuch."""
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        via_proxy_https = request.remote_addr in ("127.0.0.1", "::1") and request.headers.get("X-Forwarded-Proto") == "https"
+        if request.scheme == "https" or via_proxy_https:
+            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+        return response
+
     return app, Session
 
 

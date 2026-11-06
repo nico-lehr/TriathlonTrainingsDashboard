@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as SessionType
 
 from . import get_current_athlete_id
-from .auth import athlete_id_from_ical_key, check_login, make_token, note_failed_login, too_many_failed_logins
+from .auth import athlete_id_from_ical_key, check_login, client_ip, make_token, note_failed_login, too_many_failed_logins
 from .models import Athlete, AthleteLogin, Workout, Wellness, PlannedWorkout, RecoveryCheck, Goal, IcalPlannedWorkout
 from .workout_store import find_same_workout
 
@@ -171,16 +171,18 @@ def serialize_goal(g: Goal) -> dict:
 @api_bp.route("/auth/login", methods=["POST"])
 def login():
     """POST /api/v1/auth/login - {username, password} -> {token, athlete}."""
-    ip = request.remote_addr or "unknown"
-    if too_many_failed_logins(ip):
-        return response_error("Zu viele Fehlversuche - bitte eine Minute warten", "too_many_attempts", 429)
-
+    ip = client_ip(request.remote_addr, request.headers.get("X-Forwarded-For", ""))
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        data = {}
+    if too_many_failed_logins(ip, data.get("username")):
+        return response_error("Zu viele Fehlversuche - bitte etwas warten und dann erneut versuchen", "too_many_attempts", 429)
+
     session = get_session()
     try:
         athlete_id = check_login(session, data.get("username"), data.get("password"))
         if athlete_id is None:
-            note_failed_login(ip)
+            note_failed_login(ip, data.get("username"))
             return response_error("Benutzername oder Passwort falsch", "invalid_credentials", 401)
         athlete = session.query(Athlete).filter_by(athlete_id=athlete_id).first()
         return response_success({"token": make_token(athlete_id), "athlete": serialize_athlete(athlete)})

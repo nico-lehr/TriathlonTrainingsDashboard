@@ -4,6 +4,17 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.1.1
+
+Raspberry Pi als Server mit fester https-Adresse für alle.
+
+Neu in 2.1.1:
+- Einsteiger-Anleitung für den Raspberry Pi (docs/RASPBERRY_PI_ANLEITUNG.md)
+- Ein Befehl für eine feste, verschlüsselte Adresse von überall – auch für Freunde ohne App (Tailscale Funnel)
+- Konten für weitere Personen mit einem Befehl anlegen
+- Mehr Schutz bei öffentlicher Adresse: Sperre je Konto nach 10 Fehlversuchen, echte Besucher-Adresse hinter Tailscale, Schutz-Kopfzeilen
+- Updates bleiben auch auf alten 32-Bit-Systemen möglich (dann ohne Claude)
+
 ## 2.1.0
 
 Mobility mit Bildern, ein Trainingsprofil für alle Wünsche und Claude als KI-Coach.

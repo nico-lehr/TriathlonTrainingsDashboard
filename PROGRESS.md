@@ -94,6 +94,22 @@ Auftrag (2026-11-06): Mobility-Workouts planen, Übungen bildlich zeigen, alle T
 - Mit dem echten Claude konnte ich nicht testen (kein Schlüssel hier) – nur mit einem nachgestellten Dienst. Bitte einmal „Mit Claude persönlich anpassen“ ausprobieren.
 - Die Zeichnungen sind Seitenansichten; Drehbewegungen (z. B. Liegende Vier) sind nur angedeutet – dafür gibt es den Video-Knopf.
 
+## Zusatz J: Raspberry Pi als Server für alle
+
+Auftrag (2026-11-06): Anleitung für den Pi (noch nie benutzt), alles läuft künftig auf dem Pi, Zugriff von überall, weitere Nutzer mit eigenem Bereich. Entscheidung: öffentliche Adresse (Tailscale Funnel), Pi 4, System schon installiert.
+
+| Schritt | Status |
+|---|---|
+| J1 Einsteiger-Anleitung `docs/RASPBERRY_PI_ANLEITUNG.md` | fertig |
+| J2 `deploy/raspberry-pi/oeffentlich.sh` (Tailscale + Funnel) und `benutzer.sh` | fertig (mit Platzhaltern für Tailscale/sudo getestet) |
+| J3 Härtung: echte Besucher-Adresse nur vom lokalen Proxy (waitress trusted_proxy), Kontosperre 10/15 min, Schutz-Kopfzeilen | fertig, Tests + Prüfung am laufenden Server |
+| J4 Updates ohne Claude-Paket auf 32-Bit-Systemen | fertig, getestet |
+
+### Offene Fragen zu J
+
+- Auf einem echten Pi und mit echtem Tailscale konnte ich nicht testen.
+- Ein Passwort ändern kann jede Person bisher nicht selbst im Dashboard – das macht der Betreiber auf dem Pi.
+
 ## Offene Fragen
 
 ### Aus dem Abschluss-Check F (nicht behoben, optional)
