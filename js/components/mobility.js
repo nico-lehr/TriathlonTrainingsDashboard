@@ -65,7 +65,7 @@ function renderMobilityView() {
   document.getElementById("mob-start-btn").disabled = !session;
   const claudeBtn = document.getElementById("mob-claude-btn");
   claudeBtn.hidden = !claudeAvailable();
-  claudeBtn.textContent = kind === "claude" ? "Neu mit Claude" : "Mit Claude anpassen";
+  claudeBtn.textContent = kind === "claude" ? "Neu mit Claude erstellen" : "Mit Claude persönlich anpassen";
   const heroFig = document.getElementById("mob-hero-fig");
   const firstEx = session && MOBILITY_BY_ID[(session.exercises[0] || {}).id];
   const heroKey = firstEx ? firstEx.id : "";
