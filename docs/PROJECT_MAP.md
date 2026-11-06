@@ -149,6 +149,7 @@ Bedarf schrittweise weiter aufgeteilt werden, sobald es sich lohnt.
 - `account.js` — „Konto“-Karte in den Einstellungen: angemeldeter Benutzer, Abmelden.
 - `update.js` — Hinweis „Neue Version verfügbar“ oben und Karte „Programm-Updates“ in den Einstellungen (nur für den Betreiber; Freunde sehen nur die Versionsnummer).
 - `garmin-settings.js` — „Garmin-Verbindung“-Karte in den Einstellungen: eigenen Personal-API-Schlüssel eintragen/entfernen, Ablaufwarnung, „Jetzt von Garmin holen“.
+- `invites.js` — „Freunde einladen“: Einladungen an/aus, Code teilen/erneuern, Kontenliste (nur Betreiber).
 - `ai-settings.js` — „KI-Coach“-Karte: Stand der Claude-Verbindung; Schlüssel, Modell und Freigabe nur für den Betreiber (Server: `backend/claude_api.py`). Ollama darunter aufklappbar.
 - `training-profile.js` — „Dein Trainingsprofil“: Ziele, Beschwerden, Ausschlüsse, Hilfsmittel, Mobility-Wunsch, Zusatzwünsche (Daten: `js/data/training-profile.js`).
 - `mobility.js` — Tab „Mobility“: Einheit für heute, Dauer/Schwerpunkt, Ablauf mit Austauschen, „Mit Claude persönlich anpassen“, Übungs-Sammlung, Anleitung (Bottom-Sheet), Verlauf.
@@ -195,6 +196,7 @@ einmalig `backend/import_workouts_json.py`, siehe `docs/DEPLOYMENT.md`.
 | `routes.py` | Bestehende Endpunkte + `require_login()` (401 außer `/health`, `/auth/login`) + `/auth/login`, `/auth/me`. |
 | `dashboard_routes.py` | `/store`, `/workouts/full`, `/wellness/daily`, `/ical-link`. |
 | `ai_routes.py` | `/ai/chat`, `/ai/models` – Weiterleitung an Ollama; `/ai/claude` (Stand/Schlüssel, nur Betreiber ändert) und `/ai/claude/chat`. |
+| `invites.py` / `invite_routes.py` | Einladungscode für „Konto erstellen“ (`~/.triathlon/invite.json`), Verwaltung nur Betreiber (`/invites`). |
 | `claude_api.py` | Claude über das Anthropic-SDK: Schlüssel in `~/.triathlon/claude_api.json` (0600), Prüfen, Modelle, verständliche Fehler. |
 | `equipment_routes.py` | `/equipment…` – Material anlegen/ändern/löschen, Zuordnungen, einmaliger Import. |
 | `updater.py` | Programm-Updates: neueste GitHub-Release prüfen (einmal am Tag), Paket prüfen, sichern, installieren (ZIP oder `git`), Neustart anstoßen. Nutzerdaten sind geschützt. |

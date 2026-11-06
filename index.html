@@ -692,6 +692,31 @@
         <button type="button" class="cal-today-btn" id="logout-btn">Abmelden</button>
       </div>
 
+      <div class="card full" id="invite-card" hidden>
+        <h2>Freunde einladen</h2>
+        <p class="card-sub">Mit dem Einladungscode erstellt sich jede Person auf der Anmeldeseite selbst ein Konto – mit eigenem, getrenntem Bereich. Ohne Code kann niemand ein Konto anlegen.</p>
+        <div class="settings-list">
+          <div class="settings-list-row">
+            <label for="invite-enabled">Einladungen erlauben</label>
+            <input type="checkbox" id="invite-enabled" class="switch" role="switch">
+          </div>
+        </div>
+        <div id="invite-active" hidden>
+          <div class="invite-code-box">
+            <span class="invite-code-label">Einladungscode</span>
+            <span class="invite-code" id="invite-code">––––-––––</span>
+            <div class="invite-actions">
+              <button type="button" class="mob-btn mob-btn-primary" id="invite-share-btn">Einladung senden</button>
+              <button type="button" class="mob-btn mob-btn-secondary" id="invite-renew-btn">Neuer Code</button>
+            </div>
+          </div>
+          <p class="card-sub">„Einladung senden“ teilt einen Link, der direkt „Konto erstellen“ mit dem Code öffnet. „Neuer Code“ macht den alten sofort ungültig – bestehende Konten bleiben.</p>
+        </div>
+        <p class="coach-test-status" id="invite-status" role="status" aria-live="polite"></p>
+        <h3 class="invite-accounts-title" id="invite-accounts-title">Konten</h3>
+        <ul class="invite-accounts" id="invite-accounts"></ul>
+      </div>
+
       <div class="card full" id="training-profile-card">
         <h2>Dein Trainingsprofil</h2>
         <p class="card-sub">Alle deine Wünsche an einer Stelle. Claude berücksichtigt sie bei jedem Trainingsplan und jeder Mobility-Einheit.</p>
@@ -1124,6 +1149,7 @@
 <script src="js/components/update.js"></script>
 <script src="js/components/ai-settings.js"></script>
 <script src="js/components/training-profile.js"></script>
+<script src="js/components/invites.js"></script>
 <script src="js/components/mobility-figure.js"></script>
 <script src="js/components/mobility-player.js"></script>
 <script src="js/components/mobility.js"></script>

@@ -1,13 +1,19 @@
 """Login fuer eine Handvoll Freunde: Passwort-Hash, signierter Token, Bremse
-gegen Passwort-Raten. Keine oeffentliche Registrierung - Benutzer legt nur
-backend/create_user.py an.
+gegen Passwort-Raten. Neue Konten: backend/create_user.py oder - nur mit
+Einladungscode des Betreibers - selbst auf der Login-Seite (invites.py).
 
 Der Token ist kein Datenbank-Eintrag, sondern die mit SECRET_KEY signierte
 athlete_id (itsdangerous). Wer SECRET_KEY nicht kennt, kann keinen gueltigen
-Token bauen; nach TOKEN_MAX_AGE_S ist er abgelaufen und es braucht einen
-neuen Login.
+Token bauen.
+
+"Angemeldet bleiben": Ein solcher Token gilt REMEMBER_MAX_AGE_S (90 Tage)
+und wird bei Benutzung taeglich durch einen frischen ersetzt (Kopfzeile
+X-Renewed-Token, siehe routes.py) - wer mindestens alle 90 Tage einmal
+vorbeischaut, bleibt also angemeldet. Ohne Haken gilt er hoechstens einen
+Tag, und der Browser vergisst ihn beim Schliessen (sessionStorage).
 """
 import os
+import re
 import threading
 import time
 from collections import defaultdict, deque
@@ -19,7 +25,10 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from .models import Athlete, AthleteLogin, AthleteStore, Workout
 
-TOKEN_MAX_AGE_S = 30 * 24 * 3600  # 30 Tage
+REMEMBER_MAX_AGE_S = 90 * 24 * 3600  # "Angemeldet bleiben": 90 Tage ohne Besuch
+SESSION_MAX_AGE_S = 24 * 3600        # ohne Haken: hoechstens ein Tag
+RENEW_AFTER_S = 24 * 3600            # aelter als ein Tag -> bei Benutzung erneuern
+TOKEN_MAX_AGE_S = REMEMBER_MAX_AGE_S  # Obergrenze fuer jeden Token
 MIN_PASSWORD_LENGTH = 10
 LOGIN_MAX_FAILS = 5   # Fehlversuche ...
 LOGIN_WINDOW_S = 60   # ... pro Minute und IP
@@ -39,16 +48,29 @@ def _serializer():
     return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="login-token")
 
 
-def make_token(athlete_id):
-    return _serializer().dumps({"athlete_id": athlete_id})
+def make_token(athlete_id, remember=True):
+    return _serializer().dumps({"athlete_id": athlete_id, "remember": bool(remember)})
+
+
+def token_info(token):
+    """(athlete_id, remember, alter_in_sekunden) aus einem gueltigen Token, sonst None.
+    Aeltere Token ohne "remember" gelten als "angemeldet bleiben"."""
+    try:
+        payload, issued = _serializer().loads(token, max_age=TOKEN_MAX_AGE_S, return_timestamp=True)
+        athlete_id = payload["athlete_id"]
+    except (BadSignature, KeyError, TypeError):  # BadSignature deckt auch "abgelaufen" ab
+        return None
+    remember = payload.get("remember", True) is not False
+    age = max(0, time.time() - issued.timestamp())
+    if not remember and age > SESSION_MAX_AGE_S:
+        return None
+    return athlete_id, remember, age
 
 
 def athlete_id_from_token(token):
     """athlete_id aus einem gueltigen, nicht abgelaufenen Token, sonst None."""
-    try:
-        return _serializer().loads(token, max_age=TOKEN_MAX_AGE_S)["athlete_id"]
-    except (BadSignature, KeyError, TypeError):  # BadSignature deckt auch "abgelaufen" ab
-        return None
+    info = token_info(token)
+    return info[0] if info else None
 
 
 def make_ical_key(athlete_id):
@@ -121,7 +143,18 @@ def is_admin(session, athlete_id):
     return first is not None and first.id == login.id
 
 
-def create_login(session, username, password):
+USERNAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{2,31}$")
+
+
+def check_new_username(username):
+    """Regeln fuer selbst gewaehlte Benutzernamen (Registrierung)."""
+    username = normalize_username(username)
+    if not USERNAME_PATTERN.match(username):
+        raise ValueError("Benutzername: 3–32 Zeichen, nur Buchstaben a–z, Ziffern, Punkt, Minus oder Unterstrich.")
+    return username
+
+
+def create_login(session, username, password, claim_unclaimed=True):
     """Legt einen Benutzer an und gibt seine athlete_id zurueck.
 
     Gibt es noch einen Athleten ohne Login (den bisherigen Einzelplatz-Athleten
@@ -136,7 +169,9 @@ def create_login(session, username, password):
     if session.query(AthleteLogin).filter_by(username=username).first():
         raise ValueError(f"Den Benutzernamen '{username}' gibt es schon.")
 
-    athlete = unclaimed_athlete(session)
+    # Selbst registrierte Konten bekommen NIE den alten Einzelplatz-Athleten
+    # (claim_unclaimed=False) - sonst saehe ein Fremder dessen Daten.
+    athlete = unclaimed_athlete(session) if claim_unclaimed else None
     if athlete is None:
         next_id = (session.query(func.max(Athlete.athlete_id)).scalar() or 0) + 1
         athlete = Athlete(athlete_id=next_id, name=username)
@@ -203,3 +238,20 @@ def note_failed_login(ip, username=None):
         user = normalize_username(username) if isinstance(username, str) else ""
         if user:
             _failed_users[user].append(time.monotonic())
+
+
+# Neue Konten je Adresse begrenzen (Registrierung mit Einladungscode):
+# hoechstens 5 pro Stunde - gegen Massen-Anlegen, falls ein Code durchsickert.
+REGISTER_MAX_PER_IP = 5
+REGISTER_WINDOW_S = 3600
+_registrations = defaultdict(deque)
+
+
+def too_many_registrations(ip):
+    with _failed_logins_lock:
+        return _count(_registrations, ip, REGISTER_WINDOW_S) >= REGISTER_MAX_PER_IP
+
+
+def note_registration(ip):
+    with _failed_logins_lock:
+        _registrations[ip].append(time.monotonic())

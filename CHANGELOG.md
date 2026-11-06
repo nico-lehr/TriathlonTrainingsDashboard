@@ -4,6 +4,16 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.2.0
+
+Freunde erstellen ihr Konto selbst, und du bleibst angemeldet.
+
+Neu in 2.2.0:
+- „Konto erstellen“ auf der Anmeldeseite – nur mit deinem Einladungscode (Einstellungen → Freunde einladen)
+- „Einladung senden“ teilt einen Link, der den Code schon einträgt; „Neuer Code“ macht den alten ungültig
+- „Angemeldet bleiben“: Wer das Dashboard mindestens alle 90 Tage öffnet, muss sich nicht mehr neu anmelden
+- Neu gestaltete Anmeldeseite
+
 ## 2.1.1
 
 Raspberry Pi als Server mit fester https-Adresse für alle.

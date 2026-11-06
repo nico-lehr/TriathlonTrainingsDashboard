@@ -11,17 +11,34 @@
  * - TriathlonApiClient: aeltere Komfort-Methoden auf denselben Endpunkten.
  */
 
-// Login-Token (siehe login.html / js/login.js). Bleibt im localStorage dieses
-// Browsers, bis abgemeldet wird oder er nach 30 Tagen ablaeuft.
+// Login-Token (siehe login.html / js/login.js). "Angemeldet bleiben": im
+// localStorage - der Server schickt bei Benutzung regelmaessig einen frischen
+// (X-Renewed-Token), so bleibt angemeldet, wer mindestens alle 90 Tage
+// vorbeischaut. Ohne Haken: im sessionStorage, weg beim Schliessen des Browsers.
 const AUTH_TOKEN_KEY = "triathlon_dashboard_token_v1";
 const LOGIN_PAGE = "login.html";
 
 function getAuthToken() {
-  try { return localStorage.getItem(AUTH_TOKEN_KEY); } catch (e) { return null; }
+  try { return localStorage.getItem(AUTH_TOKEN_KEY) || sessionStorage.getItem(AUTH_TOKEN_KEY); } catch (e) { return null; }
 }
 
-function setAuthToken(token) {
-  try { localStorage.setItem(AUTH_TOKEN_KEY, token); } catch (e) { /* ignorieren */ }
+function setAuthToken(token, remember = true) {
+  try {
+    (remember ? localStorage : sessionStorage).setItem(AUTH_TOKEN_KEY, token);
+    (remember ? sessionStorage : localStorage).removeItem(AUTH_TOKEN_KEY);
+  } catch (e) { /* ignorieren */ }
+}
+
+// Erneuerten Token dort ablegen, wo der alte lag.
+function renewAuthToken(token) {
+  try {
+    if (localStorage.getItem(AUTH_TOKEN_KEY)) localStorage.setItem(AUTH_TOKEN_KEY, token);
+    else if (sessionStorage.getItem(AUTH_TOKEN_KEY)) sessionStorage.setItem(AUTH_TOKEN_KEY, token);
+  } catch (e) { /* ignorieren */ }
+}
+
+function clearAuthToken() {
+  try { localStorage.removeItem(AUTH_TOKEN_KEY); sessionStorage.removeItem(AUTH_TOKEN_KEY); } catch (e) { /* ignorieren */ }
 }
 
 function goToLogin() {
@@ -50,8 +67,10 @@ async function apiCall(endpoint, method = "GET", body = null, { timeoutMs = 2000
     throw err;
   }
 
+  const renewed = response.headers && response.headers.get("X-Renewed-Token");
+  if (renewed) renewAuthToken(renewed);
   if (response.status === 401 && redirectOn401) {
-    try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch (e) { /* ignorieren */ }
+    clearAuthToken();
     goToLogin();
     throw new Error("Nicht angemeldet");
   }
@@ -74,6 +93,7 @@ function logout() {
   try {
     theme = localStorage.getItem("triathlon_dashboard_theme_v1");
     localStorage.clear();
+    sessionStorage.clear();
     if (theme) localStorage.setItem("triathlon_dashboard_theme_v1", theme);
   } catch (e) { /* ignorieren */ }
   goToLogin();

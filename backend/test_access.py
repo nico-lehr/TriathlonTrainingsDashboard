@@ -25,7 +25,7 @@ from itsdangerous import URLSafeTimedSerializer
 from itsdangerous.timed import TimestampSigner
 
 import tools.garmin_sync
-from backend import auth, claude_api, create_app, garmin_api_routes, routes, updater
+from backend import auth, claude_api, create_app, garmin_api_routes, invites, routes, updater
 from tools import garmin_personal_api
 from backend.config import config
 
@@ -37,7 +37,7 @@ CLOSED_PORT = "http://127.0.0.1:9"  # dort laeuft nichts - kein echter Dienst wi
 
 # Die einzigen Endpunkte ohne Login (siehe routes.PUBLIC_ENDPOINTS und docs/DEPLOYMENT.md).
 # Wer hier etwas ergaenzt, macht einen Endpunkt bewusst oeffentlich.
-DOCUMENTED_PUBLIC = {"api.health_check", "api.login", "api.get_ical_feed"}
+DOCUMENTED_PUBLIC = {"api.health_check", "api.login", "api.get_ical_feed", "api.register_info", "api.register"}
 # Ausserhalb der API gibt es nur die Auslieferung der Erlaubt-Liste (backend/frontend.py).
 FRONTEND_ENDPOINTS = {"frontend.index", "frontend.public_file"}
 
@@ -86,6 +86,7 @@ class AccessTestBase(unittest.TestCase):
         for patcher in (
             mock.patch.object(garmin_personal_api, "KEY_DIR", cls.garmin_dir),
             mock.patch.object(claude_api, "KEY_DIR", cls.garmin_dir),  # nie den echten Claude-Schluessel anfassen
+            mock.patch.object(invites, "KEY_DIR", cls.garmin_dir),
             mock.patch.object(tools.garmin_sync, "TOKEN_DIR", cls.garmin_dir),
             mock.patch.object(tools.garmin_sync, "LOG_PATH", os.path.join(cls.garmin_dir, "garmin-sync.log")),
             mock.patch.object(garmin_api_routes, "threading"),  # nur dort, nicht threading.Thread im ganzen Prozess

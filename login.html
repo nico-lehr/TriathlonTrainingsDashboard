@@ -36,19 +36,37 @@
   <div class="glow-orb glow-3"></div>
 </div>
 <main class="page login-page">
-  <form class="card login-card" id="login-form">
-    <h2>Anmelden</h2>
-    <p class="card-sub">TriDashboard – jede Person sieht nur ihre eigenen Trainingsdaten.</p>
-    <div class="coach-settings-row">
-      <label for="login-username">Benutzername</label>
-      <input type="text" id="login-username" class="coach-input" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+  <form class="card login-card" id="login-form" novalidate>
+    <div class="login-brand" aria-hidden="true"><span></span><span></span><span></span></div>
+    <h2 id="login-title">Willkommen zurück</h2>
+    <p class="card-sub" id="login-sub">Melde dich an. Jede Person sieht nur ihre eigenen Trainingsdaten.</p>
+    <div class="mob-segmented login-mode" id="login-mode" role="tablist" aria-label="Anmelden oder Konto erstellen" hidden>
+      <button type="button" role="tab" class="is-on" aria-selected="true" data-mode="login">Anmelden</button>
+      <button type="button" role="tab" aria-selected="false" data-mode="register">Konto erstellen</button>
     </div>
-    <div class="coach-settings-row">
-      <label for="login-password">Passwort</label>
-      <input type="password" id="login-password" class="coach-input" autocomplete="current-password" required>
+    <div class="login-fields">
+      <label class="login-field">
+        <span>Benutzername</span>
+        <input type="text" id="login-username" class="coach-input" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+        <small class="login-hint" data-for="register" hidden>3–32 Zeichen: a–z, Ziffern, Punkt, Minus</small>
+      </label>
+      <label class="login-field">
+        <span>Passwort</span>
+        <input type="password" id="login-password" class="coach-input" autocomplete="current-password" required>
+        <small class="login-hint" data-for="register" hidden>Mindestens 10 Zeichen – z. B. drei Wörter mit einer Zahl</small>
+      </label>
+      <label class="login-field" data-for="register" hidden>
+        <span>Einladungscode</span>
+        <input type="text" id="login-code" class="coach-input login-code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX">
+        <small class="login-hint">Bekommst du von der Person, die das Dashboard betreibt.</small>
+      </label>
     </div>
+    <label class="login-remember">
+      <span>Angemeldet bleiben<small>Auf diesem Gerät nicht erneut anmelden</small></span>
+      <input type="checkbox" id="login-remember" class="switch" role="switch" checked>
+    </label>
     <p class="login-error" id="login-error" role="alert" hidden></p>
-    <button type="submit" class="update-btn" id="login-submit">Anmelden</button>
+    <button type="submit" class="mob-btn mob-btn-primary login-submit" id="login-submit">Anmelden</button>
   </form>
 </main>
 <script src="js/data/api-client.js"></script>

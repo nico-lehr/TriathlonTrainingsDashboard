@@ -110,6 +110,17 @@ Auftrag (2026-11-06): Anleitung für den Pi (noch nie benutzt), alles läuft kü
 - Auf einem echten Pi und mit echtem Tailscale konnte ich nicht testen.
 - Ein Passwort ändern kann jede Person bisher nicht selbst im Dashboard – das macht der Betreiber auf dem Pi.
 
+## Zusatz K: Konto selbst erstellen + Angemeldet bleiben
+
+Auftrag (2026-11-06): Neue Nutzer sollen sich selbst ein Konto erstellen können; Option „eingeloggt bleiben“. Entscheidung: nur mit Einladungscode (ersetzt die frühere Vorgabe „keine öffentliche Registrierung“), Anmeldung verlängert sich bei Benutzung (90 Tage).
+
+| Schritt | Status |
+|---|---|
+| K1 Einladungscode (`backend/invites.py`, Karte „Freunde einladen“, Link mit Code) | fertig |
+| K2 `POST /auth/register`: nur mit Code, immer neuer leerer Bereich, Bremsen, Höchstzahl | fertig |
+| K3 „Angemeldet bleiben“: 90 Tage, tägliche Erneuerung (X-Renewed-Token); ohne Haken sessionStorage, max. 1 Tag | fertig |
+| K4 Tests (Server 172, JS 167) + Prüfung im Browser (Desktop, iPhone hell/dunkel) | fertig |
+
 ## Offene Fragen
 
 ### Aus dem Abschluss-Check F (nicht behoben, optional)

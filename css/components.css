@@ -2471,3 +2471,40 @@
   .mob-chips[data-group="painAreas"] .mob-chip.is-on { background: #ff9f0a; color: #1d1d1f; }
   .mob-hero .mob-hero-title { margin: 0; font-size: 30px; line-height: 1.12; font-weight: 700; letter-spacing: -0.025em; }
   @media (max-width: 760px) { .mob-hero .mob-hero-title { font-size: 26px; } }
+
+  /* --- Login / Konto erstellen --- */
+  .login-card { max-width: 400px; gap: 16px; padding: 30px 28px 26px; }
+  .login-card h2 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; text-align: center; }
+  .login-card > .card-sub { text-align: center; margin: -6px 0 2px; font-size: 14px; line-height: 1.45; }
+  .login-brand { display: flex; justify-content: center; margin-bottom: 2px; }
+  .login-brand span { width: 22px; height: 22px; border-radius: 50%; margin: 0 -4px; opacity: 0.92; }
+  .login-brand span:nth-child(1) { background: var(--c-schwimmen); }
+  .login-brand span:nth-child(2) { background: var(--c-rad); }
+  .login-brand span:nth-child(3) { background: var(--c-laufen); }
+  .login-mode { display: flex; }
+  .login-mode button { flex: 1; }
+  .login-fields { display: flex; flex-direction: column; gap: 12px; }
+  .login-field { display: flex; flex-direction: column; gap: 6px; }
+  .login-field > span { font-size: 13.5px; font-weight: 600; }
+  .login-field .coach-input { min-height: 44px; font-size: 16px; } /* 16px: iPhone zoomt sonst beim Tippen */
+  .login-hint { font-size: 12.5px; color: var(--text-muted); }
+  .login-code { letter-spacing: 0.12em; font-variant-numeric: tabular-nums; text-transform: uppercase; }
+  .login-remember { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: 14px; background: color-mix(in srgb, var(--text-primary) 4%, transparent); cursor: pointer; }
+  .login-remember > span { display: flex; flex-direction: column; font-size: 14.5px; font-weight: 500; }
+  .login-remember small { font-size: 12.5px; color: var(--text-muted); font-weight: 400; }
+  .login-submit { width: 100%; }
+  .login-error { text-align: center; font-size: 13.5px; }
+
+  /* --- Freunde einladen (Einstellungen) --- */
+  .invite-code-box { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 14px 0 6px; padding: 18px; border-radius: 16px; background: color-mix(in srgb, var(--text-primary) 4%, transparent); }
+  .invite-code-label { font-size: 12.5px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .invite-code { font-size: 30px; font-weight: 700; letter-spacing: 0.12em; font-variant-numeric: tabular-nums; user-select: all; }
+  .invite-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 10px; }
+  .invite-accounts { list-style: none; margin: 8px 0 0; padding: 0; }
+  .invite-accounts li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 2px; border-top: 0.5px solid var(--border); font-size: 14.5px; }
+  .invite-accounts li:first-child { border-top: none; }
+  .invite-accounts small { color: var(--text-muted); font-size: 13px; }
+  .invite-accounts-title { margin: 18px 0 0; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+  #invite-card { scroll-margin-top: 96px; }
+  /* "hidden" muss auch bei Elementen mit display:flex gewinnen */
+  .login-card [hidden], .mob-player [hidden], #view-mobility [hidden], #invite-card [hidden] { display: none !important; }

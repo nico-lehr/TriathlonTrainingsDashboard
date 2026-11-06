@@ -220,23 +220,33 @@ Im Dashboard (egal von welchem Gerät):
 
 ## Schritt 9: Freunde dazuholen
 
-Jede Person bekommt ein eigenes Konto mit eigenem, getrenntem Bereich. Eine
-Registrierung im Internet gibt es bewusst nicht – nur du legst Konten an.
+Jede Person erstellt sich ihr Konto selbst – mit eigenem, getrenntem
+Bereich. Dafür braucht sie deinen **Einladungscode**; ohne Code kann
+niemand aus dem Internet ein Konto anlegen.
 
-1. Verbinde dich mit dem Pi (`ssh <benutzer>@raspberrypi.local`), dann:
-   ```
-   cd TriathlonTrainingsDashboard
-   bash deploy/raspberry-pi/benutzer.sh
-   ```
-   Benutzernamen und ein **langes** Passwort für die Person eingeben (am
-   besten 14 Zeichen oder mehr, z. B. drei zufällige Wörter mit Zahl).
-2. Schick der Person die Adresse aus Schritt 7, den Benutzernamen und das
-   Passwort – das Passwort am besten **getrennt** (z. B. Adresse per
-   WhatsApp, Passwort mündlich oder per Signal).
-3. Die Person meldet sich an und richtet unter ⚙️ Einstellungen ihr
+1. Im Dashboard: ⚙️ Einstellungen → **Freunde einladen** → Schalter
+   „Einladungen erlauben“ an. Es erscheint ein Code wie `SXEG-26GH`.
+2. **„Einladung senden“** tippen und z. B. per WhatsApp schicken. Der Link
+   öffnet direkt „Konto erstellen“, der Code ist schon eingetragen.
+3. Die Person wählt Benutzernamen und Passwort (mindestens 10 Zeichen) –
+   fertig, sie ist sofort angemeldet. Danach richtet sie unter ⚙️ ihr
    Trainingsprofil und ihren Garmin-Schlüssel ein.
 
-Passwort vergessen? Auf dem Pi: `bash deploy/raspberry-pi/benutzer.sh passwort`.
+- **„Neuer Code“** macht den alten sofort ungültig (bestehende Konten
+  bleiben). Gut, wenn ein Code in falsche Hände geraten ist.
+- Sind alle da: Schalter wieder **aus** – dann kann sich niemand mehr
+  registrieren. In der Karte siehst du auch alle Konten.
+- Passwort vergessen? Auf dem Pi: `bash deploy/raspberry-pi/benutzer.sh passwort`.
+  (Konten von Hand anlegen geht weiterhin mit `bash deploy/raspberry-pi/benutzer.sh`.)
+
+## Angemeldet bleiben
+
+Beim Anmelden ist **„Angemeldet bleiben“** schon eingeschaltet. Dann musst
+du dich auf diesem Gerät nicht wieder anmelden, solange du das Dashboard
+mindestens alle **90 Tage** einmal öffnest – die Anmeldung verlängert sich
+bei jedem Besuch von selbst. Schaltest du es aus (z. B. an einem fremden
+Computer), gilt die Anmeldung nur, bis der Browser geschlossen wird
+(höchstens einen Tag).
 
 ## Sicherheit – was jetzt öffentlich ist
 
@@ -248,8 +258,11 @@ erst nach dem Login, und jede Person bekommt nur ihre eigenen Daten.
   die Adresse des Ratenden kurz gesperrt; nach 10 Fehlversuchen für ein
   Konto ist dieses Konto 15 Minuten gesperrt (auch für dich – einfach warten).
 - Programmdateien, Datenbank, Schlüssel und Sicherungen sind nie abrufbar.
-- Ein Login gilt 30 Tage pro Gerät. An fremden Geräten immer **abmelden**
-  (⚙️ → Konto → Abmelden).
+- Neue Konten gibt es nur mit deinem Einladungscode (5 falsche Codes →
+  kurze Sperre, höchstens 5 neue Konten pro Stunde und Adresse, insgesamt
+  höchstens 30 Konten – änderbar mit `MAX_ACCOUNTS=` in `.env`).
+- An fremden Geräten „Angemeldet bleiben“ ausschalten oder danach
+  **abmelden** (⚙️ → Konto → Abmelden).
 - Verlorenes Handy? Auf dem Pi in der Datei `.env` den `SECRET_KEY` ändern
   (`nano .env`) und `sudo systemctl restart triathlon-dashboard` – dann sind
   alle Geräte abgemeldet.

@@ -6,13 +6,16 @@ ausser bei /health und /auth/login.
 
 Response format: {"data": [...], "meta": {}} or {"error": "...", "code": "...", "status": 404}
 """
-from flask import Blueprint, request, jsonify, Response
+from flask import Blueprint, g, request, jsonify, Response
 from datetime import datetime, date
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as SessionType
 
 from . import get_current_athlete_id
-from .auth import athlete_id_from_ical_key, check_login, client_ip, make_token, note_failed_login, too_many_failed_logins
+from .auth import (RENEW_AFTER_S, athlete_id_from_ical_key, check_login, check_new_username, client_ip, create_login,
+                   make_token, note_failed_login, note_registration, token_info, too_many_failed_logins,
+                   too_many_registrations)
+from . import invites
 from .models import Athlete, AthleteLogin, Workout, Wellness, PlannedWorkout, RecoveryCheck, Goal, IcalPlannedWorkout
 from .workout_store import find_same_workout
 
@@ -20,17 +23,32 @@ api_bp = Blueprint("api", __name__)
 
 # Die einzigen Endpunkte, die ohne Login erreichbar sind. Der Kalender-Feed
 # prueft selbst: Login-Token ODER geheimer Kalender-Schluessel (?key=...).
-PUBLIC_ENDPOINTS = {"api.health_check", "api.login", "api.get_ical_feed"}
+PUBLIC_ENDPOINTS = {"api.health_check", "api.login", "api.get_ical_feed", "api.register_info", "api.register"}
 
 
 @api_bp.before_request
 def require_login():
-    """Ohne gueltigen Bearer-Token: 401 fuer alles ausser PUBLIC_ENDPOINTS."""
+    """Ohne gueltigen Bearer-Token: 401 fuer alles ausser PUBLIC_ENDPOINTS.
+    "Angemeldet bleiben"-Token, die aelter als einen Tag sind, werden dabei
+    erneuert - so bleibt angemeldet, wer das Dashboard regelmaessig nutzt."""
     if request.endpoint in PUBLIC_ENDPOINTS:
         return None
-    if get_current_athlete_id() is None:
+    header = request.headers.get("Authorization", "")
+    info = token_info(header[len("Bearer "):].strip()) if header.startswith("Bearer ") else None
+    if info is None:
         return response_error("Nicht angemeldet", "unauthorized", 401)
+    athlete_id, remember, age = info
+    if remember and age > RENEW_AFTER_S:
+        g.renewed_token = make_token(athlete_id, remember=True)
     return None
+
+
+@api_bp.after_request
+def send_renewed_token(response):
+    token = g.pop("renewed_token", None)
+    if token and response.status_code < 400:
+        response.headers["X-Renewed-Token"] = token
+    return response
 
 
 def response_success(data, meta=None, status=200):
@@ -185,7 +203,50 @@ def login():
             note_failed_login(ip, data.get("username"))
             return response_error("Benutzername oder Passwort falsch", "invalid_credentials", 401)
         athlete = session.query(Athlete).filter_by(athlete_id=athlete_id).first()
-        return response_success({"token": make_token(athlete_id), "athlete": serialize_athlete(athlete)})
+        remember = data.get("remember") is not False  # Standard: angemeldet bleiben
+        return response_success({"token": make_token(athlete_id, remember=remember), "athlete": serialize_athlete(athlete)})
+    finally:
+        session.close()
+
+
+@api_bp.route("/auth/register", methods=["GET"])
+def register_info():
+    """GET /api/v1/auth/register - {open}: zeigt die Login-Seite "Konto erstellen"?"""
+    return response_success({"open": invites.is_open()})
+
+
+@api_bp.route("/auth/register", methods=["POST"])
+def register():
+    """POST /api/v1/auth/register - {username, password, code, remember?} -> {token, athlete}.
+    Nur mit gueltigem Einladungscode (invites.py); legt immer einen neuen,
+    leeren Bereich an."""
+    ip = client_ip(request.remote_addr, request.headers.get("X-Forwarded-For", ""))
+    data = request.get_json(silent=True)
+    data = data if isinstance(data, dict) else {}
+    if too_many_failed_logins(ip) or too_many_registrations(ip):
+        return response_error("Zu viele Versuche - bitte später noch einmal.", "too_many_attempts", 429)
+    if not invites.is_open():
+        return response_error("Neue Konten sind gerade nicht möglich. Bitte den Betreiber nach einer Einladung fragen.", "registration_closed", 403)
+    if not invites.check_code(data.get("code")):
+        note_failed_login(ip)
+        return response_error("Der Einladungscode stimmt nicht.", "invalid_invite", 403)
+    password = data.get("password")
+    if not isinstance(password, str):
+        return response_error("Bitte ein Passwort wählen.", "VALIDATION_ERROR", 400)
+    session = get_session()
+    try:
+        if session.query(AthleteLogin).count() >= invites.MAX_ACCOUNTS:
+            return response_error("Das Dashboard hat schon die Höchstzahl an Konten.", "too_many_accounts", 409)
+        try:
+            username = check_new_username(data.get("username"))
+            athlete_id = create_login(session, username, password, claim_unclaimed=False)
+        except ValueError as e:
+            session.rollback()
+            return response_error(str(e), "VALIDATION_ERROR", 400)
+        note_registration(ip)
+        athlete = session.query(Athlete).filter_by(athlete_id=athlete_id).first()
+        remember = data.get("remember") is not False
+        return response_success({"token": make_token(athlete_id, remember=remember), "athlete": serialize_athlete(athlete)}, status=201)
     finally:
         session.close()
 

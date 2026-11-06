@@ -203,11 +203,18 @@ Daten bleiben erhalten.
 - Der Server liefert nur die Webseite aus (`index.html`, `login.html`,
   `css/`, `js/` …) – `.env`, `training.db`, `backups/`, `data/`, `backend/`
   und Garmin-Token sind von außen nicht abrufbar.
-- Der Login gilt 30 Tage pro Gerät. **An fremden/geteilten Geräten immer
-  abmelden** (Einstellungen → Konto → Abmelden) – das löscht auch alles
+- **Konto selbst erstellen** geht nur mit dem Einladungscode des Betreibers
+  (Einstellungen → Freunde einladen; Standard: aus). Ein selbst erstelltes
+  Konto bekommt immer einen neuen, leeren Bereich. Bremsen: falsche Codes
+  wie falsche Passwörter, höchstens 5 neue Konten pro Stunde und Adresse,
+  insgesamt `MAX_ACCOUNTS` (Standard 30). Code-Ablage: `~/.triathlon/invite.json`.
+- **Angemeldet bleiben** (Standard an): Der Login gilt 90 Tage und wird bei
+  Benutzung täglich erneuert – wer regelmäßig kommt, bleibt angemeldet. Ohne
+  Haken: nur bis der Browser geschlossen wird, höchstens 1 Tag. **An
+  fremden/geteilten Geräten immer abmelden** (Einstellungen → Konto → Abmelden) – das löscht auch alles
   Persönliche aus dem Browser. Ein einzelner Login lässt sich nicht
-  zurückziehen: auch nach „Passwort neu“ gilt ein alter Login noch bis zu 30
-  Tage. Sofort alle abmelden (z. B. bei verlorenem Handy): in `.env` den
+  zurückziehen: auch nach „Passwort neu“ gilt ein alter Login weiter, solange
+  er benutzt wird. Sofort alle abmelden (z. B. bei verlorenem Handy): in `.env` den
   `SECRET_KEY` ändern und neu starten – dann müssen sich alle neu anmelden.
 - **Erreichbar ist der Server im ganzen Heimnetz** (WLAN) und über Tailscale.
   Daten sind durch den Login geschützt. Wer ihn nur über Tailscale
@@ -327,7 +334,7 @@ App entfernen).
 |---|---|
 | Seite lädt nicht / leere App | PC an? Dashboard-Fenster offen? Tailscale auf dem iPhone an (VPN-Symbol)? Am PC `tailscale serve status` prüfen. |
 | Kein „https“ / Zertifikatsfehler | Schritt 2.1 noch nicht gemacht (HTTPS nicht eingeschaltet). |
-| Wieder abgemeldet | Normal alle 30 Tage oder nach „Abmelden“ – einfach neu anmelden. |
+| Wieder abgemeldet | Nach 90 Tagen ohne Besuch, ohne „Angemeldet bleiben“ oder nach „Abmelden“ – einfach neu anmelden. |
 
 ---
 

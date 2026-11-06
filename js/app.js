@@ -88,6 +88,7 @@ function checkAutoReplan() {
   initUpdates();
   initAiSettings();
   initTrainingProfile();
+  initInvites();
   initMobility();
   initWeatherSettings();
   initAnalysis();
