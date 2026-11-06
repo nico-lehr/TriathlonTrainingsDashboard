@@ -2241,7 +2241,6 @@
   @media (prefers-reduced-motion: reduce) { .mob-fig-focus { animation: none; } }
 
   /* --- Mobility-Tab --- */
-  #view-mobility { max-width: 980px; margin: 0 auto; }
   .mob-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 300px); gap: 24px; align-items: center; padding: 28px 30px; }
   .mob-eyebrow { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.04em; }
   .mob-hero-title { margin: 0; font-size: 30px; line-height: 1.12; font-weight: 700; letter-spacing: -0.025em; }
@@ -2508,3 +2507,36 @@
   #invite-card { scroll-margin-top: 96px; }
   /* "hidden" muss auch bei Elementen mit display:flex gewinnen */
   .login-card [hidden], .mob-player [hidden], #view-mobility [hidden], #invite-card [hidden] { display: none !important; }
+
+  /* Mobility: ganze Seitenbreite wie die anderen Tabs - Ablauf auf breiten
+     Bildschirmen zweispaltig, Zeichnung im Kopf groesser. */
+  .mob-hero { grid-template-columns: minmax(0, 1fr) minmax(220px, 420px); }
+  @media (min-width: 1100px) {
+    .mob-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
+    .mob-item:nth-child(2) { border-top: none; }
+    .mob-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  }
+
+  /* Einstellungen: Unterzeile in Listen-Zeilen */
+  .settings-list-row label small, .garmin-import-text small { display: block; font-size: 12.5px; font-weight: 400; color: var(--text-muted); margin-top: 2px; }
+  .app-update-auto { margin: 4px 0 12px; }
+
+  /* Aus Garmin übernehmen */
+  .garmin-import-btn { margin: 0 0 12px; }
+  .garmin-import-row { cursor: pointer; }
+  .garmin-import-text { display: flex; flex-direction: column; font-size: 14.5px; font-weight: 500; }
+  .garmin-import-info { margin: 12px 2px 0 !important; font-size: 13px !important; color: var(--text-muted); }
+  .garmin-import-sheet [hidden] { display: none !important; }
+
+  /* Onboarding: Garmin verbinden */
+  .onb-garmin { margin-top: 18px; padding: 16px; border-radius: 16px; background: var(--accent-wash); display: flex; flex-direction: column; gap: 10px; }
+  .onb-garmin-text { display: flex; flex-direction: column; gap: 3px; font-size: 14.5px; }
+  .onb-garmin-text span { color: var(--text-secondary); font-size: 13.5px; }
+  .onb-garmin-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .onb-garmin-form .coach-input { flex: 1 1 220px; min-height: 40px; }
+  .onb-garmin-form a { flex-basis: 100%; font-size: 13px; }
+  .onb-garmin [hidden] { display: none !important; }
+
+  .update-menu-sync.ok { color: var(--c-good-text); }
+  .update-menu-sync.err { color: var(--c-crit-text); }
+  .update-menu-sync a.sync-hint { color: var(--accent); }

@@ -153,6 +153,20 @@ Person, änderbar mit `ADMIN_USERS=` in `.env`) oben im Dashboard einen
 Hinweis mit „Was ist neu?“, „Installieren“ und „Später“. Dieselben Knöpfe
 und „Jetzt prüfen“ stehen in den Einstellungen unter **Programm-Updates**.
 
+**Ganz automatisch:** Schalter **„Automatisch installieren“** unter
+Programm-Updates einschalten. Dann prüft der Server alle 6 Stunden und
+installiert eine neue Version **nachts zwischen 3 und 5 Uhr** (Uhrzeit des
+Servers) – mit denselben Sicherungen wie beim Klick. Scheitert eine Version,
+versucht er sie nicht jede Nacht erneut (dann steht der Grund in der Karte;
+von Hand installieren geht weiter). Funktioniert nur, wenn der Server über
+den Starter läuft (Raspberry Pi: immer; Mac/PC: `start.sh`/`start.bat`).
+Die Einstellung liegt in `~/.triathlon/update.json`.
+
+**Was ein Update nie anfasst:** `training.db` (Konten, Trainings, Ziele …),
+`.env`, `backups/`, `fit-files/` und alles in `~/.triathlon/` – dort liegen
+die Garmin-, Claude- und Einladungs-Schlüssel. Sie bleiben also bei jedem
+Update erhalten.
+
 Beim Installieren passiert automatisch:
 
 1. `training.db` wird gesichert (`backups/vor-update-<Version>-<Zeitpunkt>.db`).

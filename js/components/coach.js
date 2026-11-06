@@ -555,6 +555,7 @@ function renderOnbStep() {
         </div>
         <div class="onb-field"><label for="onb-birthdate">Geburtsdatum</label><input type="date" id="onb-birthdate" class="coach-input"></div>
       </div>
+      ${onbGarminBlockHtml()}
     </div>`;
   } else if (onbStep === 1) {
     html = `<div class="onb-step">
@@ -606,6 +607,7 @@ function renderOnbStep() {
     html = `<div class="onb-step">
       <h3>Leistungswerte <span style="font-weight:500;color:var(--text-muted)">(optional)</span></h3>
       <p class="onb-sub">Falls bekannt — macht die Empfehlung konkreter. Sonst einfach leer lassen.</p>
+      <button type="button" class="mob-btn mob-btn-tinted garmin-import-btn" data-garmin-import="onboarding" hidden>Aus Garmin übernehmen</button>
       <div class="onb-field"><label for="onb-ftp">FTP Rad (Watt)</label><input type="number" id="onb-ftp" class="coach-input" min="0" placeholder="z.B. 250"></div>
       <div class="onb-row">
         <div class="onb-field"><label for="onb-run-pace">Schwellenpace Laufen (min/km)</label><input type="text" id="onb-run-pace" class="coach-input" placeholder="z.B. 4:45"></div>
@@ -664,6 +666,7 @@ function renderOnbStep() {
   }
   document.getElementById("onb-step-body").innerHTML = html;
   wireOnbStepInputs();
+  if (typeof initOnbGarmin === "function") initOnbGarmin(document.getElementById("onb-step-body"));
   document.getElementById("onb-back-btn").style.visibility = onbStep === 0 ? "hidden" : "visible";
   document.getElementById("onb-next-btn").textContent = onbStep === ONB_STEPS - 1 ? "Fertig" : "Weiter";
 }

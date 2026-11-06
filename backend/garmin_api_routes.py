@@ -21,7 +21,7 @@ from datetime import date, datetime, timedelta
 from flask import request
 
 from tools import garmin_personal_api as personal_api
-from tools import garmin_sync
+from tools import garmin_profile, garmin_sync
 
 from . import get_current_athlete_id
 from .routes import api_bp, response_error, response_success
@@ -109,7 +109,7 @@ def _run_sync(athlete_id):
 @api_bp.route("/garmin/sync", methods=["POST"])
 def start_garmin_sync():
     athlete_id = get_current_athlete_id()
-    if not personal_api.has_key(athlete_id) and not os.path.isdir(garmin_sync.token_path(athlete_id)):
+    if not personal_api.has_key(athlete_id):
         return response_error("Garmin ist für dich noch nicht verbunden – zuerst den Schlüssel eintragen.",
                               "garmin_not_connected", 409)
     if importlib.util.find_spec("fitdecode") is None:  # liest die .fit-Dateien (parse_fit.py)
@@ -121,3 +121,18 @@ def start_garmin_sync():
         _sync_state[athlete_id] = {**(_sync_state.get(athlete_id) or {}), "running": True}
     threading.Thread(target=_run_sync, args=(athlete_id,), daemon=True, name=f"garmin-sync-{athlete_id}").start()
     return response_success(_status(athlete_id), status=202)
+
+
+@api_bp.route("/garmin/profile", methods=["GET"])
+def get_garmin_profile():
+    """GET /api/v1/garmin/profile - Profilwerte aus Garmin (Gewicht, Pulswerte,
+    Schwellen ...) zum Uebernehmen in Onboarding/Einstellungen. Nur eigene Daten."""
+    athlete_id = get_current_athlete_id()
+    if not personal_api.has_key(athlete_id):
+        return response_error("Garmin ist für dich noch nicht verbunden – zuerst den Schlüssel eintragen.",
+                              "garmin_not_connected", 409)
+    try:
+        values = garmin_profile.fetch(personal_api.PersonalApiClient(athlete_id))
+    except personal_api.GarminApiError as e:
+        return response_error(e.user_message, "garmin_error", 502)
+    return response_success({"values": values})

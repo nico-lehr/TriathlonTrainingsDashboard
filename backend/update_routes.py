@@ -8,6 +8,8 @@ Hinweis oben): Stand abfragen, neu pruefen, installieren. Logik in updater.py.
 Haengt am Blueprint aus routes.py (Login-Pflicht). Installieren darf nur der
 Betreiber (auth.is_admin) - Freunde sehen nur die Versionsnummer.
 """
+from flask import request
+
 from . import get_current_athlete_id, updater
 from .auth import is_admin
 from .routes import api_bp, get_session, response_error, response_success
@@ -47,3 +49,15 @@ def install_update():
     if not updater.start_install():
         return response_error("Das Update konnte nicht gestartet werden.", "update_error", 409)
     return response_success({**updater.status(), "admin": True}, status=202)
+
+
+@api_bp.route("/update/settings", methods=["PUT"])
+def put_update_settings():
+    """PUT /api/v1/update/settings - {auto_install}: nachts automatisch installieren (Betreiber)."""
+    if not _admin():
+        return response_error("Updates verwaltet nur der Betreiber des Dashboards.", "forbidden", 403)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or not isinstance(data.get("auto_install"), bool):
+        return response_error("'auto_install' (true/false) fehlt", "VALIDATION_ERROR", 400)
+    updater.save_settings(data["auto_install"])
+    return response_success({**updater.status(), "admin": True})

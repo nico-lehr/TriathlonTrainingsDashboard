@@ -89,6 +89,8 @@ function checkAutoReplan() {
   initAiSettings();
   initTrainingProfile();
   initInvites();
+  initGarminImport();
+  initGarminMenu();
   initMobility();
   initWeatherSettings();
   initAnalysis();

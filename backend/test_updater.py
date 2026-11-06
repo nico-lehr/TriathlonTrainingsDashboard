@@ -12,6 +12,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 import urllib.error
 import zipfile
@@ -412,3 +413,62 @@ class PipOhneClaudeTest(unittest.TestCase):
         with mock.patch.object(updater.subprocess, "run", return_value=fail), \
                 mock.patch("importlib.util.find_spec", return_value=None), self.assertRaises(updater.UpdateError):
             updater.pip_install(root)
+
+
+class AutoInstallTest(unittest.TestCase):
+    """Automatisch installieren: nur mit Haken, nachts, mit Starter, und eine
+    gescheiterte Version nicht jede Nacht erneut."""
+
+    def setUp(self):
+        import tempfile
+        from datetime import datetime
+        self.dir = tempfile.mkdtemp()
+        self.night = datetime(2026, 11, 7, 3, 30)
+        self.day = datetime(2026, 11, 7, 14, 0)
+        patches = [mock.patch.object(updater, "SETTINGS_DIR", self.dir),
+                   mock.patch.dict(os.environ, {"DASHBOARD_SUPERVISED": "1"}),
+                   mock.patch.object(updater, "current_version", return_value="2.2.0")]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+        with updater._lock:
+            updater._state.update({"latest": {"version": "2.3.0", "tag": "v2.3.0"}, "checked_at": time.time(),
+                                   "error": None, "auto_failed": None,
+                                   "install": {"running": False, "step": None, "ok": None, "message": None}})
+        self.addCleanup(shutil.rmtree, self.dir, True)
+
+    def test_standard_aus(self):
+        self.assertFalse(updater.settings()["auto_install"])
+        self.assertFalse(updater.auto_install_due(self.night))
+
+    def test_nur_nachts_und_nur_mit_starter(self):
+        updater.save_settings(True)
+        self.assertTrue(updater.auto_install_due(self.night))
+        self.assertFalse(updater.auto_install_due(self.day))
+        with mock.patch.dict(os.environ, {"DASHBOARD_SUPERVISED": "0"}):
+            self.assertFalse(updater.auto_install_due(self.night))
+
+    def test_installiert_nachts_und_nicht_zweimal_nach_fehler(self):
+        updater.save_settings(True)
+        with mock.patch.object(updater, "check"), mock.patch.object(updater, "start_install", return_value=True) as start:
+            self.assertEqual(updater.background_step(self.night), "2.3.0")
+            start.assert_called_once()
+        with updater._lock:
+            updater._state["auto_failed"] = "2.3.0"
+        self.assertFalse(updater.auto_install_due(self.night))
+
+    def test_nichts_neues_nichts_zu_tun(self):
+        updater.save_settings(True)
+        with updater._lock:
+            updater._state["latest"] = {"version": "2.2.0", "tag": "v2.2.0"}
+        self.assertFalse(updater.auto_install_due(self.night))
+
+    def test_einstellungen_und_schluessel_liegen_ausserhalb_des_programms(self):
+        # Ein Update ersetzt nur Programmdateien im Projektordner - was ausserhalb
+        # liegt (Schluessel, Einstellungen), kann es gar nicht beruehren.
+        from backend import claude_api, invites
+        from tools import garmin_personal_api
+        for d in (updater.SETTINGS_DIR, claude_api.KEY_DIR, invites.KEY_DIR, garmin_personal_api.KEY_DIR):
+            self.assertFalse(os.path.abspath(d).startswith(str(updater.BASE) + os.sep), d)
+        for rel in (".env", "training.db", "backups/x.zip", "fit-files/a.fit"):
+            self.assertTrue(updater.is_protected(rel), rel)

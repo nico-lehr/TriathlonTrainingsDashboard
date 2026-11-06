@@ -683,12 +683,9 @@ def open_db():
 
 
 def athletes_with_token():
-    """Alle Benutzer mit Garmin-Zugang: altes Token ODER offizieller Schluessel."""
+    """Alle Benutzer mit offiziellem Garmin-Schluessel (Daten kommen nur noch
+    ueber die Personal API; der alte Login dient nur "An Garmin senden")."""
     ids = set()
-    for path in glob.glob(os.path.join(TOKEN_DIR, "garmin_*.token")):
-        m = re.fullmatch(r"garmin_(\d+)\.token", os.path.basename(path))
-        if m:
-            ids.add(int(m.group(1)))
     for path in glob.glob(os.path.join(personal_api.KEY_DIR, "garmin_api_*.json")):
         m = re.fullmatch(r"garmin_api_(\d+)\.json", os.path.basename(path))
         if m:
@@ -696,13 +693,24 @@ def athletes_with_token():
     return sorted(ids)
 
 
+class NoGarminKeyError(LookupError):
+    def __init__(self, message):
+        super().__init__(message)
+        self.user_message = message  # describe_error zeigt den Satz unveraendert
+
+
 def client_for(athlete_id, fresh_login=False):
-    """Offizielle API, wenn die Person einen Schluessel hinterlegt hat - sonst
-    der bisherige Weg (gespeichertes Token bzw. --login)."""
-    if not fresh_login and personal_api.has_key(athlete_id):
+    """Daten kommen nur noch ueber die offizielle Garmin-Schnittstelle (eigener
+    Personal-API-Schluessel). --login richtet nur noch den alten Zugang fuer
+    "An Garmin senden" ein - zum Lesen wird er nicht mehr benutzt."""
+    if fresh_login:
+        connect(athlete_id, fresh_login=True)
+        log("Alter Garmin-Login gespeichert (nur fuer \"An Garmin senden\").")
+    if personal_api.has_key(athlete_id):
         log("Offizielle Garmin-Schnittstelle (Personal-API-Schluessel).")
         return personal_api.PersonalApiClient(athlete_id)
-    return connect(athlete_id, fresh_login=fresh_login)
+    raise NoGarminKeyError("Kein Garmin-Schlüssel hinterlegt – bitte im Dashboard unter Einstellungen → "
+                           "Garmin-Verbindung eintragen.")
 
 
 def sync_user(athlete_id, session_factory, start, end, args):

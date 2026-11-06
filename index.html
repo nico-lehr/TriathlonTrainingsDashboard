@@ -73,7 +73,7 @@
         </button>
         <div class="update-menu" id="update-menu">
           <div class="update-menu-meta" id="update-meta"></div>
-          <a class="update-menu-item" id="menu-item-garmin" href="tridash-sync://run"><span class="menu-item-icon">⌚</span> Mit Garmin Connect synchronisieren</a>
+          <button class="update-menu-item" id="menu-item-garmin" type="button"><span class="menu-item-icon">⌚</span> Von Garmin holen</button>
           <div class="update-menu-sync" id="garmin-sync-status"></div>
           <div class="update-menu-divider"></div>
           <button class="update-menu-item" id="menu-item-folder" type="button"><span class="menu-item-icon">📁</span> Aktualisieren</button>
@@ -729,6 +729,12 @@
         <div id="app-update-admin" hidden>
           <p class="coach-test-status" id="app-update-status"></p>
           <div class="app-update-notes" id="app-update-notes" hidden></div>
+          <div class="settings-list app-update-auto">
+            <div class="settings-list-row">
+              <label for="app-update-auto">Automatisch installieren<small>Nachts zwischen 3 und 5 Uhr, vorher wird alles gesichert</small></label>
+              <input type="checkbox" id="app-update-auto" class="switch" role="switch">
+            </div>
+          </div>
           <div class="coach-settings-row app-update-actions">
             <button type="button" class="cal-today-btn" id="app-update-check-btn">Jetzt prüfen</button>
             <button type="button" class="update-btn" id="app-update-install-btn" hidden>Installieren</button>
@@ -841,6 +847,7 @@
 
       <div class="card">
         <h2>Trainingswerte</h2>
+        <button type="button" class="mob-btn mob-btn-tinted garmin-import-btn" data-garmin-import="settings" hidden>Aus Garmin übernehmen</button>
         <p class="card-sub">Optional — hilft dem Coach bei konkreteren Empfehlungen und schaltet einzelne Kacheln frei.</p>
         <div class="goal-form">
           <div class="goal-form-row">
@@ -1150,6 +1157,7 @@
 <script src="js/components/ai-settings.js"></script>
 <script src="js/components/training-profile.js"></script>
 <script src="js/components/invites.js"></script>
+<script src="js/components/garmin-import.js"></script>
 <script src="js/components/mobility-figure.js"></script>
 <script src="js/components/mobility-player.js"></script>
 <script src="js/components/mobility.js"></script>

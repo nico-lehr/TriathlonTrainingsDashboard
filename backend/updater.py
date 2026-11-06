@@ -41,6 +41,13 @@ API_URL = os.getenv("UPDATE_API_URL", "https://api.github.com").rstrip("/")  # n
 TIMEOUT_S = 30
 CHECK_INTERVAL_S = 24 * 3600
 FIRST_CHECK_DELAY_S = 60       # erst kurz nach dem Start pruefen, nicht beim Hochfahren
+# Automatisch installieren (Einstellungen -> Programm-Updates): nachts, wenn
+# keiner trainiert/plant - nach der Sicherung um 03:15 Uhr (Raspberry Pi).
+AUTO_INSTALL_HOURS = (3, 4)    # zwischen 03:00 und 04:59 Uhr (Ortszeit des Servers)
+AUTO_CHECK_INTERVAL_S = 6 * 3600
+LOOP_SLEEP_S = 15 * 60
+SETTINGS_DIR = os.path.expanduser("~/.triathlon")  # wie Garmin-/Claude-Schluessel: ueberlebt jedes Update
+SETTINGS_FILE = "update.json"
 RESTART_EXIT_CODE = 3          # backend/launcher.py startet den Server dann neu
 KEEP_PROGRAM_BACKUPS = 5
 MAX_ZIP_BYTES = 50 * 1024 * 1024
@@ -61,8 +68,29 @@ class UpdateError(Exception):
 
 
 _lock = threading.Lock()
-_state = {"latest": None, "checked_at": None, "error": None,
+_state = {"latest": None, "checked_at": None, "error": None, "auto_failed": None,
           "install": {"running": False, "step": None, "ok": None, "message": None}}
+
+
+def settings():
+    """{auto_install: bool} aus ~/.triathlon/update.json (Standard: aus)."""
+    try:
+        with open(os.path.join(SETTINGS_DIR, SETTINGS_FILE), encoding="utf-8") as f:
+            data = json.load(f)
+        data = data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        data = {}
+    return {"auto_install": data.get("auto_install") is True}
+
+
+def save_settings(auto_install):
+    os.makedirs(SETTINGS_DIR, exist_ok=True)
+    path = os.path.join(SETTINGS_DIR, SETTINGS_FILE)
+    fd = os.open(path + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump({"auto_install": bool(auto_install)}, f)
+    os.replace(path + ".tmp", path)
+    return settings()
 
 
 # ------------------------------------------------------------ Versionen
@@ -164,20 +192,52 @@ def status():
             "supervised": os.getenv("DASHBOARD_SUPERVISED") == "1",
             "instance": INSTANCE,
             "auto_check": os.getenv("UPDATE_CHECK", "1") != "0",
+            "auto_install": settings()["auto_install"],
+            "auto_hours": list(AUTO_INSTALL_HOURS),
             "install": dict(_state["install"]),
         }
 
 
+def auto_install_due(now=None):
+    """Soll jetzt automatisch installiert werden? Nur mit Haken, nur nachts,
+    nur mit Neustart-Starter, nicht waehrend einer Installation und nicht
+    erneut fuer eine Version, die schon einmal gescheitert ist."""
+    now = now or datetime.now()
+    if not settings()["auto_install"] or now.hour not in AUTO_INSTALL_HOURS:
+        return False
+    if os.getenv("DASHBOARD_SUPERVISED") != "1":
+        return False
+    st = status()
+    return bool(st["available"] and not st["install"]["running"] and st["latest"]["version"] != _state["auto_failed"])
+
+
+def background_step(now=None):
+    """Ein Durchgang des Hintergrund-Threads: pruefen (taeglich, mit
+    Automatik alle 6 Stunden) und ggf. nachts installieren."""
+    with _lock:
+        checked = _state["checked_at"]
+    interval = AUTO_CHECK_INTERVAL_S if settings()["auto_install"] else CHECK_INTERVAL_S
+    if not checked or time.time() - checked >= interval:
+        check(force=True)
+    if auto_install_due(now):
+        version = status()["latest"]["version"]
+        print(f"Automatisches Update auf {version} ...", flush=True)
+        if start_install():
+            return version
+    return None
+
+
 def start_background_check():
-    """Prueft im Hintergrund kurz nach dem Start und dann einmal am Tag."""
+    """Prueft im Hintergrund kurz nach dem Start, dann regelmaessig; mit
+    "Automatisch installieren" auch nachts das Installieren."""
     def loop():
         time.sleep(FIRST_CHECK_DELAY_S)
         while True:
             try:
-                check(force=True)  # faengt selbst alles ab - der Thread darf nie enden
+                background_step()  # faengt selbst alles ab - der Thread darf nie enden
             except Exception as e:
                 print(f"Update-Pruefung: {type(e).__name__}", flush=True)
-            time.sleep(CHECK_INTERVAL_S)
+            time.sleep(LOOP_SLEEP_S)
     threading.Thread(target=loop, daemon=True, name="update-check").start()
 
 
@@ -460,6 +520,8 @@ def _run_install(release):
     finally:
         with _lock:
             _state["install"] = {"running": False, "step": None, **result}
+            if not result["ok"]:
+                _state["auto_failed"] = release["version"]  # nachts nicht immer wieder dieselbe Version versuchen
 
 
 def schedule_restart():

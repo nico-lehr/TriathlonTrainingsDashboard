@@ -16,6 +16,7 @@ function initUpdates() {
   const notesEl = document.getElementById("app-update-notes");
   const checkBtn = document.getElementById("app-update-check-btn");
   const installBtn = document.getElementById("app-update-install-btn");
+  const autoSwitch = document.getElementById("app-update-auto");
   if (!banner || !versionLine || !adminBox || !statusEl || !notesEl || !checkBtn || !installBtn) return;
   let pollTimer = null;
 
@@ -86,6 +87,11 @@ function initUpdates() {
     installBtn.hidden = !st.available || inst.running;
     installBtn.textContent = latest ? `Version ${latest.version} installieren` : "Installieren";
     checkBtn.disabled = !!inst.running;
+    if (autoSwitch) {
+      autoSwitch.checked = !!st.auto_install;
+      autoSwitch.disabled = !st.supervised;
+      autoSwitch.title = st.supervised ? "" : "Geht nur, wenn das Dashboard über den Starter läuft (Raspberry Pi: immer).";
+    }
     clearTimeout(pollTimer);
     if (inst.running) pollTimer = setTimeout(refresh, UPDATE_POLL_MS);
   }
@@ -145,6 +151,17 @@ function initUpdates() {
   }
 
   checkBtn.addEventListener("click", check);
+  if (autoSwitch) autoSwitch.addEventListener("change", async () => {
+    try {
+      render((await apiCall("update/settings", "PUT", { auto_install: autoSwitch.checked })).data);
+      setStatus(autoSwitch.checked
+        ? "Neue Versionen werden ab jetzt nachts automatisch installiert – vorher wird alles gesichert."
+        : "Automatisches Installieren ist aus. Neue Versionen erscheinen oben als Hinweis.", "ok");
+    } catch (e) {
+      autoSwitch.checked = !autoSwitch.checked;
+      setStatus(e.message, "err");
+    }
+  });
   installBtn.addEventListener("click", install);
   refresh();
 }

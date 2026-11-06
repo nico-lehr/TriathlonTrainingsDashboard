@@ -87,6 +87,7 @@ class AccessTestBase(unittest.TestCase):
             mock.patch.object(garmin_personal_api, "KEY_DIR", cls.garmin_dir),
             mock.patch.object(claude_api, "KEY_DIR", cls.garmin_dir),  # nie den echten Claude-Schluessel anfassen
             mock.patch.object(invites, "KEY_DIR", cls.garmin_dir),
+            mock.patch.object(updater, "SETTINGS_DIR", cls.garmin_dir),
             mock.patch.object(tools.garmin_sync, "TOKEN_DIR", cls.garmin_dir),
             mock.patch.object(tools.garmin_sync, "LOG_PATH", os.path.join(cls.garmin_dir, "garmin-sync.log")),
             mock.patch.object(garmin_api_routes, "threading"),  # nur dort, nicht threading.Thread im ganzen Prozess

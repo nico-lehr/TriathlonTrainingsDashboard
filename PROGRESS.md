@@ -121,6 +121,22 @@ Auftrag (2026-11-06): Neue Nutzer sollen sich selbst ein Konto erstellen können
 | K3 „Angemeldet bleiben“: 90 Tage, tägliche Erneuerung (X-Renewed-Token); ohne Haken sessionStorage, max. 1 Tag | fertig |
 | K4 Tests (Server 172, JS 167) + Prüfung im Browser (Desktop, iPhone hell/dunkel) | fertig |
 
+## Zusatz L: Garmin nur über die API, Werte übernehmen, automatische Updates
+
+Auftrag (2026-11-07): Mobility über die ganze Seite; Garmin-Daten nur noch über die API; Profilwerte (FTP, Gewicht …) für das Onboarding; Schlüssel bleiben bei Updates; Updates automatisch installieren.
+
+| Schritt | Status |
+|---|---|
+| L1 Mobility in voller Breite | fertig |
+| L2 Lesen nur noch über den Personal-API-Schlüssel (`garmin_sync.client_for`), Menü „Von Garmin holen“ über den Server | fertig |
+| L3 `tools/garmin_profile.py` + `GET /garmin/profile`, „Aus Garmin übernehmen“ in Einstellungen und Onboarding (inkl. Verbinden) | fertig – mit nachgestelltem Garmin geprüft |
+| L4 „Automatisch installieren“ (nachts 3–5 Uhr, `~/.triathlon/update.json`) | fertig |
+| L5 Tests (Server 185, JS 167) | fertig |
+
+### Offene Fragen zu L
+
+- Welche Profilfelder Garmins Personal API wirklich liefert, ließ sich ohne echten Schlüssel nicht prüfen. Dokumentiert sind `userprofile/settings` und `heartRateZones/v2`; FTP und VO2max stehen dort nicht – fehlt ein Wert, bleibt er leer.
+
 ## Offene Fragen
 
 ### Aus dem Abschluss-Check F (nicht behoben, optional)

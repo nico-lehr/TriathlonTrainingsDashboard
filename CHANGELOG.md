@@ -4,6 +4,16 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.3.0
+
+Garmin nur noch über die offizielle Schnittstelle, Werte aus Garmin übernehmen und Updates ganz automatisch.
+
+Neu in 2.3.0:
+- Mobility nutzt jetzt die ganze Seitenbreite
+- Garmin-Daten kommen nur noch über deinen eigenen Schlüssel (offizielle Personal API); „Aktualisieren → Von Garmin holen“ läuft über den Server
+- „Aus Garmin übernehmen“: Gewicht, Max-/Ruhepuls, Schwellenpace Laufen, Geburtsdatum, Geschlecht (und FTP, falls Garmin ihn liefert) – in den Einstellungen und im Onboarding, dort auch Garmin direkt verbinden
+- Programm-Updates: Schalter „Automatisch installieren“ – nachts zwischen 3 und 5 Uhr, vorher wird alles gesichert
+
 ## 2.2.0
 
 Freunde erstellen ihr Konto selbst, und du bleibst angemeldet.

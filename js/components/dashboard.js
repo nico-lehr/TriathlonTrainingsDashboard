@@ -30,9 +30,8 @@ function renderGarminSyncStatus() {
     // die einmalige Einrichtung. Der Hinweis steht deshalb von vornherein da,
     // statt den Nutzer erst in eine unverstaendliche Browser-Fehlermeldung
     // laufen zu lassen.
-    el.innerHTML = "Noch nie synchronisiert<br><span class=\"sync-hint\">Passiert beim Klick nichts? Einmalig "
-      + "<code>setup.command</code> starten &mdash; oder "
-      + "<code>sync-garmin.command</code> direkt doppelklicken.</span>";
+    el.innerHTML = "Holt Trainings und Gesundheitsdaten über deinen Garmin-Schlüssel "
+      + "<span class=\"sync-hint\">(Einstellungen → Garmin-Verbindung)</span>";
     el.className = "update-menu-sync";
     return;
   }

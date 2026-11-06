@@ -25,9 +25,7 @@ function initGarminSettings() {
 
   function keyText(st) {
     if (!st.configured) {
-      return [st.old_login
-        ? "Noch kein Schlüssel – deine Daten kommen bisher über die alte Garmin-Anmeldung am Dashboard-PC."
-        : "Noch kein Schlüssel hinterlegt.", ""];
+      return ["Noch kein Schlüssel hinterlegt. Trainings und Gesundheitsdaten kommen nur über diesen Schlüssel.", ""];
     }
     if (st.days_left == null) return ["Schlüssel hinterlegt.", "ok"];
     const until = fmtDateFull(new Date(st.expires + "T00:00:00"));
@@ -40,7 +38,11 @@ function initGarminSettings() {
     const [text, kind] = keyText(st);
     setStatus(statusEl, text, kind);
     deleteBtn.hidden = !st.configured;
-    syncBtn.hidden = !st.configured && !st.old_login;
+    syncBtn.hidden = !st.configured;
+    if (typeof garminConnectedCache !== "undefined" && garminConnectedCache !== !!st.configured) {
+      garminConnectedCache = !!st.configured;
+      refreshGarminImportButtons(document);
+    }
     const sync = st.sync || {};
     syncBtn.disabled = !!sync.running;
     syncStatusEl.replaceChildren();
@@ -113,4 +115,43 @@ function initGarminSettings() {
   syncBtn.addEventListener("click", startSync);
   deleteBtn.addEventListener("click", remove);
   refresh();
+}
+
+// Menü "Aktualisieren" → "Von Garmin holen": derselbe Abruf wie in den
+// Einstellungen, über die offizielle Garmin-Schnittstelle auf dem Server.
+async function startGarminSyncFromMenu() {
+  const el = document.getElementById("garmin-sync-status");
+  const show = (html, cls) => { if (el) { el.innerHTML = html; el.className = "update-menu-sync" + (cls ? " " + cls : ""); } };
+  show("Abruf läuft … beim ersten Mal kann das einige Minuten dauern.");
+  try {
+    await apiCall("garmin/sync", "POST");
+  } catch (e) {
+    if (!/läuft schon/.test(e.message)) {
+      show(`${escapeHtml(e.message)}<br><a href="#" class="sync-hint" data-open-garmin-settings>Garmin-Verbindung öffnen</a>`, "err");
+      return;
+    }
+  }
+  for (let i = 0; i < 180; i++) {
+    await new Promise(r => setTimeout(r, 5000));
+    let sync;
+    try { sync = (await apiCall("garmin/personal-api")).data.sync || {}; } catch (e) { continue; }
+    if (sync.running) continue;
+    if (sync.ok) show(`${escapeHtml(sync.message || "Fertig.")}<br><a href="#" class="sync-hint" data-reload>Neu laden, um die Daten zu sehen</a>`, "ok");
+    else show(escapeHtml(sync.message || "Abruf fehlgeschlagen."), "err");
+    return;
+  }
+}
+
+function initGarminMenu() {
+  const btn = document.getElementById("menu-item-garmin");
+  if (btn) btn.addEventListener("click", startGarminSyncFromMenu);
+  document.addEventListener("click", e => {
+    if (e.target.closest("[data-reload]")) { e.preventDefault(); window.location.reload(); }
+    if (e.target.closest("[data-open-garmin-settings]")) {
+      e.preventDefault();
+      openSettingsView();
+      const card = document.getElementById("garmin-settings-card");
+      if (card) requestAnimationFrame(() => card.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }
+  });
 }

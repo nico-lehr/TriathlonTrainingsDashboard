@@ -150,6 +150,33 @@ class RegisterTest(unittest.TestCase):
         self.assertIn("freundin", [a["username"] for a in st["accounts"]])
 
 
+class UpdateSettingsTest(unittest.TestCase):
+    def setUp(self):
+        ADMIN_ENV.start()
+        self.addCleanup(ADMIN_ENV.stop)
+        self.dir = tempfile.mkdtemp()
+        p = mock.patch("backend.updater.SETTINGS_DIR", self.dir)
+        p.start()
+        self.addCleanup(p.stop)
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.client = app.test_client()
+        with app.app_context():
+            self.admin = {"Authorization": "Bearer " + auth.make_token(ensure_admin())}
+            session = routes.get_session()
+            try:
+                login = session.query(AthleteLogin).filter_by(username="nur-freund").first()
+                fid = login.athlete_id if login else auth.create_login(session, "nur-freund", PASSWORD)
+            finally:
+                session.close()
+            self.friend = {"Authorization": "Bearer " + auth.make_token(fid)}
+
+    def test_nur_betreiber_schaltet_automatik(self):
+        self.assertEqual(self.client.put("/api/v1/update/settings", headers=self.friend, json={"auto_install": True}).status_code, 403)
+        r = self.client.put("/api/v1/update/settings", headers=self.admin, json={"auto_install": True})
+        self.assertTrue(r.get_json()["data"]["auto_install"])
+        self.assertEqual(self.client.put("/api/v1/update/settings", headers=self.admin, json={"auto_install": "ja"}).status_code, 400)
+
+
 class RememberTest(unittest.TestCase):
     def setUp(self):
         global ADMIN_ID

@@ -265,16 +265,19 @@ class ClientTest(TempDirsMixin, unittest.TestCase):
 
 
 class SyncMitApiTest(TempDirsMixin, unittest.TestCase):
-    def test_schluessel_hat_vorrang_vor_altem_token(self):
-        os.makedirs(garmin_sync.token_path(2))
+    def test_daten_nur_noch_ueber_den_schluessel(self):
+        os.makedirs(garmin_sync.token_path(2))  # nur alte Anmeldung ("An Garmin senden")
         personal_api.save_key(5, API_KEY)
-        self.assertEqual(garmin_sync.athletes_with_token(), [2, 5])
+        self.assertEqual(garmin_sync.athletes_with_token(), [5])  # Morgen-Abruf nur mit Schluessel
         self.assertIsInstance(garmin_sync.client_for(5), personal_api.PersonalApiClient)
         with mock.patch.object(garmin_sync, "connect") as connect:
-            garmin_sync.client_for(2)
-            connect.assert_called_once_with(2, fresh_login=False)
-            garmin_sync.client_for(5, fresh_login=True)  # --login bleibt der alte Weg
-            connect.assert_called_with(5, fresh_login=True)
+            with self.assertRaises(garmin_sync.NoGarminKeyError) as ctx:
+                garmin_sync.client_for(2)  # alte Anmeldung reicht zum Lesen nicht mehr
+            connect.assert_not_called()
+            self.assertIn("Garmin-Verbindung", garmin_sync.describe_error(ctx.exception, 2))
+            # --login richtet nur noch den alten Zugang ein, gelesen wird ueber die API.
+            self.assertIsInstance(garmin_sync.client_for(5, fresh_login=True), personal_api.PersonalApiClient)
+            connect.assert_called_once_with(5, fresh_login=True)
 
     def test_aufbereitung_versteht_die_antworten_der_api(self):
         cache = {"days": {"2026-10-01": {
@@ -530,15 +533,35 @@ class EinstellungenTest(TempDirsMixin, unittest.TestCase):
         self.assertIn("requirements.txt", r.get_json()["error"])
         thread.assert_not_called()
 
-    def test_abbruch_per_systemexit_haengt_nicht_auf_laeuft(self):
+    def test_profilwerte_nur_mit_eigenem_schluessel(self):
+        self.assertEqual(self.client.get("/api/v1/garmin/profile", headers=self.h["garmin-anna"]).status_code, 409)
+        personal_api.save_key(self.ids["garmin-anna"], API_KEY)
+        seen = []
+        with mock.patch("tools.garmin_profile.fetch", side_effect=lambda c: seen.append(c.athlete_id) or {"weightKg": 72.4}):
+            r = self.client.get("/api/v1/garmin/profile", headers=self.h["garmin-anna"])
+            self.assertEqual(r.get_json()["data"]["values"], {"weightKg": 72.4})
+            self.assertEqual(seen, [self.ids["garmin-anna"]])  # mit Annas Schluessel, nie dem einer anderen Person
+            self.assertEqual(self.client.get("/api/v1/garmin/profile", headers=self.h["garmin-ben"]).status_code, 409)
+        with mock.patch("tools.garmin_profile.fetch", side_effect=personal_api.GarminApiUnreachableError("Garmin ist nicht erreichbar.")):
+            r = self.client.get("/api/v1/garmin/profile", headers=self.h["garmin-anna"])
+            self.assertEqual((r.status_code, r.get_json()["error"]), (502, "Garmin ist nicht erreichbar."))
+
+    def test_ohne_schluessel_kein_abruf_auch_mit_alter_anmeldung(self):
         os.makedirs(garmin_sync.token_path(self.ids["garmin-anna"]))  # nur alte Anmeldung
-        with mock.patch.object(garmin_sync, "sync_user", side_effect=SystemExit("Die Bibliothek 'garminconnect' fehlt.")), \
+        with mock.patch("threading.Thread") as thread:
+            r = self.client.post("/api/v1/garmin/sync", headers=self.h["garmin-anna"])
+        self.assertEqual(r.status_code, 409)
+        thread.assert_not_called()
+
+    def test_abbruch_per_systemexit_haengt_nicht_auf_laeuft(self):
+        personal_api.save_key(self.ids["garmin-anna"], API_KEY)
+        with mock.patch.object(garmin_sync, "sync_user", side_effect=SystemExit("Die Bibliothek fehlt.")), \
                 mock.patch("threading.Thread") as thread:
             self.client.post("/api/v1/garmin/sync", headers=self.h["garmin-anna"])
             thread.call_args.kwargs["target"](*thread.call_args.kwargs["args"])
         st = self.client.get("/api/v1/garmin/personal-api", headers=self.h["garmin-anna"]).get_json()["data"]["sync"]
         self.assertEqual((st["running"], st["ok"]), (False, False))
-        self.assertIn("garminconnect", st["message"])
+        self.assertIn("Bibliothek", st["message"])
         with mock.patch("threading.Thread"):
             self.assertEqual(self.client.post("/api/v1/garmin/sync", headers=self.h["garmin-anna"]).status_code, 202)
 
