@@ -224,6 +224,8 @@ gestartet oder per „Jetzt von Garmin holen“ im Dashboard. Anleitung:
 | Datei | Zweck |
 |---|---|
 | `start.bat` / `start.sh` | Startet den Server über `backend/launcher.py` (installiert beim ersten Mal die Bibliotheken, legt `.env` an, startet nach einem Update neu). |
+| `deploy/raspberry-pi/install.sh` | Richtet das Dashboard auf einem Raspberry Pi/Linux als systemd-Dienst ein (.venv, .env, Dienst, tägliche Sicherung und Garmin-Abruf). |
+| `deploy/raspberry-pi/daten-zum-pi.sh` | Kopiert Datenbank, `.env`, `fit-files/` und Garmin-Schlüssel vom alten Rechner auf den Pi. |
 | `VERSION` | Programmversion; muss zum Tag der GitHub-Release passen (`docs/DEPLOYMENT.md`, Abschnitt 7). |
 | `CHANGELOG.md` | „Was ist neu“ je Version (`## <Version>`) – Text der GitHub-Release und des Update-Hinweises. |
 | `.github/workflows/release.yml` | GitHub Action: legt Tag und Release automatisch an, sobald auf `main` eine neue Nummer in `VERSION` steht. |

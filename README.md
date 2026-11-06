@@ -114,6 +114,7 @@ Auf dem Mac in allen Befehlen `python3` statt `python` schreiben.
 | Benutzer anlegen / Passwort vergessen | `python backend/create_user.py` / `… --reset` |
 | Sicherung machen | `backup.bat` / `python backup.py` (läuft auch automatisch bei jedem Start) |
 | Neue Version installieren | Hinweis oben im Dashboard → „Installieren“ (nur für dich als Betreiber; siehe [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), „Updates“) |
+| Dauerhaft auf einem Raspberry Pi | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), Abschnitt 9 (ein Installationsbefehl, startet von selbst) |
 | Auf dem iPhone | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), Abschnitt 6 (Tailscale) oder Abschnitt 8 (VS Code-Port-Weiterleitung, ohne Tailscale) |
 
 ---

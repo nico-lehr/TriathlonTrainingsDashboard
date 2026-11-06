@@ -6,6 +6,9 @@ Webseite und Datenbank. Bis zu ein paar Freunde erreichen ihn über
 dass etwas im Internet offen steht. Jede Person meldet sich mit eigenem
 Benutzernamen an und sieht nur ihre eigenen Daten.
 
+**Dauerbetrieb ohne laufenden Computer:** Mit einem Raspberry Pi läuft das
+Dashboard Tag und Nacht und startet von selbst – siehe Abschnitt 9.
+
 Befehle stehen hier mit `python`. Unter Windows geht auch `py`, auf dem Mac
 heißt es meist `python3`. Alle Befehle im Projektordner ausführen.
 
@@ -409,4 +412,128 @@ GitHub-Anmeldung – das ist gewollt.
 | Handy fragt nach GitHub-Anmeldung | Normal bei „Privat“ – mit **deinem** GitHub-Konto anmelden. |
 | „Developer Tunnel“-Warnseite kommt immer wieder | Einmal „Weiter“ – in einer neu angelegten Home-Bildschirm-App kommt sie noch einmal. |
 | Nach einem Update kurz „nicht erreichbar“ | Der Server startet neu; nach etwa einer Minute die Seite neu laden. |
+
+---
+
+## 9. Raspberry Pi als Dashboard-Server (empfohlen für den Dauerbetrieb)
+
+Ein Raspberry Pi läuft Tag und Nacht, braucht kaum Strom und macht deinen
+Computer frei: Das Dashboard läuft dann **auf dem Pi**, und alle deine
+Geräte – Mac, PC, iPhone, Tablet – greifen im Heimnetz per Browser darauf
+zu, unterwegs über Tailscale. Ein Installationsprogramm erledigt alles; es
+richtet das Dashboard als Dienst ein, der beim Einschalten, nach einem
+Absturz und nach einem Update von selbst startet, und plant eine tägliche
+Sicherung (03:15 Uhr) und einen täglichen Garmin-Abruf (05:45 Uhr) ein.
+
+**Was du brauchst:** Raspberry Pi 4 oder 5 (2 GB Arbeitsspeicher reichen),
+Raspberry Pi OS (64-Bit), Netzwerk (LAN-Kabel oder WLAN) und SSH. Am
+einfachsten stellst du beim Bespielen der Speicherkarte im **Raspberry Pi
+Imager** unter „Einstellungen bearbeiten“ Rechnername (z. B. `tripi`),
+Benutzer, Passwort, WLAN und „SSH aktivieren“ ein.
+
+### Schritt 1: Mit dem Pi verbinden
+
+Auf dem Mac im Terminal (Windows: PowerShell):
+```
+ssh <benutzer>@<pi-name>.local
+```
+z. B. `ssh nico@tripi.local`. Die Frage nach dem „fingerprint“ mit `yes`
+beantworten, dann das Pi-Passwort eingeben. Alle folgenden Befehle laufen
+in diesem Fenster **auf dem Pi**.
+
+### Schritt 2: Projekt holen und installieren
+
+```
+git clone https://github.com/nico-lehr/TriathlonTrainingsDashboard.git
+cd TriathlonTrainingsDashboard
+bash deploy/raspberry-pi/install.sh
+```
+Das dauert ein paar Minuten (fragt einmal nach dem Pi-Passwort für die
+Systemteile). Am Ende steht die Adresse, z. B. `http://tripi.local:5000`.
+Da das Projekt per `git` geholt wurde, kommen Updates später über den
+Hinweis im Dashboard (Abschnitt 3, „Updates“) – der Dienst startet danach
+von selbst neu.
+
+### Schritt 3: Daten – umziehen oder neu anfangen
+
+**Neu anfangen** (oder zusätzlich Freunde anlegen), auf dem Pi:
+```
+.venv/bin/python backend/create_user.py
+```
+
+**Bisherige Daten vom Mac/PC übernehmen** (Trainings, Benutzer, Garmin-
+Schlüssel): Auf dem **alten** Rechner das Dashboard-Fenster schließen,
+dann dort im Projektordner (der braucht dafür den aktuellen Stand, also
+vorher einmal aktualisieren):
+```
+bash deploy/raspberry-pi/daten-zum-pi.sh <benutzer>@<pi-name>.local
+```
+Das Skript sichert die Daten, hält das Dashboard auf dem Pi kurz an und
+kopiert `training.db`, `.env`, `fit-files/` und die Garmin-Schlüssel aus
+`~/.triathlon`. Alle bisherigen Benutzer und Passwörter gelten danach auf
+dem Pi weiter. Stand in der alten `.env` die Zeile `DASHBOARD_HOST=…`, auf
+dem Pi löschen (`nano .env`) und `sudo systemctl restart triathlon-dashboard`.
+
+**Wichtig:** Danach das Dashboard auf dem alten Rechner **nicht mehr
+starten** – sonst gibt es zwei getrennte Datenstände.
+
+### Schritt 4: Von allen Geräten zugreifen
+
+- **Zu Hause** (gleiches WLAN): `http://<pi-name>.local:5000`, z. B.
+  `http://tripi.local:5000` – auf Mac, PC, iPhone, Android. Klappt der Name
+  auf einem Gerät nicht, die IP-Adresse nehmen (zeigt das
+  Installationsprogramm an; im Router dem Pi eine feste IP geben, damit sie
+  sich nicht ändert).
+- **Unterwegs und für Freunde:** Tailscale auf dem Pi installieren:
+  ```
+  curl -fsSL https://tailscale.com/install.sh | sh
+  sudo tailscale up
+  ```
+  Den angezeigten Link öffnen und mit deinem Tailscale-Konto anmelden. Danach
+  gilt alles aus Abschnitt 2 und 6 mit dem **Pi** statt dem PC: Adresse
+  `http://<pi-name>:5000`, fürs iPhone mit https: `sudo tailscale serve --bg 5000`.
+- iPhone/Android als App: Adresse in Safari/Chrome öffnen → „Zum
+  Home-Bildschirm“ (Abschnitt 6, Schritt 3).
+
+### Garmin und KI auf dem Pi
+
+- Der **Garmin-Abruf** läuft jeden Morgen von selbst für alle mit Schlüssel
+  bzw. Anmeldung; „Jetzt von Garmin holen“ in den Einstellungen geht
+  weiterhin. Die alte Anmeldung (für „An Garmin senden“) auf dem Pi:
+  `.venv/bin/python tools/garmin_sync.py --login --athlete <Nummer>`.
+- **KI (Ollama):** Für die Sprachmodelle ist der Pi zu schwach. Lass Ollama
+  auf dem Mac/PC laufen und trage auf dem Pi in `.env` dessen Adresse ein,
+  z. B. `OLLAMA_URL=http://192.168.1.20:11434`, dann
+  `sudo systemctl restart triathlon-dashboard`. Ollama muss dafür im Netz
+  lauschen (Mac: im Terminal `launchctl setenv OLLAMA_HOST 0.0.0.0`, Ollama
+  neu starten). Die KI geht dann nur, wenn der Mac/PC an ist – alles andere
+  läuft weiter. Alternativ die Claude API (Einstellungen).
+
+### Verwalten (auf dem Pi)
+
+| Was | Befehl |
+|---|---|
+| Läuft es? | `sudo systemctl status triathlon-dashboard` |
+| Meldungen ansehen | `sudo journalctl -u triathlon-dashboard -n 100` (live: `-f`) |
+| Neu starten | `sudo systemctl restart triathlon-dashboard` |
+| Anhalten / wieder starten | `sudo systemctl stop …` / `sudo systemctl start triathlon-dashboard` |
+| Garmin jetzt holen (alle) | `sudo systemctl start triathlon-dashboard-garmin` |
+| Benutzer anlegen / Passwort neu | `.venv/bin/python backend/create_user.py` / `… --reset` |
+| Installation auffrischen | `bash deploy/raspberry-pi/install.sh` (harmlos, beliebig oft) |
+
+**Sicherungen nicht nur auf der Speicherkarte lassen** – SD-Karten gehen
+irgendwann kaputt. Ab und zu auf den Mac holen (dort im Terminal):
+```
+scp -r <benutzer>@<pi-name>.local:TriathlonTrainingsDashboard/backups ~/Desktop/dashboard-sicherung
+```
+
+### Wenn es nicht klappt
+
+| Problem | Lösung |
+|---|---|
+| `ssh: Could not resolve hostname` | Pi an und im selben Netz? Statt des Namens die IP aus dem Router nehmen. |
+| Adresse `….local:5000` lädt nicht | Auf dem Pi `sudo systemctl status triathlon-dashboard`; Meldungen mit `journalctl` (siehe oben). |
+| Installationsprogramm bricht bei den Bibliotheken ab | Internet am Pi prüfen, dann erneut `bash deploy/raspberry-pi/install.sh`. |
+| „Address already in use“ in den Meldungen | Läuft das Dashboard zusätzlich per `start.sh` im Terminal? Dieses beenden – der Dienst reicht. |
+| Nach dem Umzug fehlen Daten | Lief beim Kopieren das alte Dashboard noch? Erneut `daten-zum-pi.sh` (die vorige Pi-Datenbank liegt als `training.db.vor-umzug` daneben). |
 

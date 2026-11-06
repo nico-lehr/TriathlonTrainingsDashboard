@@ -12,4 +12,8 @@ ENV = BASE / ".env"
 if not ENV.exists():
     template = (BASE / ".env.example").read_text(encoding="utf-8")
     ENV.write_text(template.replace("SECRET_KEY=\n", f"SECRET_KEY={secrets.token_hex(32)}\n"), encoding="utf-8")
+    try:
+        ENV.chmod(0o600)  # enthaelt den geheimen Schluessel - nur fuer den eigenen Benutzer lesbar
+    except OSError:
+        pass  # z. B. Windows: dort schuetzt das Benutzerprofil
     print("Datei .env mit neuem geheimen Schluessel angelegt.")
