@@ -150,8 +150,7 @@ function initGarminMenu() {
     if (e.target.closest("[data-open-garmin-settings]")) {
       e.preventDefault();
       openSettingsView();
-      const card = document.getElementById("garmin-settings-card");
-      if (card) requestAnimationFrame(() => card.scrollIntoView({ behavior: "smooth", block: "start" }));
+      revealSettingsCard("garmin-settings-card");
     }
   });
 }

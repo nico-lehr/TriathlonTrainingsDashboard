@@ -4,8 +4,7 @@
 
 function openTrainingProfile() {
   openSettingsView();
-  const card = document.getElementById("training-profile-card");
-  if (card) requestAnimationFrame(() => card.scrollIntoView({ behavior: "smooth", block: "start" }));
+  revealSettingsCard("training-profile-card");
 }
 
 function initTrainingProfile() {

@@ -4,6 +4,18 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.0
+
+Für das Handy neu gestaltet – nach dem Vorbild von iPhone-Apps.
+
+Neu in 2.4.0:
+- Tab-Leiste unten (Übersicht, Kalender, Coach, Mobility, Mehr) und großer Titel oben statt Logo-, Datums- und Tab-Zeilen
+- Weniger Text: Erklärungen unter den Karten stehen auf dem Handy nur noch hinter dem i-Symbol; leere Rekorde, Ziehgriffe und Layout-Hinweise sind ausgeblendet
+- Filter und Schwerpunkte als eine wischbare Zeile
+- Einstellungen als aufklappbare Liste wie in der iPhone-App „Einstellungen“
+- Neu unter Konto: „Darstellung“ – Automatisch, Hell oder Dunkel
+- Am Computer bleibt alles wie gewohnt
+
 ## 2.3.0
 
 Garmin nur noch über die offizielle Schnittstelle, Werte aus Garmin übernehmen und Updates ganz automatisch.

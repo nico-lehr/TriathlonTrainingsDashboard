@@ -91,6 +91,8 @@ function checkAutoReplan() {
   initInvites();
   initGarminImport();
   initGarminMenu();
+  initMobileShell();
+  initThemeChoice();
   initMobility();
   initWeatherSettings();
   initAnalysis();
