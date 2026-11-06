@@ -26,7 +26,7 @@ echo "==> Sicherung auf diesem Rechner (backups/) ..."
 python3 backup.py || true
 
 echo "==> Dashboard auf dem Pi anhalten ..."
-ssh "$PI" "sudo systemctl stop triathlon-dashboard"
+ssh -t "$PI" "sudo systemctl stop triathlon-dashboard"
 
 echo "==> Kopieren ..."
 ssh "$PI" "test -f '$REMOTE_DIR/training.db' && cp '$REMOTE_DIR/training.db' '$REMOTE_DIR/training.db.vor-umzug' || true"
@@ -39,5 +39,5 @@ if [ -d "$HOME/.triathlon" ]; then
 fi
 
 echo "==> Dashboard auf dem Pi starten ..."
-ssh "$PI" "sudo systemctl start triathlon-dashboard"
+ssh -t "$PI" "sudo systemctl start triathlon-dashboard"
 echo "Fertig. Auf dem alten Rechner das Dashboard ab jetzt NICHT mehr starten - sonst gibt es zwei getrennte Datenstaende."
