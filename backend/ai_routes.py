@@ -58,3 +58,86 @@ def ai_models():
     except (urllib.error.URLError, OSError, ValueError) as e:
         return ollama_error(e)
     return response_success({"models": [m.get("name") or m.get("model") for m in tags.get("models", [])]})
+
+
+# ------------------------------------------------------------ Claude API
+# GET    /api/v1/ai/claude        Stand (Schluessel da? Modell? freigegeben? darf ich?)
+# PUT    /api/v1/ai/claude        {key?, model?, shared?} - nur Betreiber; neuer Schluessel wird geprueft
+# DELETE /api/v1/ai/claude        Schluessel entfernen - nur Betreiber
+# POST   /api/v1/ai/claude/chat   {prompt, task?, schema?} -> {response}
+# Logik und Ablage in claude_api.py; der Schluessel verlaesst den Server nie.
+
+from . import claude_api, get_current_athlete_id  # noqa: E402
+from .auth import is_admin  # noqa: E402
+from .routes import get_session  # noqa: E402
+
+TASK_NAMES = {"plan", "analysis", "recommendation", "lessons", "focus", "perfSummary", "mobility"}
+
+
+def _is_admin():
+    session = get_session()
+    try:
+        return is_admin(session, get_current_athlete_id())
+    finally:
+        session.close()
+
+
+def _claude_error(e):
+    return response_error(str(e), e.code, e.status)
+
+
+@api_bp.route("/ai/claude", methods=["GET"])
+def get_claude():
+    return response_success(claude_api.status(_is_admin()))
+
+
+@api_bp.route("/ai/claude", methods=["PUT"])
+def put_claude():
+    admin = _is_admin()
+    if not admin:
+        return response_error("Den Claude-Schlüssel kann nur der Betreiber des Dashboards ändern.", "forbidden", 403)
+    data = request.get_json(silent=True)
+    data = data if isinstance(data, dict) else {}
+    key = data.get("key") if data.get("key") not in (None, "") else None
+    model = data.get("model") if data.get("model") not in (None, "") else None
+    shared = data.get("shared") if isinstance(data.get("shared"), bool) else None
+    if key is None and model is None and shared is None:
+        return response_error("Nichts zu speichern.", "VALIDATION_ERROR", 400)
+    try:
+        claude_api.save(key=key, model=model, shared=shared)
+    except ValueError as e:
+        return response_error(str(e), "VALIDATION_ERROR", 400)
+    except claude_api.ClaudeError as e:
+        return _claude_error(e)
+    return response_success(claude_api.status(admin))
+
+
+@api_bp.route("/ai/claude", methods=["DELETE"])
+def delete_claude():
+    admin = _is_admin()
+    if not admin:
+        return response_error("Den Claude-Schlüssel kann nur der Betreiber des Dashboards entfernen.", "forbidden", 403)
+    claude_api.delete()
+    return response_success(claude_api.status(admin))
+
+
+@api_bp.route("/ai/claude/chat", methods=["POST"])
+def claude_chat():
+    data = request.get_json(silent=True)
+    data = data if isinstance(data, dict) else {}
+    prompt = data.get("prompt")
+    if not isinstance(prompt, str) or not prompt.strip():
+        return response_error("'prompt' fehlt", "VALIDATION_ERROR", 400)
+    if len(prompt) > claude_api.PROMPT_MAX_CHARS:
+        return response_error("Die Anfrage ist zu lang.", "VALIDATION_ERROR", 400)
+    task = data.get("task") if data.get("task") in TASK_NAMES else ""
+    schema = data.get("schema") if isinstance(data.get("schema"), dict) else None
+    st = claude_api.status(_is_admin())
+    if not st["configured"]:
+        return response_error("Für Claude ist noch kein Schlüssel hinterlegt.", "claude_not_configured", 409)
+    if not st["available"] and st["sdk"]:
+        return response_error("Der Betreiber hat Claude für andere Personen nicht freigegeben.", "claude_not_shared", 403)
+    try:
+        return response_success({"response": claude_api.chat(prompt, task=task, schema=schema)})
+    except claude_api.ClaudeError as e:
+        return _claude_error(e)

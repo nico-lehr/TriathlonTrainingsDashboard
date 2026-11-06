@@ -76,6 +76,24 @@ Auftrag (2026-10-22): Hinweis auf neue Versionen und Installation nach Bestätig
 - Dateien, die eine neue Version löscht, bleiben bei ZIP-Installationen liegen (stören nicht).
 - Mit Windows selbst konnte ich nicht testen (nur Linux). `start.bat` startet den Starter in einer einzigen Zeile, damit Windows die Datei während eines Updates nicht weiterliest. Bitte beim ersten echten Update kurz zuschauen.
 
+## Zusatz I: Mobility mit Bildern, Trainingsprofil, Claude
+
+Auftrag (2026-11-06): Mobility-Workouts planen, Übungen bildlich zeigen, alle Trainingswünsche persönlich anpassen; Claude statt Ollama; Gestaltung schlicht wie bei Apple.
+
+| Schritt | Status |
+|---|---|
+| I1 Claude über den Server (`backend/claude_api.py`, Schlüssel nur Betreiber, Freigabe für andere, Opus 5.5 Standard) | fertig |
+| I2 „Dein Trainingsprofil“ – alle Wünsche an einer Stelle, fließt in jede KI-Planung | fertig |
+| I3 Übungs-Sammlung (33 Übungen) mit bewegten Strichfiguren + Video-Link | fertig |
+| I4 Einheit zusammenstellen: Regeln (offline) und Claude (nur Übungen aus der Sammlung, JSON-Schema) | fertig |
+| I5 Mitmach-Modus + Rückmeldung, Kalender/Trainingsplan-Anbindung | fertig |
+| I6 Tests (JS 167, Server 151, kein Netz) + Prüfung im Browser (Desktop hell, iPhone dunkel, nachgestelltes Claude) | fertig |
+
+### Offene Fragen zu I
+
+- Mit dem echten Claude konnte ich nicht testen (kein Schlüssel hier) – nur mit einem nachgestellten Dienst. Bitte einmal „Mit Claude persönlich anpassen“ ausprobieren.
+- Die Zeichnungen sind Seitenansichten; Drehbewegungen (z. B. Liegende Vier) sind nur angedeutet – dafür gibt es den Video-Knopf.
+
 ## Offene Fragen
 
 ### Aus dem Abschluss-Check F (nicht behoben, optional)

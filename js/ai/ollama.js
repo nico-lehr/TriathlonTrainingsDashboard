@@ -160,12 +160,22 @@ function parsePlanResponse(rawText, windowDates) {
     seen.add(dedupeKey);
     const intensity = ["leicht", "mittel", "hart"].includes(entry.intensity) ? entry.intensity : null;
     const exercises = (entry.sport === "Kraft" || entry.sport === "Mobility") && Array.isArray(entry.exercises)
-      ? entry.exercises.filter(x => x && x.name).map(x => ({
-          name: String(x.name).slice(0, 80),
-          sets: x.sets != null ? Number(x.sets) || null : null,
-          reps: x.reps != null ? String(x.reps).slice(0, 20) : null,
-          note: x.note ? String(x.note).slice(0, 200) : null,
-        }))
+      ? entry.exercises.filter(x => x && (x.name || x.id)).map(x => {
+          // Mobility-Übung aus der Sammlung (js/data/mobility-exercises.js): id
+          // behalten, damit Zeichnung und Mitmach-Modus funktionieren.
+          const lib = entry.sport === "Mobility" && typeof MOBILITY_BY_ID !== "undefined" ? MOBILITY_BY_ID[x.id] : null;
+          const out = {
+            name: lib ? lib.name : String(x.name).slice(0, 80),
+            sets: x.sets != null ? Number(x.sets) || null : null,
+            reps: x.reps != null ? String(x.reps).slice(0, 20) : null,
+            note: x.note ? String(x.note).slice(0, 200) : null,
+          };
+          if (lib) {
+            out.id = lib.id;
+            out.seconds = Math.min(90, Math.max(15, Math.round(Number(x.seconds) || lib.seconds)));
+          }
+          return out;
+        }).filter(x => x.name && x.name !== "undefined")
       : null;
     valid.push({
       date: entry.date,

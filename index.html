@@ -52,6 +52,7 @@
       <button class="tab-btn active" data-view="overview">Übersicht</button>
       <button class="tab-btn" data-view="calendar">Kalender</button>
       <button class="tab-btn" data-view="coach">Coach</button>
+      <button class="tab-btn" data-view="mobility">Mobility</button>
       <button class="tab-btn" data-view="nutrition">Ernährung</button>
       <button class="tab-btn" data-view="records">Rekorde</button>
       <button class="tab-btn" data-view="analysis">Analyse</button>
@@ -298,13 +299,13 @@
     <section class="coach-header">
       <div class="coach-header-top">
         <h2>Coach
-          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Ziel-Event eintragen — der Coach erstellt daraus eine Trainingsempfehlung auf Basis deiner Form, Historie und Bestzeiten. Läuft lokal über <a href="https://ollama.com" target="_blank" rel="noopener">Ollama</a>, deine Daten bleiben auf deinem Rechner.</div></span>
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Ziel-Event eintragen — der Coach erstellt daraus eine Trainingsempfehlung auf Basis deiner Form, Historie und Bestzeiten. Die KI (Claude oder Ollama) richtest du unter ⚙️ Einstellungen → KI-Coach ein.</div></span>
         </h2>
         <div class="coach-header-actions">
           <button class="update-btn onb-start-btn" id="onboarding-start-btn" type="button">Onboarding starten</button>
         </div>
       </div>
-      <p class="card-sub onb-start-hint">Neu hier? "Onboarding starten" beantwortet in 5 kurzen Schritten die wichtigsten Fragen für Profil &amp; Ziel. Ollama-Verbindung &amp; Athletenprofil findest du jetzt oben rechts unter ⚙️ Einstellungen.</p>
+      <p class="card-sub onb-start-hint">Neu hier? "Onboarding starten" beantwortet in 5 kurzen Schritten die wichtigsten Fragen für Profil &amp; Ziel. KI-Coach &amp; Trainingsprofil findest du oben rechts unter ⚙️ Einstellungen.</p>
     </section>
 
     <div class="dash-grid-bar">
@@ -444,12 +445,8 @@
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Plant rollierend jeweils die nächsten Tage für dein Hauptevent (★ bei „Deine Ziele"). Läuft der Vorrat aus, wird automatisch nachgeplant — du kannst hier auch jederzeit manuell nachplanen. Geplante Einheiten stehen zusätzlich im Kalender und lassen sich dort per Drag & Drop verschieben. Die Zeitleiste darunter zeigt die Trainingsphasen bis zu deinem Event und wo du gerade stehst.</div></span>
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erweiterte Einstellungen" title="Erweiterte Einstellungen">⚙</button><div class="info-popover trainingplan-settings-popover" id="trainingplan-settings-popover">
             <p class="workouts-columns-title">Erweiterte Einstellungen</p>
-            <p class="card-sub" style="margin:0 0 8px;">Zusätzliche Wünsche, die die KI ab jetzt bei der Trainingsplan-Erstellung (inkl. „Kürzere Variante"/„Alternative Einheit") berücksichtigt.</p>
-            <textarea id="trainingplan-custom-wishes" class="coach-input plan-edit-textarea" rows="3" placeholder="z.B. 1x Zugseiltraining pro Woche, montags kein Rad"></textarea>
-            <div class="coach-settings-row" style="margin-top:8px;">
-              <button type="button" class="update-btn" id="trainingplan-wishes-save-btn">Speichern</button>
-              <span class="coach-test-status" id="trainingplan-wishes-status"></span>
-            </div>
+            <p class="card-sub" style="margin:0 0 8px;">Deine Wünsche (Ziele, Beschwerden, Hilfsmittel, Zusatzwünsche) stehen jetzt gesammelt in deinem Trainingsprofil.</p>
+            <button type="button" class="update-btn" id="trainingplan-open-profile-btn">Trainingsprofil öffnen</button>
             <p class="workouts-columns-title plan-wish-title">Terminwünsche</p>
             <p class="card-sub plan-wish-sub">Ein fester Wunsch wie „Donnerstag schwimmen“ – die nächste Planung baut ihn ein.</p>
             <div class="plan-wish-form">
@@ -497,6 +494,65 @@
        <button class="coach-gate-skip" id="coach-gate-skip" type="button">Ohne Onboarding fortfahren</button>
      </div>
    </div>
+  </div>
+
+  <div id="view-mobility" class="view">
+    <section class="card full mob-hero" aria-labelledby="mob-title">
+      <div class="mob-hero-text">
+        <p class="mob-eyebrow" id="mob-eyebrow">Für dich heute</p>
+        <h2 class="mob-hero-title" id="mob-title">Mobility</h2>
+        <p class="mob-hero-sub" id="mob-intro"></p>
+        <p class="mob-hero-meta" id="mob-meta"></p>
+        <div class="mob-hero-actions">
+          <button type="button" class="mob-btn mob-btn-primary" id="mob-start-btn">Starten</button>
+          <button type="button" class="mob-btn mob-btn-secondary" id="mob-claude-btn" hidden>Mit Claude persönlich anpassen</button>
+        </div>
+        <p class="mob-status" id="mob-status" role="status" aria-live="polite"></p>
+      </div>
+      <div class="mob-hero-fig" id="mob-hero-fig" aria-hidden="true"></div>
+    </section>
+
+    <section class="card full mob-options" aria-label="Einheit anpassen">
+      <div class="mob-option-row">
+        <span class="mob-option-label" id="mob-duration-label">Dauer</span>
+        <div class="mob-segmented" id="mob-duration" role="radiogroup" aria-labelledby="mob-duration-label"></div>
+      </div>
+      <div class="mob-option-row">
+        <span class="mob-option-label" id="mob-focus-label">Schwerpunkt</span>
+        <div class="mob-chips" id="mob-focus" role="group" aria-labelledby="mob-focus-label"></div>
+      </div>
+      <button type="button" class="mob-profile-link" id="mob-profile-link">
+        <span class="mob-profile-link-text"><span class="mob-profile-link-title">Dein Trainingsprofil</span><span class="mob-profile-link-sub" id="mob-profile-summary"></span></span>
+        <span class="mob-chevron" aria-hidden="true">›</span>
+      </button>
+    </section>
+
+    <section class="card full">
+      <div class="mob-section-head">
+        <h2>Ablauf</h2>
+        <div class="mob-plan-wrap">
+          <input type="date" id="mob-plan-date" class="coach-input mob-plan-date" aria-label="Datum für den Kalender">
+          <button type="button" class="mob-btn mob-btn-tinted" id="mob-plan-btn">In den Kalender</button>
+        </div>
+      </div>
+      <ol class="mob-list" id="mob-session-list"></ol>
+    </section>
+
+    <section class="card full">
+      <div class="mob-section-head">
+        <h2>Alle Übungen</h2>
+        <span class="mob-count" id="mob-library-count"></span>
+      </div>
+      <div class="mob-chips mob-lib-filter" id="mob-library-filter" role="group" aria-label="Übungen filtern"></div>
+      <div class="mob-grid" id="mob-library"></div>
+    </section>
+
+    <section class="card full" id="mob-history-card" hidden>
+      <h2>Zuletzt gemacht</h2>
+      <ul class="mob-history" id="mob-history"></ul>
+    </section>
+
+    <p class="mob-disclaimer">Sanft bleiben: Ziehen ist gut, Schmerz nicht. Bei Beschwerden, die nicht weggehen, ersetzt das keine Physiotherapie.</p>
   </div>
 
   <div id="view-nutrition" class="view">
@@ -636,6 +692,12 @@
         <button type="button" class="cal-today-btn" id="logout-btn">Abmelden</button>
       </div>
 
+      <div class="card full" id="training-profile-card">
+        <h2>Dein Trainingsprofil</h2>
+        <p class="card-sub">Alle deine Wünsche an einer Stelle. Claude berücksichtigt sie bei jedem Trainingsplan und jeder Mobility-Einheit.</p>
+        <div id="training-profile-body"></div>
+      </div>
+
       <div class="card full" id="app-update-card">
         <h2>Programm-Updates</h2>
         <p class="card-sub" id="app-update-version">Version …</p>
@@ -672,98 +734,60 @@
         <button type="button" class="reset-link" id="garmin-api-delete-btn" hidden>Schlüssel entfernen</button>
       </div>
 
-      <div class="card full">
-        <h2>Ollama-Verbindung</h2>
-        <p class="card-sub">Für den KI-Coach (Trainingsempfehlungen, Auswertungen). Ollama läuft auf dem Dashboard-PC, die Anfragen gehen über den Dashboard-Server – deine Daten verlassen das eigene Netz nicht.</p>
-        <div class="coach-settings-row" hidden>
-          <label for="coach-ollama-url">Adresse</label>
-          <input type="text" id="coach-ollama-url" class="coach-input" placeholder="http://localhost:11434">
+      <div class="card full" id="ai-settings-card">
+        <h2>KI-Coach</h2>
+        <p class="card-sub">Claude erstellt Trainingspläne, Mobility-Einheiten und Auswertungen – abgestimmt auf dein Trainingsprofil.</p>
+        <div class="ai-status-row">
+          <span class="ai-status-dot" id="claude-status-dot" aria-hidden="true"></span>
+          <span class="ai-status-text" id="claude-status-text">Prüfe …</span>
         </div>
-        <div class="coach-settings-row">
-          <label for="coach-ollama-model">Modell</label>
-          <input type="text" id="coach-ollama-model" class="coach-input" placeholder="llama3.1">
+        <div id="claude-admin" hidden>
+          <div class="settings-list">
+            <div class="settings-list-row">
+              <label for="claude-api-key">Schlüssel</label>
+              <input type="password" id="claude-api-key" class="coach-input" autocomplete="off" spellcheck="false" placeholder="sk-ant-…">
+            </div>
+            <div class="settings-list-row">
+              <label for="claude-model">Modell</label>
+              <select id="claude-model" class="coach-input"></select>
+            </div>
+            <div class="settings-list-row">
+              <label for="claude-shared">Für alle Personen freigeben</label>
+              <input type="checkbox" id="claude-shared" class="switch" role="switch">
+            </div>
+          </div>
+          <p class="card-sub settings-list-foot">Freigegeben laufen auch die Anfragen deiner Freunde über deinen Schlüssel – und damit über dein Guthaben.</p>
+          <div class="coach-settings-row">
+            <button type="button" class="update-btn" id="claude-save-btn">Schlüssel prüfen &amp; speichern</button>
+            <button type="button" class="reset-link" id="claude-delete-btn" hidden>Schlüssel entfernen</button>
+          </div>
+          <p class="coach-test-status" id="claude-test-status" role="status"></p>
+          <p class="card-sub coach-setup-hint">Schlüssel erstellen: <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> → API Keys. Er liegt danach nur auf dem Dashboard-Server, nie im Browser.</p>
         </div>
-        <div class="coach-settings-row">
-          <button class="cal-today-btn" id="coach-test-btn" type="button">Verbindung testen</button>
-          <span class="coach-test-status" id="coach-test-status"></span>
-        </div>
-        <div class="coach-settings-row">
-          <button class="cal-today-btn" id="ollama-setup-btn" type="button">⚙️ Ollama Setup</button>
-        </div>
-        <p class="card-sub coach-setup-hint">
-          Einmalig auf dem Dashboard-PC einrichten: <a href="https://ollama.com/download" target="_blank" rel="noopener">Ollama installieren</a>
-          und ein Modell laden (Terminal: <code>ollama pull llama3.1</code>). Läuft Ollama auf einem anderen Rechner,
-          die Adresse in der Datei <code>.env</code> eintragen (<code>OLLAMA_URL</code>) — Details in docs/DEPLOYMENT.md.
-        </p>
-      </div>
-
-      <div class="card full">
-        <h2>Claude API (optional)</h2>
-        <p class="card-sub">Alternative bzw. Ergänzung zu Ollama — nutzt ein stärkeres Modell über die Anthropic API (kostenpflichtig, eigener API-Key). Läuft direkt aus dem Browser, kein eigenes Backend nötig.</p>
-        <div class="coach-settings-row">
-          <label for="claude-api-key">API-Key</label>
-          <input type="password" id="claude-api-key" class="coach-input" placeholder="sk-ant-...">
-        </div>
-        <div class="coach-settings-row">
-          <label for="claude-model">Modell</label>
-          <input type="text" id="claude-model" class="coach-input" placeholder="claude-haiku-4-5-20251001">
-        </div>
-        <div class="coach-settings-row">
-          <button class="cal-today-btn" id="claude-test-btn" type="button">Verbindung testen</button>
-          <span class="coach-test-status" id="claude-test-status"></span>
-        </div>
-        <p class="card-sub coach-setup-hint">
-          API-Key erstellen unter <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.
-          Standardmodell ist bewusst das gündigste verfügbare (Haiku), um die Kosten so gering wie möglich zu halten.
-          Der Key wird nur lokal in diesem Browser gespeichert, nie an einen eigenen Server geschickt.
-        </p>
-      </div>
-
-      <div class="card full">
-        <h2>Hybrid-Modus — welche Aufgabe nutzt welchen Anbieter?</h2>
-        <p class="card-sub">Standardmäßig läuft alles lokal & kostenlos über Ollama. Einzelne Aufgaben können gezielt auf Claude umgestellt werden, z.B. nur die selten aufgerufene Trainingsplan-Erstellung — so bleiben die API-Kosten minimal.</p>
-        <div class="coach-settings-row">
-          <label for="hybrid-task-plan">Trainingsplan-Erstellung</label>
-          <select id="hybrid-task-plan" class="coach-input" data-task="plan">
-            <option value="ollama">Ollama (lokal)</option>
-            <option value="claude">Claude API</option>
-          </select>
-        </div>
-        <div class="coach-settings-row">
-          <label for="hybrid-task-analysis">Workout-Auswertung</label>
-          <select id="hybrid-task-analysis" class="coach-input" data-task="analysis">
-            <option value="ollama">Ollama (lokal)</option>
-            <option value="claude">Claude API</option>
-          </select>
-        </div>
-        <div class="coach-settings-row">
-          <label for="hybrid-task-recommendation">Ziel-Empfehlung</label>
-          <select id="hybrid-task-recommendation" class="coach-input" data-task="recommendation">
-            <option value="ollama">Ollama (lokal)</option>
-            <option value="claude">Claude API</option>
-          </select>
-        </div>
-        <div class="coach-settings-row">
-          <label for="hybrid-task-lessons">Lessons Learned</label>
-          <select id="hybrid-task-lessons" class="coach-input" data-task="lessons">
-            <option value="ollama">Ollama (lokal)</option>
-            <option value="claude">Claude API</option>
-          </select>
-        </div>
-        <div class="coach-settings-row">
-          <label for="hybrid-task-focus">Trainingsbelastungsfokus (Ist/Soll)</label>
-          <select id="hybrid-task-focus" class="coach-input" data-task="focus">
-            <option value="ollama">Ollama (lokal)</option>
-            <option value="claude">Claude API</option>
-          </select>
-        </div>
-        <div class="coach-settings-row">
-          <label for="hybrid-task-perfSummary">Leistungszustand-Zusammenfassung</label>
-          <select id="hybrid-task-perfSummary" class="coach-input" data-task="perfSummary">
-            <option value="ollama">Ollama (lokal)</option>
-            <option value="claude">Claude API</option>
-          </select>
-        </div>
+        <details class="settings-disclosure">
+          <summary>Ohne Claude: lokale KI (Ollama)</summary>
+          <p class="card-sub">Nur nötig, wenn Claude nicht eingerichtet ist. Ollama läuft auf dem Dashboard-PC – deine Daten verlassen das eigene Netz nicht.</p>
+          <div class="coach-settings-row" hidden>
+            <label for="coach-ollama-url">Adresse</label>
+            <input type="text" id="coach-ollama-url" class="coach-input" placeholder="http://localhost:11434">
+          </div>
+          <div class="coach-settings-row">
+            <label for="coach-ollama-model">Modell</label>
+            <input type="text" id="coach-ollama-model" class="coach-input" placeholder="llama3.1">
+          </div>
+          <div class="coach-settings-row">
+            <button class="cal-today-btn" id="coach-test-btn" type="button">Verbindung testen</button>
+            <span class="coach-test-status" id="coach-test-status"></span>
+          </div>
+          <div class="coach-settings-row">
+            <button class="cal-today-btn" id="ollama-setup-btn" type="button">⚙️ Ollama Setup</button>
+          </div>
+          <p class="card-sub coach-setup-hint">
+            Einmalig auf dem Dashboard-PC einrichten: <a href="https://ollama.com/download" target="_blank" rel="noopener">Ollama installieren</a>
+            und ein Modell laden (Terminal: <code>ollama pull llama3.1</code>). Läuft Ollama auf einem anderen Rechner,
+            die Adresse in der Datei <code>.env</code> eintragen (<code>OLLAMA_URL</code>) — Details in docs/DEPLOYMENT.md.
+          </p>
+        </details>
       </div>
 
       <div class="card">
@@ -1065,6 +1089,9 @@
 <script src="js/analytics/streak.js"></script>
 <script src="js/analytics/achievements.js"></script>
 <script src="js/analytics/triathlon.js"></script>
+<script src="js/data/mobility-exercises.js"></script>
+<script src="js/data/training-profile.js"></script>
+<script src="js/analytics/mobility-plan.js"></script>
 <script src="js/ai/context-builder.js"></script>
 <script src="js/ai/prompts.js"></script>
 <script src="js/ai/ollama.js"></script>
@@ -1095,6 +1122,11 @@
 <script src="js/components/account.js"></script>
 <script src="js/components/garmin-settings.js"></script>
 <script src="js/components/update.js"></script>
+<script src="js/components/ai-settings.js"></script>
+<script src="js/components/training-profile.js"></script>
+<script src="js/components/mobility-figure.js"></script>
+<script src="js/components/mobility-player.js"></script>
+<script src="js/components/mobility.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

@@ -44,7 +44,8 @@ Regeln:
 - Bei "Zuletzt von dir vorgeschlagene Einheiten + Status": wiederholt übersprungene Einheiten nicht identisch wiederholen, sondern Umfang/Art anpassen.
 - "Ernährungsziel heute"/"Wettkampf-Verpflegungsplan" sind reiner Kontext (z.B. um zu wissen, ob gerade Carb-Loading oder eine Fettstoffwechsel-fokussierte Grundlagenphase läuft) - im JSON-Ergebnis nicht wiederholen, das Schema hat dafür kein Feld.
 - Nie einen exakten Trainingsload/TSS-Wert erfinden - nur "intensity": "leicht"|"mittel"|"hart" angeben, keine Zahl.
-- Bei "Kraft"/"Mobility": ein "exercises"-Array mit 3-6 konkreten Übungen (Name, Sätze, Wiederholungen, kurzer Hinweis) angeben - passend zu Triathlon (Rumpf-/Beinstabilität, Verletzungsprävention), ohne Annahmen über verfügbares Equipment (nur Körpergewicht/einfache Kurzhanteln annehmen).
+- Bei "Kraft": ein "exercises"-Array mit 3-6 konkreten Übungen (Name, Sätze, Wiederholungen, kurzer Hinweis) angeben - passend zu Triathlon (Rumpf-/Beinstabilität, Verletzungsprävention), ohne Annahmen über verfügbares Equipment (nur Körpergewicht/einfache Kurzhanteln annehmen).
+${mobilityPlanRule()}
 - Bei Schwimmen/Rad/Laufen: "description" MUSS enthalten (a) eine kurze konkrete Struktur mit Einrollen/Hauptteil/Auslaufen (z.B. "10min Einrollen, 6x400m zügig mit 90s Pause, 10min Auslaufen") UND (b) den passenden Ziel-Bereich aus den oben angegebenen Zonen (Herzfrequenz-Zonen/Pace-Zonen/Leistungszonen) für die gewählte Intensität - z.B. "Hauptteil im Bereich Z2 Grundlage (128-142 bpm bzw. 5:20-5:45/km)". Nutze dafür AUSSCHLIESSLICH die im Kontext oben schon berechneten Zonenwerte, erfinde selbst keine Zahlen. Sind für eine Sportart keine Zonen im Kontext angegeben (kein Schwellenwert im Profil hinterlegt), einfach nur "leicht/mittel/hart" ohne Zahlen nennen.
 - Bei Schwimmen/Rad/Laufen zusätzlich: falls unter "Zuletzt tatsächlich absolviert" oder in einer früheren Analyse erkennbar ist, dass ähnliche Einheiten dieser Sportart zuletzt zu hart/zu leicht gelaufen sind oder häufig übersprungen wurden, das kurz in der "description" berücksichtigen (z.B. "diesmal bewusst 5min kürzer, da die letzten beiden Tempoläufe übersprungen wurden").
 - Kein "exercises"-Feld bei Schwimmen/Rad/Laufen (nur bei Kraft/Mobility, s.o.).
@@ -123,7 +124,8 @@ ${modeInstruction}
 Regeln:
 - Sportart ausschließlich aus: ${sports.join(", ")}.
 - Nutze für den Zielbereich (Herzfrequenz/Pace/Leistung) AUSSCHLIESSLICH die oben angegebenen Zonenwerte, erfinde selbst keine Zahlen. Sind keine Zonen angegeben, nur "leicht/mittel/hart" ohne Zahlen nennen.
-- Bei Kraft/Mobility: "exercises"-Array mit 3-6 konkreten Übungen (Name, Sätze, Wiederholungen, kurzer Hinweis), sonst kein "exercises"-Feld.
+- Bei Kraft: "exercises"-Array mit 3-6 konkreten Übungen (Name, Sätze, Wiederholungen, kurzer Hinweis), sonst kein "exercises"-Feld.
+${mobilityPlanRule()}
 - Alle Textfelder als reiner Klartext ohne Markdown (kein **, kein #, keine Aufzählungszeichen).
 - Falls oben "Zusätzliche Wünsche des Athleten" angegeben sind, nach Möglichkeit berücksichtigen.
 - WICHTIG - Konsistenz: "sport" muss exakt zur tatsächlichen Aktivität in "title"/"description" passen (z.B. Zugseiltraining/Klimmzüge/Kniebeugen -> sport MUSS "Kraft" sein), und "duration_min" muss der in "description" genannten Gesamtdauer entsprechen, falls dort eine genannt wird.
@@ -233,4 +235,13 @@ Alle Texte als reiner Klartext ohne Markdown.
 
 Antworte AUSSCHLIESSLICH mit einem JSON-Objekt in genau dieser Form, keinerlei Text davor/danach:
 {"heute":{"empfehlung":"...","begruendung":"..."},"diese_woche":{"empfehlung":"...","begruendung":"..."},"naechste_woche":{"empfehlung":"...","begruendung":"..."}}`;
+}
+
+// Mobility im Trainingsplan: nur Übungen aus der Sammlung (mit Zeichnung),
+// passend zum Trainingsprofil - parsePlanResponse übernimmt nur gültige ids.
+function mobilityPlanRule() {
+  if (typeof allowedMobilityExercises !== "function") return "- Bei \"Mobility\": \"exercises\"-Array mit 4-8 Übungen (Name, Wiederholungen, kurzer Hinweis).";
+  const allowed = allowedMobilityExercises(trainingProfile(), mobilityPainfulIds(todayStr()));
+  const list = allowed.map(ex => `${ex.id} (${ex.name})`).join(", ");
+  return `- Bei "Mobility": "exercises"-Array mit 4-8 Übungen AUSSCHLIESSLICH aus dieser Liste, je Eintrag {"id": exakt die id, "name": Name, "seconds": Dauer je Seite 20-90, "reps": z.B. "40 s je Seite", "note": kurzer Tipp}. Erlaubt: ${list}. Dauer passend zum Mobility-Wunsch im Profil.`;
 }

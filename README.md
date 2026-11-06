@@ -137,7 +137,7 @@ belegt, Firewall, Passwort vergessen, KI antwortet nicht) steht in
 # Was mit deinen Daten passiert
 
 - **Alles bleibt auf deinem PC** (Datei `training.db`). Nach außen spricht
-  der Server nur mit: Ollama (KI, normalerweise auf demselben PC), Garmin
+  der Server nur mit: Claude bzw. Ollama (KI), Garmin
   (Sync und „An Garmin senden“, mit dem Zugangsschlüssel der jeweiligen
   Person), Open-Meteo (Wetter, nur der Ortsname bzw. die Koordinaten
   deines Heimatorts, falls du einen einstellst) und GitHub (einmal am Tag
@@ -152,9 +152,11 @@ belegt, Firewall, Passwort vergessen, KI antwortet nicht) steht in
 - `.env`, `training.db`, `backups/` und alle Trainingsdaten sind so
   eingerichtet, dass sie **nicht versehentlich ins Internet hochgeladen**
   werden (`.gitignore`) und der Server sie **nie ausliefert**.
-- Nutzt du den KI-Coach mit einem Anthropic-Schlüssel (optional), gehen
-  zusammengefasste Kennzahlen an diesen Dienst. Mit Ollama bleibt auch das
-  komplett lokal.
+- Nutzt du den KI-Coach mit Claude (optional), gehen zusammengefasste
+  Kennzahlen und dein Trainingsprofil an Anthropic. Der Claude-Schlüssel
+  liegt nur auf dem Dashboard-Server (`~/.triathlon/claude_api.json`, nur
+  für deinen Computer-Benutzer lesbar), nie im Browser. Mit Ollama bleibt
+  auch das komplett lokal.
 
 ---
 
@@ -167,7 +169,7 @@ belegt, Firewall, Passwort vergessen, KI antwortet nicht) steht in
 | Dashboard betreiben | Python 3 (aktuelle Version; `start.bat`/`start.sh` installieren den Rest) und ein Browser | **ja** |
 | Freunde / Handy | Tailscale (kostenlos) | optional |
 | Automatische Garmin-Synchronisierung, „An Garmin senden“ | Garmin-Konto und einmalig `python -m pip install -r requirements.txt` | optional |
-| KI-Coach | Ollama auf dem Dashboard-PC **oder** ein Anthropic-Schlüssel | optional |
+| KI-Coach | ein Claude-Schlüssel (Anthropic) **oder** Ollama auf dem Dashboard-PC | optional |
 
 ### KI-Coach einrichten (optional)
 
@@ -175,13 +177,19 @@ Der Coach-Bereich wertet einzelne Einheiten aus und erstellt Trainingspläne
 und Empfehlungen (heute / diese Woche / nächste Woche). Jeder KI-Plan wird
 zusätzlich vom Regelwerk des Dashboards geprüft (siehe unten).
 
-- **Lokal mit Ollama** (kostenlos, nichts verlässt den Rechner):
+- **Claude (empfohlen):** Schlüssel auf
+  [console.anthropic.com](https://console.anthropic.com/settings/keys)
+  erstellen und als Betreiber in den Einstellungen → **KI-Coach** eintragen.
+  Er liegt dann nur auf dem Dashboard-Server; alle deine Geräte nutzen ihn.
+  Mit „Für alle Personen freigeben“ dürfen auch deine Freunde Claude nutzen
+  (über dein Guthaben). Modell wählbar: Opus 5.5 (beste Qualität, Standard),
+  Sonnet 5.5 oder Haiku 5.5 (am günstigsten).
+- **Lokal mit Ollama** (kostenlos, nichts verlässt den Rechner), wenn kein
+  Claude eingerichtet ist:
   [ollama.com](https://ollama.com) auf dem Dashboard-PC installieren, dann
   `ollama pull llama3.1`. Die Freunde brauchen kein eigenes Ollama — ihr
   Browser fragt den Dashboard-Server, der fragt Ollama. Anderer Rechner:
   `OLLAMA_URL=http://…:11434` in `.env` eintragen.
-- **Anthropic-Schlüssel**: im Coach-Tab hinterlegbar (bleibt nur in diesem
-  Browser; „Abmelden“ löscht ihn).
 
 Ohne beides funktioniert alles andere normal — nur der Coach-Bereich bleibt leer.
 

@@ -74,7 +74,13 @@ heißt es meist `python3`. Alle Befehle im Projektordner ausführen.
   fragt nie nach einem Garmin-Passwort. Ohne Anmeldung zeigt der Knopf eine
   Meldung; der `.fit`-Download geht immer. Bitte einmal mit dem echten Konto
   ausprobieren – Garmin kann seine Schnittstelle jederzeit ändern.
-- **KI-Coach:** [Ollama](https://ollama.com/download) auf diesem PC installieren
+- **KI-Coach mit Claude (empfohlen):** Einstellungen → **KI-Coach** →
+  Claude-Schlüssel einfügen → „Schlüssel prüfen & speichern“. Das kann nur
+  der Betreiber. Der Schlüssel liegt danach nur auf diesem PC in
+  `~/.triathlon/claude_api.json` und geht nie an den Browser zurück. Mit
+  „Für alle Personen freigeben“ nutzen auch Freunde Claude – über dein
+  Guthaben. Ohne Claude antwortet Ollama (nächster Punkt).
+- **KI-Coach lokal:** [Ollama](https://ollama.com/download) auf diesem PC installieren
   und ein Modell laden (`ollama pull llama3.1`). Die Freunde brauchen kein
   eigenes Ollama – ihr Browser fragt den Dashboard-Server, der fragt Ollama.
   Läuft Ollama auf einem anderen Rechner: in `.env` die Zeile
@@ -501,7 +507,9 @@ starten** – sonst gibt es zwei getrennte Datenstände.
   bzw. Anmeldung; „Jetzt von Garmin holen“ in den Einstellungen geht
   weiterhin. Die alte Anmeldung (für „An Garmin senden“) auf dem Pi:
   `.venv/bin/python tools/garmin_sync.py --login --athlete <Nummer>`.
-- **KI (Ollama):** Für die Sprachmodelle ist der Pi zu schwach. Lass Ollama
+- **KI:** Am einfachsten mit **Claude** – Schlüssel in den Einstellungen →
+  KI-Coach eintragen, fertig; der Pi schickt die Anfragen direkt an Claude.
+- **Ollama statt Claude:** Für die Sprachmodelle ist der Pi zu schwach. Lass Ollama
   auf dem Mac/PC laufen und trage auf dem Pi in `.env` dessen Adresse ein,
   z. B. `OLLAMA_URL=http://192.168.1.20:11434`, dann
   `sudo systemctl restart triathlon-dashboard`. Ollama muss dafür im Netz

@@ -864,34 +864,6 @@ function initCoach() {
   });
   document.getElementById("coach-test-btn").addEventListener("click", testOllamaConnection);
 
-  // Claude API-Einstellungen (optional, siehe js/ai/claude.js) - derselbe
-  // Aufbau wie bei Ollama oben.
-  loadClaudeSettings();
-  const claudeKeyInput = document.getElementById("claude-api-key");
-  const claudeModelInput = document.getElementById("claude-model");
-  claudeKeyInput.value = claudeSettings.apiKey;
-  claudeModelInput.value = claudeSettings.model;
-  claudeKeyInput.addEventListener("change", () => {
-    claudeSettings.apiKey = claudeKeyInput.value.trim();
-    saveClaudeSettings();
-  });
-  claudeModelInput.addEventListener("change", () => {
-    claudeSettings.model = claudeModelInput.value.trim() || CLAUDE_DEFAULT_MODEL;
-    saveClaudeSettings();
-  });
-  document.getElementById("claude-test-btn").addEventListener("click", testClaudeConnection);
-
-  // Hybrid-Weiche: pro KI-Aufgabe Ollama oder Claude (siehe js/ai/provider.js).
-  loadHybridSettings();
-  document.querySelectorAll("#view-settings select[data-task]").forEach(sel => {
-    const task = sel.dataset.task;
-    sel.value = hybridSettings[task] || "ollama";
-    sel.addEventListener("change", () => {
-      hybridSettings[task] = sel.value;
-      saveHybridSettings();
-    });
-  });
-
   const profileFields = [
     ["profile-name", "name", v => v.trim() || null],
     ["profile-gender", "gender", v => v || null],

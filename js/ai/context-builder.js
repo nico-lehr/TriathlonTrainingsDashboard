@@ -274,6 +274,10 @@ function buildCompactContext(goal) {
     }
   }
 
+  // "Dein Trainingsprofil" (js/data/training-profile.js): Ziele, Beschwerden,
+  // Hilfsmittel, Mobility-Rückmeldungen - fließt in jede Empfehlung und Planung.
+  if (typeof trainingProfileContextLines === "function") trainingProfileContextLines().forEach(l => lines.push(l));
+
   return lines.join("\n");
 }
 

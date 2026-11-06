@@ -99,6 +99,7 @@ Claude-API-Key, Kartenreihenfolge).
 - `achievements.js` — Laden/Speichern der bereits freigeschalteten Erfolge (`achievementsState`) + Erfolgs-Schnappschuss (z. B. letzte bekannte Bestzeit je Distanz). Die eigentliche Erkennung/Freischaltung passiert in `js/analytics/achievements.js`, siehe `docs/DATA_MODEL.md`.
 
 ### `js/analytics/` — reine Berechnungen, kein UI
+- `mobility-plan.js` — stellt eine Mobility-Einheit aus der Sammlung zusammen (Regeln) bzw. baut den Claude-Auftrag samt JSON-Schema und prüft die Antwort; Umwandlung in/aus geplanten Einheiten.
 - `training-load.js` — CTL/ATL/TSB (PMC), ACWR-Zeitreihen, Trainingsmonotonie/-Strain nach Foster (1998, `computeMonotonyStrainSeries`) und der Monatsvergleich (`computeMonthComparison`, aktueller vs. vorheriger Kalendermonat).
 - `performance.js` — kompakte Bestzeiten-Zusammenfassung für den KI-Kontext, sowie die getrennte VO2max-Schätzung + Trend für Laufen und Rad (`computeVo2MaxEstimate`, primär per Pace/Watt-Puls-Regression) für die zwei Kennzahlen-Kacheln ganz oben im Überblick.
 - `workout-comparison.js` — findet vergleichbare frühere Einheiten (gleiche Sportart, Distanz/Dauer ±20%) für die KI-Auswertung je Einheit.
@@ -148,6 +149,11 @@ Bedarf schrittweise weiter aufgeteilt werden, sobald es sich lohnt.
 - `account.js` — „Konto“-Karte in den Einstellungen: angemeldeter Benutzer, Abmelden.
 - `update.js` — Hinweis „Neue Version verfügbar“ oben und Karte „Programm-Updates“ in den Einstellungen (nur für den Betreiber; Freunde sehen nur die Versionsnummer).
 - `garmin-settings.js` — „Garmin-Verbindung“-Karte in den Einstellungen: eigenen Personal-API-Schlüssel eintragen/entfernen, Ablaufwarnung, „Jetzt von Garmin holen“.
+- `ai-settings.js` — „KI-Coach“-Karte: Stand der Claude-Verbindung; Schlüssel, Modell und Freigabe nur für den Betreiber (Server: `backend/claude_api.py`). Ollama darunter aufklappbar.
+- `training-profile.js` — „Dein Trainingsprofil“: Ziele, Beschwerden, Ausschlüsse, Hilfsmittel, Mobility-Wunsch, Zusatzwünsche (Daten: `js/data/training-profile.js`).
+- `mobility.js` — Tab „Mobility“: Einheit für heute, Dauer/Schwerpunkt, Ablauf mit Austauschen, „Mit Claude persönlich anpassen“, Übungs-Sammlung, Anleitung (Bottom-Sheet), Verlauf.
+- `mobility-player.js` — Mitmach-Modus im Vollbild: Timer, Seitenwechsel, Ton/Ansage, Wake Lock, Rückmeldung am Ende.
+- `mobility-figure.js` — bewegte Strichfigur als SVG (Skelett mit festen Knochenlängen, Zwei-Knochen-IK, ein gemeinsamer Animationstakt).
 
 ### `js/app.js` — Einstiegspunkt
 Definiert `renderAll()` (ruft die Render-Funktionen aller Tabs auf) und
@@ -188,7 +194,8 @@ einmalig `backend/import_workouts_json.py`, siehe `docs/DEPLOYMENT.md`.
 | `auth.py` | Passwort-Hash, signierte Token (30 Tage), geheimer Kalender-Schlüssel, Bremse 5 Fehlversuche/Minute/IP. |
 | `routes.py` | Bestehende Endpunkte + `require_login()` (401 außer `/health`, `/auth/login`) + `/auth/login`, `/auth/me`. |
 | `dashboard_routes.py` | `/store`, `/workouts/full`, `/wellness/daily`, `/ical-link`. |
-| `ai_routes.py` | `/ai/chat`, `/ai/models` – Weiterleitung an Ollama. |
+| `ai_routes.py` | `/ai/chat`, `/ai/models` – Weiterleitung an Ollama; `/ai/claude` (Stand/Schlüssel, nur Betreiber ändert) und `/ai/claude/chat`. |
+| `claude_api.py` | Claude über das Anthropic-SDK: Schlüssel in `~/.triathlon/claude_api.json` (0600), Prüfen, Modelle, verständliche Fehler. |
 | `equipment_routes.py` | `/equipment…` – Material anlegen/ändern/löschen, Zuordnungen, einmaliger Import. |
 | `updater.py` | Programm-Updates: neueste GitHub-Release prüfen (einmal am Tag), Paket prüfen, sichern, installieren (ZIP oder `git`), Neustart anstoßen. Nutzerdaten sind geschützt. |
 | `update_routes.py` | `/update`, `/update/check`, `/update/install` – Details und Installieren nur für den Betreiber (`auth.is_admin`). |

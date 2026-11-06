@@ -446,7 +446,7 @@ function openPlanEdit(id, defaults) {
     <div class="onb-field" id="plan-edit-exercises-field" style="display:${isStrengthLike ? "" : "none"};">
       <label>Übungen</label>
       <div id="plan-edit-exercises">${(p.exercises || []).map((ex, i) => `
-        <div class="plan-exercise-row" data-idx="${i}">
+        <div class="plan-exercise-row" data-idx="${i}"${ex.id ? ` data-ex-id="${escapeHtml(ex.id)}" data-ex-seconds="${Number(ex.seconds) || ""}"` : ""}>
           <input type="text" class="coach-input plan-ex-name" value="${escapeHtml(ex.name || "")}" placeholder="Übung">
           <input type="text" class="coach-input plan-ex-sets" value="${escapeHtml(String(ex.sets ?? ""))}" placeholder="Sätze" style="max-width:70px;">
           <input type="text" class="coach-input plan-ex-reps" value="${escapeHtml(ex.reps || "")}" placeholder="Wdh." style="max-width:70px;">
@@ -454,6 +454,17 @@ function openPlanEdit(id, defaults) {
         </div>`).join("")}</div>
       <button type="button" class="chip" id="plan-ex-add">+ Übung</button>
     </div>`;
+  if (!host.dataset.mobBound) {
+    host.dataset.mobBound = "1";
+    host.addEventListener("click", e => {
+      const btn = e.target.closest(".plan-mob-start-btn");
+      if (!btn) return;
+      const pw = plannedWorkouts.find(x => x.id === btn.dataset.id);
+      if (!pw) return;
+      closePlanEdit();
+      startPlannedMobility(pw);
+    });
+  }
   let stepsCustom = !!(p.steps && validateWorkoutSteps(p.steps).steps);
   const stepsHtml = `
     <div class="onb-field" id="plan-edit-steps-field"${isStrengthLike ? " hidden" : ""}>
@@ -465,6 +476,7 @@ function openPlanEdit(id, defaults) {
   host.innerHTML = `
     <div class="onb-step">
       <h3>${isNew ? "Neue Einheit planen" : "Geplante Einheit bearbeiten"}</h3>
+      ${planMobilityStartHtml(p)}
       <div class="onb-row">
         <div class="onb-field"><label for="plan-edit-date">Datum</label><input type="date" id="plan-edit-date" class="coach-input" value="${p.date}"></div>
         <div class="onb-field"><label for="plan-edit-sport">Sportart</label>
@@ -675,12 +687,22 @@ function openPlanEdit(id, defaults) {
     // isStrengthLike - die kann sich per Sportart-Wechsel geändert haben (s.o.).
     const currentSport = document.getElementById("plan-edit-sport").value;
     const currentlyStrengthLike = currentSport === "Kraft" || currentSport === "Mobility";
-    const exercises = currentlyStrengthLike ? [...host.querySelectorAll(".plan-exercise-row")].map(row => ({
-      name: row.querySelector(".plan-ex-name").value.trim(),
-      sets: row.querySelector(".plan-ex-sets").value.trim() ? Number(row.querySelector(".plan-ex-sets").value.trim()) || null : null,
-      reps: row.querySelector(".plan-ex-reps").value.trim() || null,
-      note: null,
-    })).filter(ex => ex.name) : null;
+    const exercises = currentlyStrengthLike ? [...host.querySelectorAll(".plan-exercise-row")].map(row => {
+      const ex = {
+        name: row.querySelector(".plan-ex-name").value.trim(),
+        sets: row.querySelector(".plan-ex-sets").value.trim() ? Number(row.querySelector(".plan-ex-sets").value.trim()) || null : null,
+        reps: row.querySelector(".plan-ex-reps").value.trim() || null,
+        note: null,
+      };
+      // Übung aus der Mobility-Sammlung: id behalten, solange der Name passt
+      // (sonst ist es eine eigene Übung ohne Zeichnung).
+      const lib = row.dataset.exId && typeof MOBILITY_BY_ID !== "undefined" ? MOBILITY_BY_ID[row.dataset.exId] : null;
+      if (lib && lib.name === ex.name && currentSport === "Mobility") {
+        ex.id = lib.id;
+        ex.seconds = Number(row.dataset.exSeconds) || lib.seconds;
+      }
+      return ex;
+    }).filter(ex => ex.name) : null;
     let steps = null;
     if (stepsCustom && !currentlyStrengthLike) {
       const checked = checkEditedSteps(stepsHost.querySelector(".pe-steps-list"), currentSport);
@@ -813,26 +835,12 @@ function initPlanWishForm() {
   renderPlanWishList();
 }
 
-// "Erweiterte Einstellungen" (⚙ an der Trainingsplan-Kartenüberschrift) -
-// freie Zusatzwünsche für die KI-Trainingsplan-Erstellung, persistiert im
-// Athletenprofil (athleteProfile.customPlanWishes, siehe context-builder.js/
-// prompts.js). Einmalig verkabelt (statisches Markup in index.html, wie
-// initWorkoutColumnToggle für die Spaltenauswahl), nicht bei jedem Render.
+// "Erweiterte Einstellungen" (⚙ an der Trainingsplan-Kartenüberschrift):
+// die freien Wünsche stehen jetzt gesammelt im Trainingsprofil
+// (js/components/training-profile.js) - hier nur der Weg dorthin.
 function initTrainingPlanWishes() {
-  const textarea = document.getElementById("trainingplan-custom-wishes");
-  const saveBtn = document.getElementById("trainingplan-wishes-save-btn");
-  const status = document.getElementById("trainingplan-wishes-status");
-  if (!textarea || !saveBtn) return;
-  textarea.value = athleteProfile.customPlanWishes || "";
-  saveBtn.addEventListener("click", () => {
-    athleteProfile.customPlanWishes = textarea.value.trim();
-    saveAthleteProfile();
-    if (status) {
-      status.textContent = "✓ Gespeichert";
-      status.className = "coach-test-status ok";
-      setTimeout(() => { status.textContent = ""; status.className = "coach-test-status"; }, 2000);
-    }
-  });
+  const btn = document.getElementById("trainingplan-open-profile-btn");
+  if (btn) btn.addEventListener("click", () => openTrainingProfile());
 }
 
 function initPlanEditOverlay() {
@@ -840,4 +848,16 @@ function initPlanEditOverlay() {
   const overlay = document.getElementById("plan-edit-overlay");
   if (closeBtn) closeBtn.addEventListener("click", closePlanEdit);
   if (overlay) overlay.addEventListener("click", e => { if (e.target === overlay) closePlanEdit(); });
+}
+
+// Geplante Mobility-Einheit mit Übungen aus der Sammlung: Vorschau der
+// Zeichnungen + "Mitmachen" direkt im Bearbeiten-Fenster.
+function planMobilityStartHtml(p) {
+  if (!p || !p.id || p.sport !== "Mobility" || typeof MOBILITY_BY_ID === "undefined") return "";
+  const ex = (p.exercises || []).filter(x => x && MOBILITY_BY_ID[x.id]);
+  if (!ex.length) return "";
+  return `<div class="plan-mob-start">
+      <div class="plan-mob-start-text"><b>${ex.length} Übungen mit Anleitung</b><span>Zeichnung, Timer und Seitenwechsel – zum Mitmachen.</span></div>
+      <button type="button" class="mob-btn mob-btn-primary plan-mob-start-btn" data-id="${escapeHtml(p.id)}">Mitmachen</button>
+    </div>`;
 }
