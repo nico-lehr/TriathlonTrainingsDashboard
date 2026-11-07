@@ -8,7 +8,6 @@
 // Rekorde, Analyse, Einstellungen, Übersicht mit allen Karten).
 // Abschaltbar unter Einstellungen → Konto ("Neue Handy-Ansicht").
 
-const M_KEY = "triathlon_dashboard_m_graphit_v1";
 const M_QUERY = "(max-width: 700px)";
 const M_RANGES = [[7, "7 Tage"], [30, "30 Tage"], [90, "90 Tage"], [365, "1 Jahr"]];
 const M_SPORT = {
@@ -23,11 +22,12 @@ const M_SPORT_OTHER = { color: "var(--m-muted)", icon: '<circle cx="12" cy="12" 
 const mState = { anim: true, page: "heute", sub: "mobility", planId: null, range: 30, calMonth: null, calWeek: null, classic: null, busy: false,
   coachText: "", coachNote: null };  // coachNote: { loading, reply, hints, error, undo }
 
+// Seit 2.4.30 gibt es nur noch Graphit (die klassische Ansicht liegt im
+// Branch archiv/klassische-ansicht). Ein früher gespeichertes "off" zählt nicht mehr.
 function mEnabled() {
-  try { return localStorage.getItem(M_KEY) !== "off"; } catch (e) { return true; }
+  return true;
 }
-// Graphit gilt seit 2.4.25 auf allen Bildschirmen (am Computer mehrspaltig,
-// siehe css/m-graphit.css); abschaltbar je Gerät in den Einstellungen.
+// Graphit gilt auf allen Bildschirmen (am Computer mehrspaltig, siehe css/m-graphit.css).
 function mActive() {
   return mEnabled();
 }
@@ -547,8 +547,7 @@ function mRenderMehr() {
   const rows = [["nutrition", "Ernährung"], ["records", "Rekorde"], ["analysis", "Analyse", true], ["overview", "Insights", true], ["settings", "Einstellungen"]];
   return mHeaderHtml("Weitere Bereiche", "Mehr")
     + mCols(`<section class="m-card m-navlist">${rows.map(([v, l, side]) => `<button type="button" class="m-nav-row${side ? " m-side-hide" : ""}" data-m-classic="${v}"><span>${l}</span><i>›</i></button>`).join("")}</section>`,
-      `<section class="m-card m-navlist"><button type="button" class="m-nav-row" data-m-act="profile"><span>Dein Trainingsprofil</span><i>›</i></button>
-        <button type="button" class="m-nav-row" data-m-act="m-off"><span>Klassische Ansicht verwenden</span><i>›</i></button></section>`
+      `<section class="m-card m-navlist"><button type="button" class="m-nav-row" data-m-act="profile"><span>Dein Trainingsprofil</span><i>›</i></button></section>`
       + (typeof mAdmin !== "undefined" && mAdmin.isAdmin ? `<section class="m-card m-navlist"><button type="button" class="m-nav-row" data-m-page="admin"><span>Admin · Statistik</span><i>›</i></button></section>` : ""));
 }
 
@@ -676,7 +675,7 @@ function mBack() {
 // Welche Knöpfe in der Admin-Statistik als "Funktion benutzt" zählen.
 const M_TRACK_ACTS = { "coach-note": "coach-note", "coach-undo": "coach-undo", outlook: "outlook", "start-mob": "mob-start", "start-mob-now": "mob-start",
   "start-strength": "strength-start", "start-strength-now": "strength-start", "mob-claude": "mob-claude", "plan-new": "plan-new", plan: "plan-open",
-  workout: "workout-open", "m-off": "classic-view" };
+  workout: "workout-open" };
 
 async function mAction(btn) {
   const act = btn.dataset.mAct;
@@ -762,12 +761,6 @@ async function mAction(btn) {
       mState.classic = "settings"; openSettingsView(); renderMApp(); openSettingsPanel("garmin");
     }
     renderMApp();
-  }
-  else if (act === "m-off") {
-    try { localStorage.setItem(M_KEY, "off"); } catch (e) { /* nur Komfort */ }
-    mState.classic = null;
-    renderMApp();
-    syncMSwitch();
   }
 }
 
@@ -980,11 +973,6 @@ function mPlanSheet(id) {
   });
 }
 
-function syncMSwitch() {
-  const sw = document.getElementById("m-graphit-switch");
-  if (sw) sw.checked = mEnabled();
-}
-
 function initMApp() {
   const host = document.createElement("div");
   host.id = "m-app";
@@ -1032,15 +1020,6 @@ function initMApp() {
   host.addEventListener("keydown", e => {
     if ((e.key === "Enter" || e.key === " ") && e.target.matches("[role=button][data-m-page]")) { e.preventDefault(); mShow(e.target.dataset.mPage); }
   });
-
-  // Schalter in den Einstellungen (Konto)
-  const sw = document.getElementById("m-graphit-switch");
-  if (sw) sw.addEventListener("change", () => {
-    try { localStorage.setItem(M_KEY, sw.checked ? "on" : "off"); } catch (e) { /* nur Komfort */ }
-    mState.classic = sw.checked ? "settings" : null;
-    renderMApp();
-  });
-  syncMSwitch();
 
   // Neu zeichnen, wenn sich Daten ändern.
   const wrap = name => {

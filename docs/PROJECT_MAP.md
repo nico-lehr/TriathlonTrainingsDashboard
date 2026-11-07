@@ -160,7 +160,7 @@ Bedarf schrittweise weiter aufgeteilt werden, sobald es sich lohnt.
 - `mobility.js` — Tab „Mobility“: Einheit für heute, Dauer/Schwerpunkt, Ablauf mit Austauschen, „Mit Claude persönlich anpassen“, Übungs-Sammlung, Anleitung (Bottom-Sheet), Verlauf.
 - `mobility-player.js` — Mitmach-Modus im Vollbild: Timer, Seitenwechsel, Ton/Ansage, Wake Lock, Rückmeldung am Ende.
 - `mobility-figure.js` — bewegte Strichfigur als SVG (Skelett mit festen Knochenlängen, Zwei-Knochen-IK, ein gemeinsamer Animationstakt).
-- `m-app.js` — Handy-Ansicht „Graphit“ (bis 700 px, abschaltbar unter Einstellungen → Konto): Übersicht (Erholung/Woche/Schlaf-Ringe, Heute, Woche, Form, Ziel), Kalender, Coach, Training (Mobility | Kraft), Mehr (öffnet die bisherigen Seiten). Stil: `css/m-graphit.css`.
+- `m-app.js` — Die Oberfläche „Graphit“ (seit 2.4.30 die einzige, auf allen Bildschirmen; die alte klassische Ansicht ist im Branch `archiv/klassische-ansicht` archiviert – die klassischen Seiten dienen nur noch als Unterseiten, z. B. Analyse, Insights, Einstellungen): Übersicht (Erholung/Woche/Schlaf-Ringe, Heute, Woche, Form, Ziel), Kalender, Coach, Training (Mobility | Kraft), Mehr (öffnet die bisherigen Seiten). Stil: `css/m-graphit.css`.
 - `settings-hub.js` — Einstellungen als Liste (Profil, Training & Planung, Garmin, KI-Coach, Kalender-Abo, Wetter, Equipment, App); ein Tipp zeigt nur den Bereich (Karten mit `data-sp` in index.html). `openSettingsPanel(id)` für Direkt-Sprünge.
 - `m-admin.js` — Nutzungszähler `mTrack()` (nur feste Namen, gesammelt an `/usage`) und die Seite „Admin · Statistik“ unter Mehr (nur Betreiber, `/admin/stats`): nur Zahlen je Person, keine Inhalte.
 

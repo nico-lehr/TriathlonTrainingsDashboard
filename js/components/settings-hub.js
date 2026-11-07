@@ -14,7 +14,6 @@ const SH_ICONS = {
   kalender: ["#f08a5d", '<rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/>'],
   wetter: ["#f2c14e", '<circle cx="12" cy="12" r="3.8"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M5.6 18.4l1.6-1.6M16.8 7.2l1.6-1.6"/>'],
   equipment: ["#c9a0ff", '<path d="M4 15.5c3 0 4-1.5 5.5-4l1.5 1.5c1.5-.5 3-.5 4.5.5L20 16v2.5H4z"/>'],
-  darstellung: ["#8d929a", '<rect x="4" y="5" width="16" height="11" rx="2"/><path d="M9 19.5h6M12 16v3.5"/>'],
   updates: ["#6f9cf0", '<path d="M12 4v10M7.5 10 12 14.5 16.5 10M5 19.5h14"/>'],
   einladen: ["#f2705e", '<circle cx="9.5" cy="9" r="3"/><path d="M4 18.5c.9-2.7 3-4 5.5-4s4.6 1.3 5.5 4M17.5 8v6M14.5 11h6"/>'],
   statistik: ["#4fd18b", '<path d="M5 19.5V12M10 19.5V7M15 19.5v-5M20 19.5V4.5"/>'],
@@ -92,7 +91,6 @@ function renderSettingsHub() {
   const p = typeof athleteProfile !== "undefined" ? athleteProfile : {};
   const user = (document.getElementById("account-username") || {}).textContent || "";
   const name = p.name || user || "Du";
-  const graphitOn = typeof mEnabled === "function" ? mEnabled() : false;
   const isAdmin = typeof mAdmin !== "undefined" && mAdmin.isAdmin;
   const invite = document.getElementById("invite-card");
   hub.innerHTML = `
@@ -111,11 +109,6 @@ function renderSettingsHub() {
       ${shRow("kalender", "Kalender & Wetter")}
     </div></div>
     <div class="sh-group"><h3>App</h3><div class="sh-list">
-      <label class="sh-row sh-switch-row">
-        <span class="sh-ic" style="--c:${SH_ICONS.darstellung[0]}"><svg viewBox="0 0 24 24" aria-hidden="true">${SH_ICONS.darstellung[1]}</svg></span>
-        <span class="sh-label">Neue Ansicht „Graphit“</span>
-        <input type="checkbox" class="switch" id="sh-graphit" role="switch" ${graphitOn ? "checked" : ""}>
-      </label>
       ${shRow("updates", "Programm-Updates")}
       ${invite && !invite.hidden ? shRow("einladen", "Freunde einladen") : ""}
       ${isAdmin && typeof mShow === "function" ? shRow("statistik", "Admin · Statistik") : ""}
@@ -172,11 +165,6 @@ function initSettingsHub() {
     const row = e.target.closest("[data-sh-open]");
     if (row) { openSettingsPanel(row.dataset.shOpen); return; }
     if (e.target.closest("#sh-logout")) { if (typeof logout === "function") logout(); }
-  });
-  hub.addEventListener("change", e => {
-    if (e.target.id !== "sh-graphit") return;
-    const orig = document.getElementById("m-graphit-switch");
-    if (orig) { orig.checked = e.target.checked; orig.dispatchEvent(new Event("change", { bubbles: true })); }
   });
   document.getElementById("settings-panel-back").addEventListener("click", settingsPanelBack);
   // Stand rechts aktuell halten (Garmin-Status kommt erst nach dem Laden).
