@@ -20,7 +20,7 @@ const M_SPORT = {
 };
 const M_SPORT_OTHER = { color: "var(--m-muted)", icon: '<circle cx="12" cy="12" r="7"/>' };
 
-const mState = { page: "heute", sub: "mobility", planId: null, range: 30, calMonth: null, calWeek: null, classic: null, busy: false,
+const mState = { anim: true, page: "heute", sub: "mobility", planId: null, range: 30, calMonth: null, calWeek: null, classic: null, busy: false,
   coachText: "", coachNote: null };  // coachNote: { loading, reply, hints, error, undo }
 
 function mEnabled() {
@@ -51,7 +51,7 @@ function mRing(p, color, big, small, extraCls = "") {
   const C = 2 * Math.PI * 42;
   const pct = Math.max(0, Math.min(1, p || 0));
   return `<div class="m-ring ${extraCls}"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="m-ring-track" cx="50" cy="50" r="42"/>`
-    + `<circle class="m-ring-val" cx="50" cy="50" r="42" stroke="${color}" style="color:${color};stroke-dasharray:${C};stroke-dashoffset:${C * (1 - pct)}"/></svg>`
+    + `<circle class="m-ring-val" cx="50" cy="50" r="42" stroke="${color}" style="color:${color};--c:${C};stroke-dasharray:${C};stroke-dashoffset:${C * (1 - pct)}"/></svg>`
     + `<div class="m-ring-txt"><b>${big}</b><small>${small}</small></div></div>`;
 }
 
@@ -599,6 +599,7 @@ function renderMApp() {
     b.classList.toggle("on", on);
     if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
   });
+  mMoveTabIndicator();
   if (mState.classic) return;
   const body = document.getElementById("m-body");
   const html = { heute: mRenderHeute, kalender: mRenderKalender, coach: mRenderCoach, training: mRenderTraining, mehr: mRenderMehr }[mState.page]();
@@ -607,9 +608,39 @@ function renderMApp() {
   body.innerHTML = html;
   if (sel) { const ta = document.getElementById("m-coach-note"); if (ta && !ta.disabled) { ta.focus(); ta.setSelectionRange(sel[0], sel[1]); } }
   mFillFigures(body);
+  if (mState.anim) { mState.anim = false; mPlayEnter(body); }
+}
+
+// Kleine Animationen beim Wechsel des Bereichs: Karten gleiten nacheinander
+// herein, Ringe und Balken füllen sich. Nur beim Wechsel, nicht bei jedem
+// Neuzeichnen (z. B. nach einem Tipp im Befinden).
+let mEnterTimer = null;
+function mPlayEnter(body) {
+  body.classList.remove("m-anim");
+  void body.offsetWidth; // Animation neu starten
+  let i = 0;
+  body.querySelectorAll(".m-top, .m-subseg, .m-card, .m-more").forEach(el => { el.style.animationDelay = `${Math.min(i++, 8) * 40}ms`; });
+  body.classList.add("m-anim");
+  clearTimeout(mEnterTimer);
+  mEnterTimer = setTimeout(() => body.classList.remove("m-anim"), 1400);
+}
+
+// Markierung des aktiven Bereichs gleitet zum gewählten Knopf (oben bzw. in der Seitenleiste).
+function mMoveTabIndicator() {
+  const nav = document.getElementById("m-tabs");
+  const ind = document.getElementById("m-tab-ind");
+  if (!nav || !ind) return;
+  const on = nav.querySelector("button.on");
+  if (!on || !on.offsetWidth) { ind.style.opacity = "0"; return; }
+  ind.style.opacity = "1";
+  ind.style.width = `${on.offsetWidth}px`;
+  ind.style.height = `${on.offsetHeight}px`;
+  ind.style.transform = `translate(${on.offsetLeft}px, ${on.offsetTop}px)`;
+  if (!nav.classList.contains("ind-ready")) requestAnimationFrame(() => nav.classList.add("ind-ready"));
 }
 
 function mShow(page) {
+  if (page !== mState.page) mState.anim = true;
   mState.page = page;
   mState.classic = null;
   renderMApp();
@@ -632,6 +663,7 @@ function mOpenClassic(view, scrollTo) {
 
 function mBack() {
   mState.classic = null;
+  mState.anim = true;
   activateView("overview");
   renderMApp();
   window.scrollTo({ top: 0 });
@@ -941,6 +973,7 @@ function initMApp() {
   host.hidden = true;
   host.innerHTML = `
     <nav class="m-tabs" id="m-tabs" aria-label="Bereiche">
+      <span class="m-tab-ind" id="m-tab-ind" aria-hidden="true"></span>
       <div class="m-brand" aria-hidden="true"><span class="m-brand-dots"><i></i><i></i><i></i></span>Triathlon<small>Trainings-Dashboard</small></div>
       <button type="button" data-m-page="heute"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z"/></svg>Übersicht</button>
       <button type="button" data-m-page="kalender"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></svg>Kalender</button>
@@ -960,7 +993,7 @@ function initMApp() {
     const tab = e.target.closest("[data-m-page]");
     if (tab) { mShow(tab.dataset.mPage); return; }
     const sub = e.target.closest("[data-m-sub]");
-    if (sub) { mState.sub = sub.dataset.mSub; mState.planId = null; renderMApp(); return; }
+    if (sub) { if (mState.sub !== sub.dataset.mSub) mState.anim = true; mState.sub = sub.dataset.mSub; mState.planId = null; renderMApp(); return; }
     const classic = e.target.closest("[data-m-classic]");
     if (classic) { mOpenClassic(classic.dataset.mClassic, classic.dataset.mScroll); return; }
     const seg = e.target.closest("[data-m-check] button");
@@ -998,5 +1031,7 @@ function initMApp() {
   ["savePlannedWorkouts", "saveMobilityState", "saveStrengthState", "renderAll", "renderOutlook"].forEach(wrap);
   if (typeof onGarminState === "function") onGarminState(() => mScheduleRender());
   if (window.matchMedia) window.matchMedia(M_QUERY).addEventListener("change", () => renderMApp());
+  window.addEventListener("resize", () => mMoveTabIndicator());
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => mMoveTabIndicator());
   renderMApp();
 }
