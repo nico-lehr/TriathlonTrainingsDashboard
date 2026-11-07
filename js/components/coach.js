@@ -921,10 +921,25 @@ function initCoach() {
   profileFields.forEach(([id, key, parse]) => {
     const input = document.getElementById(id);
     if (athleteProfile[key] != null) input.value = athleteProfile[key];
-    input.addEventListener("change", () => {
-      athleteProfile[key] = parse(input.value);
+    const commit = () => {
+      const value = parse(input.value);
+      if (athleteProfile[key] === value) return;
+      athleteProfile[key] = value;
+      // Selbst eingetragen = eigener Wert: der tägliche Garmin-Abgleich
+      // überschreibt ihn nicht mehr (zurück mit "↺ Garmin").
+      if (typeof GARMIN_IMPORT_FIELDS !== "undefined" && GARMIN_IMPORT_FIELDS.some(([k]) => k === key)) {
+        const gv = (athleteProfile.garminValues || {})[key];
+        const over = new Set(athleteProfile.garminOverrides || []);
+        if (gv == null || String(gv) !== String(value)) over.add(key); else over.delete(key);
+        athleteProfile.garminOverrides = [...over];
+      }
       saveAthleteProfile();
-    });
+    };
+    // Schon beim Tippen speichern (kurz verzögert) - nicht erst beim Verlassen
+    // des Felds: Am Handy wird die App oft direkt weggewischt.
+    let typingTimer = null;
+    input.addEventListener("input", () => { clearTimeout(typingTimer); typingTimer = setTimeout(commit, 700); });
+    input.addEventListener("change", () => { clearTimeout(typingTimer); commit(); });
   });
   [["profile-include-strength", "includeStrength"], ["profile-include-mobility", "includeMobility"]].forEach(([id, key]) => {
     const input = document.getElementById(id);

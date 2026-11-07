@@ -61,3 +61,47 @@ class StoreRaceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StoreConflictTest(unittest.TestCase):
+    """Zwei Geraete: Das Handy kennt noch einen alten Stand und darf den neueren
+    vom Computer nicht still ueberschreiben (Feld "base")."""
+
+    @classmethod
+    def setUpClass(cls):
+        StoreRaceTest.setUpClass.__func__(cls)
+
+    @classmethod
+    def tearDownClass(cls):
+        StoreRaceTest.tearDownClass.__func__(cls)
+
+    def setUp(self):
+        session = self.session_factory()
+        name = f"konflikt-{id(self)}"
+        auth.create_login(session, name, PASSWORD)
+        session.close()
+        token = self.app.test_client().post("/api/v1/auth/login", json={"username": name, "password": PASSWORD}).get_json()["data"]["token"]
+        self.h = {"Authorization": f"Bearer {token}"}
+        self.c = self.app.test_client()
+
+    def put(self, body):
+        return self.c.put("/api/v1/store/triathlon_dashboard_athlete_profile_v1", json=body, headers=self.h)
+
+    def test_ohne_base_wie_bisher(self):
+        self.assertEqual(self.put({"value": {"a": 1}}).status_code, 200)
+        self.assertEqual(self.put({"value": {"a": 2}}).status_code, 200)
+
+    def test_passender_base_wird_gespeichert(self):
+        self.assertEqual(self.put({"value": {"ftp": 250}, "base": None}).status_code, 200)  # neu
+        self.assertEqual(self.put({"value": {"ftp": 260}, "base": {"ftp": 250}}).status_code, 200)
+        self.assertEqual(self.put({"value": {"ftp": 260.0, "x": 1}, "base": {"ftp": 260.0}}).status_code, 200)  # 260 == 260.0
+
+    def test_veralteter_base_gibt_409_mit_aktuellem_wert(self):
+        self.put({"value": {"ftp": 250, "gewicht": 72}})
+        r = self.put({"value": {"ftp": 230}, "base": {"ftp": 200}})
+        self.assertEqual(r.status_code, 409)
+        body = r.get_json()
+        self.assertEqual(body["code"], "store_conflict")
+        self.assertEqual(body["current"], {"ftp": 250, "gewicht": 72})
+        got = self.c.get("/api/v1/store", headers=self.h).get_json()["data"]["triathlon_dashboard_athlete_profile_v1"]
+        self.assertEqual(got, {"ftp": 250, "gewicht": 72})  # nichts ueberschrieben

@@ -8,9 +8,10 @@ Die bestehenden Endpunkte in routes.py bleiben unveraendert.
 import gzip
 import json
 import re
+import threading
 from datetime import datetime
 
-from flask import Response, request
+from flask import Response, jsonify, request
 from sqlalchemy.exc import IntegrityError
 
 from . import get_current_athlete_id
@@ -19,6 +20,9 @@ from .models import AthleteStore, Wellness, Workout
 from .routes import api_bp, get_session, response_error, response_success
 
 STORE_KEY_RE = re.compile(r"^[a-z0-9_]{1,64}$")
+# Pruefen ("hat der Server noch den Stand des Browsers?") und Schreiben am Stueck,
+# sonst koennten zwei gleichzeitige Anfragen beide die Pruefung bestehen.
+_store_write_lock = threading.Lock()
 
 
 def json_response(payload):
@@ -49,13 +53,25 @@ def get_store():
 
 @api_bp.route("/store/<key>", methods=["PUT"])
 def put_store(key):
-    """PUT /api/v1/store/<key> - {value: ...} speichern (ersetzt den alten Wert)."""
+    """PUT /api/v1/store/<key> - {value: ...} speichern (ersetzt den alten Wert).
+
+    Mit {"base": ...} (der Stand, den der Browser zuletzt vom Server kannte)
+    wird nur gespeichert, wenn der Server noch genau diesen Stand hat. Sonst
+    409 "store_conflict" samt aktuellem Wert: Der Browser fuehrt dann beide
+    Aenderungen zusammen (js/data/api-client.js: storeMerge3) und speichert
+    erneut - so ueberschreibt ein lange offenes Handy nicht still, was am
+    Computer eingetragen wurde. Ohne "base" (aeltere Browser) wie bisher."""
     if not STORE_KEY_RE.match(key):
         return response_error("Ungueltiger Schluessel", "invalid_key", 400)
     data = request.get_json(silent=True)
     if not isinstance(data, dict) or "value" not in data:
         return response_error("'value' fehlt", "VALIDATION_ERROR", 400)
 
+    with _store_write_lock:
+        return _put_store_locked(key, data)
+
+
+def _put_store_locked(key, data):
     session = get_session()
     try:
         athlete_id = get_current_athlete_id()
@@ -64,6 +80,11 @@ def put_store(key):
         # und es wird einfach sie aktualisiert.
         for attempt in range(2):
             row = session.query(AthleteStore).filter_by(athlete_id=athlete_id, key=key).first()
+            if "base" in data:
+                current = row.value if row is not None else None
+                if current != data["base"]:
+                    return jsonify({"error": "Auf einem anderen Gerät wurde das inzwischen geändert.", "code": "store_conflict",
+                                    "status": 409, "current": current}), 409
             if row is None:
                 row = AthleteStore(athlete_id=athlete_id, key=key)
                 session.add(row)

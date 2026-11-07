@@ -75,7 +75,13 @@ async function apiCall(endpoint, method = "GET", body = null, { timeoutMs = 2000
     throw new Error("Nicht angemeldet");
   }
   const json = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(json.error || `HTTP ${response.status}`);
+  if (!response.ok) {
+    const err = new Error(json.error || `HTTP ${response.status}`);
+    err.status = response.status;
+    err.code = json.code;
+    err.body = json;
+    throw err;
+  }
   return json;
 }
 
@@ -88,7 +94,11 @@ function requireLogin() {
 
 // Abmelden: alles Persoenliche aus diesem Browser entfernen (Token, KI-Schluessel,
 // Einstellungen) - nur das gewaehlte Hell/Dunkel-Design bleibt.
-function logout() {
+async function logout() {
+  // Noch Unterwegs-Gebliebenes vorher abschicken (hoechstens 3 Sekunden warten).
+  retryFailedStore();
+  const until = Date.now() + 3000;
+  while ((storeSending.size || storeDirty.size) && Date.now() < until) await new Promise(r => setTimeout(r, 100));
   let theme = null;
   try {
     theme = localStorage.getItem("triathlon_dashboard_theme_v1");
@@ -122,6 +132,7 @@ function showApiError(message) {
    ---------------------------------------------------------------------- */
 
 let userStore = {};
+let storeBase = {};             // letzter bekannter Server-Stand je Schluessel (fuer "base", siehe unten)
 const storeSending = new Set(); // Schluessel, die gerade zum Server unterwegs sind
 const storeDirty = new Set();   // Schluessel mit noch nicht gesendeter Aenderung
 const storeFailed = new Set();  // Schluessel, deren letztes Speichern scheiterte (der Browser hat den neueren Stand)
@@ -130,14 +141,96 @@ let storeLoaded = false;
 let storeStale = false;         // auf einem anderen Geraet wurde inzwischen etwas geaendert
 let storeCheckedAt = 0;
 let storeChangeCount = 0;       // zaehlt eigene Aenderungen (siehe checkStoreStale)
+let storeOwner = null;          // athlete_id - der Zwischenspeicher gilt nur fuer diese Person
+let storeMerged = false;        // mit Aenderungen eines anderen Geraets zusammengefuehrt -> neu laden
+let storeRetryTimer = null;
+let storeRetryDelay = 0;
+const storeReadKeys = new Set(); // Schluessel, die seit dem Laden gelesen wurden (storeGet)
+
+const deepCopy = v => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
+const sameJson = (a, b) => stableJson(a === undefined ? null : a) === stableJson(b === undefined ? null : b);
+
+/* Zwischenspeicher im Geraet ("Ausgang"): Jede Aenderung liegt hier, bis der
+   Server sie bestaetigt. Faellt das Netz weg, wird die App geschlossen oder
+   stuerzt der Browser ab, geht sie nicht verloren - beim naechsten Oeffnen
+   wird sie nachgeschickt (loadUserStore). */
+const STORE_OUTBOX_KEY = "triathlon_dashboard_outbox_v1";
+
+function readOutbox() {
+  try {
+    const box = JSON.parse(localStorage.getItem(STORE_OUTBOX_KEY) || "null");
+    return box && typeof box === "object" && box.items ? box : null;
+  } catch (e) { return null; }
+}
+
+function writeOutbox(mutate) {
+  try {
+    const box = readOutbox();
+    const items = box && box.owner === storeOwner ? box.items : {};
+    mutate(items);
+    if (Object.keys(items).length) localStorage.setItem(STORE_OUTBOX_KEY, JSON.stringify({ owner: storeOwner, items }));
+    else localStorage.removeItem(STORE_OUTBOX_KEY);
+  } catch (e) { /* voller Speicher: dann eben ohne Zwischenspeicher */ }
+}
+
+/* Drei-Wege-Zusammenfuehrung: base = Stand, von dem dieses Geraet ausging,
+   mine = eigener Stand, theirs = jetziger Server-Stand (anderes Geraet).
+   Was nur eine Seite geaendert hat, wird uebernommen; Objekte Feld fuer Feld,
+   Listen mit "id" Eintrag fuer Eintrag. Haben beide dasselbe Feld geaendert,
+   gewinnt die eigene (neueste) Eingabe. */
+function storeMerge3(base, mine, theirs) {
+  if (sameJson(mine, base)) return deepCopy(theirs);
+  if (sameJson(theirs, base) || sameJson(mine, theirs)) return deepCopy(mine);
+  const isObj = v => v && typeof v === "object" && !Array.isArray(v);
+  if (isObj(mine) && isObj(theirs)) {
+    const b = isObj(base) ? base : {};
+    const out = {};
+    new Set([...Object.keys(mine), ...Object.keys(theirs), ...Object.keys(b)]).forEach(k => {
+      const v = storeMerge3(b[k], mine[k], theirs[k]);
+      if (v !== undefined) out[k] = v;
+    });
+    return out;
+  }
+  // Listen: Eintraege ueber "id" zuordnen - oder ueber "date", wenn jeder Tag
+  // nur einmal vorkommt (z. B. Gewichtsverlauf).
+  const lists = [mine, theirs, ...(base == null ? [] : [base])];
+  const keyField = ["id", "date"].find(f => lists.every(l => Array.isArray(l) && l.every(x => isObj(x) && x[f] != null)
+    && new Set(l.map(x => String(x[f]))).size === l.length));
+  if (keyField) {
+    const byId = list => new Map((list || []).map(x => [String(x[keyField]), x]));
+    const b = byId(base), m = byId(mine), t = byId(theirs);
+    const order = [...theirs.map(x => String(x[keyField])), ...mine.map(x => String(x[keyField])).filter(id => !t.has(id))];
+    return order.map(id => storeMerge3(b.get(id), m.get(id), t.get(id))).filter(v => v !== undefined);
+  }
+  return deepCopy(mine);
+}
 
 async function loadUserStore() {
-  userStore = (await apiCall("store")).data || {};
+  const [store, me] = await Promise.all([apiCall("store"), apiCall("auth/me").catch(() => null)]);
+  userStore = store.data || {};
+  storeBase = deepCopy(userStore);
+  storeOwner = me && me.data ? (me.data.username || me.data.id || null) : null;
+  storeReadKeys.clear();
   storeLoaded = true;
+  // Nicht angekommene Aenderungen vom letzten Mal nachschicken.
+  const box = readOutbox();
+  if (box && storeOwner != null && box.owner === storeOwner) {
+    Object.entries(box.items).forEach(([key, item]) => {
+      const merged = storeMerge3(item.base, item.value, userStore[key]);
+      if (sameJson(merged, userStore[key])) return;
+      userStore[key] = merged;
+      storeDirty.add(key);
+    });
+    writeOutbox(items => Object.keys(items).forEach(k => { if (!storeDirty.has(k)) delete items[k]; }));
+    [...storeDirty].forEach(key => { writeOutbox(items => { items[key] = { value: userStore[key], base: storeBase[key] ?? null }; }); sendStoreKey(key); });
+  } else if (box && storeOwner != null) {
+    try { localStorage.removeItem(STORE_OUTBOX_KEY); } catch (e) { /* ignorieren */ }
+  }
 }
 
 // Kopie statt Referenz - verhaelt sich wie frueher JSON.parse(localStorage...).
 function storeGet(key) {
+  storeReadKeys.add(key);
   return key in userStore ? JSON.parse(JSON.stringify(userStore[key])) : null;
 }
 
@@ -145,30 +238,117 @@ function storeGet(key) {
 // wie der Ablage-Eintrag, und eine noch nicht gespeicherte Aenderung (etwa ein
 // Lade-Merker der KI) saehe beim Vergleich wie eine Aenderung von aussen aus.
 function storeSet(key, value) {
-  userStore[key] = value === undefined ? null : JSON.parse(JSON.stringify(value));
+  let next = value === undefined ? null : JSON.parse(JSON.stringify(value));
+  // Schutz: Wird ein Bereich gespeichert, den der Code seit dem Laden nie
+  // gelesen hat, kennt er den gespeicherten Stand nicht (z. B. leeres
+  // Standard-Profil beim Start). Dann nicht ersetzen, sondern ergaenzen:
+  // Vorhandenes bleibt, nur die neuen Angaben kommen dazu.
+  if (storeLoaded && !storeReadKeys.has(key) && userStore[key] != null) {
+    const empty = Array.isArray(next) ? [] : {};
+    next = storeMerge3(empty, next, userStore[key]);
+    if (typeof console !== "undefined") console.warn(`Ablage: "${key}" vor dem Laden gespeichert - ergänzt statt ersetzt.`);
+  }
+  storeReadKeys.add(key);
+  userStore[key] = next;
   storeChangeCount++;
   storeDirty.add(key);
+  writeOutbox(items => { items[key] = { value: userStore[key], base: storeBase[key] ?? null }; });
   if (!storeSending.has(key)) sendStoreKey(key);
 }
 
 // Sendet nacheinander; mehrere schnelle Aenderungen desselben Schluessels
-// werden zu einer Anfrage mit dem neuesten Stand zusammengefasst.
+// werden zu einer Anfrage mit dem neuesten Stand zusammengefasst. "base" ist
+// der Server-Stand, von dem dieses Geraet ausging - hat ein anderes Geraet
+// inzwischen etwas geaendert, antwortet der Server mit 409 und dem neuen
+// Stand, und beide Aenderungen werden zusammengefuehrt statt ueberschrieben.
 async function sendStoreKey(key) {
   storeSending.add(key);
+  let conflicts = 0;
   while (storeDirty.has(key)) {
     storeDirty.delete(key);
+    const value = userStore[key];
     try {
-      await apiCall(`store/${key}`, "PUT", { value: userStore[key] });
+      await apiCall(`store/${key}`, "PUT", { value, base: storeBase[key] ?? null });
+      storeBase[key] = deepCopy(value);
       storeFailed.delete(key);
+      if (!storeDirty.has(key)) writeOutbox(items => { delete items[key]; });
+      storeRetryDelay = 0;
       showApiError(null);
     } catch (e) {
+      if (e.status === 409 && e.code === "store_conflict" && conflicts++ < 3) {
+        const current = e.body ? e.body.current : null;
+        userStore[key] = storeMerge3(storeBase[key], userStore[key], current);
+        storeBase[key] = deepCopy(current);
+        storeMerged = true;
+        storeDirty.add(key);
+        writeOutbox(items => { items[key] = { value: userStore[key], base: storeBase[key] ?? null }; });
+        continue;
+      }
       storeFailed.add(key);
-      storeFailedText = `Speichern fehlgeschlagen (${e.message}). Die letzte Änderung ist evtl. nicht gesichert.`;
+      storeFailedText = `Speichern fehlgeschlagen (${e.message}). Die Änderung ist im Gerät gesichert und wird automatisch nachgeschickt.`;
       showApiError(storeFailedText);
+      if (!e.status || e.status >= 500 || e.status === 409) scheduleStoreRetry();
     }
   }
   storeSending.delete(key);
+  if (storeMerged && !storeSending.size && !storeDirty.size) reloadAfterMerge();
 }
+
+// Gescheitertes Speichern von selbst wiederholen: nach 3 s, dann immer
+// laenger (bis 1 Minute) - und sofort, wenn das Netz zurueck ist.
+function scheduleStoreRetry() {
+  clearTimeout(storeRetryTimer);
+  storeRetryDelay = Math.min(60000, storeRetryDelay ? storeRetryDelay * 2 : 3000);
+  storeRetryTimer = setTimeout(retryFailedStore, storeRetryDelay);
+}
+
+function retryFailedStore() {
+  clearTimeout(storeRetryTimer);
+  [...storeFailed].forEach(key => {
+    if (storeSending.has(key)) return;
+    storeDirty.add(key);
+    sendStoreKey(key);
+  });
+}
+window.addEventListener("online", retryFailedStore);
+
+// Nach dem Zusammenfuehren kennen die geoeffneten Seiten nur den eigenen
+// Stand - neu laden, damit auch die Aenderungen vom anderen Geraet sichtbar
+// sind (alles ist zu diesem Zeitpunkt gespeichert). Nicht mitten in einer
+// Eingabe: dann erst, wenn die Seite das naechste Mal in den Hintergrund geht.
+function reloadAfterMerge() {
+  const el = document.activeElement;
+  const typing = el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+  if (typing) return;
+  storeMerged = false;
+  window.location.reload();
+}
+
+// Wird die Seite geschlossen oder die App weggewischt, die noch offenen
+// Aenderungen schnell noch abschicken (keepalive: laeuft auch nach dem
+// Schliessen weiter). Was dabei nicht ankommt, liegt im Zwischenspeicher.
+function flushStoreOnExit() {
+  // Ein Feld, in dem gerade getippt wurde, verlassen: das loest dessen
+  // "change" aus, und damit wird die Eingabe noch gespeichert.
+  const el = document.activeElement;
+  if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && typeof el.blur === "function") el.blur();
+  const keys = new Set([...storeDirty, ...storeSending, ...storeFailed]);
+  if (!keys.size || typeof fetch !== "function") return;
+  const token = getAuthToken();
+  keys.forEach(key => {
+    const body = JSON.stringify({ value: userStore[key], base: storeBase[key] ?? null });
+    if (body.length > 60000) return; // zu gross fuer keepalive - bleibt im Zwischenspeicher
+    try {
+      fetch(`api/v1/store/${key}`, { method: "PUT", keepalive: true, body,
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) } }).catch(() => {});
+    } catch (e) { /* ignorieren */ }
+  });
+}
+window.addEventListener("pagehide", flushStoreOnExit);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") { flushStoreOnExit(); if (storeMerged && !storeSending.size && !storeDirty.size) { storeMerged = false; window.location.reload(); } }
+  else retryFailedStore();
+});
 
 // Wartet, bis die letzte Aenderung dieses Schluessels beim Server angekommen
 // ist - fuer Server-Funktionen, die selbst aus der Ablage lesen (An Garmin senden).
@@ -221,7 +401,14 @@ async function checkStoreStale() {
   // Waehrenddessen selbst etwas geaendert (auch wenn es schon gespeichert ist):
   // die Server-Antwort ist dann aelter als der eigene Stand - nicht vergleichen.
   if (!idle() || storeChangeCount !== changesBefore) return;
-  if (storeChangedElsewhere(server)) { storeStale = true; showStoreStaleNotice(); }
+  if (!storeChangedElsewhere(server)) return;
+  // Hier ist nichts ungesichert - also einfach den neuen Stand laden, statt
+  // nur zu warnen (eine Warnung wird leicht uebersehen, und die naechste
+  // Aenderung haette dann mit veraltetem Stand gearbeitet). Nur mitten in
+  // einer Eingabe bleibt es beim Hinweis mit "Neu laden".
+  const el = document.activeElement;
+  if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) { storeStale = true; showStoreStaleNotice(); }
+  else window.location.reload();
 }
 document.addEventListener("visibilitychange", checkStoreStale);
 window.addEventListener("focus", checkStoreStale); // zwei Fenster nebeneinander: Wechsel per Klick

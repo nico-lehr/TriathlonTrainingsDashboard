@@ -73,6 +73,11 @@ function checkAutoReplan() {
   // Garmin-Waagedaten ins Gewichts-Log uebernehmen, bevor irgendetwas
   // gerendert wird - sonst zeigt die erste Darstellung noch das alte Gewicht.
   // Ergaenzt nur fehlende Tage, ueberschreibt keine manuellen Eintraege.
+  // Profil und Gewichtsverlauf VORHER laden: sonst saehe die Uebernahme ein
+  // leeres Standard-Profil und speicherte es ueber das echte (bis 2.4.26
+  // gingen so beim Start Einstellungen verloren, sobald Garmin ein Gewicht lieferte).
+  loadAthleteProfile();
+  loadWeightLog();
   if (typeof syncGarminWeightIntoLog === "function") syncGarminWeightIntoLog();
   initTopNav();
   initFilterBar();

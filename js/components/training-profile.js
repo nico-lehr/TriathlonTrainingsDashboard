@@ -94,7 +94,9 @@ function initTrainingProfile() {
     });
     const text = (id, apply) => {
       const el = document.getElementById(id);
-      el.addEventListener("change", () => { apply(el.value.trim()); saved(); });
+      let timer = null; // schon beim Tippen speichern, nicht erst beim Verlassen des Felds
+      el.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => apply(el.value.trim()), 800); });
+      el.addEventListener("change", () => { clearTimeout(timer); apply(el.value.trim()); saved(); });
     };
     text("tp-goals", v => saveTrainingProfile({ goals: v.slice(0, 500) }));
     text("tp-limitations", v => { athleteProfile.limitations = v || null; saveAthleteProfile(); });
