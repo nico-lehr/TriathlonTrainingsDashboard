@@ -292,6 +292,7 @@ erst nach dem Login, und jede Person bekommt nur ihre eigenen Daten.
 | „Zu viele Fehlversuche“ | 15 Minuten warten. Passwort vergessen: `bash deploy/raspberry-pi/benutzer.sh passwort` auf dem Pi. |
 | Installationsprogramm bricht ab | Internet am Pi prüfen, dann `bash deploy/raspberry-pi/install.sh` einfach noch einmal. |
 | Nach dem Umzug fehlen Daten | Lief beim Kopieren das Dashboard auf dem Mac noch? Mac-Dashboard schließen, Schritt 5 A noch einmal. |
+| Garmin: „nicht erreichbar“ | Auf dem Pi im Projektordner: `.venv/bin/python tools/garmin_check.py` – prüft Uhrzeit, Internet, Verbindung zu Garmin und (mit `--athlete 1`) deinen gespeicherten Schlüssel und sagt, woran es liegt. |
 | Claude: „Paket fehlt“ | 32-Bit-System (Schritt 3). Plan B aus Schritt 2 mit „64-bit“. |
 
 Mehr Details für Fortgeschrittene: [DEPLOYMENT.md](DEPLOYMENT.md), Abschnitt 9.

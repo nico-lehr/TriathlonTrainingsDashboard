@@ -4,6 +4,14 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.2
+
+Garmin: genaue Fehlermeldung statt „nicht erreichbar“.
+
+Neu in 2.4.2:
+- Klappt die Verbindung zu Garmin nicht, nennt das Dashboard jetzt den Grund (z. B. falsche Uhrzeit des Rechners, Internet/DNS, Zeitüberschreitung, Verbindung abgelehnt)
+- Prüfprogramm für den Raspberry Pi: `.venv/bin/python tools/garmin_check.py` (optional mit `--athlete 1` für den gespeicherten Schlüssel)
+
 ## 2.4.1
 
 Die Handy-Ansicht aus 2.4.0 ist wieder entfernt – das Dashboard sieht auf dem Handy wieder aus wie in 2.3.0.

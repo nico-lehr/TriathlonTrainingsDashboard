@@ -588,3 +588,30 @@ class EinstellungenTest(TempDirsMixin, unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VerbindungsfehlerTest(unittest.TestCase):
+    """'Nicht erreichbar' nennt den konkreten Grund (Uhrzeit, DNS, Zeitueberschreitung ...)."""
+
+    def check(self, exc, *words):
+        msg = personal_api.describe_connection_error(exc)
+        for w in words:
+            self.assertIn(w, msg)
+        self.assertNotIn(API_KEY, msg)
+
+    def test_gruende(self):
+        import socket
+        import ssl
+        import urllib.error
+        self.check(urllib.error.URLError(ssl.SSLCertVerificationError("certificate verify failed: certificate is not yet valid")), "Uhrzeit", "Zertifikat")
+        self.check(urllib.error.URLError(socket.gaierror(-3, "Temporary failure in name resolution")), "DNS", "personal.connectapi.garmin.com")
+        self.check(urllib.error.URLError(TimeoutError("timed out")), "Zeitüberschreitung")
+        self.check(urllib.error.URLError(ConnectionResetError(104, "Connection reset by peer")), "abgebrochen")
+        self.check(OSError("irgendwas"), "nicht erreichbar", "OSError")
+
+    def test_beim_speichern_kommt_der_grund_an(self):
+        import urllib.error
+        with mock.patch.object(personal_api, "_open", side_effect=urllib.error.URLError(TimeoutError("timed out"))):
+            with self.assertRaises(personal_api.GarminApiUnreachableError) as ctx:
+                personal_api.exchange_key(API_KEY)
+        self.assertIn("Zeitüberschreitung", ctx.exception.user_message)

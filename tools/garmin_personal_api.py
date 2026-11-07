@@ -20,6 +20,8 @@ import base64
 import hashlib
 import json
 import os
+import socket
+import ssl
 import time
 import urllib.error
 import urllib.parse
@@ -178,8 +180,29 @@ def _request(method, path, *, token=None, api_key=None, params=None, accept="app
         if e.code == 404 and missing_ok:
             return None
         raise GarminApiError(f"Garmin antwortet mit Fehler {e.code} ({path.split('?')[0]}).") from None
-    except (urllib.error.URLError, TimeoutError, OSError):
-        raise GarminApiUnreachableError("Garmin ist nicht erreichbar – Internetverbindung prüfen und später erneut versuchen.") from None
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise GarminApiUnreachableError(describe_connection_error(e)) from None
+
+
+def describe_connection_error(e):
+    """Verbindungsfehler -> verstaendlicher Satz mit dem konkreten Grund,
+    damit "nicht erreichbar" nicht alles bedeutet (DNS, Uhrzeit/Zertifikat,
+    Zeitueberschreitung, abgelehnte Verbindung). Nennt nie Schluessel oder Token."""
+    reason = e.reason if isinstance(e, urllib.error.URLError) and not isinstance(e, urllib.error.HTTPError) else e
+    host = urllib.parse.urlparse(BASE_URL).hostname or BASE_URL
+    detail = f"{type(reason).__name__}: {str(reason)[:120]}".strip().rstrip(":")
+    if isinstance(reason, ssl.SSLCertVerificationError) or (isinstance(reason, ssl.SSLError) and "certificate" in str(reason).lower()):
+        return (f"Die sichere Verbindung zu Garmin wurde abgelehnt (Zertifikat). Häufigster Grund: falsche Uhrzeit "
+                f"auf dem Dashboard-Rechner – dort prüfen mit „date“. ({detail})")
+    if isinstance(reason, ssl.SSLError):
+        return f"Die sichere Verbindung zu Garmin ist fehlgeschlagen. ({detail})"
+    if isinstance(reason, socket.gaierror):
+        return (f"Der Dashboard-Rechner findet {host} nicht (Namensauflösung/DNS). Hat er Internet? ({detail})")
+    if isinstance(reason, (TimeoutError, socket.timeout)):
+        return f"Garmin antwortet nicht rechtzeitig (Zeitüberschreitung nach {TIMEOUT_S} s). Später erneut versuchen. ({detail})"
+    if isinstance(reason, (ConnectionRefusedError, ConnectionResetError, ConnectionAbortedError)):
+        return f"Die Verbindung zu Garmin wurde abgelehnt oder abgebrochen (Firewall/Netz?). ({detail})"
+    return f"Garmin ist vom Dashboard-Rechner aus nicht erreichbar. ({detail})"
 
 
 def _jwt_expiration(token):
