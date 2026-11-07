@@ -227,8 +227,40 @@ function createMobilityFigure(exercise, { animate = true, label = true } = {}) {
     }
     if (pr.type === "block") {
       const [x] = tx([pr.x, 0]);
-      svg.appendChild(svgEl("rect", { class: "mob-fig-prop-fill", x: x - 5, y: FIG_VIEW.floor - (pr.h || 6), width: 10, height: pr.h || 6, rx: 1.2 }));
+      const w = pr.w || 10;
+      svg.appendChild(svgEl("rect", { class: "mob-fig-prop-fill", x: x - w / 2, y: FIG_VIEW.floor - (pr.h || 6), width: w, height: pr.h || 6, rx: 1.2 }));
       return null;
+    }
+    if (pr.type === "bench") { // Hantelbank: Polster (w breit, Oberkante h) auf einem Fuß
+      const [x] = tx([pr.x, 0]);
+      const w = pr.w || 30, h = pr.h || 12;
+      svg.appendChild(svgEl("rect", { class: "mob-fig-prop-fill", x: x - w / 2, y: FIG_VIEW.floor - h, width: w, height: 3, rx: 1.2 }));
+      svg.appendChild(svgEl("line", { class: "mob-fig-prop", x1: x, y1: FIG_VIEW.floor - h + 2, x2: x, y2: FIG_VIEW.floor }));
+      return null;
+    }
+    if (pr.type === "line") { // feste Linie (Lehne, Schiene eines Geräts)
+      const [x1, y1] = tx(pr.from), [x2, y2] = tx(pr.to);
+      svg.appendChild(svgEl("line", { class: "mob-fig-prop", x1, y1, x2, y2 }));
+      return null;
+    }
+    if (pr.type === "pulley") { // Kabelzug/Gerät: Rolle an festem Punkt
+      const [x, y] = tx(pr.at);
+      svg.appendChild(svgEl("line", { class: "mob-fig-prop", x1: x, y1: Math.min(y, 8), x2: x, y2: FIG_VIEW.floor }));
+      svg.appendChild(svgEl("circle", { class: "mob-fig-prop-fill", r: 2.4, cx: x, cy: y }));
+      return null;
+    }
+    if (pr.type === "bar") { // Klimmzugstange: kurzer fester Querbalken
+      const [x, y] = tx(pr.at);
+      svg.appendChild(svgEl("line", { class: "mob-fig-prop", x1: x - 9, y1: y, x2: x + 9, y2: y }));
+      return null;
+    }
+    if (pr.type === "plate") { // Langhantel von der Seite: Hantelscheibe an einem Punkt
+      const el = svgEl("circle", { class: "mob-fig-plate", r: pr.r || 6.5 });
+      return { pr, el, late: true };
+    }
+    if (pr.type === "kettlebell") {
+      const el = svgEl("circle", { class: "mob-fig-plate", r: 3.6 });
+      return { pr, el, late: true };
     }
     if (pr.type === "roller" && pr.x != null) { // liegt fest, der Körper rollt darüber
       svg.appendChild(svgEl("circle", { class: "mob-fig-prop-fill", r: 5, cx: pr.x + offX, cy: FIG_VIEW.floor - 5 }));
@@ -296,6 +328,12 @@ function createMobilityFigure(exercise, { animate = true, label = true } = {}) {
         const a = figPoint(pts, pr.from), b = Array.isArray(pr.to) ? pr.to : figPoint(pts, pr.to);
         if (!a || !b) return;
         el.setAttribute("d", line(a, b));
+      } else if (pr.type === "plate" || pr.type === "kettlebell") {
+        const at = figPoint(pts, pr.at);
+        if (!at) return;
+        const [x, y] = tx(at);
+        el.setAttribute("cx", x.toFixed(2));
+        el.setAttribute("cy", (y + (pr.type === "kettlebell" ? 3.4 : 0)).toFixed(2));
       } else if (pr.type === "weight") {
         const at = figPoint(pts, pr.at);
         if (!at) return;

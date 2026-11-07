@@ -27,7 +27,7 @@ const plain = x => JSON.parse(JSON.stringify(x));
 const EXERCISES = plain(run("STRENGTH_EXERCISES"));
 const AREAS = plain(run("STRENGTH_AREAS"));
 const GROUPS = plain(run("STRENGTH_GROUPS"));
-const EQUIPMENT = plain(run("MOBILITY_EQUIPMENT"));
+const EQUIPMENT = plain(run("STRENGTH_EQUIPMENT"));
 const profile = patch => ({ goals: "", focusAreas: [], painAreas: [], avoid: [], equipment: [], ...patch });
 
 test("Kraft-Sammlung: eindeutige ids (auch gegenüber Mobility), gültige Felder, Texte vollständig", () => {
@@ -124,4 +124,73 @@ test("KI-Trainingsplan: Kraft-Übungen aus der Sammlung behalten id, Sätze begr
   assert.strictEqual(session.plannedId, "p1");
   assert.deepStrictEqual(session.exercises.map(x => x.id), [known.id]);
   assert.strictEqual(run(`plannedToStrengthSession({ exercises: [{ name: "Eigene" }] })`), null);
+});
+
+test("Trainingsart: jede Art deckt alle Bewegungsmuster ab und nutzt nur ihre Geräte", () => {
+  const MODES = plain(run("STRENGTH_MODES"));
+  assert.deepStrictEqual(Object.keys(MODES), ["body", "dumbbells", "kettlebell", "band", "gym"]);
+  Object.entries(MODES).forEach(([mode, m]) => {
+    const s = plain(run(`buildStrengthSession({ tp: ${JSON.stringify(profile())}, today: "2026-11-07", mode: "${mode}" })`));
+    const groups = s.exercises.map(x => EXERCISES.find(e => e.id === x.id).group);
+    assert.deepStrictEqual([...new Set(groups)].sort(), [...GROUPS].sort(), mode + ": Gruppen");
+    s.exercises.forEach(x => {
+      const ex = EXERCISES.find(e => e.id === x.id);
+      assert.ok(ex.equipment.every(e => m.equipment.includes(e)), `${mode}: ${ex.id} braucht ${ex.equipment}`);
+    });
+    if (m.prefer.length) {
+      const withGear = s.exercises.filter(x => EXERCISES.find(e => e.id === x.id).equipment.some(e => m.prefer.includes(e)));
+      assert.ok(withGear.length >= 4, `${mode}: nur ${withGear.length} Übungen mit ${m.prefer}`);
+    }
+    assert.ok(s.title.includes(m.label), mode + " Titel");
+  });
+});
+
+test("Trainingsart Eigengewicht/Band: Übungen mit optionalem Gewicht starten mit 0 kg", () => {
+  run(`strengthState.weights = { ausfallschritt: 10 }`);
+  assert.strictEqual(run(`strengthModeKg(STRENGTH_BY_ID.ausfallschritt, "body")`), 0);
+  assert.strictEqual(run(`strengthModeKg(STRENGTH_BY_ID.ausfallschritt, "band")`), 0);
+  assert.strictEqual(run(`strengthModeKg(STRENGTH_BY_ID.ausfallschritt, "dumbbells")`), 10);
+  assert.strictEqual(run(`strengthModeKg(STRENGTH_BY_ID["bulgarische-kniebeuge"], "dumbbells")`), 6);
+  assert.strictEqual(run(`strengthModeKg(STRENGTH_BY_ID.kniebeuge, "gym")`), null);
+  ["body", "band"].forEach(mode => {
+    const s = plain(run(`buildStrengthSession({ tp: ${JSON.stringify(profile())}, today: "2026-11-08", mode: "${mode}" })`));
+    s.exercises.forEach(x => assert.ok(x.kg === null || x.kg === 0, `${mode}: ${x.id} mit ${x.kg} kg`));
+  });
+});
+
+test("Trainingsart merken: ohne Auswahl Kurzhanteln, wenn im Profil, sonst Eigengewicht", () => {
+  run("strengthState.mode = null");
+  assert.strictEqual(run(`strengthMode(${JSON.stringify(profile({ equipment: ["dumbbells"] }))})`), "dumbbells");
+  assert.strictEqual(run(`strengthMode(${JSON.stringify(profile())})`), "body");
+  run(`setStrengthMode("kettlebell")`);
+  run(`setStrengthMode("quatsch")`);
+  run("loadStrengthState()");
+  assert.strictEqual(run(`strengthMode(${JSON.stringify(profile())})`), "kettlebell");
+  run(`setStrengthMode("body")`);
+});
+
+test("Trainingsart wechseln: geplante Übungen werden gruppengleich getauscht", () => {
+  const list = [
+    { id: "goblet-kniebeuge", name: "Goblet-Kniebeuge", sets: 3, reps: "10", note: "x" },
+    { id: "unterarmstuetz", name: "Unterarmstütz", sets: 3, reps: "40 s" },
+    { name: "Eigene Übung", sets: 2, reps: "8" },
+  ];
+  const tp = JSON.stringify(profile());
+  const next = plain(run(`adaptStrengthExercises(${JSON.stringify(list)}, ${tp}, "body", "2026-11-07")`));
+  assert.strictEqual(next.length, 3);
+  const swapped = EXERCISES.find(e => e.id === next[0].id);
+  assert.strictEqual(swapped.group, "knee");
+  assert.deepStrictEqual(swapped.equipment.filter(e => !["wall", "bench"].includes(e)), []);
+  assert.strictEqual(next[0].name, swapped.name);
+  assert.deepStrictEqual(next[1], list[1], "passt schon - bleibt");
+  assert.deepStrictEqual(next[2], list[2], "eigene Übung bleibt");
+  // Kettlebell: bevorzugte Geräte -> Kniebeuge wird zur Kettlebell-Übung.
+  const kb = plain(run(`adaptStrengthExercises(${JSON.stringify(list)}, ${tp}, "kettlebell", "2026-11-07")`));
+  assert.ok(EXERCISES.find(e => e.id === kb[0].id).equipment.includes("kettlebell"));
+  // strict: nur tauschen, was mit den Geräten nicht geht (Unterarmstütz bleibt bei Kurzhanteln).
+  const keep = [{ id: "unterarmstuetz", name: "Unterarmstütz", sets: 3, reps: "40 s" }];
+  assert.strictEqual(run(`adaptStrengthExercises(${JSON.stringify(keep)}, ${tp}, "dumbbells", "2026-11-07", true)`), null);
+  assert.ok(run(`adaptStrengthExercises(${JSON.stringify(keep)}, ${tp}, "dumbbells", "2026-11-07")`), "ohne strict: Kurzhantel-Übung bevorzugt");
+  // Nichts zu tun -> null
+  assert.strictEqual(run(`adaptStrengthExercises(${JSON.stringify([list[1]])}, ${tp}, "body", "2026-11-07")`), null);
 });

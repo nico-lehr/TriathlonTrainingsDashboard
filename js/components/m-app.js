@@ -478,12 +478,22 @@ function mOpenPlannedTraining(pw) {
   mShow("training");
 }
 
+// Geplante Kraft-Einheit an die gewählte Trainingsart anpassen, wenn Übungen
+// darin Geräte brauchen, die du gerade nicht nutzt (wird gespeichert -> Garmin).
+function mFitPlannedStrength(pw) {
+  if (!pw || pw.status !== "geplant" || pw.date < todayStr() || !Array.isArray(pw.exercises)) return;
+  const next = adaptStrengthExercises(pw.exercises, trainingProfile(), strengthMode(), pw.date, true);
+  if (next) updatePlannedWorkout(pw.id, { exercises: next });
+}
+
 function mStrengthSession() {
   const today = todayStr();
   const last = strengthState.history[strengthState.history.length - 1];
-  const rules = () => buildStrengthSession({ tp: trainingProfile(), today, lastIds: last ? last.exercises || [] : [] });
+  const tp = trainingProfile();
+  const rules = () => buildStrengthSession({ tp, today, lastIds: last ? last.exercises || [] : [], mode: strengthMode(tp) });
   const focus = mPlannedFocus("Kraft");
   if (focus) {
+    mFitPlannedStrength(focus);
     const fromPlan = plannedToStrengthSession(focus);
     if (fromPlan) return { session: fromPlan, when: mWhenLabel(focus), planned: focus };
     // Plan ohne Übungen aus der Sammlung: passende Einheit zusammenstellen, die den Plan abhakt.
@@ -492,7 +502,7 @@ function mStrengthSession() {
   }
   const planned = (typeof plannedWorkouts !== "undefined" ? plannedWorkouts : [])
     .filter(p => p.sport === "Kraft" && p.status === "geplant" && p.date >= today).sort((a, b) => a.date.localeCompare(b.date))
-    .map(p => ({ p, s: plannedToStrengthSession(p) })).find(x => x.s);
+    .map(p => { mFitPlannedStrength(p); return { p, s: plannedToStrengthSession(p) }; }).find(x => x.s);
   if (planned) return { session: planned.s, when: mWhenLabel(planned.p), planned: planned.p };
   const s = rules();
   return s ? { session: s, when: "Vorschlag für dich" } : null;
@@ -522,14 +532,17 @@ function mRenderTraining() {
   const seg = `<div class="m-subseg" role="tablist" aria-label="Training"><button type="button" class="${mState.sub === "mobility" ? "on" : ""}" data-m-sub="mobility" role="tab" aria-selected="${mState.sub === "mobility"}">Mobility</button><button type="button" class="${mState.sub === "kraft" ? "on" : ""}" data-m-sub="kraft" role="tab" aria-selected="${mState.sub === "kraft"}">Kraft</button></div>`;
   if (mState.sub === "kraft") {
     const k = mStrengthSession();
-    if (!k) return mHeaderHtml("Kraft", "Training") + seg + `<section class="m-card"><p class="m-empty">Mit deinen Hilfsmitteln passt gerade keine Übung. Trag im Trainingsprofil ein, was du zu Hause hast.</p><div class="m-actions"><button type="button" class="m-btn soft" data-m-act="profile">Trainingsprofil</button></div></section>`;
+    const mode = strengthMode();
+    const modes = `<div class="m-modes" role="radiogroup" aria-label="Womit trainierst du?">${Object.entries(STRENGTH_MODES).map(([key, m]) =>
+      `<button type="button" role="radio" aria-checked="${key === mode}" class="${key === mode ? "on" : ""}" data-m-mode="${key}">${mEsc(m.label)}</button>`).join("")}</div>`;
+    if (!k) return mHeaderHtml("Kraft", "Training") + seg + modes + `<section class="m-card"><p class="m-empty">Mit deinen Hilfsmitteln passt gerade keine Übung. Trag im Trainingsprofil ein, was du zu Hause hast.</p><div class="m-actions"><button type="button" class="m-btn soft" data-m-act="profile">Trainingsprofil</button></div></section>`;
     const s = k.session;
     const rows = s.exercises.map((x, i) => {
       const ex = STRENGTH_BY_ID[x.id];
       return `<button type="button" class="m-row" data-m-act="strength-detail" data-id="${ex.id}"><span class="m-fig-sm" data-m-fig="s:${ex.id}"></span><span class="m-grow"><span class="m-row-title">${mEsc(ex.name)}</span><span class="m-row-meta">${x.sets} × ${mEsc(ex.hold ? `${x.hold || ex.hold} s` : x.reps || ex.reps)}${ex.weight && (x.kg != null ? x.kg : strengthWeight(ex.id)) > 0 ? ` · ${mNum(x.kg != null ? x.kg : strengthWeight(ex.id), 1).replace(",0", "")} kg` : ""}</span></span><span class="m-tag plan">${mEsc(STRENGTH_AREAS[ex.areas[0]])}</span></button>`;
     }).join("");
-    const needs = [...new Set(s.exercises.flatMap(x => STRENGTH_BY_ID[x.id].equipment))].map(e => MOBILITY_EQUIPMENT[e].split(" ")[0]);
-    return mHeaderHtml(k.when, "Training") + seg + mPlanBanner(k)
+    const needs = [...new Set(s.exercises.flatMap(x => STRENGTH_BY_ID[x.id].equipment))].map(e => STRENGTH_EQUIPMENT[e].split(/[ ,/]/)[0]);
+    return mHeaderHtml(k.when, "Training") + seg + modes + mPlanBanner(k)
       + mCols(`<section class="m-card m-hero-ex"><div class="m-fig-lg" data-m-fig="s:${s.exercises[0].id}"></div>
           <div><b class="m-hero-title">${mEsc(s.title)}</b><small class="m-row-meta">${s.minutes || Math.round(strengthSessionSeconds(s) / 60)} min · ${s.exercises.length} Übungen${needs.length ? ` · ${mEsc(needs.join(" & "))}` : " · ohne Geräte"}</small></div>
           <button type="button" class="m-btn primary wide" data-m-act="start-strength-now">Training starten</button></section>`,
@@ -781,6 +794,19 @@ async function mAction(btn) {
   }
 }
 
+// Trainingsart wechseln: Vorschlag neu zusammenstellen; eine geplante Einheit
+// wird angepasst und gespeichert (damit Garmin dieselben Übungen bekommt).
+function mSetStrengthMode(mode) {
+  if (!STRENGTH_MODES[mode] || mode === strengthMode()) return;
+  setStrengthMode(mode);
+  const k = mStrengthSession();
+  if (k && k.planned && !k.filled) {
+    const next = adaptStrengthExercises(k.planned.exercises, trainingProfile(), mode);
+    if (next) updatePlannedWorkout(k.planned.id, { exercises: next });
+  }
+  renderMApp();
+}
+
 function mStartStrength(session) {
   openMobilityPlayer({ ...session, exercises: session.exercises.map(x => ({ ...x })) }, {
     onFinish: res => {
@@ -803,7 +829,7 @@ function mStrengthDetail(id) {
       <button type="button" class="mob-icon-btn mob-sheet-close" aria-label="Schließen">${MOB_ICONS.close}</button>
       <div class="mob-sheet-fig"></div>
       <h2 class="mob-sheet-title">${mEsc(ex.name)}</h2>
-      <p class="mob-sheet-meta">${ex.sets} × ${mEsc(ex.hold ? `${ex.hold} s` : ex.reps)} · Pause ${ex.rest} s${ex.equipment.length ? " · " + mEsc(ex.equipment.map(e => MOBILITY_EQUIPMENT[e]).join(", ")) : ""}</p>
+      <p class="mob-sheet-meta">${ex.sets} × ${mEsc(ex.hold ? `${ex.hold} s` : ex.reps)} · Pause ${ex.rest} s${ex.equipment.length ? " · " + mEsc(ex.equipment.map(e => STRENGTH_EQUIPMENT[e]).join(", ")) : ""}</p>
       <h3>So geht's</h3><ol class="mob-steps">${ex.steps.map(s => `<li>${mEsc(s)}</li>`).join("")}</ol>
       <h3>Das spürst du</h3><p>${mEsc(ex.feel)}</p>
       <h3>Achte darauf</h3><ul class="mob-mistakes">${ex.mistakes.map(s => `<li>${mEsc(s)}</li>`).join("")}</ul>
@@ -1031,6 +1057,8 @@ function initMApp() {
     if (tab) { mShow(tab.dataset.mPage); return; }
     const sub = e.target.closest("[data-m-sub]");
     if (sub) { if (mState.sub !== sub.dataset.mSub) mState.anim = true; mState.sub = sub.dataset.mSub; mState.planId = null; renderMApp(); return; }
+    const mode = e.target.closest("[data-m-mode]");
+    if (mode) { mSetStrengthMode(mode.dataset.mMode); return; }
     const classic = e.target.closest("[data-m-classic]");
     if (classic) { mOpenClassic(classic.dataset.mClassic, classic.dataset.mScroll); return; }
     const seg = e.target.closest("[data-m-check] button");

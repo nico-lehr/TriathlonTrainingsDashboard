@@ -2236,6 +2236,8 @@
   .mob-fig-prop { stroke: var(--baseline); stroke-width: 2.2; stroke-linecap: round; }
   .mob-fig-prop-fill { fill: var(--baseline); }
   .mob-fig-band { stroke: var(--accent); stroke-width: 1.4; fill: none; stroke-linecap: round; }
+  .mob-fig-weight { stroke: var(--accent); stroke-width: 3.4; fill: none; stroke-linecap: round; }
+  .mob-fig-plate { fill: none; stroke: var(--accent); stroke-width: 2.4; }
   .mob-fig-focus { fill: var(--accent); opacity: 0.22; transform-box: fill-box; transform-origin: center; animation: mob-pulse 2.4s ease-in-out infinite; }
   @keyframes mob-pulse { 0%, 100% { transform: scale(0.85); opacity: 0.16; } 50% { transform: scale(1.15); opacity: 0.3; } }
   @media (prefers-reduced-motion: reduce) { .mob-fig-focus { animation: none; } }

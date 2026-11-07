@@ -231,6 +231,19 @@ class GarminWorkoutTest(unittest.TestCase):
 class SwimAndDefaultsTest(unittest.TestCase):
     """Umwandlung ohne Server: Schwimmstil, Bahnlaenge, Ersatz-Variante, Standard-Ablauf."""
 
+    def test_jede_kraftuebung_hat_garmin_eintrag_aus_dem_katalog(self):
+        import re
+        from garminconnect.exercises import _RAW
+        from backend.garmin_workouts import GARMIN_EXERCISES
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with open(os.path.join(root, "js", "data", "strength-exercises.js"), encoding="utf-8") as f:
+            ids = re.findall(r'^\s+id: "([a-z0-9-]+)"', f.read(), re.M)
+        self.assertGreaterEqual(len(ids), 45)
+        catalog = {(cat, name) for _, cat, name in _RAW}
+        for ex_id in ids:
+            self.assertIn(ex_id, GARMIN_EXERCISES, ex_id)
+            self.assertIn(GARMIN_EXERCISES[ex_id], catalog, ex_id)
+
     def test_schwimmen_mit_stil_und_25m_bahn(self):
         from backend.garmin_workouts import workout_variants
         entry = {"sport": "Schwimmen", "title": "Technik", "duration_min": 45, "intensity": "mittel"}

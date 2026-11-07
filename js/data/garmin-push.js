@@ -52,7 +52,7 @@ function garminExercises(pw) {
     const str = pw.sport === "Kraft" && typeof STRENGTH_BY_ID !== "undefined" ? STRENGTH_BY_ID[x.id] : null;
     if (str) {
       const repsText = String(x.reps || str.reps || "");
-      const kg = x.kg != null ? Number(x.kg) : (str.weight && typeof strengthWeight === "function" ? strengthWeight(str.id) : null);
+      const kg = x.kg != null ? Number(x.kg) : (typeof strengthModeKg === "function" ? strengthModeKg(str, strengthMode()) : (str.weight && typeof strengthWeight === "function" ? strengthWeight(str.id) : null));
       return { id: str.id, name: str.name, sets: Number(x.sets) || str.sets || 1, note: x.note || null,
         reps: str.hold ? null : (parseInt(repsText, 10) || null), seconds: str.hold ? (Number(x.hold) || str.hold) : null,
         sides: /je Seite/.test(repsText), rest_s: Number(x.rest) || str.rest || 60, weight_kg: kg > 0 ? kg : null };
