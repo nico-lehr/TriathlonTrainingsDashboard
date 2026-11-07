@@ -4,6 +4,15 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.31
+
+Der Kalender zeigt dir jetzt, was als Nächstes kommt.
+
+Neu in 2.4.31:
+- Die Liste im Kalender startet immer bei „Heute“ und zeigt die nächsten 7 Tage – vergangene Workouts stehen dort nicht mehr
+- Mit dem Pfeil blätterst du weiter in die Zukunft; die Stunden oben rechts zeigen, wie viel Training ansteht
+- Vergangene Tage siehst du weiterhin, wenn du sie im Monat oben antippst
+
 ## 2.4.30
 
 Trainings auf der Uhr sind jetzt so detailliert wie beim Garmin Coach.
