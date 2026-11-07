@@ -90,6 +90,7 @@ function checkAutoReplan() {
   initCardSearch();
   initAccount();
   initGarminSettings();
+  initGarminPushSettings();
   initUpdates();
   initAiSettings();
   initTrainingProfile();

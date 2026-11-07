@@ -25,7 +25,7 @@ CLIENT_EVENTS = {
     "page": {"heute", "kalender", "coach", "training", "mehr",
              "overview", "nutrition", "records", "analysis", "settings", "calendar", "mobility"},
     "feature": {"coach-note", "coach-undo", "outlook", "mob-start", "strength-start", "mob-claude",
-                "plan-new", "plan-open", "workout-open", "garmin-send", "classic-view"},
+                "plan-new", "plan-open", "workout-open", "garmin-send", "garmin-push-login", "classic-view"},
     "error": {"js"},
 }
 MAX_EVENTS_PER_REQUEST = 50

@@ -2678,3 +2678,23 @@ body.m-graphit .settings-page-head, body.m-graphit .sh-back { display: none; }
   .pf-src { font-size: 0 !important; padding: 4px 6px; }
   .pf-src::before { content: "↺"; font-size: 17px; }
 }
+
+/* --- Trainings auf die Uhr (js/components/garmin-push-settings.js) --- */
+#gp-body .gp-h { margin: 20px 0 0; font-size: 13px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--text-secondary); }
+#gp-body .gp-list { margin-top: 8px; }
+#gp-body .coach-settings-row { margin-top: 16px; }
+#gp-body .gp-foot { margin-top: 12px; }
+#gp-body .gp-logout { display: block; margin-top: 14px; }
+.gp-what { display: flex; flex-direction: column; min-width: 0; }
+.gp-what b { font-size: 14.5px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gp-what small, .gp-sub { display: block; font-size: 12.5px; color: var(--text-secondary); font-weight: 400; }
+.gp-st { flex: none; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+.gp-st.ok { color: var(--c-good-text); }
+.gp-st.ok i, .plan-garmin-watch.ok i { width: 7px; height: 7px; border-radius: 50%; background: #34c759; }
+.gp-st.bad { color: var(--c-crit-text); }
+.gp-empty { margin-top: 8px; }
+.gp-official { margin-top: 16px; }
+.gp-official.ok { color: var(--c-good-text); }
+.plan-garmin-watch { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; white-space: nowrap; color: var(--text-secondary); }
+.plan-garmin-watch.ok { color: var(--c-good-text); }
+.plan-garmin-watch.wait i { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid currentColor; box-sizing: border-box; }

@@ -152,7 +152,7 @@ def step_note(step, sport):
     else:
         aim = ""
     lead = {"warmup": f"Locker {WARMUP_WORD.get(sport, 'aufwärmen')}", "cooldown": f"Locker {COOLDOWN_WORD.get(sport, 'abwärmen')}",
-            "recovery": "Erholen", "rest": "Pause"}.get(step.get("type"))
+            "recovery": "Erholen", "rest": "Pause", "interval": None if aim else "Hauptteil"}.get(step.get("type"))
     return " · ".join(x for x in (lead, aim) if x) or None
 
 
@@ -329,7 +329,10 @@ def exercise_steps(exercises, mobility, with_catalog, counter):
 
     for x in exercises:
         if mobility:
-            labels = [f"{x['name']} links", f"{x['name']} rechts"] if x["sides"] and x["seconds"] else [x["name"]]
+            if x["sides"] and x["seconds"]:
+                labels = [f"{x['name']} links", f"{x['name']} rechts"]
+            else:
+                labels = [f"{x['name']} (je Seite)" if x["sides"] else x["name"]]
             for label in labels:
                 out.append(work(x, label))
             out.append(step("rest", END_TIME, 10))

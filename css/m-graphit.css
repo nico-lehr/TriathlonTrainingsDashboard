@@ -596,3 +596,8 @@ body.m-graphit.m-classic #m-body { display: none; }
   .m-anim .m-adm-bars i { transform-origin: bottom; animation: m-grow-y .7s .2s cubic-bezier(.2,.8,.2,1) both; }
   .m-anim .m-adm-rank-bar i { transform-origin: left center; animation: m-grow .7s .25s cubic-bezier(.2,.8,.2,1) both; }
 }
+
+/* Trainings auf die Uhr: Hinweis im Einheiten-Blatt */
+.m-sh-note.m-watch i { display: inline-block; width: 7px; height: 7px; margin: 0 7px 1px 0; vertical-align: middle; border-radius: 50%; background: var(--m-good); }
+.m-sh-note.m-watch.wait { color: var(--m-muted, #9aa0a6); }
+.m-sh-note.m-watch.wait i { background: none; border: 1.5px solid currentColor; box-sizing: border-box; }

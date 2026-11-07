@@ -904,13 +904,20 @@ function mPlanSheetHtml(p) {
   const notes = sentences.length ? `<section class="m-card"><div class="m-head"><h2>Worauf es ankommt</h2></div><ul class="m-notes">${sentences.map(t => `<li>${mEsc(t)}</li>`).join("")}</ul></section>` : "";
 
   const st = typeof garminSendState !== "undefined" ? garminSendState.get(p.id) || {} : {};
+  const watch = typeof garminWatchStatus === "function" ? garminWatchStatus(p) : null;
+  const canGarmin = typeof canSendToGarmin === "function" && canSendToGarmin(p);
+  const garminLabel = st.loading ? "Sende an Garmin …" : watch && watch.kind === "ok" || p.garminSentAt ? "Auf Garmin aktualisieren" : "An Garmin senden";
+  const garminNote = st.error ? `<p class="m-say bad small">${mEsc(st.error)}</p><button type="button" class="m-btn ghost wide" data-sh="fit">Stattdessen als .fit-Datei laden</button>`
+    : watch ? `<p class="m-sh-note m-watch ${watch.kind}"><i aria-hidden="true"></i>${watch.kind === "ok" ? "Auf deiner Uhr – Änderungen hier landen automatisch auch dort." : "Kommt gleich automatisch auf deine Uhr."}</p>`
+      : p.garminSentAt ? `<p class="m-sh-note">✓ Gesendet am ${mEsc(new Date(p.garminSentAt).toLocaleDateString("de-DE", { day: "numeric", month: "short" }))} – nach dem nächsten Sync auf der Uhr.</p>` : "";
   let primary = "";
   if (p.sport === "Kraft" && typeof plannedToStrengthSession === "function" && plannedToStrengthSession(p)) primary = `<button type="button" class="m-btn primary wide" data-sh="strength">Mitmachen</button>`;
   else if (p.sport === "Mobility" && typeof plannedToMobilitySession === "function" && plannedToMobilitySession(p)) primary = `<button type="button" class="m-btn primary wide" data-sh="mobility">Starten</button>`;
-  else if (typeof canSendToGarmin === "function" && canSendToGarmin(p)) {
-    primary = `<button type="button" class="m-btn primary wide" data-sh="garmin"${st.loading ? " disabled" : ""}>${st.loading ? "Sende an Garmin …" : p.garminSentAt ? "Erneut an Garmin senden" : "An Garmin senden"}</button>`
-      + (st.error ? `<p class="m-say bad small">${mEsc(st.error)}</p><button type="button" class="m-btn ghost wide" data-sh="fit">Stattdessen als .fit-Datei laden</button>`
-        : p.garminSentAt ? `<p class="m-sh-note">✓ Gesendet am ${mEsc(new Date(p.garminSentAt).toLocaleDateString("de-DE", { day: "numeric", month: "short" }))} – nach dem nächsten Sync auf der Uhr.</p>` : "");
+  if (canGarmin) {
+    const cls = primary ? "m-btn soft wide" : "m-btn primary wide";
+    // Schon auf der Uhr: nur der Hinweis, aktualisieren geht automatisch (Knopf nur ohne Automatik).
+    const showBtn = !(watch && garminPush.auto) || st.error;
+    primary += (showBtn ? `<button type="button" class="${cls}" data-sh="garmin"${st.loading ? " disabled" : ""}>${garminLabel}</button>` : "") + garminNote;
   }
   const done = p.status === "erledigt";
   const actions = `<div class="m-sh-actions">${primary}

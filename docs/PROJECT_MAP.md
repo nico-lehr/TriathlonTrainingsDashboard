@@ -93,6 +93,7 @@ Claude-API-Key, Kartenreihenfolge).
 - `strength-exercises.js` — Kraft-Sammlung (15 Übungen) mit Sätzen, Wiederholungen, Pausen, Startgewicht und Strichfigur (Hilfsmittel-Namen in `mobility-exercises.js`).
 - `planned-workouts.js` — geplante/KI-vorgeschlagene Trainingseinheiten (Laden/Speichern/Anlegen/Verschieben), getrennt von den echten Workouts (`ALL`/`DATA`); setzt die Phase je Einheit (`getPhase`), prüft Verschiebungen gegen die Planregeln (`planRuleViolations`, `applyPlanSuggestion`), nimmt KI-Pläne nur geprüft an (`checkedPlanFromAi`) und hält die Schritte einer Einheit (`validateWorkoutSteps`, `defaultWorkoutSteps`), siehe `docs/DATA_MODEL.md`.
 - `plan-wishes.js` — Terminwünsche für den Trainingsplan („Do 60 min Schwimmen“), werden bei der nächsten KI-Planung fest eingeplant.
+- `garmin-push.js` — Trainings auf die Uhr im Browser: rechnet Schritte/Übungen der nächsten 7 Tage aus, stößt den Abgleich an (beim Öffnen und nach jeder Plan-Änderung), Stand je Einheit (`garminWatchStatus`).
 - `fit-workout-writer.js` — schreibt eine geplante Einheit als importierbare `.fit`-Workout-Datei für Garmin Connect (Gegenrichtung zu `fit-parser.js`) und schickt sie auf Wunsch direkt an Garmin (`sendPlannedWorkoutToGarmin` → `backend/garmin_workouts.py`), siehe `docs/DATA_MODEL.md`.
 - `weather.js` — Wetter für den Kalender: holt über den eigenen Server die 7-Tage-Vorhersage für den Heimatort (`athleteProfile.homeLocation`), Ortssuche, WMO-Code → Symbol.
 - `equipment.js` — Material (Schuhe, Rad, Verschleißteile) über `/api/v1/equipment`, Kilometer und Fälligkeit; übernimmt einmalig die alte Liste aus der Ablage.
@@ -150,7 +151,8 @@ Bedarf schrittweise weiter aufgeteilt werden, sobald es sich lohnt.
 - `data-import.js` — neue `.fit`-Dateien einlesen (Ordner-Scan-Menü + Drag & Drop) und auf dem Server speichern.
 - `account.js` — „Konto“-Karte in den Einstellungen: angemeldeter Benutzer, Abmelden.
 - `update.js` — Hinweis „Neue Version verfügbar“ oben und Karte „Programm-Updates“ in den Einstellungen (nur für den Betreiber; Freunde sehen nur die Versionsnummer).
-- `garmin-settings.js` — „Garmin-Verbindung“-Karte in den Einstellungen: eigenen Personal-API-Schlüssel eintragen/entfernen, Ablaufwarnung, „Jetzt von Garmin holen“.
+- `garmin-push-settings.js` — Karte „Trainings auf die Uhr“ (Einstellungen → Garmin): einmal mit Garmin anmelden (ggf. Zwei-Faktor-Code), Automatik an/aus, Stand der nächsten 7 Tage, „Jetzt abgleichen“, offizielle Verbindung (sobald freigeschaltet).
+- `garmin-settings.js` — „Daten von Garmin“-Karte in den Einstellungen: eigenen Personal-API-Schlüssel eintragen/entfernen, Ablaufwarnung, „Jetzt von Garmin holen“.
 - `garmin-import.js` — Garmin verbinden im Onboarding (Werte werden automatisch übernommen) und „Dein Profil“ in den Einstellungen: Garmin-Werte nur anzeigen, täglicher Abgleich, eigene Änderungen bleiben (`garminValues`/`garminOverrides`).
 - `invites.js` — „Freunde einladen“: Einladungen an/aus, Code teilen/erneuern, Kontenliste (nur Betreiber).
 - `ai-settings.js` — „KI-Coach“-Karte: Stand der Claude-Verbindung; Schlüssel, Modell und Freigabe nur für den Betreiber (Server: `backend/claude_api.py`). Ollama darunter aufklappbar.
@@ -210,7 +212,9 @@ einmalig `backend/import_workouts_json.py`, siehe `docs/DEPLOYMENT.md`.
 | `update_routes.py` | `/update`, `/update/check`, `/update/install` – Details und Installieren nur für den Betreiber (`auth.is_admin`). |
 | `launcher.py` | Starter aus `start.bat`/`start.sh`: startet `app.py` und nach einem Update (Code 3) neu. |
 | `garmin_api_routes.py` | `/garmin/personal-api` (eigenen Garmin-Schlüssel prüfen, speichern, entfernen – der Schlüssel kommt nie zurück) und `/garmin/sync` (Abruf für die angemeldete Person im Hintergrund). |
-| `garmin_workouts.py` | `/planned-workouts/<id>/send-to-garmin` – geplante Einheit als Garmin-Workout hochladen und in den Garmin-Kalender legen (Token des Garmin-Syncs). |
+| `garmin_workouts.py` | Baut Garmin-Workouts aus geplanten Einheiten (Ausdauer mit Zielbereichen und Hinweisen, Kraft/Mobility mit Garmins Übungskatalog) und `/planned-workouts/<id>/send-to-garmin` (sofort senden, nutzt `garmin_push`). |
+| `garmin_push.py` | Trainings auf die Uhr: gleicht die nächsten 7 Tage mit Garmin ab (neu/ändern/verschieben/löschen, nie doppelt; Tabelle `garmin_workout_links`), Anmeldung im Dashboard (`/garmin/workouts/login`, Passwort nie gespeichert), Automatik (`garmin_push_state`), morgens über `tools/garmin_sync.py`. |
+| `garmin_official.py` | Offizielle Garmin Training API – vorbereitet, aus bis zur Freischaltung (`.env`: `GARMIN_TRAINING_*`), OAuth 2.0 mit PKCE; siehe `docs/GARMIN_TRAINING_API.md`. |
 | `weather_routes.py` | `/weather`, `/weather/geocode` – Open-Meteo-Vorhersage und Ortssuche, 1 Stunde zwischengespeichert. |
 | `frontend.py` | Liefert nur die Erlaubt-Liste aus (`index.html`, `login.html`, `manifest.json`, `css/`, `js/`, `icons/`). |
 | `workout_store.py` | Gemeinsame Duplikat-Regel + Workout-Zeile aus Parser-Ergebnis (POST, Import, Garmin-Sync). |

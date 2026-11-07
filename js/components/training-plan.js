@@ -116,9 +116,12 @@ const garminSendState = new Map(); // id -> { loading } | { error } | { schedule
 function planItemGarminHtml(p) {
   if (!canSendToGarmin(p)) return "";
   const st = garminSendState.get(p.id) || {};
-  const inner = p.garminSentAt && !st.loading && !st.error
-    ? `<span class="plan-garmin-sent" title="An Garmin gesendet am ${fmtDateFull(new Date(p.garminSentAt))}">✓ gesendet ${fmtDate(new Date(p.garminSentAt))}</span>`
-    : `<button type="button" class="cal-today-btn plan-garmin-send" data-id="${p.id}"${st.loading ? " disabled" : ""}>${st.loading ? "Sende …" : "An Garmin senden"}</button>`;
+  const watch = typeof garminWatchStatus === "function" ? garminWatchStatus(p) : null;
+  let inner;
+  if (st.loading) inner = `<button type="button" class="cal-today-btn plan-garmin-send" data-id="${p.id}" disabled>Sende …</button>`;
+  else if (watch && !st.error) inner = `<span class="plan-garmin-watch ${watch.kind}" title="${watch.kind === "ok" ? "Liegt im Garmin-Kalender – Änderungen hier werden automatisch übernommen." : "Wird gleich automatisch an Garmin gesendet."}"><i aria-hidden="true"></i>${watch.text}</span>`;
+  else if (p.garminSentAt && !st.error) inner = `<span class="plan-garmin-sent" title="An Garmin gesendet am ${fmtDateFull(new Date(p.garminSentAt))}">✓ gesendet ${fmtDate(new Date(p.garminSentAt))}</span>`;
+  else inner = `<button type="button" class="cal-today-btn plan-garmin-send" data-id="${p.id}">An Garmin senden</button>`;
   return `<div class="plan-item-garmin">${inner}</div>`;
 }
 
@@ -146,7 +149,8 @@ function planEditGarminNoteHtml(p) {
 
 function garminSendLabel(p) {
   const st = garminSendState.get(p.id) || {};
-  return st.loading ? "Sende …" : (p.garminSentAt ? "Erneut an Garmin senden" : "An Garmin senden");
+  const linked = typeof garminPush !== "undefined" && garminPush.links[p.id];
+  return st.loading ? "Sende …" : (linked || p.garminSentAt ? "Auf Garmin aktualisieren" : "An Garmin senden");
 }
 
 function wireGarminSend(rootEl) {
@@ -171,7 +175,6 @@ async function sendToGarminFromUi(id) {
   const p = plannedWorkouts.find(x => x.id === id);
   if (!p || (garminSendState.get(id) || {}).loading) return;
   if (typeof mTrack === "function") mTrack("feature", "garmin-send");
-  if (p.garminSentAt && !(await confirmDialog(`Diese Einheit wurde am ${fmtDateFull(new Date(p.garminSentAt))} schon an Garmin gesendet. Nochmal senden? In Garmin Connect steht sie dann zweimal.`, { okLabel: "Nochmal senden", danger: false }))) return;
   garminSendState.set(id, { loading: true });
   refreshGarminSendUi(id);
   try {

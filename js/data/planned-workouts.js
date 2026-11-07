@@ -17,6 +17,7 @@ function loadPlannedWorkouts() {
 function savePlannedWorkouts() {
   storeSet(PLANNED_WORKOUTS_KEY, plannedWorkouts);
   scheduleIcalSync();
+  if (typeof scheduleGarminPush === "function") scheduleGarminPush(); // Trainings auf die Uhr (js/data/garmin-push.js)
 }
 
 // Kalender-Abo (iCal) - der Server bekommt eine Kopie der geplanten Einheiten

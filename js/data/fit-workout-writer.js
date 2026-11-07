@@ -259,29 +259,32 @@ function exportPlannedWorkoutsAsFit(list) {
   });
 }
 
-// Garmin nimmt per Versand nur Ausdauer-Workouts an (Kraft braucht Übungen
-// aus Garmins eigenem Katalog) - dort bleibt der .fit-Download.
+// An Garmin senden geht für Ausdauer und für Kraft/Mobility mit Übungen
+// (garminSupported, js/data/garmin-push.js).
 function canSendToGarmin(pw) {
-  return ["Laufen", "Rad", "Schwimmen"].includes(pw.sport);
+  return typeof garminSupported === "function" ? garminSupported(pw) : ["Laufen", "Rad", "Schwimmen"].includes(pw.sport);
 }
 
-// Schickt eine geplante Einheit direkt an Garmin Connect (backend/
-// garmin_workouts.py: Upload + Eintrag in den Garmin-Kalender am geplanten
-// Tag) und vermerkt am Eintrag, wann. Ergebnis { garmin_workout_id,
-// scheduled_date }; Fehler kommen als Error mit verständlicher Meldung.
+// Schickt eine geplante Einheit sofort an Garmin Connect (backend/
+// garmin_workouts.py -> garmin_push.py: anlegen oder - wenn schon dort -
+// aktualisieren, nie doppelt; Eintrag in den Garmin-Kalender am geplanten
+// Tag). Ergebnis { garmin_workout_id, scheduled_date }; Fehler kommen als
+// Error mit verständlicher Meldung.
 async function sendPlannedWorkoutToGarmin(id) {
   const pw = plannedWorkouts.find(p => p.id === id);
   if (!pw) throw new Error("Diese Einheit gibt es nicht mehr.");
   await storeSaved(PLANNED_WORKOUTS_KEY); // der Server liest die Einheit aus der Ablage
+  const body = typeof garminPushDetails === "function" ? garminPushDetails(pw) : { steps: resolvedWorkoutSteps(pw) };
+  delete body.id;
   let res;
   try {
-    res = await apiCall(`planned-workouts/${encodeURIComponent(id)}/send-to-garmin`, "POST",
-      { steps: resolvedWorkoutSteps(pw) }, { timeoutMs: 60000 });
+    res = await apiCall(`planned-workouts/${encodeURIComponent(id)}/send-to-garmin`, "POST", body, { timeoutMs: 60000 });
   } catch (e) {
     // Zeitüberschreitung: der Server kann trotzdem hochgeladen haben.
-    if (e.timeout) throw new Error("Die Antwort kam nicht rechtzeitig - das Workout ist vielleicht trotzdem angekommen. Bitte in Garmin Connect nachsehen, bevor du erneut sendest.");
+    if (e.timeout) throw new Error("Die Antwort kam nicht rechtzeitig - das Workout ist vielleicht trotzdem angekommen. Ein erneutes Senden aktualisiert es nur, doppelt wird es nicht.");
     throw e;
   }
   updatePlannedWorkout(id, { garminSentAt: new Date().toISOString(), garminWorkoutId: res.data.garmin_workout_id });
+  if (typeof refreshGarminPush === "function") refreshGarminPush();
   return res.data;
 }

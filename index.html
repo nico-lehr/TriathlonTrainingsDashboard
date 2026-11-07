@@ -765,7 +765,7 @@
       </div>
 
       <div class="card full" id="garmin-settings-card" data-sp="garmin">
-        <h2>Garmin-Verbindung
+        <h2>Daten von Garmin
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Offizielle Garmin-Schnittstelle („Personal API“): Mit deinem eigenen Schlüssel holt der Dashboard-Server deine Trainings (als .fit-Datei) und Gesundheitsdaten (Schlaf, HRV, Ruhepuls, Gewicht, Schritte; Body Battery, soweit Garmin sie dort liefert) – nur lesen, ohne dein Garmin-Passwort. Workouts auf die Uhr schicken kann dieser Schlüssel nicht. VO2max und Trainingszustand liefert die Schnittstelle nicht; das Dashboard schätzt VO2max dann selbst.</div></span>
         </h2>
         <p class="card-sub">Schlüssel in Garmin Connect erstellen: <a href="https://connect.garmin.com/app/settings/personalApiToken" target="_blank" rel="noopener">Einstellungen → Personal API</a>. Er wird nur einmal angezeigt – gleich hier einfügen. Bitte nur über eine sichere Verbindung eintragen (zu Hause oder über die https-Adresse).</p>
@@ -784,6 +784,12 @@
         </div>
         <p class="coach-test-status" id="garmin-api-sync-status"></p>
         <button type="button" class="reset-link" id="garmin-api-delete-btn" hidden>Schlüssel entfernen</button>
+      </div>
+
+      <div class="card full" id="garmin-push-card" data-sp="garmin">
+        <h2>Trainings auf die Uhr</h2>
+        <p class="card-sub">Deine geplanten Einheiten der nächsten 7 Tage landen automatisch im Garmin-Kalender und auf deiner Uhr – mit allen Schritten, Zielbereichen, Übungen und Hinweisen. Änderst du den Plan, zieht Garmin mit.</p>
+        <div id="gp-body"><p class="card-sub">Lade …</p></div>
       </div>
 
       <div class="card full" id="ai-settings-card" data-sp="ki">
@@ -1138,6 +1144,7 @@
 <script src="js/data/planned-workouts.js"></script>
 <script src="js/data/plan-wishes.js"></script>
 <script src="js/data/fit-workout-writer.js"></script>
+<script src="js/data/garmin-push.js"></script>
 <script src="js/data/weight-log.js"></script>
 <script src="js/data/equipment.js"></script>
 <script src="js/data/achievements.js"></script>
@@ -1201,6 +1208,7 @@
 <script src="js/components/mobility.js"></script>
 <script src="js/components/m-app.js"></script>
 <script src="js/components/m-admin.js"></script>
+<script src="js/components/garmin-push-settings.js"></script>
 <script src="js/components/settings-hub.js"></script>
 <script src="js/app.js"></script>
 </body>

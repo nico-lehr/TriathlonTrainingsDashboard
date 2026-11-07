@@ -84,6 +84,11 @@ vergleichen.
 
 ### Einmalig pro Person: bei Garmin anmelden
 
+**Einfacher (ab 2.4.28):** im Dashboard unter Einstellungen → Garmin →
+„Trainings auf die Uhr“ mit Garmin-E-Mail und Passwort anmelden. Das
+Passwort wird nicht gespeichert. Danach kommen die geplanten Einheiten der
+nächsten 7 Tage automatisch auf die Uhr. Der Weg im Terminal geht weiterhin:
+
 ```
 python tools/garmin_sync.py --login --athlete 2
 ```

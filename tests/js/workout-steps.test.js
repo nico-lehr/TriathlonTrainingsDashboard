@@ -194,7 +194,7 @@ test("sendPlannedWorkoutToGarmin: schickt die Schritte an den Endpunkt und verme
 test("sendPlannedWorkoutToGarmin: nach Zeitüberschreitung eigener Hinweis, nichts als gesendet vermerkt", async () => {
   app.apiCall = () => Promise.reject(Object.assign(new Error("Server nicht erreichbar"), { timeout: true }));
   app.replacePlannedWorkouts([{ id: "t1", date: "2026-10-14", sport: "Rad", duration_min: 60, intensity: "leicht" }]);
-  await assert.rejects(app.sendPlannedWorkoutToGarmin("t1"), /nicht rechtzeitig.*in Garmin Connect nachsehen/);
+  await assert.rejects(app.sendPlannedWorkoutToGarmin("t1"), /nicht rechtzeitig.*doppelt wird es nicht/);
   assert.strictEqual(plain(vm.runInContext("plannedWorkouts", app))[0].garminSentAt, undefined);
   app.apiCall = () => Promise.reject(new Error("Server nicht erreichbar - läuft das Dashboard auf dem PC?"));
   await assert.rejects(app.sendPlannedWorkoutToGarmin("t1"), /Server nicht erreichbar/);

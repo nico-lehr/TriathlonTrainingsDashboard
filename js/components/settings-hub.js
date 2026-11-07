@@ -23,7 +23,7 @@ const SH_ICONS = {
 const SH_PANELS = {
   profil: ["Profil", "Persönliche Angaben und Trainingswerte. Werte mit „Garmin“ kommen von deiner Uhr."],
   training: ["Training & Planung", "Wie viel Zeit du hast, was eingeplant wird und deine Wünsche an den Plan."],
-  garmin: ["Garmin", "Verbindung zu Garmin Connect für Trainings, Schlaf und Gesundheitswerte."],
+  garmin: ["Garmin", "Deine Daten von Garmin holen – und geplante Trainings automatisch auf die Uhr bringen."],
   ki: ["KI-Coach", "Claude erstellt Pläne, Mobility-Einheiten und Auswertungen."],
   kalender: ["Kalender-Abo", "Deine geplanten Einheiten in der Kalender-App auf Handy und Computer."],
   wetter: ["Wetter", "Vorhersage an Outdoor-Einheiten der nächsten 7 Tage."],
@@ -53,7 +53,9 @@ function shStatus(id) {
     case "garmin": {
       const gs = typeof garminState !== "undefined" ? garminState : null;
       if (!gs || !gs.loaded) return "…";
-      return gs.configured ? { text: "Verbunden", ok: true } : { text: "Nicht verbunden", warn: true };
+      const watch = typeof garminPush !== "undefined" && garminPush.connected;
+      if (gs.configured) return { text: watch ? "Verbunden · Uhr" : "Verbunden", ok: true };
+      return watch ? { text: "Nur Uhr verbunden", ok: true } : { text: "Nicht verbunden", warn: true };
     }
     case "ki": {
       if (typeof claudeAvailable !== "function") return "";
@@ -181,5 +183,6 @@ function initSettingsHub() {
   document.getElementById("settings-panel-back").addEventListener("click", settingsPanelBack);
   // Stand rechts aktuell halten (Garmin-Status kommt erst nach dem Laden).
   if (typeof onGarminState === "function") onGarminState(() => { if (!shPanel) renderSettingsHub(); });
+  if (typeof onGarminPush === "function") onGarminPush(() => { if (!shPanel) renderSettingsHub(); });
   showSettingsHub();
 }
