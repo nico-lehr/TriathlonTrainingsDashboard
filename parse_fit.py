@@ -32,7 +32,27 @@ SPORT_MAP = {
     "generic": "Sonstiges",
     "flexibility_training": "Flexibilität",
     "transition": "Wechsel",
+    "mobility": "Mobility",
 }
+
+# Neuere Garmin-Uhren schreiben Sportarten, die die eingebaute Liste von
+# fitdecode noch nicht kennt - dann kommt nur die Zahl an (z.B. 86 statt
+# "mobility", Garmins Aktivitaet "Mobility" ab 2025). Werte aus dem
+# offiziellen FIT-Profil (FIT SDK 21.x).
+SPORT_NUM_MAP = {85: "pool_apnea", 86: "mobility", 87: "geocaching"}
+
+
+def sport_name(value):
+    """Rohwert der Sportart als Text. Unbekannte Zahlen werden zu "generic"
+    (-> "Sonstiges"), damit nie eine nackte Zahl als Sportart erscheint."""
+    if value is None:
+        return "generic"
+    if isinstance(value, int):
+        return SPORT_NUM_MAP.get(value, "generic")
+    text = str(value)
+    if text.isdigit():
+        return SPORT_NUM_MAP.get(int(text), "generic")
+    return text
 
 # sport="training" ist mehrdeutig (Garmin nutzt es als Oberkategorie für Kraft-,
 # Cardio- UND Beweglichkeitstraining) - erst der sub_sport unterscheidet sie.
@@ -289,8 +309,10 @@ def main():
             skipped.append({"file": fname, "reason": "keine session-Nachricht gefunden"})
             continue
 
-        sport_raw = str(fields.get("sport", "generic"))
+        sport_raw = sport_name(fields.get("sport"))
         sub_sport_raw = str(fields.get("sub_sport", "generic"))
+        if sub_sport_raw.isdigit():  # unbekannte Unterart -> keine nackte Zahl anzeigen
+            sub_sport_raw = "generic"
         sport_de = get_sport_de(sport_raw, sub_sport_raw)
         sub_sport_de = SUBSPORT_MAP.get(sub_sport_raw, sub_sport_raw)
 
@@ -424,6 +446,11 @@ def main():
             "has_gps": has_gps,
             "rpe_estimated": rpe_estimated,
             "avg_mets": avg_mets,
+            # Garmin "Trainingseffekt" (0-5) und Atemfrequenz - stehen in
+            # jeder neueren Garmin-Aufzeichnung, auch ohne Strecke (Mobility).
+            "aerobic_te": fields.get("total_training_effect"),
+            "anaerobic_te": fields.get("total_anaerobic_training_effect"),
+            "avg_respiration_rate": fields.get("enhanced_avg_respiration_rate") or fields.get("avg_respiration_rate"),
             "dev_raw": dev_raw or None,
         }
 

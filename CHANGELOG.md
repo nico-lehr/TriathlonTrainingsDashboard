@@ -4,6 +4,18 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.23
+
+Garmin holt sofort, Mobility wird erkannt, Training direkt aus dem Kalender.
+
+Neu in 2.4.23:
+- Nach dem Speichern des Garmin-Schlüssels holt das Dashboard die Daten sofort – nicht erst am nächsten Morgen
+- Am Handy oben: „Jetzt von Garmin holen“, solange noch keine Daten da sind; während des Abrufs „Holt Garmin-Daten …“
+- Garmins neue Aktivität „Mobility“ wird erkannt (vorher stand dort nur „86“)
+- Einheiten ohne Strecke (Mobility, Kraft) zeigen keine leeren Felder für Distanz, Pace und Höhenmeter mehr; dazu Min-Puls, Trainingseffekt und Atemfrequenz, wenn Garmin sie liefert
+- Geplante Kraft- oder Mobility-Einheit im Kalender antippen öffnet direkt „Training“ mit Start-Knopf
+- Kein weißer Balken mehr unten am Handy (z. B. unter „Mehr“)
+
 ## 2.4.22
 
 Handy: Mitmachen auf einen Blick und aufgeräumte Trainings-Ansicht.

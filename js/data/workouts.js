@@ -27,6 +27,7 @@ async function loadPersistedWorkouts() {
   // Dubletten zusammenfuehren, BEVOR die Multisport-/Wechsel-Erkennung
   // laeuft - die gruppiert nach Tag und wuerde sich von doppelten
   // Einheiten in die Irre fuehren lassen.
+  workouts.forEach(fixNumericSport);
   const allWorkouts = dedupeWorkouts(workouts);
   postProcessWorkouts(allWorkouts);
   allWorkouts.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
@@ -58,6 +59,21 @@ async function saveImportedWorkouts(workouts) {
     if (res.meta && res.meta.duplicate) duplicates++;
   }
   return { duplicates };
+}
+
+// Ältere Garmin-Abrufe haben Sportarten, die das Leseprogramm noch nicht
+// kannte, als nackte Zahl gespeichert (z.B. "86" = Garmins "Mobility"). Hier
+// beim Laden reparieren - ohne die gespeicherten Daten anzufassen.
+const NUMERIC_SPORT_FIX = { 86: ["Mobility", "mobility"], 85: ["Apnoe", "pool_apnea"], 87: ["Geocaching", "geocaching"] };
+function fixNumericSport(w) {
+  if (!w) return w;
+  const num = /^\d+$/.test(String(w.sport ?? "")) ? Number(w.sport) : /^\d+$/.test(String(w.sport_raw ?? "")) ? Number(w.sport_raw) : null;
+  if (num == null) return w;
+  const [de, raw] = NUMERIC_SPORT_FIX[num] || ["Sonstiges", "generic"];
+  w.sport = de;
+  w.sport_raw = raw;
+  if (/^\d+$/.test(String(w.sub_sport ?? ""))) w.sub_sport = null;
+  return w;
 }
 
 /* ======================================================================

@@ -376,3 +376,14 @@ test("Koppeltraining: keine Koppeleinheit -> leere Liste, keine Zusammenfassung"
   const r = plain(app.computeBrickAnalysis([session("Rad", 2026, 10, 3, 7, 0, 60), run(2026, 10, 3, 12, 0, 3.0, 150)]));
   assert.deepStrictEqual(r, { sessions: [], summary: { paceSec: null, hr: null } });
 });
+
+test("Sportart als nackte Zahl (alte Garmin-Abrufe): 86 wird zu Mobility, Unbekanntes zu Sonstiges", () => {
+  const a = plain(vm.runInContext(`fixNumericSport({ sport: "86", sport_raw: "86", sub_sport: "0" })`, app));
+  assert.strictEqual(a.sport, "Mobility");
+  assert.strictEqual(a.sport_raw, "mobility");
+  assert.strictEqual(a.sub_sport, null);
+  const b = plain(vm.runInContext(`fixNumericSport({ sport: "199", sport_raw: "199" })`, app));
+  assert.strictEqual(b.sport, "Sonstiges");
+  const c = plain(vm.runInContext(`fixNumericSport({ sport: "Rad", sport_raw: "cycling", sub_sport: "Indoor" })`, app));
+  assert.deepStrictEqual(c, { sport: "Rad", sport_raw: "cycling", sub_sport: "Indoor" });
+});

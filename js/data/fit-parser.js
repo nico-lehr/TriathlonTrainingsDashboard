@@ -121,9 +121,10 @@ const LENGTH_TYPE_ACTIVE = 1; // length_type: 0=idle (Pause/Wende-Rest), 1=activ
 // falsche Angabe anzuzeigen. SWOLF/Zugfrequenz bleiben unberührt.
 
 
-const SPORT_ENUM = { 0: "generic", 1: "running", 2: "cycling", 5: "swimming", 10: "training", 62: "hiit" };
+// 86 = mobility: Garmins Aktivität "Mobility" (neuere Uhren, FIT SDK 21.x).
+const SPORT_ENUM = { 0: "generic", 1: "running", 2: "cycling", 5: "swimming", 10: "training", 62: "hiit", 86: "mobility" };
 
-const SPORT_MAP_DE = { running: "Laufen", cycling: "Rad", swimming: "Schwimmen", hiit: "Intervalltraining", training: "Krafttraining", generic: "Sonstiges", flexibility_training: "Flexibilität" };
+const SPORT_MAP_DE = { running: "Laufen", cycling: "Rad", swimming: "Schwimmen", hiit: "Intervalltraining", training: "Krafttraining", generic: "Sonstiges", flexibility_training: "Flexibilität", mobility: "Mobility" };
 // sport="training" ist mehrdeutig (Kraft-/Cardio-/Beweglichkeitstraining) - erst
 // der sub_sport unterscheidet sie. Werte empirisch verifiziert (fitdecode) über
 // den kompletten 2026er-Datensatz.

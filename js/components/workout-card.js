@@ -194,6 +194,11 @@ function buildWorkoutDetailHtml(w) {
   // DATA_MODEL.md) - Kachel bleibt bis dahin einfach weg statt "–" zu zeigen.
   if (w.avg_swolf != null) extraStats.push(["SWOLF" + (w.best_swolf != null ? " (Ø / Beste Bahn)" : ""), `${fmtNum(w.avg_swolf, 1)}${w.best_swolf != null ? " / " + w.best_swolf : ""}`]);
   if (w.avg_stroke_rate != null) extraStats.push(["Ø Zugfrequenz", `${fmtNum(w.avg_stroke_rate, 0)} Züge/min`]);
+  // Garmin-Trainingseffekt (0-5) und Atemfrequenz - gibt es auch bei
+  // Einheiten ohne Strecke (Mobility, Kraft), deshalb hier allgemein.
+  if (w.aerobic_te != null || w.anaerobic_te != null) extraStats.push(["Trainingseffekt aerob / anaerob", `${w.aerobic_te != null ? fmtNum(w.aerobic_te, 1) : "–"} / ${w.anaerobic_te != null ? fmtNum(w.anaerobic_te, 1) : "–"}`]);
+  if (w.avg_respiration_rate != null) extraStats.push(["Ø Atemfrequenz", `${fmtNum(w.avg_respiration_rate, 0)} Atemzüge/min`]);
+  if (w.min_hr != null) extraStats.push(["Min HF", `${w.min_hr}`]);
   // Schwimmstil (dominant_stroke) bewusst nicht mehr angezeigt - die Erkennung
   // war falsch (unverifizierte FIT-Feldnummern, siehe fit-parser.js) und wird
   // von der KI ohnehin nicht genutzt, siehe CHANGE_REQUESTS.md.
@@ -221,6 +226,10 @@ function buildWorkoutDetailHtml(w) {
   const hasPower = !!(stream && stream.power && stream.power.some(v => v != null));
   const hasGct = !!(stream && stream.gct && stream.gct.some(v => v != null));
   const hasVr = !!(stream && stream.vr && stream.vr.some(v => v != null));
+  // Einheiten ohne Strecke (Mobility, Kraft, Yoga ...): Distanz, Pace und
+  // Höhenmeter wären immer leer - statt "–"-Kacheln einfach weglassen.
+  const noRoute = w.distance_km == null && !["running", "cycling", "swimming"].includes(w.sport_raw)
+    && !(stream && stream.speed && stream.speed.some(v => v != null));
   const missingRunDynamics = w.sport_raw === "running" && !hasPower && !hasGct && !hasVr;
 
   return `
@@ -232,10 +241,10 @@ function buildWorkoutDetailHtml(w) {
     <p class="modal-sub">${w._date ? fmtDateFull(w._date) + " · " + w._date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) + " Uhr" : ""}</p>
     <div class="modal-stats">
       <div class="st"><div class="l">Dauer</div><div class="v">${w.duration_min != null ? fmtNum(w.duration_min, 0) + " min" : "–"}</div></div>
-      <div class="st"><div class="l">Distanz${indoor ? " (virtuell)" : ""}</div><div class="v">${w.distance_km != null ? fmtNum(w.distance_km, 2) + " km" : "–"}</div></div>
+      ${noRoute ? "" : `<div class="st"><div class="l">Distanz${indoor ? " (virtuell)" : ""}</div><div class="v">${w.distance_km != null ? fmtNum(w.distance_km, 2) + " km" : "–"}</div></div>`}
       <div class="st"><div class="l">Ø HF / Max HF</div><div class="v">${w.avg_hr ?? "–"} / ${w.max_hr ?? "–"}</div></div>
-      <div class="st"><div class="l">${indoor ? "Geschwindigkeit (virtuell)" : "Pace / Speed"}</div><div class="v">${paceOrSpeed}</div></div>
-      ${indoor ? "" : `<div class="st"><div class="l">Höhenmeter${w.elevation_gain_m == null && effectiveElevationGainM(w) != null ? " (nachgetragen)" : ""}</div><div class="v">${effectiveElevationGainM(w) != null ? Math.round(effectiveElevationGainM(w)) + " m" : "–"}</div></div>`}
+      ${noRoute ? "" : `<div class="st"><div class="l">${indoor ? "Geschwindigkeit (virtuell)" : "Pace / Speed"}</div><div class="v">${paceOrSpeed}</div></div>`}
+      ${indoor || noRoute ? "" : `<div class="st"><div class="l">Höhenmeter${w.elevation_gain_m == null && effectiveElevationGainM(w) != null ? " (nachgetragen)" : ""}</div><div class="v">${effectiveElevationGainM(w) != null ? Math.round(effectiveElevationGainM(w)) + " m" : "–"}</div></div>`}
       <div class="st"><div class="l">Load</div><div class="v">${w.training_load != null ? fmtNum(w.training_load, 0) : "–"}</div></div>
       <div class="st"><div class="l">Kalorien</div><div class="v">${w.calories != null ? Math.round(w.calories) + " kcal" : "–"}</div></div>
       ${extraStatsHtml}
@@ -246,10 +255,10 @@ function buildWorkoutDetailHtml(w) {
         <h4>Herzfrequenz-Verlauf</h4>
         <div class="chart-wrap wd-hr-chart"></div>
       </div>
-      <div>
+      ${noRoute ? "" : `<div>
         <h4>Pace- / Geschwindigkeitsverlauf</h4>
         <div class="chart-wrap wd-pace-chart"></div>
-      </div>
+      </div>`}
       ${hasAlt ? `<div><h4>Höhenprofil</h4><div class="chart-wrap wd-alt-chart"></div></div>` : ""}
       ${hasCad ? `<div><h4>Schrittfrequenz-Verlauf</h4><div class="chart-wrap wd-cad-chart"></div></div>` : ""}
       ${hasPower ? `<div><h4>Leistungsverlauf</h4><div class="chart-wrap wd-power-chart"></div></div>` : ""}
@@ -281,7 +290,8 @@ function buildWorkoutRatingHtml(w) {
   // Vorrang, siehe effectiveElevationGainM(), js/data/workout-notes.js).
   // Bei Swimming ergeben Höhenmeter (egal ob aufgezeichnet oder nachgetragen)
   // keinen Sinn - komplette Zeile daher nur für Nicht-Schwimmen-Sportarten.
-  const elevationRowHtml = (w.elevation_gain_m == null && w.sport_raw !== "swimming") ? `
+  // Ebenso nicht bei Einheiten ohne Strecke (Mobility, Kraft ...).
+  const elevationRowHtml = (w.elevation_gain_m == null && w.sport_raw !== "swimming" && w.distance_km != null) ? `
       <div class="wd-rating-elevation-row">
         <label for="wd-rating-elevation-${encodeURIComponent(w.file)}">Höhenmeter nachtragen (fehlt in der Aufzeichnung)</label>
         <div class="wd-rating-elevation-inputs">
@@ -451,7 +461,9 @@ function renderWorkoutDetailCharts(w, rootEl) {
   const swimLengths = (w.sport_raw === "swimming" && Array.isArray(w.lengths))
     ? w.lengths.filter(l => l.speed_mps != null && l.speed_mps > 0)
     : null;
-  if (swimLengths && swimLengths.length >= 2) {
+  if (!paceHost) {
+    // Einheit ohne Strecke - kein Pace-Diagramm (siehe noRoute oben)
+  } else if (swimLengths && swimLengths.length >= 2) {
     let cum = 0;
     const pts = swimLengths.map(l => {
       cum += l.duration_s || 0;
