@@ -363,3 +363,23 @@ body.m-graphit { min-height: 100vh; min-height: 100dvh; }
   border: 1px solid color-mix(in srgb, var(--m-accent) 25%, transparent); font-size: 13.5px; line-height: 1.35;
 }
 .m-planbar-act { display: flex; gap: 14px; flex: none; }
+
+/* Coach: Nächste Einheiten nach Tagen */
+.m-cdays { display: flex; flex-direction: column; gap: 14px; }
+.m-cday + .m-cday { border-top: 1px solid var(--m-line); padding-top: 14px; }
+.m-cday-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.m-cday-head b { font-size: 15px; font-weight: 700; color: var(--m-text); }
+.m-cday.today .m-cday-head b { color: var(--m-accent); }
+.m-cday-head span { font-size: 12.5px; color: var(--m-muted); font-variant-numeric: tabular-nums; }
+.m-cday .m-row:first-child { padding-top: 6px; }
+
+/* Coach: Nachricht an den Coach */
+.m-note { display: block; width: 100%; box-sizing: border-box; min-height: 64px; resize: vertical; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--m-line); background: color-mix(in srgb, var(--m-text) 5%, transparent); color: var(--m-text);
+  font: inherit; font-size: 16px; line-height: 1.4; }
+.m-note::placeholder { color: var(--m-muted); }
+.m-note:focus { outline: none; border-color: var(--m-accent); }
+.m-card .m-actions { margin-top: 10px; }
+.m-btn:disabled { opacity: .6; cursor: default; }
+.m-reply { margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--m-accent) 10%, transparent); }
+.m-reply .m-link { margin-top: 4px; padding: 0; }

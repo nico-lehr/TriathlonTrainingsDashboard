@@ -190,6 +190,32 @@ Feste Terminwünsche des Athleten - genau so einplanen (gleiches Datum, gleiche 
 ${lines.join("\n")}`;
 }
 
+// Ergänzung zum Trainingsplan-Prompt für "Sag dem Coach Bescheid"
+// (replanFromCoachNote, js/ai/ollama.js): die Nachricht des Athleten und der
+// bisherige Plan im Zeitfenster. Die Antwort bekommt zusätzlich ein Feld
+// "antwort" (1-2 Sätze an den Athleten).
+function buildCoachNotePrompt(note, oldPlan, windowDates) {
+  const today = windowDates[0];
+  const weekday = d => new Date(d + "T00:00:00").toLocaleDateString("de-DE", { weekday: "long" });
+  const lines = oldPlan.length
+    ? oldPlan.map(p => `- ${p.date} (${weekday(p.date)}): ${p.sport} – ${p.title || p.sport}, ${p.duration_min != null ? p.duration_min + " min" : "Dauer offen"}${p.intensity ? ", " + p.intensity : ""}${p.description ? " – " + p.description : ""}`)
+    : ["- (in diesem Zeitraum war noch nichts geplant)"];
+  return `
+
+Bisheriger Plan in diesem Zeitraum (heute ist ${today}, ${weekday(today)}):
+${lines.join("\n")}
+
+Nachricht des Athleten an dich: "${String(note).replace(/"/g, "'")}"
+
+Setze diese Nachricht um und gib den kompletten Plan für ALLE ${windowDates.length} Tage im Zeitfenster zurück:
+- Die Nachricht hat Vorrang vor den Trainingstagen im Profil (z.B. "heute spontan 45 min schwimmen" -> heute Schwimmen, 45 min, auch wenn heute kein Trainings- oder Schwimmtag ist).
+- Ändere nur, was dafür nötig ist: übrige Einheiten möglichst unverändert übernehmen (gleiche Sportart, Dauer, Beschreibung), nur verschieben oder anpassen, wenn sonst die Belastung zu hoch wird (z.B. zwei harte Einheiten direkt hintereinander) oder die Nachricht es verlangt.
+- Was nicht mehr im Plan stehen soll, einfach weglassen.
+- Zusätzlich das Feld "antwort": 1-2 kurze Sätze an den Athleten (du-Form, Klartext), was du geändert hast und warum.
+
+Antwortformat diesmal: {"antwort":"...","workouts":[...]} - "workouts" genau wie oben beschrieben, darf leer sein, wenn im ganzen Zeitraum nichts geplant sein soll.`;
+}
+
 // Ergänzung zum Trainingsplan-Prompt: die festen Regeln des Regelwerks als
 // Text (planRulesText, js/analytics/plan-rules.js) - dieselben Zahlen, mit
 // denen generateTrainingPlan() den Vorschlag danach prüft.

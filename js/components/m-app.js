@@ -20,7 +20,8 @@ const M_SPORT = {
 };
 const M_SPORT_OTHER = { color: "var(--m-muted)", icon: '<circle cx="12" cy="12" r="7"/>' };
 
-const mState = { page: "heute", sub: "mobility", planId: null, range: 30, calMonth: null, calWeek: null, classic: null, busy: false };
+const mState = { page: "heute", sub: "mobility", planId: null, range: 30, calMonth: null, calWeek: null, classic: null, busy: false,
+  coachText: "", coachNote: null };  // coachNote: { loading, reply, hints, error, undo }
 
 function mEnabled() {
   try { return localStorage.getItem(M_KEY) !== "off"; } catch (e) { return true; }
@@ -357,9 +358,27 @@ function mRenderCoach() {
       ${ready && ready.level ? `<small>${mEsc(ready.level.label)}</small>` : ""}</div></div></section>` : "";
 
   const today = todayStr();
-  const next = (typeof plannedWorkouts !== "undefined" ? plannedWorkouts : []).filter(p => p.date >= today && p.status === "geplant").sort((a, b) => a.date.localeCompare(b.date)).slice(0, 7);
-  const nextHtml = next.length ? next.map(p => `<button type="button" class="m-row" data-m-act="plan" data-id="${mEsc(p.id)}">${mIcon(p.sport)}<span class="m-grow"><span class="m-row-title">${new Date(p.date + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short" })} · ${mEsc(p.title || p.sport)}</span><span class="m-row-meta">${p.duration_min ? mDur(p.duration_min) : ""}${p.description ? ` · ${mEsc(p.description.split(/[.\n]/)[0]).slice(0, 50)}` : ""}</span></span>${p.intensity ? `<span class="m-tag ${p.intensity}">${mEsc(p.intensity)}</span>` : ""}</button>`).join("")
-    : `<p class="m-empty">Noch nichts geplant.</p>`;
+  const next = (typeof plannedWorkouts !== "undefined" ? plannedWorkouts : []).filter(p => p.date >= today && p.status === "geplant").sort((a, b) => a.date.localeCompare(b.date)).slice(0, 10);
+  // Nach Tagen gruppiert: jeder Tag ein eigener Block mit Überschrift
+  // ("Heute", "Morgen", "Mo, 9. Nov.") und Gesamtdauer.
+  const byDay = [];
+  next.forEach(p => { const last = byDay[byDay.length - 1]; if (last && last.date === p.date) last.items.push(p); else byDay.push({ date: p.date, items: [p] }); });
+  const tomorrow = localDateStr(mAddDays(new Date(), 1));
+  const dayName = d => d === today ? "Heute" : d === tomorrow ? "Morgen" : new Date(d + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long" });
+  const nextHtml = byDay.length ? byDay.map(g => {
+    const total = g.items.reduce((a, p) => a + (p.duration_min || 0), 0);
+    const rows = g.items.map(p => `<button type="button" class="m-row" data-m-act="plan" data-id="${mEsc(p.id)}">${mIcon(p.sport)}<span class="m-grow"><span class="m-row-title">${mEsc(p.title || p.sport)}</span><span class="m-row-meta">${p.duration_min ? mDur(p.duration_min) : ""}${p.description ? ` · ${mEsc(p.description.split(/[.\n]/)[0]).slice(0, 50)}` : ""}</span></span>${p.intensity ? `<span class="m-tag ${p.intensity}">${mEsc(p.intensity)}</span>` : ""}</button>`).join("");
+    return `<div class="m-cday${g.date === today ? " today" : ""}"><div class="m-cday-head"><b>${dayName(g.date)}</b><span>${new Date(g.date + "T12:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" })}${total ? " · " + mDur(total) : ""}</span></div><div class="m-list">${rows}</div></div>`;
+  }).join("") : `<p class="m-empty">Noch nichts geplant.</p>`;
+
+  // "Sag dem Coach Bescheid": freie Nachricht -> KI plant die nächsten 7 Tage um.
+  const cn = mState.coachNote || {};
+  const noteCard = `<section class="m-card"><div class="m-head"><h2>Sag dem Coach Bescheid</h2></div>
+      <textarea id="m-coach-note" class="m-note" rows="2" maxlength="500" placeholder="z. B. „Heute spontan 45 min schwimmen“"${cn.loading ? " disabled" : ""}>${mEsc(mState.coachText)}</textarea>
+      <div class="m-actions"><button type="button" class="m-btn primary wide" data-m-act="coach-note"${cn.loading ? " disabled" : ""}>${cn.loading ? "Coach plant um …" : "Plan anpassen"}</button></div>
+      ${cn.error ? `<p class="m-say bad">${mEsc(cn.error)}</p>` : ""}
+      ${cn.reply ? `<div class="m-reply"><p class="m-say">${mEsc(cn.reply)}</p>${(cn.hints || []).map(h => `<p class="m-say small">${mEsc(h)}</p>`).join("")}${cn.undo ? `<button type="button" class="m-link" data-m-act="coach-undo">Rückgängig</button>` : ""}</div>` : ""}
+    </section>`;
 
   return mHeaderHtml("Dein Coach", "Coach", typeof claudeAvailable === "function" && claudeAvailable() ? `<span class="m-pill"><i></i>Claude</span>` : "")
     + `<section class="m-card"><div class="m-head"><h2>Wie fühlst du dich?</h2><span class="m-head-note">heute</span></div>
@@ -368,7 +387,8 @@ function mRenderCoach() {
         <div class="m-check"><span>Verletzung</span>${mSeg("injury", inj, rc.injury || "no")}</div></section>`
     + `<section class="m-card"><div class="m-head"><h2>Empfehlung</h2><button type="button" class="m-link" data-m-act="outlook">${typeof outlook !== "undefined" && outlook.loading ? "…" : "Neu"}</button></div>${say}</section>`
     + goalCard
-    + `<section class="m-card"><div class="m-head"><h2>Nächste Einheiten</h2><button type="button" class="m-link" data-m-classic="coach" data-m-scroll="trainingplan">Plan bearbeiten</button></div><div class="m-list">${nextHtml}</div></section>`
+    + noteCard
+    + `<section class="m-card"><div class="m-head"><h2>Nächste Einheiten</h2><button type="button" class="m-link" data-m-classic="coach" data-m-scroll="trainingplan">Plan bearbeiten</button></div><div class="m-cdays">${nextHtml}</div></section>`
     + `<button type="button" class="m-more" data-m-classic="coach">Ganzer Coach-Bereich</button>`;
 }
 
@@ -522,7 +542,10 @@ function renderMApp() {
   if (mState.classic) return;
   const body = document.getElementById("m-body");
   const html = { heute: mRenderHeute, kalender: mRenderKalender, coach: mRenderCoach, training: mRenderTraining, mehr: mRenderMehr }[mState.page]();
+  const focused = document.activeElement && document.activeElement.id === "m-coach-note" ? document.activeElement : null;
+  const sel = focused ? [focused.selectionStart, focused.selectionEnd] : null;
   body.innerHTML = html;
+  if (sel) { const ta = document.getElementById("m-coach-note"); if (ta && !ta.disabled) { ta.focus(); ta.setSelectionRange(sel[0], sel[1]); } }
   mFillFigures(body);
 }
 
@@ -584,6 +607,23 @@ async function mAction(btn) {
   } else if (act === "week") {
     mState.calWeek = mAddDays(mState.calWeek, 7 * Number(btn.dataset.dir));
     mState.calMonth = new Date(mState.calWeek.getFullYear(), mState.calWeek.getMonth(), 1);
+    renderMApp();
+  } else if (act === "coach-note") {
+    if (typeof replanFromCoachNote !== "function" || (mState.coachNote && mState.coachNote.loading)) return;
+    const text = mState.coachText.trim();
+    mState.coachNote = { loading: true };
+    renderMApp();
+    try {
+      const res = await replanFromCoachNote(text);
+      mState.coachNote = { reply: res.reply, hints: res.hints, undo: res.undo };
+      mState.coachText = "";
+    } catch (e) {
+      mState.coachNote = { error: typeof describeAiError === "function" && !/Ziel|Schreib|Trainingsregeln/.test(e.message || "") ? describeAiError(e) : (e.message || String(e)) };
+    }
+    renderMApp();
+  } else if (act === "coach-undo") {
+    const cn = mState.coachNote;
+    if (cn && cn.undo) { cn.undo(); mState.coachNote = { reply: "Alles wieder wie vorher." }; }
     renderMApp();
   } else if (act === "outlook") {
     if (typeof generateOutlook !== "function" || outlook.loading) return;
@@ -874,6 +914,7 @@ function initMApp() {
     const btn = e.target.closest("[data-m-act]");
     if (btn) mAction(btn);
   });
+  host.addEventListener("input", e => { if (e.target.id === "m-coach-note") mState.coachText = e.target.value; });
   host.addEventListener("keydown", e => {
     if ((e.key === "Enter" || e.key === " ") && e.target.matches("[role=button][data-m-page]")) { e.preventDefault(); mShow(e.target.dataset.mPage); }
   });

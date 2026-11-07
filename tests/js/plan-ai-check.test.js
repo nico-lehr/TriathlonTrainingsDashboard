@@ -157,3 +157,36 @@ test("parseOutlookResponse: kaputte oder leere Antworten werden gemeldet", () =>
   const partial = plain(app.parseOutlookResponse(JSON.stringify({ heute: { empfehlung: "Ruhetag." } }), PROMPT));
   assert.deepStrictEqual(partial.diese_woche, { empfehlung: "", begruendung: "" });
 });
+
+/* ---------- "Sag dem Coach Bescheid" (replanFromCoachNote) ---------- */
+
+test("Coach-Nachricht: offene Einheiten der nächsten 7 Tage werden ersetzt, Erledigtes bleibt, Rückgängig stellt alles her", async () => {
+  const today = run("todayStr()");
+  const plus = n => run(`(() => { const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + ${n}); return localDateStr(d); })()`);
+  run(`getPrimaryGoal = () => ({ id: "g1", name: "Ziel" });
+    buildPlanPrompt = () => ""; buildPlanRulesPrompt = () => ""; buildPlanRetryPrompt = () => "";
+    buildCoachNotePrompt = (note, old) => { globalThis.__note = note; globalThis.__old = old.map(p => p.title); return ""; };
+    planRuleViolations = () => [];`);
+  run(`replacePlannedWorkouts(${JSON.stringify([
+    { id: "a", date: today, sport: "Rad", title: "Rad heute", duration_min: 90, status: "geplant", goalId: "g1" },
+    { id: "b", date: today, sport: "Laufen", title: "Lauf erledigt", duration_min: 30, status: "erledigt", goalId: "g1" },
+    { id: "c", date: plus(10), sport: "Rad", title: "Später", duration_min: 60, status: "geplant", goalId: "g1" },
+  ])})`);
+  run(`callAiText = async () => JSON.stringify({ antwort: "Schwimmen ist drin.", workouts: [
+    { date: "${today}", sport: "Schwimmen", title: "Schwimmen", duration_min: 45, intensity: "leicht", description: "locker" },
+    { date: "${plus(1)}", sport: "Rad", title: "Rad verschoben", duration_min: 90, intensity: "leicht", description: "Z2" }] })`);
+  await run(`replanFromCoachNote("Heute 45 min schwimmen").then(r => { globalThis.__res = r; })`);
+  assert.strictEqual(run("__note"), "Heute 45 min schwimmen");
+  assert.deepStrictEqual(plain(run("__old")), ["Rad heute"]);
+  assert.strictEqual(run("__res.reply"), "Schwimmen ist drin.");
+  const titles = plain(run("plannedWorkouts.map(p => p.title)")).sort();
+  assert.deepStrictEqual(titles, ["Lauf erledigt", "Rad verschoben", "Schwimmen", "Später"]);
+  run("__res.undo()");
+  assert.deepStrictEqual(plain(run("plannedWorkouts.map(p => p.id)")), ["a", "b", "c"]);
+});
+
+test("Coach-Nachricht: leerer Text und fehlendes Ziel geben eine klare Meldung, der Plan bleibt", async () => {
+  await assert.rejects(run(`replanFromCoachNote("  ")`), /Schreib kurz/);
+  run(`getPrimaryGoal = () => null`);
+  await assert.rejects(run(`replanFromCoachNote("x")`), /Hauptziel/);
+});
