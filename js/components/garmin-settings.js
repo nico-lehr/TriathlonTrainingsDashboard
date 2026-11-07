@@ -6,6 +6,71 @@
 
 const GARMIN_SYNC_POLL_MS = 5000;
 
+// Gemeinsamer Stand der Garmin-Verbindung (Einstellungen, Menü
+// "Aktualisieren", Handy-Ansicht): { loaded, configured, expires, days_left,
+// sync: { running, at, ok, message } }. Wer sich mit onGarminState() meldet,
+// bekommt jede Änderung.
+let garminState = { loaded: false, configured: false, sync: {} };
+const garminStateListeners = [];
+
+function onGarminState(fn) { garminStateListeners.push(fn); }
+
+function setGarminState(data) {
+  garminState = { ...(data || {}), loaded: true, configured: !!(data && data.configured), sync: (data && data.sync) || {} };
+  garminStateListeners.forEach(fn => { try { fn(garminState); } catch (e) { console.error(e); } });
+  if (garminState.sync.running) watchGarminSync();
+}
+
+async function refreshGarminState() {
+  try { setGarminState((await apiCall("garmin/personal-api")).data); } catch (e) { /* bleibt beim alten Stand */ }
+  return garminState;
+}
+
+// Nach einem Abruf die neuen Trainings und Gesundheitsdaten zeigen - ohne
+// die Seite neu zu laden.
+async function reloadGarminData() {
+  await Promise.all([loadPersistedWorkouts(), loadWellness()]);
+  if (typeof syncGarminWeightIntoLog === "function") syncGarminWeightIntoLog();
+  renderAll();
+}
+
+// Wartet, bis ein laufender Abruf fertig ist (läuft nur einmal gleichzeitig)
+// und lädt danach die Daten neu. Ergebnis: der Abschluss-Stand des Abrufs.
+let garminWatch = null;
+function watchGarminSync() {
+  if (garminWatch) return garminWatch;
+  garminWatch = (async () => {
+    try {
+      for (let i = 0; i < 240; i++) {
+        await new Promise(r => setTimeout(r, GARMIN_SYNC_POLL_MS));
+        let data;
+        try { data = (await apiCall("garmin/personal-api")).data; } catch (e) { continue; }
+        if (data.sync && data.sync.running) continue;
+        if (data.sync && data.sync.ok) { try { await reloadGarminData(); } catch (e) { console.error(e); } }
+        garminWatch = null;
+        setGarminState(data);
+        return garminState.sync;
+      }
+      return garminState.sync;
+    } finally {
+      garminWatch = null;
+    }
+  })();
+  return garminWatch;
+}
+
+// Abruf starten (oder an einen laufenden anhängen) und auf das Ende warten.
+// Fehler beim Starten (z. B. kein Schlüssel) kommen als Error.
+async function startGarminSync() {
+  try {
+    setGarminState((await apiCall("garmin/sync", "POST")).data);
+  } catch (e) {
+    if (!/läuft schon/.test(e.message)) throw e;
+    setGarminState({ ...garminState, sync: { ...garminState.sync, running: true } });
+  }
+  return watchGarminSync();
+}
+
 function initGarminSettings() {
   const statusEl = document.getElementById("garmin-api-status");
   const keyInput = document.getElementById("garmin-api-key");
@@ -15,7 +80,6 @@ function initGarminSettings() {
   const syncStatusEl = document.getElementById("garmin-api-sync-status");
   const deleteBtn = document.getElementById("garmin-api-delete-btn");
   if (!statusEl || !keyInput || !expiresInput || !saveBtn || !syncBtn || !syncStatusEl || !deleteBtn) return;
-  let pollTimer = null;
 
   function setStatus(el, text, kind) {
     el.textContent = text || "";
@@ -47,31 +111,19 @@ function initGarminSettings() {
     syncBtn.disabled = !!sync.running;
     syncStatusEl.replaceChildren();
     if (sync.running) {
-      setStatus(syncStatusEl, "Abruf läuft … beim ersten Mal kann das einige Minuten dauern.", "");
+      setStatus(syncStatusEl, "Abruf läuft … beim ersten Mal kann das einige Minuten dauern. Die Daten erscheinen danach von selbst.", "");
     } else if (sync.at) {
       const when = new Date(sync.at);
-      setStatus(syncStatusEl, `Letzter Abruf ${fmtDate(when)} ${when.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}: ${sync.message || ""} `, sync.ok ? "ok" : "err");
-      if (sync.ok) {
-        const reload = document.createElement("button");
-        reload.type = "button";
-        reload.className = "chip";
-        reload.textContent = "Neu laden, um die Daten zu sehen";
-        reload.addEventListener("click", () => window.location.reload());
-        syncStatusEl.appendChild(reload);
-      }
+      setStatus(syncStatusEl, `Letzter Abruf ${fmtDate(when)} ${when.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}: ${sync.message || ""}`, sync.ok ? "ok" : "err");
     } else {
       setStatus(syncStatusEl, "", "");
     }
-    clearTimeout(pollTimer);
-    if (sync.running) pollTimer = setTimeout(refresh, GARMIN_SYNC_POLL_MS);
   }
 
   async function refresh() {
-    try {
-      render((await apiCall("garmin/personal-api")).data);
-    } catch (e) {
-      setStatus(statusEl, e.message, "err");
-    }
+    const before = garminState.loaded;
+    await refreshGarminState();
+    if (!before && !garminState.loaded) setStatus(statusEl, "Garmin-Stand konnte nicht geladen werden.", "err");
   }
 
   async function save() {
@@ -83,7 +135,7 @@ function initGarminSettings() {
       const res = await apiCall("garmin/personal-api", "PUT", { key, expires: expiresInput.value || null }, { timeoutMs: 45000 });
       keyInput.value = "";
       expiresInput.value = "";
-      render(res.data);
+      setGarminState(res.data); // der Server startet gleich den ersten Abruf
     } catch (e) {
       setStatus(statusEl, e.message, "err");
     } finally {
@@ -94,7 +146,7 @@ function initGarminSettings() {
   async function startSync() {
     syncBtn.disabled = true;
     try {
-      render((await apiCall("garmin/sync", "POST")).data);
+      await startGarminSync();
     } catch (e) {
       setStatus(syncStatusEl, e.message, "err");
       syncBtn.disabled = false;
@@ -104,7 +156,7 @@ function initGarminSettings() {
   async function remove() {
     if (!(await confirmDialog("Garmin-Schlüssel entfernen? Danach holt das Dashboard keine neuen Garmin-Daten mehr für dich (bereits geholte bleiben). Zurückziehen kannst du ihn zusätzlich in Garmin Connect.", { okLabel: "Entfernen" }))) return;
     try {
-      render((await apiCall("garmin/personal-api", "DELETE")).data);
+      setGarminState((await apiCall("garmin/personal-api", "DELETE")).data);
     } catch (e) {
       setStatus(statusEl, e.message, "err");
     }
@@ -114,6 +166,7 @@ function initGarminSettings() {
   keyInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); save(); } });
   syncBtn.addEventListener("click", startSync);
   deleteBtn.addEventListener("click", remove);
+  onGarminState(render);
   refresh();
 }
 
@@ -123,23 +176,15 @@ async function startGarminSyncFromMenu() {
   const el = document.getElementById("garmin-sync-status");
   const show = (html, cls) => { if (el) { el.innerHTML = html; el.className = "update-menu-sync" + (cls ? " " + cls : ""); } };
   show("Abruf läuft … beim ersten Mal kann das einige Minuten dauern.");
+  let sync;
   try {
-    await apiCall("garmin/sync", "POST");
+    sync = await startGarminSync();
   } catch (e) {
-    if (!/läuft schon/.test(e.message)) {
-      show(`${escapeHtml(e.message)}<br><a href="#" class="sync-hint" data-open-garmin-settings>Garmin-Verbindung öffnen</a>`, "err");
-      return;
-    }
-  }
-  for (let i = 0; i < 180; i++) {
-    await new Promise(r => setTimeout(r, 5000));
-    let sync;
-    try { sync = (await apiCall("garmin/personal-api")).data.sync || {}; } catch (e) { continue; }
-    if (sync.running) continue;
-    if (sync.ok) show(`${escapeHtml(sync.message || "Fertig.")}<br><a href="#" class="sync-hint" data-reload>Neu laden, um die Daten zu sehen</a>`, "ok");
-    else show(escapeHtml(sync.message || "Abruf fehlgeschlagen."), "err");
+    show(`${escapeHtml(e.message)}<br><a href="#" class="sync-hint" data-open-garmin-settings>Garmin-Verbindung öffnen</a>`, "err");
     return;
   }
+  if (sync && sync.ok) show(`${escapeHtml(sync.message || "Fertig.")} Die Daten sind aktualisiert.`, "ok");
+  else show(escapeHtml((sync && sync.message) || "Abruf fehlgeschlagen."), "err");
 }
 
 function initGarminMenu() {

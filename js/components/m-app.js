@@ -20,7 +20,7 @@ const M_SPORT = {
 };
 const M_SPORT_OTHER = { color: "var(--m-muted)", icon: '<circle cx="12" cy="12" r="7"/>' };
 
-const mState = { page: "heute", sub: "mobility", range: 30, calMonth: null, calWeek: null, classic: null, busy: false };
+const mState = { page: "heute", sub: "mobility", planId: null, range: 30, calMonth: null, calWeek: null, classic: null, busy: false };
 
 function mEnabled() {
   try { return localStorage.getItem(M_KEY) !== "off"; } catch (e) { return true; }
@@ -122,12 +122,19 @@ function mHeaderHtml(kicker, title, right = "") {
 }
 
 function mSyncPill() {
+  const gs = typeof garminState !== "undefined" ? garminState : { loaded: false, sync: {} };
   const sync = typeof lastGarminSync === "function" ? lastGarminSync() : null;
-  if (!sync || !sync.at) return `<button type="button" class="m-pill" data-m-act="garmin"><i class="off"></i>Garmin verbinden</button>`;
+  if (gs.sync && gs.sync.running) return `<span class="m-pill busy" role="status"><i></i>Holt Garmin-Daten …</span>`;
+  if (gs.loaded && !gs.configured) return `<button type="button" class="m-pill" data-m-act="garmin"><i class="off"></i>Garmin verbinden</button>`;
+  if (gs.loaded && gs.sync && gs.sync.at && gs.sync.ok === false) return `<button type="button" class="m-pill" data-m-act="garmin"><i class="bad"></i>Garmin: Abruf fehlgeschlagen</button>`;
+  if (!sync || !sync.at) {
+    return gs.loaded ? `<button type="button" class="m-pill" data-m-act="garmin-sync"><i class="old"></i>Jetzt von Garmin holen</button>`
+      : `<button type="button" class="m-pill" data-m-act="garmin"><i class="off"></i>Garmin</button>`;
+  }
   const d = new Date(sync.at);
   const today = localDateStr(d) === todayStr();
   const label = today ? d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
-  return `<button type="button" class="m-pill" data-m-act="garmin-sync"><i class="${today ? "" : "old"}"></i>Garmin · ${mEsc(label)}</button>`;
+  return `<button type="button" class="m-pill" data-m-act="garmin-sync" aria-label="Jetzt von Garmin holen (zuletzt ${mEsc(label)})"><i class="${today ? "" : "old"}"></i>Garmin · ${mEsc(label)} ↻</button>`;
 }
 
 function mRenderHeute() {
@@ -365,15 +372,62 @@ function mRenderCoach() {
     + `<button type="button" class="m-more" data-m-classic="coach">Ganzer Coach-Bereich</button>`;
 }
 
+// Geplante Kraft-/Mobility-Einheit, die gerade unter "Training" gezeigt wird
+// (aus Kalender, Übersicht oder Coach angetippt).
+function mPlannedFocus(sport) {
+  const pw = mState.planId ? (plannedWorkouts || []).find(p => p.id === mState.planId) : null;
+  return pw && pw.sport === sport ? pw : null;
+}
+
+function mWhenLabel(pw) {
+  if (pw.date === todayStr()) return "Heute geplant";
+  return `Geplant: ${new Date(pw.date + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "short" })}`;
+}
+
+function mOpenPlannedTraining(pw) {
+  mState.planId = pw.id;
+  mState.sub = pw.sport === "Kraft" ? "kraft" : "mobility";
+  mShow("training");
+}
+
 function mStrengthSession() {
   const today = todayStr();
+  const last = strengthState.history[strengthState.history.length - 1];
+  const rules = () => buildStrengthSession({ tp: trainingProfile(), today, lastIds: last ? last.exercises || [] : [] });
+  const focus = mPlannedFocus("Kraft");
+  if (focus) {
+    const fromPlan = plannedToStrengthSession(focus);
+    if (fromPlan) return { session: fromPlan, when: mWhenLabel(focus), planned: focus };
+    // Plan ohne Übungen aus der Sammlung: passende Einheit zusammenstellen, die den Plan abhakt.
+    const s = rules();
+    return s ? { session: { ...s, title: focus.title || s.title, plannedId: focus.id }, when: mWhenLabel(focus), planned: focus, filled: true } : null;
+  }
   const planned = (typeof plannedWorkouts !== "undefined" ? plannedWorkouts : [])
     .filter(p => p.sport === "Kraft" && p.status === "geplant" && p.date >= today).sort((a, b) => a.date.localeCompare(b.date))
     .map(p => ({ p, s: plannedToStrengthSession(p) })).find(x => x.s);
-  if (planned) return { session: planned.s, when: planned.p.date === today ? "Heute geplant" : `Geplant: ${new Date(planned.p.date + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long" })}` };
-  const last = strengthState.history[strengthState.history.length - 1];
-  const s = buildStrengthSession({ tp: trainingProfile(), today, lastIds: last ? last.exercises || [] : [] });
+  if (planned) return { session: planned.s, when: mWhenLabel(planned.p), planned: planned.p };
+  const s = rules();
   return s ? { session: s, when: "Vorschlag für dich" } : null;
+}
+
+function mMobilitySession() {
+  const focus = mPlannedFocus("Mobility");
+  if (focus) {
+    const fromPlan = plannedToMobilitySession(focus);
+    if (fromPlan) return { session: fromPlan, label: mWhenLabel(focus), planned: focus };
+    const rules = mobRulesSession();
+    if (rules) return { session: { ...rules, title: focus.title || rules.title, plannedId: focus.id }, label: mWhenLabel(focus), planned: focus, filled: true };
+  }
+  const { session, kind } = mobActiveSession();
+  const label = { claude: "Von Claude für dich", planned: "Heute eingeplant", saved: "Für dich heute", rules: "Für dich heute" }[kind] || "Für dich heute";
+  return { session, label, planned: null };
+}
+
+// Kopfzeile über dem Training, wenn es aus dem Plan kommt.
+function mPlanBanner(k) {
+  if (!k || !k.planned) return "";
+  return `<div class="m-planbar"><span>${k.filled ? "Im Plan standen keine Übungen aus der Sammlung – passend dazu zusammengestellt." : `Aus deinem Plan · ${mEsc(k.planned.title || k.planned.sport)}`}</span>
+    <span class="m-planbar-act"><button type="button" class="m-link" data-m-act="plan-details" data-id="${mEsc(k.planned.id)}">Details</button>${mState.planId ? `<button type="button" class="m-link" data-m-act="plan-clear">Anderes Training</button>` : ""}</span></div>`;
 }
 
 function mRenderTraining() {
@@ -387,24 +441,24 @@ function mRenderTraining() {
       return `<button type="button" class="m-row" data-m-act="strength-detail" data-id="${ex.id}"><span class="m-fig-sm" data-m-fig="s:${ex.id}"></span><span class="m-grow"><span class="m-row-title">${mEsc(ex.name)}</span><span class="m-row-meta">${x.sets} × ${mEsc(ex.hold ? `${x.hold || ex.hold} s` : x.reps || ex.reps)}${ex.weight && (x.kg != null ? x.kg : strengthWeight(ex.id)) > 0 ? ` · ${mNum(x.kg != null ? x.kg : strengthWeight(ex.id), 1).replace(",0", "")} kg` : ""}</span></span><span class="m-tag plan">${mEsc(STRENGTH_AREAS[ex.areas[0]])}</span></button>`;
     }).join("");
     const needs = [...new Set(s.exercises.flatMap(x => STRENGTH_BY_ID[x.id].equipment))].map(e => MOBILITY_EQUIPMENT[e].split(" ")[0]);
-    return mHeaderHtml(k.when, "Training") + seg
+    return mHeaderHtml(k.when, "Training") + seg + mPlanBanner(k)
       + `<section class="m-card m-hero-ex"><div class="m-fig-lg" data-m-fig="s:${s.exercises[0].id}"></div>
           <div><b class="m-hero-title">${mEsc(s.title)}</b><small class="m-row-meta">${s.minutes || Math.round(strengthSessionSeconds(s) / 60)} min · ${s.exercises.length} Übungen${needs.length ? ` · ${mEsc(needs.join(" & "))}` : " · ohne Geräte"}</small></div>
           <button type="button" class="m-btn primary wide" data-m-act="start-strength-now">Training starten</button></section>`
       + `<section class="m-card"><div class="m-head"><h2>Übungen</h2><button type="button" class="m-link" data-m-act="profile">Hilfsmittel</button></div><div class="m-list">${rows}</div></section>`;
   }
-  const { session, kind } = mobActiveSession();
+  const mk = mMobilitySession();
+  const session = mk.session;
   if (!session) return mHeaderHtml("Mobility", "Training") + seg + `<section class="m-card"><p class="m-empty">Mit deinem Trainingsprofil passt gerade keine Übung.</p><div class="m-actions"><button type="button" class="m-btn soft" data-m-act="profile">Trainingsprofil</button></div></section>`;
   const rows = session.exercises.filter(x => MOBILITY_BY_ID[x.id]).map(x => {
     const ex = MOBILITY_BY_ID[x.id];
     return `<button type="button" class="m-row" data-m-act="mob-detail" data-id="${ex.id}"><span class="m-fig-sm" data-m-fig="m:${ex.id}"></span><span class="m-grow"><span class="m-row-title">${mEsc(ex.name)}</span><span class="m-row-meta">${mEsc(mobExerciseMeta(ex, x.seconds))} · ${mEsc(MOBILITY_AREAS[ex.areas[0]])}</span></span></button>`;
   }).join("");
-  const label = { claude: "Von Claude für dich", planned: "Heute eingeplant", saved: "Für dich heute", rules: "Für dich heute" }[kind] || "Für dich heute";
-  return mHeaderHtml(label, "Training") + seg
+  return mHeaderHtml(mk.label, "Training") + seg + mPlanBanner(mk)
     + `<section class="m-card m-hero-ex"><div class="m-fig-lg" data-m-fig="m:${session.exercises[0].id}"></div>
         <div><b class="m-hero-title">${mEsc(session.title)}</b><small class="m-row-meta">${Math.max(1, Math.round(mobilitySessionSeconds(session) / 60))} min · ${session.exercises.length} Übungen</small></div>
         <button type="button" class="m-btn primary wide" data-m-act="start-mob-now">Starten</button>
-        ${typeof claudeAvailable === "function" && claudeAvailable() ? `<button type="button" class="m-btn ghost wide" data-m-act="mob-claude">${mState.busy ? "Claude stellt zusammen …" : "Mit Claude anpassen"}</button>` : ""}</section>`
+        ${!mk.planned && typeof claudeAvailable === "function" && claudeAvailable() ? `<button type="button" class="m-btn ghost wide" data-m-act="mob-claude">${mState.busy ? "Claude stellt zusammen …" : "Mit Claude anpassen"}</button>` : ""}</section>`
     + `<section class="m-card"><div class="m-head"><h2>Ablauf</h2><button type="button" class="m-link" data-m-classic="mobility">Alle Übungen</button></div><div class="m-list">${rows}</div></section>`;
 }
 
@@ -433,11 +487,30 @@ function mScheduleRender() {
   mRenderTimer = setTimeout(renderMApp, 60);
 }
 
+// Farbe der Safari-Leisten oben/unten an die dunkle Ansicht anpassen.
+function mThemeColor(active) {
+  let meta = document.getElementById("m-theme-color");
+  if (active && !meta) {
+    meta = document.createElement("meta");
+    meta.name = "theme-color";
+    meta.id = "m-theme-color";
+    document.head.appendChild(meta);
+  }
+  if (meta) { if (active) meta.content = "#0c0d0f"; else meta.remove(); }
+  // Die festen hell/dunkel-Einträge würden sonst Vorrang haben.
+  document.querySelectorAll('meta[name="theme-color"][media]').forEach(m => {
+    if (active) { if (!m.dataset.mMedia) m.dataset.mMedia = m.media; m.media = "not all"; }
+    else if (m.dataset.mMedia) { m.media = m.dataset.mMedia; delete m.dataset.mMedia; }
+  });
+}
+
 function renderMApp() {
   const host = document.getElementById("m-app");
   if (!host) return;
   const active = mActive();
   document.body.classList.toggle("m-graphit", active);
+  document.documentElement.classList.toggle("m-graphit-root", active);
+  mThemeColor(active);
   document.body.classList.toggle("m-classic", active && !!mState.classic);
   if (!active) { host.hidden = true; return; }
   host.hidden = !!mState.classic;
@@ -484,7 +557,13 @@ function mBack() {
 async function mAction(btn) {
   const act = btn.dataset.mAct;
   const id = btn.dataset.id;
-  if (act === "plan" && id) mPlanSheet(id);
+  if (act === "plan" && id) {
+    const pw = plannedWorkouts.find(p => p.id === id);
+    if (pw && (pw.sport === "Kraft" || pw.sport === "Mobility")) mOpenPlannedTraining(pw);
+    else mPlanSheet(id);
+  }
+  else if (act === "plan-details" && id) mPlanSheet(id);
+  else if (act === "plan-clear") { mState.planId = null; renderMApp(); }
   else if (act === "plan-new") openPlanEdit(null, { date: btn.dataset.date || todayStr() });
   else if (act === "workout") {
     const w = mAllWorkouts().find(x => String(x.file || x.id || "") === btn.dataset.file);
@@ -516,7 +595,7 @@ async function mAction(btn) {
     const pw = plannedWorkouts.find(p => p.id === id);
     if (pw) startPlannedMobility(pw);
   } else if (act === "start-mob-now") {
-    const { session } = mobActiveSession();
+    const { session } = mMobilitySession();
     if (session) startMobilitySession(session);
   } else if (act === "mob-detail" && id) openMobilityDetail(id);
   else if (act === "mob-claude") {
@@ -534,7 +613,13 @@ async function mAction(btn) {
   } else if (act === "strength-detail" && id) mStrengthDetail(id);
   else if (act === "profile") { mState.classic = "settings"; openTrainingProfile(); renderMApp(); }
   else if (act === "garmin") { mState.classic = "settings"; openSettingsView(); renderMApp(); const c = document.getElementById("garmin-settings-card"); if (c) c.scrollIntoView({ block: "start" }); }
-  else if (act === "garmin-sync") { if (typeof startGarminSyncFromMenu === "function") startGarminSyncFromMenu(); }
+  else if (act === "garmin-sync") {
+    try { await startGarminSync(); } catch (e) {
+      mState.classic = "settings"; openSettingsView(); renderMApp();
+      const c = document.getElementById("garmin-settings-card"); if (c) c.scrollIntoView({ block: "start" });
+    }
+    renderMApp();
+  }
   else if (act === "m-off") {
     try { localStorage.setItem(M_KEY, "off"); } catch (e) { /* nur Komfort */ }
     mState.classic = null;
@@ -548,6 +633,7 @@ function mStartStrength(session) {
     onFinish: res => {
       addStrengthHistory(res);
       if (session.plannedId) updatePlannedWorkout(session.plannedId, { status: "erledigt" });
+      if (session.plannedId && mState.planId === session.plannedId) mState.planId = null;
       renderMApp();
     },
   });
@@ -773,7 +859,7 @@ function initMApp() {
     const tab = e.target.closest("[data-m-page]");
     if (tab) { mShow(tab.dataset.mPage); return; }
     const sub = e.target.closest("[data-m-sub]");
-    if (sub) { mState.sub = sub.dataset.mSub; renderMApp(); return; }
+    if (sub) { mState.sub = sub.dataset.mSub; mState.planId = null; renderMApp(); return; }
     const classic = e.target.closest("[data-m-classic]");
     if (classic) { mOpenClassic(classic.dataset.mClassic, classic.dataset.mScroll); return; }
     const seg = e.target.closest("[data-m-check] button");
@@ -808,6 +894,7 @@ function initMApp() {
     window[name] = function (...args) { const r = fn.apply(this, args); mScheduleRender(); return r; };
   };
   ["savePlannedWorkouts", "saveMobilityState", "saveStrengthState", "renderAll", "renderOutlook"].forEach(wrap);
+  if (typeof onGarminState === "function") onGarminState(() => mScheduleRender());
   if (window.matchMedia) window.matchMedia(M_QUERY).addEventListener("change", () => renderMApp());
   renderMApp();
 }

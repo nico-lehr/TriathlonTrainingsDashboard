@@ -344,3 +344,22 @@ body.m-graphit .plan-edit-card h3 { background: none; }
 .m-sheet-bar { min-height: 46px; box-sizing: border-box; background: var(--m-bg); border-radius: 22px 22px 0 0; z-index: 1; }
 .m-sheet-body { padding-top: 0; }
 .m-sh-head { padding-right: 0; }
+
+/* Kein heller Rand unter kurzen Seiten (z. B. "Mehr"): auch html dunkel. */
+html.m-graphit-root { background: #0c0d0f; color-scheme: dark; }
+body.m-graphit { min-height: 100vh; min-height: 100dvh; }
+
+/* Garmin-Knopf oben */
+.m-pill i.bad { background: var(--m-bad); }
+.m-pill.busy { cursor: default; color: var(--m-text); }
+.m-pill.busy i { background: var(--m-accent); animation: m-pulse 1s ease-in-out infinite; }
+@keyframes m-pulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .m-pill.busy i { animation: none; } }
+
+/* Training aus dem Plan */
+.m-planbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 14px; border-radius: 14px; background: color-mix(in srgb, var(--m-accent) 12%, var(--m-surface));
+  border: 1px solid color-mix(in srgb, var(--m-accent) 25%, transparent); font-size: 13.5px; line-height: 1.35;
+}
+.m-planbar-act { display: flex; gap: 14px; flex: none; }

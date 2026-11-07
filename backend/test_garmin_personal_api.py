@@ -467,6 +467,10 @@ class EinstellungenTest(TempDirsMixin, unittest.TestCase):
         super().setUp()
         self.client = self.app.test_client()
         garmin_api_routes._sync_state.clear()
+        # Das Speichern startet den ersten Abruf - in Tests nie wirklich laufen lassen.
+        patcher = mock.patch("threading.Thread")
+        self.started_threads = patcher.start()
+        self.addCleanup(patcher.stop)
 
     def put(self, who, body):
         return self.client.put("/api/v1/garmin/personal-api", headers=self.h[who], json=body)
@@ -489,10 +493,23 @@ class EinstellungenTest(TempDirsMixin, unittest.TestCase):
         self.client.delete("/api/v1/garmin/personal-api", headers=self.h["garmin-anna"])
         self.assertFalse(personal_api.has_key(self.ids["garmin-anna"]))
 
+    def test_nach_dem_speichern_startet_gleich_der_erste_abruf(self):
+        self.fake({personal_api.TOKEN_PATH: jwt(time.time() + 86400).encode()})
+        r = self.put("garmin-anna", {"key": API_KEY})
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.get_json()["data"]["sync"]["running"])
+        self.assertEqual(self.started_threads.call_args.kwargs["args"], (self.ids["garmin-anna"],))
+        self.started_threads.return_value.start.assert_called_once()
+        # Nochmal speichern, waehrend er laeuft: kein zweiter Abruf, Schluessel trotzdem gespeichert
+        self.assertEqual(self.put("garmin-anna", {"key": API_KEY}).status_code, 200)
+        self.started_threads.return_value.start.assert_called_once()
+        personal_api.delete_key(self.ids["garmin-anna"])
+
     def test_abgelehnter_schluessel_wird_nicht_gespeichert(self):
         self.fake({personal_api.TOKEN_PATH: 401})
         r = self.put("garmin-anna", {"key": API_KEY})
         self.assertEqual(r.status_code, 400)
+        self.started_threads.assert_not_called()  # kein Abruf ohne gueltigen Schluessel
         self.assertIn("abgelehnt", r.get_json()["error"])
         self.assertFalse(personal_api.has_key(self.ids["garmin-anna"]))
 

@@ -74,6 +74,9 @@ def put_garmin_personal_api():
         return response_error(e.user_message, "garmin_unreachable", 502)
     personal_api.save_key(athlete_id, key, expires)
     personal_api.cache_token(athlete_id, key, token, expires_at)
+    # Gleich den ersten Abruf starten - sonst kaemen die Daten erst mit dem
+    # naechtlichen Abruf. Scheitert das Starten, bleibt der Schluessel trotzdem.
+    _start_sync(athlete_id)
     return response_success(_status(athlete_id))
 
 
@@ -106,20 +109,27 @@ def _run_sync(athlete_id):
             _sync_state[athlete_id] = {"running": False, "at": datetime.now().isoformat(timespec="seconds"), **result}
 
 
+def _start_sync(athlete_id):
+    """Startet den Abruf im Hintergrund. None = gestartet, sonst (Meldung, Code, Status)."""
+    if not personal_api.has_key(athlete_id):
+        return ("Garmin ist für dich noch nicht verbunden – zuerst den Schlüssel eintragen.", "garmin_not_connected", 409)
+    if importlib.util.find_spec("fitdecode") is None:  # liest die .fit-Dateien (parse_fit.py)
+        return ("Auf dem Dashboard-PC fehlt noch eine Bibliothek. Einmalig dort ausführen: "
+                "python -m pip install -r requirements.txt", "library_missing", 503)
+    with _sync_lock:
+        if (_sync_state.get(athlete_id) or {}).get("running"):
+            return ("Der Abruf läuft schon.", "sync_running", 409)
+        _sync_state[athlete_id] = {**(_sync_state.get(athlete_id) or {}), "running": True}
+    threading.Thread(target=_run_sync, args=(athlete_id,), daemon=True, name=f"garmin-sync-{athlete_id}").start()
+    return None
+
+
 @api_bp.route("/garmin/sync", methods=["POST"])
 def start_garmin_sync():
     athlete_id = get_current_athlete_id()
-    if not personal_api.has_key(athlete_id):
-        return response_error("Garmin ist für dich noch nicht verbunden – zuerst den Schlüssel eintragen.",
-                              "garmin_not_connected", 409)
-    if importlib.util.find_spec("fitdecode") is None:  # liest die .fit-Dateien (parse_fit.py)
-        return response_error("Auf dem Dashboard-PC fehlt noch eine Bibliothek. Einmalig dort ausführen: "
-                              "python -m pip install -r requirements.txt", "library_missing", 503)
-    with _sync_lock:
-        if (_sync_state.get(athlete_id) or {}).get("running"):
-            return response_error("Der Abruf läuft schon.", "sync_running", 409)
-        _sync_state[athlete_id] = {**(_sync_state.get(athlete_id) or {}), "running": True}
-    threading.Thread(target=_run_sync, args=(athlete_id,), daemon=True, name=f"garmin-sync-{athlete_id}").start()
+    err = _start_sync(athlete_id)
+    if err:
+        return response_error(*err)
     return response_success(_status(athlete_id), status=202)
 
 
