@@ -4,6 +4,17 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.26
+
+Am Computer wie eine richtige App, das Menü steht fest, und alles bewegt sich ein bisschen.
+
+Neu in 2.4.26:
+- Computer: Seitenleiste links mit allen Bereichen, der Inhalt nutzt die ganze Breite – auf großen Bildschirmen in drei Spalten
+- Übersicht am Computer zusätzlich mit „Als Nächstes“ (die nächsten geplanten Einheiten)
+- Kalender am Computer: großer Monatskalender, in jedem Tag stehen die Einheiten (gemacht farbig, geplant gestrichelt)
+- Das Menü oben steht jetzt fest: alle fünf Bereiche sind immer sichtbar, nichts rutscht mehr zur Seite
+- Kleine Animationen: die Markierung im Menü gleitet mit, Karten gleiten herein, Ringe zeichnen sich auf, Knöpfe geben beim Antippen nach (aus, wenn „Bewegung reduzieren“ eingeschaltet ist)
+
 ## 2.4.25
 
 Graphit auch am Computer, Garmin gleich beim Start und ein aufgeräumtes Profil.
