@@ -20,6 +20,17 @@ const RECOVERY_METRICS = [
     hint: "Schlafdauer", transform: v => v / 60 },
   { field: "body_battery_high", label: "Body Battery", unit: "", digits: 0, invert: false, color: "var(--c-sonstiges)",
     hint: "Tageshöchstwert der Energiereserve" },
+  // Weitere Werte nur anzeigen, wenn die Uhr sie liefert (optional).
+  { field: "readiness_score", label: "Trainingsbereitschaft", unit: "", digits: 0, invert: false, color: "var(--c-rad)",
+    hint: "Garmin Training Readiness (0–100)", optional: true },
+  { field: "skin_temp_dev_c", label: "Handgelenktemperatur", unit: "°C", digits: 1, invert: true, color: "var(--c-laufen)",
+    hint: "Abweichung vom eigenen Normalwert in der Nacht", optional: true },
+  { field: "resp_sleep", label: "Atemfrequenz", unit: "/min", digits: 1, invert: true, color: "var(--c-schwimmen)",
+    hint: "Atemzüge pro Minute im Schlaf", optional: true },
+  { field: "spo2_avg", label: "Blutsauerstoff", unit: "%", digits: 0, invert: false, color: "var(--c-rad)",
+    hint: "SpO2 im Schlaf (Durchschnitt)", optional: true },
+  { field: "stress_avg", label: "Stress", unit: "", digits: 0, invert: true, color: "var(--c-sonstiges)",
+    hint: "Garmin-Stresswert des Tages (0–100)", optional: true },
 ];
 
 function renderRecovery() {
@@ -44,6 +55,7 @@ function renderRecovery() {
 
   RECOVERY_METRICS.forEach(m => {
     const latest = latestWellness(m.field);
+    if (m.optional && !latest && !wellnessSeries(m.field, days).length) return;
     const baseline = wellnessBaseline(m.field, 30);
     const tf = m.transform || (v => v);
 

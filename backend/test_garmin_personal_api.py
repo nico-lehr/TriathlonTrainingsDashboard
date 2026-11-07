@@ -292,6 +292,28 @@ class SyncMitApiTest(TempDirsMixin, unittest.TestCase):
         self.assertEqual((day["weight_kg"], day["body_fat_pct"]), (72.4, 15.5))
         self.assertIsNone(day["vo2max"])  # liefert die Personal API nicht - nie geraten
 
+    def test_temperatur_atmung_spo2_stress_und_bereitschaft(self):
+        cache = {"days": {"2026-10-04": {
+            "sleep": {"dailySleepDTO": {"sleepTimeSeconds": 25200, "averageRespirationValue": 14.5, "averageSpO2Value": 95,
+                                        "lowestSpO2Value": 88, "avgSleepStress": 18, "awakeSleepSeconds": 1200},
+                      "avgSkinTempDeviationC": 0.8},
+            "hrv": {"hrvSummary": {"lastNightAvg": 50, "weeklyAvg": 55}},
+            "summary": {"averageStressLevel": 31, "avgWakingRespirationValue": 15.2, "moderateIntensityMinutes": 20,
+                        "vigorousIntensityMinutes": 15, "bodyBatteryChargedValue": 61},
+            "readiness": [{"score": 72, "level": "HIGH"}],
+        }, "2026-10-05": {
+            "sleep": {"dailySleepDTO": {"sleepTimeSeconds": 25200, "averageRespirationValue": 99, "averageSpO2Value": 12}},
+        }}}
+        out = garmin_sync.normalize(cache)
+        day = out["2026-10-04"]
+        self.assertEqual((day["skin_temp_dev_c"], day["resp_sleep"], day["resp_waking"]), (0.8, 14.5, 15.2))
+        self.assertEqual((day["spo2_avg"], day["spo2_low"], day["stress_avg"], day["sleep_stress"]), (95, 88, 31, 18))
+        self.assertEqual((day["readiness_score"], day["readiness_level"], day["hrv_weekly_avg"]), (72, "HIGH", 55))
+        self.assertEqual((day["intensity_min_moderate"], day["intensity_min_vigorous"], day["body_battery_charged"], day["sleep_awake_min"]), (20, 15, 61, 20))
+        # Messfehler (Atmung 99/min, SpO2 12 %) werden zur Luecke statt weitergegeben
+        self.assertIsNone(out["2026-10-05"]["resp_sleep"])
+        self.assertIsNone(out["2026-10-05"]["spo2_avg"])
+
     def test_body_battery_aus_verschachtelter_tageszusammenfassung(self):
         cache = {"days": {}, "ranges": {"daily_summaries": {"data": [
             {"calendarDate": "2026-10-02", "bodyBattery": {"bodyBatteryHighestValue": 91, "bodyBatteryLowestValue": 22}}]}}}

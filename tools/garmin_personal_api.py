@@ -311,6 +311,10 @@ class PersonalApiClient:
         return self._get("/wellness-service/wellness/dailyHeartRate", {"date": cdate}, missing_ok=True)
 
     # Gesundheitsdaten fuer einen Zeitraum
+    def get_training_readiness(self, cdate):
+        """Training Readiness (0-100) eines Tages - Liste, neuester Eintrag zuerst."""
+        return self._get(f"/metrics-service/metrics/trainingreadiness/{cdate}", missing_ok=True)
+
     def get_body_battery(self, startdate, enddate):
         return self._get("/wellness-service/wellness/bodyBattery/reports/daily",
                          {"startDate": startdate, "endDate": enddate})

@@ -145,7 +145,8 @@ function futurePlannedDatesForGoal(goalId) {
 // Erholungs-Check, Hauptevent. Den ACWR holt validatePlan() selbst
 // (computePerformanceState). options: weitere validatePlan-Optionen, z. B. planUntil.
 function planRuleViolations(list, options = {}) {
-  const wellness = { hrv_ms: wellnessDeviation("hrv_ms"), resting_hr: wellnessDeviation("resting_hr") };
+  const wellness = typeof planWellnessInput === "function" ? planWellnessInput()
+    : { hrv_ms: wellnessDeviation("hrv_ms"), resting_hr: wellnessDeviation("resting_hr") };
   return validatePlan(list, DATA, wellness, recoveryCheck, { goal: getPrimaryGoal(), ...options });
 }
 

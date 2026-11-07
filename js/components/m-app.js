@@ -75,8 +75,10 @@ function mLoadSeries() {
 }
 
 // Erholung in % aus HRV, Ruhepuls und Schlaf (Garmin) im Vergleich zum
-// eigenen 30-Tage-Mittel; der Erholungs-Check (Muskelkater, Energie,
-// Verletzung) zieht ab. Ohne Garmin-Daten nur aus dem Erholungs-Check.
+// eigenen 30-Tage-Mittel, dazu Garmins Trainingsbereitschaft. Warnzeichen der
+// Uhr (erhöhte Handgelenktemperatur, schnellere Atmung im Schlaf) ziehen ab,
+// ebenso der Erholungs-Check (Muskelkater, Energie, Verletzung). Ohne
+// Garmin-Daten nur aus dem Erholungs-Check.
 function mRecovery() {
   const parts = [];
   const hrv = typeof wellnessDeviation === "function" ? wellnessDeviation("hrv_ms") : null;
@@ -85,6 +87,11 @@ function mRecovery() {
   if (hrv) parts.push([0.5, Math.max(0, Math.min(100, 72 + hrv.deltaPct * 2.5))]);
   if (rhr) parts.push([0.25, Math.max(0, Math.min(100, 72 - rhr.deltaPct * 4))]);
   if (sleep) parts.push([0.25, Math.max(0, Math.min(100, (sleep.value / 480) * 90))]);
+  const ready = typeof latestWellness === "function" ? latestWellness("readiness_score", 1) : null;
+  if (ready) parts.push([0.35, ready.value]);
+  const temp = typeof latestWellness === "function" ? latestWellness("skin_temp_dev_c", 1) : null;
+  const resp = typeof wellnessDeviation === "function" ? wellnessDeviation("resp_sleep") : null;
+  const signs = typeof planWellnessSigns === "function" && typeof planWellnessInput === "function" ? planWellnessSigns(planWellnessInput(), todayStr()) : [];
   const rc = typeof recoveryCheck !== "undefined" ? recoveryCheck : {};
   const checked = rc.soreness || rc.energy || rc.injury === "yes";
   if (!parts.length && !checked) return null;
@@ -92,7 +99,10 @@ function mRecovery() {
   if (rc.soreness === "severe") score -= 18; else if (rc.soreness === "moderate") score -= 8; else if (rc.soreness === "light") score -= 3;
   if (rc.energy === "low") score -= 18; else if (rc.energy === "reduced") score -= 8; else if (rc.energy === "high") score += 4;
   if (rc.injury === "yes") score -= 25;
+  if (temp && temp.value >= 0.8) score -= Math.min(20, 10 + (temp.value - 0.8) * 15);
+  if (resp && resp.value - resp.baseline >= 1.5) score -= 8;
   return {
+    signs,
     score: Math.round(Math.max(0, Math.min(100, score))),
     hrv: hrv ? Math.round(hrv.value) : null,
     rhr: rhr ? Math.round(rhr.value) : (typeof latestWellness === "function" && latestWellness("resting_hr") ? Math.round(latestWellness("resting_hr").value) : null),
@@ -100,8 +110,41 @@ function mRecovery() {
   };
 }
 
+// Kleine Zeile unter den Ringen: Nachtwerte der Uhr, falls vorhanden.
+function mNightValues() {
+  if (typeof latestWellness !== "function") return "";
+  const v = (f, days = 2) => latestWellness(f, days);
+  const n = (x, d) => mNum(x, d);
+  const items = [];
+  const ready = v("readiness_score");
+  if (ready) items.push(["Bereitschaft", `${Math.round(ready.value)}`, ready.value < 25 ? "bad" : ""]);
+  const temp = v("skin_temp_dev_c");
+  if (temp) items.push(["Temperatur", `${temp.value >= 0 ? "+" : "−"}${n(Math.abs(temp.value), 1)} °C`, temp.value >= 0.8 ? "bad" : ""]);
+  const resp = v("resp_sleep");
+  if (resp) {
+    const dev = typeof wellnessDeviation === "function" ? wellnessDeviation("resp_sleep") : null;
+    items.push(["Atmung", `${n(resp.value, 1)}/min`, dev && dev.value - dev.baseline >= 1.5 ? "bad" : ""]);
+  }
+  const spo2 = v("spo2_avg");
+  if (spo2) items.push(["SpO2", `${Math.round(spo2.value)} %`, spo2.value < 90 ? "bad" : ""]);
+  const stress = v("stress_avg");
+  if (stress) items.push(["Stress", `${Math.round(stress.value)}`, ""]);
+  if (!items.length) return "";
+  return `<div class="m-night">${items.map(([l, val, cls]) => `<span class="${cls}"><small>${l}</small>${val}</span>`).join("")}</div>`;
+}
+
 function mVerdict(rec, plannedHard) {
   if (!rec) return { cls: "neutral", text: "Füll den Erholungs-Check im Coach aus – dann sage ich dir, was heute passt." };
+  // Warnzeichen der Uhr gehen vor: ein guter Gesamtwert soll sie nicht überdecken.
+  if (rec.signs && rec.signs.length) {
+    // Mögliche Infektzeichen (Temperatur, Atmung) zuerst nennen.
+    const sorted = [...rec.signs].sort((a, b) => (/temperatur|atmest/.test(b) ? 1 : 0) - (/temperatur|atmest/.test(a) ? 1 : 0));
+    const first = sorted[0].charAt(0).toUpperCase() + sorted[0].slice(1);
+    const more = sorted.length - 1;
+    const sick = /temperatur|atmest/.test(sorted[0]);
+    return { cls: rec.score >= 45 ? "warn" : "bad",
+      text: `${first}${more ? ` – dazu ${more === 1 ? "ein weiteres Warnzeichen" : `${more} weitere Warnzeichen`}` : ""}. ${sick ? "Kann ein beginnender Infekt sein – heute lieber locker oder Pause." : "Heute lieber locker."}` };
+  }
   if (rec.score >= 70) return { cls: "good", text: plannedHard ? "Gut erholt – die harte Einheit heute passt." : "Gut erholt – du kannst heute gut trainieren." };
   if (rec.score >= 45) return { cls: "warn", text: plannedHard ? "Mittel erholt – harte Einheit lieber etwas kürzer." : "Mittel erholt – heute eher locker." };
   return { cls: "bad", text: "Wenig erholt – heute locker oder Ruhetag." };
@@ -167,6 +210,7 @@ function mRenderHeute() {
       <div class="m-ring-col">${mRing(sleep ? sleep.value / 480 : 0, "var(--m-r3)", sleep ? `${Math.floor(sleep.value / 60)}:${String(Math.round(sleep.value % 60)).padStart(2, "0")}` : "–", "Schlaf")}
         <span class="m-ring-sub">${deep ? `Tiefschlaf ${Math.floor(deep.value / 60)}:${String(Math.round(deep.value % 60)).padStart(2, "0")}` : "keine Daten"}</span></div>
     </div>
+    ${mNightValues()}
     <div class="m-verdict ${verdict.cls}"><i></i>${mEsc(verdict.text)}</div>`;
 
   // Heute geplant

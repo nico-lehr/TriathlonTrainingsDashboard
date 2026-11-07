@@ -110,6 +110,11 @@ RECENT_REFETCH_DAYS = 3  # letzte n Tage immer neu holen - Garmin traegt Werte n
 # werden alte Tage automatisch nachgezogen, wenn hier etwas dazukommt.
 DAY_SECTIONS = ("sleep", "hrv", "rhr", "max_metrics", "training_status", "summary")
 
+# Training Readiness (Garmin-Bereitschaft 0-100) nur fuer die letzten Tage -
+# fuer Empfehlungen zaehlt der aktuelle Wert; sonst wuerde die Erweiterung
+# einmalig hunderte alte Tage neu abfragen.
+READINESS_DAYS = 45
+
 
 def log(msg):
     print(msg, flush=True)
@@ -399,7 +404,13 @@ def sync_wellness(client, start, end, path):
         e = days.get(ds)
         return not isinstance(e, dict) or any(k not in e for k in DAY_SECTIONS)
 
-    todo = [ds for ds in all_days if ds not in days or ds >= refetch_from or unvollstaendig(ds)]
+    readiness_from = (date.today() - timedelta(days=READINESS_DAYS)).isoformat()
+
+    def ohne_readiness(ds):
+        e = days.get(ds)
+        return ds >= readiness_from and (not isinstance(e, dict) or "readiness" not in e)
+
+    todo = [ds for ds in all_days if ds not in days or ds >= refetch_from or unvollstaendig(ds) or ohne_readiness(ds)]
 
     log(f"\nGesundheitsdaten: {len(all_days)} Tage im Zeitraum, {len(todo)} abzurufen "
         f"({len(all_days) - len(todo)} bereits vorhanden).")
@@ -409,7 +420,7 @@ def sync_wellness(client, start, end, path):
     # get_body_battery lieferte im Praxistest nichts, deshalb je Tag.
     sections = (("sleep", "get_sleep_data"), ("hrv", "get_hrv_data"), ("rhr", "get_rhr_day"),
                 ("max_metrics", "get_max_metrics"), ("training_status", "get_training_status"),
-                ("summary", "get_user_summary"))
+                ("summary", "get_user_summary"), ("readiness", "get_training_readiness"))
     try:
         for i, ds in enumerate(todo, 1):
             entry = days.get(ds, {})
@@ -421,6 +432,8 @@ def sync_wellness(client, start, end, path):
             fails = entry.setdefault("_failed", {})
             for key, method in sections:
                 if key in entry and ds < refetch_from:
+                    continue
+                if key == "readiness" and ds < readiness_from:
                     continue
                 result = call(client, method, ds)
                 if result is not FAILED:
@@ -463,6 +476,11 @@ def num(*candidates):
         if isinstance(v, (int, float)) and not isinstance(v, bool):
             return v
     return None
+
+
+def in_range(value, lo, hi):
+    """Wert nur, wenn er plausibel ist - ein Messfehler wird zur Luecke."""
+    return value if value is not None and lo <= value <= hi else None
 
 
 def as_dict(value):
@@ -539,6 +557,10 @@ def normalize(cache):
         ts = dig(raw, "training_status", "mostRecentTrainingStatus", "latestTrainingStatusData") or {}
         ts_first = next(iter(ts.values()), {}) if isinstance(ts, dict) else {}
 
+        summ = as_dict(raw.get("summary"))
+        readiness = raw.get("readiness")
+        readiness = as_dict(readiness[0] if isinstance(readiness, list) and readiness else readiness)
+
         sleep_s = num(sleep_dto.get("sleepTimeSeconds"))
         entry = {
             "sleep_min": round(sleep_s / 60) if sleep_s else None,
@@ -560,6 +582,27 @@ def normalize(cache):
             # Unbekannte Phrasen werden unveraendert durchgereicht statt geraten.
             "training_status": training_status_label(ts_first),
             "training_load_week": num(ts_first.get("weeklyTrainingLoad")) if isinstance(ts_first, dict) else None,
+            # --- weitere Nacht-/Tageswerte (alle aus Antworten, die ohnehin
+            # abgefragt werden; Feldnamen wie in Garmin Connect). Unplausible
+            # Werte (Messfehler) werden verworfen statt weitergegeben.
+            "sleep_light_min": (lambda v: round(v / 60) if v else None)(num(sleep_dto.get("lightSleepSeconds"))),
+            "sleep_awake_min": (lambda v: round(v / 60) if v is not None else None)(num(sleep_dto.get("awakeSleepSeconds"))),
+            "sleep_stress": in_range(num(sleep_dto.get("avgSleepStress")), 0, 100),
+            "hrv_weekly_avg": num(hrv_sum.get("weeklyAvg")),
+            # Handgelenktemperatur: Abweichung vom eigenen Normalwert in Grad C
+            # (Garmin misst keine absolute Temperatur).
+            "skin_temp_dev_c": in_range(num(find_key(sleep_raw, "avgSkinTempDeviationC"),
+                                           find_key(sleep_dto, "avgSkinTempDeviationC")), -5, 5),
+            "resp_sleep": in_range(num(sleep_dto.get("averageRespirationValue")), 4, 40),
+            "resp_waking": in_range(num(find_key(summ, "avgWakingRespirationValue")), 4, 40),
+            "spo2_avg": in_range(num(sleep_dto.get("averageSpO2Value"), find_key(summ, "averageSpo2")), 70, 100),
+            "spo2_low": in_range(num(sleep_dto.get("lowestSpO2Value"), find_key(summ, "lowestSpo2")), 50, 100),
+            "stress_avg": in_range(num(find_key(summ, "averageStressLevel")), 0, 100),
+            "body_battery_charged": in_range(num(find_key(summ, "bodyBatteryChargedValue"), find_key(sleep_raw, "bodyBatteryChange")), 0, 100),
+            "intensity_min_moderate": num(find_key(summ, "moderateIntensityMinutes")),
+            "intensity_min_vigorous": num(find_key(summ, "vigorousIntensityMinutes")),
+            "readiness_score": in_range(num(readiness.get("score")), 0, 100),
+            "readiness_level": readiness.get("level") if isinstance(readiness.get("level"), str) else None,
         }
         if any(v is not None for v in entry.values()):
             out[ds] = entry
@@ -586,6 +629,16 @@ def normalize(cache):
                 e["body_battery_high"] = hi
             if lo is not None:
                 e["body_battery_low"] = lo
+        # Tageswerte aus der Zusammenfassung des Zeitraums (offizielle API) -
+        # nur, wenn der Tag sie nicht schon aus der Tagesabfrage hat.
+        for field, key, lo, hi in (("stress_avg", "averageStressLevel", 0, 100),
+                                   ("resp_waking", "avgWakingRespirationValue", 4, 40),
+                                   ("spo2_avg", "averageSpo2", 70, 100),
+                                   ("spo2_low", "lowestSpo2", 50, 100),
+                                   ("body_battery_charged", "bodyBatteryChargedValue", 0, 100)):
+            v = in_range(num(find_key(summ, key)), lo, hi)
+            if v is not None and day_entry(ds).get(field) is None:
+                day_entry(ds)[field] = v
         # Schritte hier als Reserve, falls der Zeitraum-Endpunkt nichts liefert
         st = num(summ.get("totalSteps"))
         if st is not None:
@@ -660,6 +713,7 @@ def store_wellness(session, athlete_id, daily):
         row.hrv_ms = values.get("hrv_ms")
         row.resting_hr = values.get("resting_hr")
         row.steps = values.get("steps")
+        row.stress_level = values.get("stress_avg")
         row.garmin_wellness_data = values
         session.add(row)
     session.commit()

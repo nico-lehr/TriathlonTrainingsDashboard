@@ -76,6 +76,18 @@ function wellnessDeviation(field, days = 30) {
   return { ...latest, baseline: base, deltaPct: ((latest.value - base) / base) * 100 };
 }
 
+// Alle Garmin-Messwerte, die in die Planprüfung (planWellnessSigns,
+// js/analytics/plan-rules.js) einfließen.
+function planWellnessInput() {
+  return {
+    hrv_ms: wellnessDeviation("hrv_ms"),
+    resting_hr: wellnessDeviation("resting_hr"),
+    resp_sleep: wellnessDeviation("resp_sleep"),
+    skin_temp_dev_c: latestWellness("skin_temp_dev_c", 2),
+    readiness_score: latestWellness("readiness_score", 2),
+  };
+}
+
 // Zeitpunkt/Ergebnis des letzten Syncs - fuer die Statusanzeige im Update-Menue.
 function lastGarminSync() { return WELLNESS.sync || null; }
 

@@ -81,6 +81,14 @@ const PLAN_BAD_RECOVERY = { energy: ["low"], soreness: ["severe"] };
 const PLAN_HRV_DROP_PCT = 10;
 const PLAN_RHR_RISE_BPM = 5;
 const PLAN_WELLNESS_MAX_AGE_DAYS = 1;
+// Weitere Warnzeichen der Uhr (je nur von heute/gestern):
+// - Handgelenktemperatur ab +0,8 °C über dem eigenen Normalwert (Garmin misst
+//   nur die Abweichung) - häufig das erste Zeichen eines Infekts.
+// - Atemfrequenz im Schlaf ab +1,5 Atemzügen/min über dem 30-Tage-Mittel.
+// - Garmin Training Readiness unter 25 von 100 ("niedrig").
+const PLAN_SKIN_TEMP_RISE_C = 0.8;
+const PLAN_RESP_RISE = 1.5;
+const PLAN_READINESS_LOW = 25;
 
 // Sportarten eines Ziels - je mind. 1 lockere Grundlageneinheit pro Woche.
 const PLAN_GOAL_SPORTS = { Triathlon: ["Schwimmen", "Rad", "Laufen"], Schwimmen: ["Schwimmen"], Rad: ["Rad"], Laufen: ["Laufen"] };
@@ -421,7 +429,9 @@ function planRecoveryGate(acwr, recovery, todayKey) {
 }
 
 // Erwartet die Ausgabe von wellnessDeviation() (js/data/garmin-wellness.js):
-// { hrv_ms: wellnessDeviation("hrv_ms"), resting_hr: wellnessDeviation("resting_hr") }.
+// { hrv_ms: wellnessDeviation("hrv_ms"), resting_hr: wellnessDeviation("resting_hr"),
+//   resp_sleep: wellnessDeviation("resp_sleep"), skin_temp_dev_c: latestWellness(...),
+//   readiness_score: latestWellness(...) } - siehe planWellnessInput().
 // Fehlt etwas (kein Garmin-Sync, zu wenig Werte für eine Basislinie, Wert
 // älter als gestern), wird still übersprungen - nie raten.
 function planWellnessSigns(wellness, todayKey) {
@@ -431,6 +441,11 @@ function planWellnessSigns(wellness, todayKey) {
   const signs = [];
   if (fresh(hrv) && hrv.deltaPct <= -PLAN_HRV_DROP_PCT) signs.push(`deine HRV liegt ${Math.round(-hrv.deltaPct)} % unter deinem Durchschnitt`);
   if (fresh(rhr) && rhr.value - rhr.baseline >= PLAN_RHR_RISE_BPM) signs.push(`dein Ruhepuls liegt ${Math.round(rhr.value - rhr.baseline)} Schläge über deinem Durchschnitt`);
+  const recent = d => d && d.date >= minDate && d.date <= todayKey && d.value != null;
+  const temp = wellness && wellness.skin_temp_dev_c, resp = wellness && wellness.resp_sleep, ready = wellness && wellness.readiness_score;
+  if (recent(temp) && temp.value >= PLAN_SKIN_TEMP_RISE_C) signs.push(`deine Handgelenktemperatur liegt ${String(Math.round(temp.value * 10) / 10).replace(".", ",")} °C über deinem Normalwert`);
+  if (fresh(resp) && resp.value - resp.baseline >= PLAN_RESP_RISE) signs.push(`du atmest im Schlaf ${String(Math.round((resp.value - resp.baseline) * 10) / 10).replace(".", ",")} Atemzüge pro Minute schneller als sonst`);
+  if (recent(ready) && ready.value < PLAN_READINESS_LOW) signs.push(`Garmin meldet nur ${Math.round(ready.value)} von 100 Punkten Trainingsbereitschaft`);
   return signs;
 }
 

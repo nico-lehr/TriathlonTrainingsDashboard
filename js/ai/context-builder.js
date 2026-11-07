@@ -183,6 +183,34 @@ function buildCompactContext(goal) {
     if (steps) wellBits.push(`Schritte ${Math.round(steps.value).toLocaleString("de-DE")}`);
     const ts = latestWellness("training_status");
     if (ts) wellBits.push(`Trainingszustand laut Garmin: ${ts.value}`);
+    // Weitere Nachtwerte der Uhr - Temperatur, Atmung und Sauerstoff sind
+    // oft die ersten Zeichen eines Infekts, noch bevor man sich krank fühlt.
+    const ready = latestWellness("readiness_score", 2);
+    if (ready) {
+      const lvl = latestWellness("readiness_level", 2);
+      wellBits.push(`Trainingsbereitschaft laut Garmin ${Math.round(ready.value)}/100${lvl ? ` (${lvl.value})` : ""}`);
+    }
+    const hrvWeek = latestWellness("hrv_weekly_avg", 3);
+    if (hrvWeek) wellBits.push(`HRV 7-Tage-Schnitt laut Garmin ${Math.round(hrvWeek.value)} ms`);
+    const temp = latestWellness("skin_temp_dev_c", 3);
+    if (temp) wellBits.push(`Handgelenktemperatur nachts ${temp.value >= 0 ? "+" : "−"}${fmtNum(Math.abs(temp.value), 1)} °C ggue. eigenem Normalwert${temp.value >= 0.8 ? " (erhöht - möglicher Infekt)" : ""}`);
+    const resp = wellnessDeviation("resp_sleep");
+    if (resp) {
+      const d = resp.value - resp.baseline;
+      wellBits.push(`Atemfrequenz im Schlaf ${fmtNum(resp.value, 1)}/min (${d >= 0 ? "+" : "−"}${fmtNum(Math.abs(d), 1)} ggue. 30-Tage-Mittel)`);
+    } else {
+      const r = latestWellness("resp_sleep", 3) || latestWellness("resp_waking", 3);
+      if (r) wellBits.push(`Atemfrequenz ${fmtNum(r.value, 1)}/min`);
+    }
+    const spo2 = latestWellness("spo2_avg", 3);
+    if (spo2) {
+      const low = latestWellness("spo2_low", 3);
+      wellBits.push(`Blutsauerstoff (SpO2) Ø ${Math.round(spo2.value)} %${low ? `, tiefster Wert ${Math.round(low.value)} %` : ""}`);
+    }
+    const stress = wellnessDeviation("stress_avg");
+    if (stress) wellBits.push(`Stress (Garmin, 0-100) Ø ${Math.round(stress.value)} (30-Tage-Mittel ${Math.round(stress.baseline)})`);
+    const sleepStress = latestWellness("sleep_stress", 2);
+    if (sleepStress) wellBits.push(`Stress im Schlaf Ø ${Math.round(sleepStress.value)}`);
   }
 
   // Koerperzusammensetzung als eigene Zeile mit Trend - fuer die Bewertung von
@@ -643,6 +671,16 @@ function buildOutlookFacts() {
   if (hrv) facts.today.push(`HRV (Garmin, ${fmtDate(new Date(hrv.date + "T00:00:00"))}): ${signed(Math.round(hrv.deltaPct), 0)} % gegenüber dem eigenen 30-Tage-Mittel`);
   const rhr = wellnessDeviation("resting_hr");
   if (rhr) facts.today.push(`Ruhepuls (Garmin, ${fmtDate(new Date(rhr.date + "T00:00:00"))}): ${signed(Math.round(rhr.value - rhr.baseline), 0)} Schläge gegenüber dem eigenen 30-Tage-Mittel`);
+  const ready = latestWellness("readiness_score", 2);
+  if (ready) facts.today.push(`Trainingsbereitschaft (Garmin): ${Math.round(ready.value)} von 100`);
+  const temp = latestWellness("skin_temp_dev_c", 2);
+  if (temp) facts.today.push(`Handgelenktemperatur nachts (Garmin): ${signed(Math.round(temp.value * 10) / 10, 1)} °C gegenüber dem eigenen Normalwert${temp.value >= 0.8 ? " – erhöht, möglicher Infekt" : ""}`);
+  const resp = wellnessDeviation("resp_sleep");
+  if (resp) facts.today.push(`Atemfrequenz im Schlaf (Garmin): ${signed(Math.round((resp.value - resp.baseline) * 10) / 10, 1)} Atemzüge/min gegenüber dem eigenen 30-Tage-Mittel`);
+  const spo2 = latestWellness("spo2_avg", 2);
+  if (spo2) facts.today.push(`Blutsauerstoff nachts (Garmin): Ø ${Math.round(spo2.value)} %`);
+  const stress = wellnessDeviation("stress_avg");
+  if (stress) facts.today.push(`Stress (Garmin): Ø ${Math.round(stress.value)} von 100 (eigenes Mittel ${Math.round(stress.baseline)})`);
   const todayPlan = openPlan(todayKey, todayKey);
   facts.today.push(todayPlan.length
     ? `Heute geplant: ${todayPlan.map(p => [p.sport, p.duration_min != null ? `${Math.round(p.duration_min)} min` : "", p.intensity || ""].filter(Boolean).join(" ")).join(", ")}`

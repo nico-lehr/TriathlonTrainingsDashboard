@@ -451,3 +451,17 @@ test("Regel 7: die Erholungswoche endet 7 Tage nach dem Rennen", () => {
   const v = byRule(validate(plan, { goal }), "recovery_week");
   assert.deepStrictEqual(v.map(x => x.workoutId), [plan[0].id]);
 });
+
+test("Garmin-Werte: Handgelenktemperatur, Atemfrequenz und niedrige Trainingsbereitschaft -> warn", () => {
+  const plan = [pw(day(1), "Laufen", 50, "hart"), pw(day(3), "Rad", 60, "leicht")];
+  const temp = byRule(validate(plan, { wellness: { skin_temp_dev_c: { date: day(0), value: 0.9 } } }), "wellness");
+  assert.strictEqual(temp.length, 1);
+  assert.match(temp[0].text, /Handgelenktemperatur liegt 0,9 °C/);
+  assert.strictEqual(byRule(validate(plan, { wellness: { skin_temp_dev_c: { date: day(0), value: 0.5 } } }), "wellness").length, 0);
+  const resp = byRule(validate(plan, { wellness: { resp_sleep: { date: day(0), value: 16.5, baseline: 14.5, deltaPct: 13.8 } } }), "wellness");
+  assert.match(resp[0].text, /2 Atemzüge pro Minute schneller/);
+  const ready = byRule(validate(plan, { wellness: { readiness_score: { date: day(0), value: 18 } } }), "wellness");
+  assert.match(ready[0].text, /nur 18 von 100/);
+  // alte Werte zählen nicht
+  assert.strictEqual(byRule(validate(plan, { wellness: { skin_temp_dev_c: { date: day(-4), value: 1.5 } } }), "wellness").length, 0);
+});

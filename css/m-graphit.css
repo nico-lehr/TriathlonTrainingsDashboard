@@ -383,3 +383,9 @@ body.m-graphit { min-height: 100vh; min-height: 100dvh; }
 .m-btn:disabled { opacity: .6; cursor: default; }
 .m-reply { margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--m-accent) 10%, transparent); }
 .m-reply .m-link { margin-top: 4px; padding: 0; }
+
+/* Übersicht: Nachtwerte der Uhr unter den Ringen */
+.m-night { display: flex; flex-wrap: wrap; justify-content: space-around; gap: 8px 14px; margin: 12px 0 12px; padding-top: 12px; border-top: 1px solid var(--m-line); }
+.m-night span { display: flex; flex-direction: column; align-items: center; font-size: 14px; font-weight: 650; color: var(--m-text); font-variant-numeric: tabular-nums; }
+.m-night small { font-size: 11px; font-weight: 500; color: var(--m-muted); }
+.m-night span.bad { color: var(--m-bad); }
