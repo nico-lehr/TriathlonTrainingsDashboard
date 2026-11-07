@@ -4,6 +4,17 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.29
+
+Mobility-Einheiten dauern jetzt wirklich so lange wie geplant.
+
+Neu in 2.4.29:
+- Korrektur: Vom KI-Coach geplante Mobility-Einheiten waren oft viel zu kurz (z. B. 10 Minuten geplant, aber nur knapp 3 Minuten Übungen). Jetzt ergeben die Übungen zusammen immer ungefähr die geplante Dauer
+- Dehnungen werden mindestens 30 Sekunden gehalten. Ist eine Einheit zu kurz, werden Übungen länger oder eine passende Übung kommt dazu; ist sie zu lang, wird gekürzt
+- Schon geplante, zu kurze Mobility-Einheiten werden beim nächsten Öffnen automatisch passend gemacht – auch auf der Garmin-Uhr
+- Bewegungsübungen zeigen mehr Wiederholungen, wenn sie länger dauern
+- Der Mitmach-Modus läuft jetzt genau so lange, wie angezeigt
+
 ## 2.4.28
 
 Trainings landen automatisch auf deiner Garmin-Uhr, und die Einstellungen sind schlichter.
