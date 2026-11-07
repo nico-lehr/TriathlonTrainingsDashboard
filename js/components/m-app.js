@@ -164,12 +164,12 @@ function mRenderHeute() {
   // Heute geplant
   let todayCard;
   if (main) {
-    const desc = (main.description || "").split(/[.\n]/)[0];
+    const desc = mStepSummary(main) || (main.description || "").split(/[.,\n]/)[0];
     todayCard = `<div class="m-today">${mIcon(main.sport, "lg")}<div class="m-grow"><div class="m-row-title lg">${mEsc(main.title || main.sport)}${main.duration_min ? ` · ${mDur(main.duration_min)}` : ""}</div>
         <div class="m-row-meta">${main.intensity ? `<span class="m-tag ${main.intensity}">${mEsc(main.intensity)}</span>` : ""}${mEsc(desc).slice(0, 90)}</div></div></div>
       <div class="m-actions">${main.status === "erledigt" ? `<span class="m-done-note">Erledigt ✓</span>` : ""}
         ${main.sport === "Kraft" && typeof plannedToStrengthSession === "function" && plannedToStrengthSession(main) ? `<button type="button" class="m-btn primary" data-m-act="start-strength" data-id="${mEsc(main.id)}">Mitmachen</button>` : ""}
-        <button type="button" class="m-btn ${main.sport === "Kraft" ? "soft" : "primary"}" data-m-act="plan" data-id="${mEsc(main.id)}">Details${main.sport === "Kraft" ? "" : " & An Garmin"}</button></div>`;
+        <button type="button" class="m-btn ${main.sport === "Kraft" ? "soft" : "primary"}" data-m-act="plan" data-id="${mEsc(main.id)}">${main.sport === "Kraft" ? "Details" : "Ansehen & an Garmin"}</button></div>`;
   } else {
     todayCard = `<p class="m-empty">${(athleteProfile.trainingDays || []).length && !(athleteProfile.trainingDays || []).includes(["so", "mo", "di", "mi", "do", "fr", "sa"][now.getDay()]) ? "Heute ist Ruhetag. Genieß ihn." : "Für heute ist nichts geplant."}</p>
       <div class="m-actions"><button type="button" class="m-btn soft" data-m-page="coach">Plan ansehen</button></div>`;
@@ -484,7 +484,7 @@ function mBack() {
 async function mAction(btn) {
   const act = btn.dataset.mAct;
   const id = btn.dataset.id;
-  if (act === "plan" && id) openPlanEdit(id);
+  if (act === "plan" && id) mPlanSheet(id);
   else if (act === "plan-new") openPlanEdit(null, { date: btn.dataset.date || todayStr() });
   else if (act === "workout") {
     const w = mAllWorkouts().find(x => String(x.file || x.id || "") === btn.dataset.file);
@@ -576,6 +576,172 @@ function mStrengthDetail(id) {
   requestAnimationFrame(() => overlay.classList.add("is-open"));
   const close = () => { overlay.classList.remove("is-open"); setTimeout(() => overlay.remove(), 250); };
   overlay.addEventListener("click", e => { if (e.target === overlay || e.target.closest(".mob-sheet-close")) close(); });
+}
+
+/* ------------------------------------------------------------ Geplante Einheit */
+
+const M_STEP_COLOR = { warmup: "var(--m-muted)", cooldown: "var(--m-muted)", recovery: "var(--m-good)", rest: "var(--m-good)" };
+
+// Schritte flach machen (Wiederholungen ausschreiben) - für die Zeitleiste.
+function mFlatSteps(steps) {
+  const out = [];
+  steps.forEach(s => {
+    if (s.type === "repeat") for (let i = 0; i < (s.count || 1); i++) s.steps.forEach(x => out.push(x));
+    else out.push(s);
+  });
+  return out;
+}
+
+function mStepTarget(s) {
+  return s.target && s.target.kind && s.target.kind !== "none" ? `${WORKOUT_TARGET_LABELS[s.target.kind].replace(/-?Zone$/, "").replace("Leistungszone", "Leistung").trim()} Zone ${s.target.zone}` : "";
+}
+
+function mStepAmount(s) {
+  return s.duration_min ? mDur(s.duration_min) : s.distance_km ? `${mNum(s.distance_km, s.distance_km < 1 ? 2 : 1)} km` : "bis Runde";
+}
+
+// Kurzform für Listen: "15′ Aufwärmen · 45′ Zone 2 · 10′ Abwärmen"
+function mStepSummary(p) {
+  if (!["Laufen", "Rad", "Schwimmen"].includes(p.sport) || typeof plannedWorkoutSteps !== "function") return "";
+  return plannedWorkoutSteps(p).map(s => s.type === "repeat" ? `${s.count}× ${s.steps.map(x => mStepAmount(x)).join("/")}`
+    : `${s.duration_min ? `${Math.round(s.duration_min)}′` : mStepAmount(s)} ${s.type === "interval" && mStepTarget(s) ? mStepTarget(s).replace(/^HF /, "") : WORKOUT_STEP_LABELS[s.type]}`).join(" · ");
+}
+
+// Beschreibung in kurze Punkte teilen: an Satzenden (nicht nach "ca.",
+// "z. B." ...), lange Sätze zusätzlich an Kommas außerhalb von Klammern.
+// Bewusst ohne Lookbehind im RegExp (ältere iPhones kennen das nicht).
+const M_ABBR = /(?:^|[\s(])(?:ca|bzw|z|B|u|a|ggf|evtl|inkl|max|min|mind|ggü|vgl|Nr|bspw)\.$/i;
+function mNoteParts(text) {
+  const out = [];
+  String(text || "").split(/\n+/).forEach(line => {
+    let cur = "";
+    for (let i = 0; i < line.length; i++) {
+      cur += line[i];
+      if (/[.!?]/.test(line[i]) && /\s/.test(line[i + 1] || "") && /[A-ZÄÖÜ0-9]/.test((line.slice(i + 1).trim()[0]) || "") && !M_ABBR.test(cur)) { out.push(cur); cur = ""; }
+    }
+    if (cur.trim()) out.push(cur);
+  });
+  return out.flatMap(sentence => {
+    const t = sentence.trim();
+    if (t.length <= 90) return [t.replace(/\.$/, "")];
+    const parts = []; let cur = "", depth = 0;
+    for (const ch of t) {
+      if (ch === "(") depth++; else if (ch === ")") depth = Math.max(0, depth - 1);
+      if (ch === "," && depth === 0) { parts.push(cur); cur = ""; } else cur += ch;
+    }
+    parts.push(cur);
+    return parts.map(x => x.trim().replace(/\.$/, "")).filter(Boolean).map(x => x[0].toUpperCase() + x.slice(1));
+  }).filter(Boolean);
+}
+
+function mPlanSheetHtml(p) {
+  const date = new Date(p.date + "T12:00:00");
+  const today = p.date === todayStr();
+  const sport = mSport(p.sport);
+  const head = `<div class="m-sh-head">${mIcon(p.sport, "lg")}<div class="m-grow">
+      <div class="m-kicker">${today ? "Heute" : mEsc(date.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" }))} · ${mEsc(p.sport)}</div>
+      <h2 class="m-sh-title">${mEsc(p.title || p.sport)}</h2></div></div>
+    <div class="m-sh-facts">
+      ${p.duration_min ? `<div class="m-num"><small>Dauer</small><b>${mDur(p.duration_min)}</b></div>` : ""}
+      ${p.intensity ? `<div class="m-num"><small>Intensität</small><b class="m-int ${mEsc(p.intensity)}">${mEsc(p.intensity[0].toUpperCase() + p.intensity.slice(1))}</b></div>` : ""}
+      <div class="m-num"><small>Status</small><b class="${p.status === "erledigt" ? "good" : p.status === "uebersprungen" ? "bad" : ""}">${p.status === "erledigt" ? "Erledigt" : p.status === "uebersprungen" ? "Übersprungen" : "Geplant"}</b></div>
+    </div>`;
+
+  let flow = "";
+  const endurance = ["Laufen", "Rad", "Schwimmen"].includes(p.sport);
+  if (endurance && typeof plannedWorkoutSteps === "function") {
+    const steps = plannedWorkoutSteps(p);
+    const flat = mFlatSteps(steps);
+    const total = flat.reduce((a, s) => a + (s.duration_min || (s.distance_km ? s.distance_km * 6 : 3)), 0) || 1;
+    const bar = flat.map(s => `<span style="flex:${(s.duration_min || (s.distance_km ? s.distance_km * 6 : 3)) / total};background:${M_STEP_COLOR[s.type] || sport.color}"></span>`).join("");
+    const rows = steps.map(s => {
+      if (s.type === "repeat") {
+        return `<li class="m-step"><i style="background:${sport.color}"></i><div class="m-grow"><b>${s.count}× wiederholen</b>
+          ${s.steps.map(x => `<span class="m-row-meta">${mEsc(WORKOUT_STEP_LABELS[x.type])} · ${mStepAmount(x)}${mStepTarget(x) ? ` · ${mEsc(mStepTarget(x))}` : ""}</span>`).join("")}</div></li>`;
+      }
+      return `<li class="m-step"><i style="background:${M_STEP_COLOR[s.type] || sport.color}"></i><div class="m-grow"><b>${mEsc(WORKOUT_STEP_LABELS[s.type])}</b>${mStepTarget(s) ? `<span class="m-row-meta">${mEsc(mStepTarget(s))}</span>` : ""}</div><span class="m-step-amt">${mStepAmount(s)}</span></li>`;
+    }).join("");
+    flow = `<section class="m-card"><div class="m-head"><h2>Ablauf</h2><span class="m-head-note">so läuft es auf der Uhr</span></div>
+      <div class="m-flowbar" aria-hidden="true">${bar}</div><ol class="m-steps">${rows}</ol></section>`;
+  } else if ((p.exercises || []).length) {
+    const lib = p.sport === "Kraft" && typeof STRENGTH_BY_ID !== "undefined" ? STRENGTH_BY_ID : p.sport === "Mobility" && typeof MOBILITY_BY_ID !== "undefined" ? MOBILITY_BY_ID : {};
+    flow = `<section class="m-card"><div class="m-head"><h2>Übungen</h2></div><div class="m-list">${p.exercises.map(x => {
+      const ex = x.id && lib[x.id];
+      const amount = x.sets ? `${x.sets} × ${x.reps || ""}` : x.seconds ? `${x.seconds} s` : x.reps || "";
+      return `<div class="m-row">${ex ? `<span class="m-fig-sm" data-m-fig="${p.sport === "Kraft" ? "s" : "m"}:${ex.id}"></span>` : mIcon(p.sport, "sm")}<span class="m-grow"><span class="m-row-title">${mEsc(ex ? ex.name : x.name)}</span>${amount || x.note ? `<span class="m-row-meta">${mEsc(amount)}${x.note ? `${amount ? " · " : ""}${mEsc(x.note)}` : ""}</span>` : ""}</span></div>`;
+    }).join("")}</div></section>`;
+  }
+
+  const sentences = mNoteParts(p.description);
+  const notes = sentences.length ? `<section class="m-card"><div class="m-head"><h2>Worauf es ankommt</h2></div><ul class="m-notes">${sentences.map(t => `<li>${mEsc(t)}</li>`).join("")}</ul></section>` : "";
+
+  const st = typeof garminSendState !== "undefined" ? garminSendState.get(p.id) || {} : {};
+  let primary = "";
+  if (p.sport === "Kraft" && typeof plannedToStrengthSession === "function" && plannedToStrengthSession(p)) primary = `<button type="button" class="m-btn primary wide" data-sh="strength">Mitmachen</button>`;
+  else if (p.sport === "Mobility" && typeof plannedToMobilitySession === "function" && plannedToMobilitySession(p)) primary = `<button type="button" class="m-btn primary wide" data-sh="mobility">Starten</button>`;
+  else if (typeof canSendToGarmin === "function" && canSendToGarmin(p)) {
+    primary = `<button type="button" class="m-btn primary wide" data-sh="garmin"${st.loading ? " disabled" : ""}>${st.loading ? "Sende an Garmin …" : p.garminSentAt ? "Erneut an Garmin senden" : "An Garmin senden"}</button>`
+      + (st.error ? `<p class="m-say bad small">${mEsc(st.error)}</p><button type="button" class="m-btn ghost wide" data-sh="fit">Stattdessen als .fit-Datei laden</button>`
+        : p.garminSentAt ? `<p class="m-sh-note">✓ Gesendet am ${mEsc(new Date(p.garminSentAt).toLocaleDateString("de-DE", { day: "numeric", month: "short" }))} – nach dem nächsten Sync auf der Uhr.</p>` : "");
+  }
+  const done = p.status === "erledigt";
+  const actions = `<div class="m-sh-actions">${primary}
+      <div class="m-sh-row">
+        <button type="button" class="m-btn soft" data-sh="edit">Bearbeiten</button>
+        <button type="button" class="m-btn soft" data-sh="${done ? "open" : "done"}">${done ? "Wieder offen" : "Erledigt"}</button>
+      </div>
+      ${!done && p.status !== "uebersprungen" ? `<button type="button" class="m-btn ghost wide" data-sh="skip">Überspringen</button>` : ""}</div>`;
+  return head + flow + notes + actions;
+}
+
+function mPlanSheet(id) {
+  const p = plannedWorkouts.find(x => x.id === id);
+  if (!p) return;
+  document.querySelectorAll(".m-sheet-overlay").forEach(el => el.remove());
+  const overlay = document.createElement("div");
+  overlay.className = "m-sheet-overlay";
+  overlay.innerHTML = `<div class="m-sheet" role="dialog" aria-modal="true" aria-label="${mEsc(p.title || p.sport)}">
+      <div class="m-sheet-bar"><span class="m-sheet-grab" aria-hidden="true"></span><button type="button" class="m-icon m-sheet-close" aria-label="Schließen">×</button></div>
+      <div class="m-sheet-body"></div></div>`;
+  document.body.appendChild(overlay);
+  document.body.classList.add("m-sheet-open");
+  const body = overlay.querySelector(".m-sheet-body");
+  const draw = () => {
+    const cur = plannedWorkouts.find(x => x.id === id);
+    if (!cur) { close(); return; }
+    body.innerHTML = mPlanSheetHtml(cur);
+    mFillFigures(body);
+  };
+  const close = () => {
+    overlay.classList.remove("is-open");
+    document.body.classList.remove("m-sheet-open");
+    setTimeout(() => overlay.remove(), 250);
+  };
+  draw();
+  requestAnimationFrame(() => overlay.classList.add("is-open"));
+  overlay.addEventListener("click", async e => {
+    if (e.target === overlay || e.target.closest(".m-sheet-close")) { close(); return; }
+    const btn = e.target.closest("[data-sh]");
+    if (!btn) return;
+    const act = btn.dataset.sh;
+    const cur = plannedWorkouts.find(x => x.id === id);
+    if (!cur) return;
+    if (act === "edit") { close(); openPlanEdit(id); }
+    else if (act === "strength") { close(); mStartStrength(plannedToStrengthSession(cur)); }
+    else if (act === "mobility") { close(); startPlannedMobility(cur); }
+    else if (act === "garmin") { const pr = sendToGarminFromUi(id); draw(); await pr; draw(); }
+    else if (act === "fit") exportPlannedWorkoutAsFit(id);
+    else if (act === "done" || act === "open" || act === "skip") {
+      updatePlannedWorkout(id, { status: act === "done" ? "erledigt" : act === "skip" ? "uebersprungen" : "geplant" });
+      if (typeof renderTrainingPlanCard === "function") renderTrainingPlanCard();
+      draw();
+      renderMApp();
+    }
+  });
+  document.addEventListener("keydown", function onKey(e) {
+    if (!overlay.isConnected) { document.removeEventListener("keydown", onKey); return; }
+    if (e.key === "Escape") close();
+  });
 }
 
 function syncMSwitch() {

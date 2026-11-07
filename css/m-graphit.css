@@ -248,3 +248,99 @@ body.m-graphit.m-classic .m-backbar {
 @media (prefers-reduced-motion: reduce) {
   .m-ring-val { transition: none; }
 }
+
+.m-tag.leicht { background: color-mix(in srgb, var(--m-good) 18%, transparent); color: var(--m-good); }
+
+/* ---- Geplante Einheit als Blatt von unten (m-app.js: mPlanSheet) ---- */
+body.m-sheet-open { overflow: hidden; }
+.m-sheet-overlay {
+  position: fixed; inset: 0; z-index: 240; display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(0,0,0,0); transition: background .25s ease;
+}
+.m-sheet-overlay.is-open { background: rgba(0,0,0,.55); }
+.m-sheet {
+  width: 100%; max-width: 520px; max-height: calc(100dvh - 24px - env(safe-area-inset-top));
+  display: flex; flex-direction: column; background: var(--m-bg); color: var(--m-text);
+  border-radius: 22px 22px 0 0; border: 1px solid var(--m-line); border-bottom: none;
+  transform: translateY(100%); transition: transform .3s cubic-bezier(.2,.8,.2,1);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+}
+.m-sheet-overlay.is-open .m-sheet { transform: none; }
+.m-sheet-bar { position: relative; display: flex; justify-content: center; padding: 8px 12px 0; flex: none; }
+.m-sheet-grab { width: 38px; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--m-text) 22%, transparent); }
+.m-sheet-close { position: absolute; right: 12px; top: 8px; width: 32px; height: 32px; font-size: 20px; line-height: 1; }
+.m-sheet-body { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 10px 16px calc(20px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 12px; }
+.m-sheet button { font-family: inherit; }
+.m-sh-head { display: flex; align-items: center; gap: 14px; padding: 6px 40px 2px 0; }
+.m-sh-title { margin: 2px 0 0; font-size: 24px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.15; }
+.m-sh-facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.m-sh-facts .m-num b { font-size: 17px; }
+.m-int.leicht { color: var(--m-good); } .m-int.mittel { color: var(--m-warn); } .m-int.hart { color: var(--m-bad); }
+.m-flowbar { display: flex; gap: 3px; height: 12px; margin-bottom: 14px; }
+.m-flowbar span { border-radius: 4px; min-width: 6px; }
+.m-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.m-step { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--m-line); }
+.m-step:first-child { border-top: none; padding-top: 0; }
+.m-step > i { width: 4px; align-self: stretch; min-height: 34px; border-radius: 2px; flex: none; }
+.m-step b { font-size: 15px; font-weight: 650; }
+.m-step-amt { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.m-notes { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.m-notes li { position: relative; padding-left: 16px; font-size: 15px; line-height: 1.45; color: color-mix(in srgb, var(--m-text) 90%, var(--m-muted)); }
+.m-notes li::before { content: ""; position: absolute; left: 2px; top: .6em; width: 6px; height: 6px; border-radius: 50%; background: var(--m-accent); }
+.m-sh-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.m-sh-row { display: flex; gap: 10px; }
+.m-sh-note { margin: 0; font-size: 13px; color: var(--m-good); text-align: center; }
+.m-sheet .m-btn:disabled { opacity: .6; }
+
+/* ---- Bearbeiten-Fenster & andere Fenster in der Handy-Ansicht: hell genug, klar ---- */
+body.m-graphit .modal-overlay { align-items: flex-end; padding: 0; }
+body.m-graphit .modal-card {
+  width: 100%; max-width: 520px; max-height: calc(100dvh - 24px - env(safe-area-inset-top)); margin: 0;
+  border-radius: 22px 22px 0 0; background: var(--m-bg); border: 1px solid var(--m-line); border-bottom: none;
+  padding: 18px 16px calc(20px + env(safe-area-inset-bottom)); box-shadow: none;
+}
+body.m-graphit .modal-close { width: 32px; height: 32px; background: var(--m-surface-2); color: var(--m-text); }
+body.m-graphit .plan-edit-card h3 { font-size: 22px; letter-spacing: -0.02em; margin: 0 40px 14px 0; }
+body.m-graphit .plan-edit-card .onb-field { margin-bottom: 14px; }
+body.m-graphit .plan-edit-card .onb-field > label { font-size: 13px; font-weight: 650; color: var(--m-muted); text-transform: none; margin-bottom: 6px; display: block; }
+body.m-graphit .plan-edit-card .onb-row { gap: 10px; }
+body.m-graphit .modal-card .coach-input {
+  font-size: 16px; color: var(--m-text); background: var(--m-surface-2);
+  border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 11px 12px; min-height: 46px;
+}
+body.m-graphit .modal-card .coach-input:focus { outline: none; border-color: var(--m-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--m-accent) 25%, transparent); }
+body.m-graphit .modal-card input[type="date"].coach-input { text-align: left; -webkit-appearance: none; appearance: none; display: block; }
+body.m-graphit .modal-card textarea.coach-input { min-height: 150px; line-height: 1.45; resize: vertical; }
+body.m-graphit .modal-card .cal-today-btn, body.m-graphit .modal-card .update-btn { min-height: 44px; border-radius: 12px; font-size: 15px; }
+
+/* ---- Mitmach-Modus (Mobility/Kraft) am Handy: alles auf einen Bildschirm ---- */
+@media (max-width: 700px) {
+  .mob-player { height: 100dvh; padding-bottom: calc(12px + var(--safe-bottom)); }
+  .mob-player-body {
+    display: flex; flex-direction: column; gap: 8px; overflow: hidden; padding-top: 10px; align-items: stretch;
+  }
+  .mob-player-stage {
+    flex: 1 1 auto; min-height: 110px; height: auto; max-height: none; width: 100%;
+    aspect-ratio: auto; margin: 0; padding: 2% 4% 1%; border-radius: 22px; box-sizing: border-box;
+  }
+  .mob-player-badge { top: 10px; font-size: 13px; padding: 5px 12px; }
+  .mob-player-info { flex: none; }
+  .mob-player-kicker { font-size: 13px; }
+  .mob-player-name { font-size: 22px; margin-top: 2px; }
+  .mob-player-note { font-size: 14px; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .mob-timer { width: 112px; height: 112px; margin: 8px 0 2px; }
+  .mob-timer-num { font-size: 32px; }
+  .mob-player.is-manual .mob-timer-num { font-size: 44px; }
+  .mob-player-sub { font-size: 14px; margin-top: 2px; }
+  .mob-weight { margin-top: 4px; }
+  .mob-player-controls { margin-top: 8px; gap: 26px; }
+  .mob-ctrl { width: 50px; height: 50px; }
+  .mob-ctrl-main { width: 66px; height: 66px; }
+  .mob-player-howto { margin-top: 4px; }
+  .mob-player-howto summary { padding: 6px; font-size: 14px; }
+  .mob-player-howto[open] { max-height: 30dvh; overflow-y: auto; }
+}
+body.m-graphit .plan-edit-card h3 { background: none; }
+.m-sheet-bar { min-height: 46px; box-sizing: border-box; background: var(--m-bg); border-radius: 22px 22px 0 0; z-index: 1; }
+.m-sheet-body { padding-top: 0; }
+.m-sh-head { padding-right: 0; }
