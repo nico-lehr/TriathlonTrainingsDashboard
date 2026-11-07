@@ -34,6 +34,8 @@ function mActive() {
 
 // Zwei Spalten am Computer, am Handy einfach untereinander (gleiche Reihenfolge).
 const mCols = (left, right, cls = "") => `<div class="m-cols ${cls}"><div class="m-col">${left}</div><div class="m-col">${right}</div></div>`;
+// Am großen Bildschirm drei Spalten (am Handy wie immer untereinander, in derselben Reihenfolge).
+const mCols3 = (a, b, c, cls = "") => `<div class="m-cols three ${cls}"><div class="m-col">${a}</div><div class="m-col">${b}</div><div class="m-col">${c}</div></div>`;
 
 const mEsc = s => escapeHtml(String(s == null ? "" : s));
 const mSport = s => M_SPORT[s] || M_SPORT[String(s).replace(/\s*\(.*\)$/, "")] || M_SPORT_OTHER;
@@ -318,15 +320,22 @@ function mRenderHeute() {
       ${w.training_load != null ? `<span class="m-load">${Math.round(w.training_load)}<small>Load</small></span>` : ""}</button>`).join("")
     : `<p class="m-empty">Noch keine Trainings. Verbinde Garmin oder importiere .fit-Dateien.</p>`;
 
+  // Als Nächstes (nur am Computer sichtbar - dort ist Platz dafür)
+  const todayKey = localDateStr(mDay(now));
+  const upcoming = (typeof plannedWorkouts !== "undefined" ? plannedWorkouts : [])
+    .filter(p => p.status === "geplant" && p.date > todayKey).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 4);
+  const nextCard = upcoming.length ? `<section class="m-card m-desk-only"><div class="m-head"><h2>Als Nächstes</h2><button type="button" class="m-link" data-m-page="kalender">Kalender</button></div><div class="m-list">${upcoming.map(p => `<button type="button" class="m-row" data-m-act="plan" data-id="${mEsc(p.id)}">${mIcon(p.sport)}<span class="m-grow"><span class="m-row-title">${mEsc(p.title || p.sport)}</span><span class="m-row-meta">${new Date(p.date + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" })}${p.duration_min ? ` · ${mDur(p.duration_min)}` : ""}</span></span>${p.intensity ? `<span class="m-tag plan">${mEsc(p.intensity)}</span>` : ""}</button>`).join("")}</div></section>` : "";
+
   return mHeaderHtml(now.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" }), "Heute", mSyncPill())
-    + mCols(`<section class="m-card m-hero" aria-label="Dein Zustand heute">${rings}</section>`
+    + mCols3(`<section class="m-card m-hero" aria-label="Dein Zustand heute">${rings}</section>`
     + `<section class="m-card"><div class="m-head"><h2>Heute geplant</h2><button type="button" class="m-link" data-m-page="coach">Plan</button></div>${todayCard}</section>`
-    + `<section class="m-card"><div class="m-head"><h2>Diese Woche</h2><button type="button" class="m-link" data-m-page="kalender">Kalender</button></div>
+    + nextCard,
+    `<section class="m-card"><div class="m-head"><h2>Diese Woche</h2><button type="button" class="m-link" data-m-page="kalender">Kalender</button></div>
         <div class="m-days">${days}</div>
         <div class="m-week-num"><span><b>${mNum(doneMin / 60, 1)} h</b> von ${mNum(targetMin / 60, 1)} h</span><span>${weekWorkouts.length} Einheiten</span></div>
-        <div class="m-bar" role="img" aria-label="Stunden je Sportart diese Woche">${bar}</div>${legend ? `<div class="m-legend">${legend}</div>` : ""}</section>`,
-    formCard + goalCard
-    + `<section class="m-card"><div class="m-head"><h2>Letzte ${mEsc(rangeLabel)}</h2><button type="button" class="m-chip" data-m-act="range" aria-label="Zeitraum ändern">${mEsc(rangeLabel)} ▾</button></div>
+        <div class="m-bar" role="img" aria-label="Stunden je Sportart diese Woche">${bar}</div>${legend ? `<div class="m-legend">${legend}</div>` : ""}</section>`
+    + goalCard + formCard,
+    `<section class="m-card"><div class="m-head"><h2>Letzte ${mEsc(rangeLabel)}</h2><button type="button" class="m-chip" data-m-act="range" aria-label="Zeitraum ändern">${mEsc(rangeLabel)} ▾</button></div>
         <div class="m-stats">
           <div class="m-num"><small>Einheiten</small><b>${inRange.length}</b></div>
           <div class="m-num"><small>Zeit</small><b>${mNum(sum(inRange, "duration_min") / 60, 1)} h</b></div>
@@ -358,7 +367,10 @@ function mRenderKalender() {
     const k = localDateStr(date);
     const sport = done.get(k) || plan.get(k);
     const cls = ["m-mc", k === localDateStr(today) ? "today" : "", date < today ? "past" : "", k >= weekKey && k <= weekEnd ? "inweek" : ""].join(" ");
-    cells += `<button type="button" class="${cls}" data-m-act="cal-day" data-date="${k}"><b>${d}</b><i style="${sport ? `background:${mSport(sportGroup(sport) === "Sonstiges" ? sport : sportGroup(sport)).color}` : ""}${sport && !done.has(k) ? ";opacity:.5" : ""}"></i></button>`;
+    const evs = mWorkoutsOn(date).map(w => ({ t: w.title || w.name || w.sport, s: sportGroup(w.sport) === "Sonstiges" ? w.sport : sportGroup(w.sport), done: true }))
+      .concat(mPlannedOn(k).filter(p => p.status === "geplant").map(p => ({ t: p.title || p.sport, s: p.sport, done: false })));
+    const evHtml = evs.length ? `<span class="m-mc-evs">${evs.slice(0, 3).map(e => `<em class="${e.done ? "done" : "plan"}" style="--c:${mSport(e.s).color}">${mEsc(e.t)}</em>`).join("")}${evs.length > 3 ? `<em class="more">+${evs.length - 3}</em>` : ""}</span>` : "";
+    cells += `<button type="button" class="${cls}" data-m-act="cal-day" data-date="${k}"><b>${d}</b>${evHtml}<i style="${sport ? `background:${mSport(sportGroup(sport) === "Sonstiges" ? sport : sportGroup(sport)).color}` : ""}${sport && !done.has(k) ? ";opacity:.5" : ""}"></i></button>`;
   }
   const agenda = [0, 1, 2, 3, 4, 5, 6].map(i => {
     const d = mAddDays(mState.calWeek, i);
@@ -430,13 +442,12 @@ function mRenderCoach() {
     </section>`;
 
   return mHeaderHtml("Dein Coach", "Coach", typeof claudeAvailable === "function" && claudeAvailable() ? `<span class="m-pill"><i></i>Claude</span>` : "")
-    + mCols(`<section class="m-card"><div class="m-head"><h2>Wie fühlst du dich?</h2><span class="m-head-note">heute</span></div>
+    + mCols3(`<section class="m-card"><div class="m-head"><h2>Wie fühlst du dich?</h2><span class="m-head-note">heute</span></div>
         <div class="m-check"><span>Muskelkater</span>${mSeg("soreness", sore, so)}</div>
         <div class="m-check"><span>Energie</span>${mSeg("energy", energy, en)}</div>
         <div class="m-check"><span>Verletzung</span>${mSeg("injury", inj, rc.injury || "no")}</div></section>`
-    + `<section class="m-card"><div class="m-head"><h2>Empfehlung</h2><button type="button" class="m-link" data-m-act="outlook">${typeof outlook !== "undefined" && outlook.loading ? "…" : "Neu"}</button></div>${say}</section>`
-    + goalCard
-    + noteCard,
+    + `<section class="m-card"><div class="m-head"><h2>Empfehlung</h2><button type="button" class="m-link" data-m-act="outlook">${typeof outlook !== "undefined" && outlook.loading ? "…" : "Neu"}</button></div>${say}</section>`,
+    noteCard + goalCard,
     `<section class="m-card"><div class="m-head"><h2>Nächste Einheiten</h2><button type="button" class="m-link" data-m-classic="coach" data-m-scroll="trainingplan">Plan bearbeiten</button></div><div class="m-cdays">${nextHtml}</div></section>`
     + `<button type="button" class="m-more" data-m-classic="coach">Ganzer Coach-Bereich</button>`);
 }
@@ -582,7 +593,7 @@ function renderMApp() {
   mThemeColor(active);
   document.body.classList.toggle("m-classic", active && !!mState.classic);
   if (!active) { host.hidden = true; return; }
-  host.hidden = !!mState.classic;
+  host.hidden = false; // bei bisherigen Seiten blendet CSS den Inhalt aus (am Computer bleibt die Seitenleiste)
   document.querySelectorAll("#m-tabs button").forEach(b => {
     const on = !mState.classic && b.dataset.mPage === mState.page;
     b.classList.toggle("on", on);
@@ -930,11 +941,12 @@ function initMApp() {
   host.hidden = true;
   host.innerHTML = `
     <nav class="m-tabs" id="m-tabs" aria-label="Bereiche">
-      <button type="button" data-m-page="heute">Übersicht</button>
-      <button type="button" data-m-page="kalender">Kalender</button>
-      <button type="button" data-m-page="coach">Coach</button>
-      <button type="button" data-m-page="training">Training</button>
-      <button type="button" data-m-page="mehr">Mehr</button>
+      <div class="m-brand" aria-hidden="true"><span class="m-brand-dots"><i></i><i></i><i></i></span>Triathlon<small>Trainings-Dashboard</small></div>
+      <button type="button" data-m-page="heute"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z"/></svg>Übersicht</button>
+      <button type="button" data-m-page="kalender"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></svg>Kalender</button>
+      <button type="button" data-m-page="coach"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.5V16h0.5A2.5 2.5 0 0 1 5 13.5z"/></svg>Coach</button>
+      <button type="button" data-m-page="training"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.5v5M6.5 7.5v9M17.5 7.5v9M20.5 9.5v5M6.5 12h11"/></svg>Training</button>
+      <button type="button" data-m-page="mehr"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/></svg>Mehr</button>
     </nav>
     <main id="m-body" class="m-body"></main>`;
   document.body.insertBefore(host, document.body.firstChild);
