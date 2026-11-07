@@ -387,3 +387,14 @@ test("Sportart als nackte Zahl (alte Garmin-Abrufe): 86 wird zu Mobility, Unbeka
   const c = plain(vm.runInContext(`fixNumericSport({ sport: "Rad", sport_raw: "cycling", sub_sport: "Indoor" })`, app));
   assert.deepStrictEqual(c, { sport: "Rad", sport_raw: "cycling", sub_sport: "Indoor" });
 });
+
+test("Beckenschwimmen: Pace aus der Zeit in Bewegung wie bei Garmin (nicht aus der Gesamtzeit)", () => {
+  // Echtes Beispiel: 1,57 km, Gesamtzeit 46:47, in Bewegung 29:43 -> Garmin zeigt 1:53 /100 m
+  const lengths = Array.from({ length: 63 }, () => ({ duration_s: 1783 / 63 }));
+  const w = app.swimMovingPace({ sport_raw: "swimming", distance_km: 1.57, duration_min: 46.8, pace_min_per_100m: "2:58", lengths });
+  assert.strictEqual(w.pace_min_per_100m, "1:53");
+  assert.strictEqual(w.moving_time_min, 29.7);
+  // Ohne Bahnen (Freiwasser) und bei anderen Sportarten bleibt alles, wie es ist
+  assert.strictEqual(app.swimMovingPace({ sport_raw: "swimming", distance_km: 2, pace_min_per_100m: "2:00" }).pace_min_per_100m, "2:00");
+  assert.strictEqual(app.swimMovingPace({ sport_raw: "running", distance_km: 10, pace_min_per_km: "5:00", lengths }).pace_min_per_km, "5:00");
+});

@@ -266,12 +266,14 @@ def fmt_pace_per_km(avg_speed_ms):
     return f"{m}:{s:02d}"
 
 
-def fmt_pace_per_100m(avg_speed_ms):
+def fmt_pace_per_100m(avg_speed_ms, truncate=False):
+    """truncate: Sekunden abschneiden statt runden - so zeigt Garmin die
+    Schwimm-Pace an (1:53,6 -> 1:53)."""
     if not avg_speed_ms or avg_speed_ms <= 0:
         return None
     sec_per_100m = 100.0 / avg_speed_ms
     m = int(sec_per_100m // 60)
-    s = int(round(sec_per_100m % 60))
+    s = int(sec_per_100m % 60) if truncate else int(round(sec_per_100m % 60))
     if s == 60:
         m += 1
         s = 0
@@ -380,13 +382,23 @@ def main():
         if not avg_speed and distance_m and duration_s:
             avg_speed = distance_m / duration_s
 
+        # Beckenschwimmen: Garmin rechnet Pace und Geschwindigkeit nur mit der
+        # Zeit IN BEWEGUNG (Summe der aktiven Bahnen) - die Uhr laeuft in den
+        # Pausen am Beckenrand weiter. Mit der Gesamtzeit kaeme z. B. 2:58
+        # statt 1:53 /100 m heraus. Muss zu swimMovingPace() (js/data/workouts.js) passen.
+        moving_s = None
+        if sport_raw == "swimming" and swim_lengths_out:
+            moving_s = sum(l["duration_s"] for l in swim_lengths_out if l.get("duration_s")) or None
+            if moving_s and distance_m:
+                avg_speed = distance_m / moving_s
+
         pace_str = None
         speed_kmh = None
         if avg_speed:
             if sport_raw == "running":
                 pace_str = fmt_pace_per_km(avg_speed)
             elif sport_raw == "swimming":
-                pace_str = fmt_pace_per_100m(avg_speed)
+                pace_str = fmt_pace_per_100m(avg_speed, truncate=bool(moving_s))
             elif sport_raw == "cycling":
                 speed_kmh = round(avg_speed * 3.6, 1)
 
@@ -411,6 +423,7 @@ def main():
             "sport_raw": sport_raw,
             "sub_sport": sub_sport_de,
             "duration_min": round(duration_s / 60, 1) if duration_s else None,
+            "moving_time_min": round(moving_s / 60, 1) if moving_s else None,
             "duration_s": round(duration_s, 1) if duration_s else None,
             "distance_km": round(distance_m / 1000, 2) if distance_m else None,
             "avg_hr": fields.get("avg_heart_rate"),

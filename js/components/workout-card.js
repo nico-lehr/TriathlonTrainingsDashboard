@@ -180,7 +180,8 @@ function buildWorkoutDetailHtml(w) {
   // brauchen z.B. eine HRM-Pro-Brustgurt oder einen Running-Dynamics-Pod).
   const extraStats = [];
   const cadUnit = w.sport_raw === "cycling" ? "U/min" : "spm";
-  if (w.avg_cadence != null) extraStats.push(["Ø Kadenz" + (w.max_cadence != null ? " / Max" : ""), `${Math.round(w.avg_cadence)}${w.max_cadence != null ? " / " + Math.round(w.max_cadence) : ""} ${cadUnit}`]);
+  // Beim Schwimmen ist die "Kadenz" dieselbe Zahl wie die Zugfrequenz (unten) - nicht doppelt zeigen.
+  if (w.avg_cadence != null && !(w.sport_raw === "swimming" && w.avg_stroke_rate != null)) extraStats.push(["Ø Kadenz" + (w.max_cadence != null ? " / Max" : ""), `${Math.round(w.avg_cadence)}${w.max_cadence != null ? " / " + Math.round(w.max_cadence) : ""} ${cadUnit}`]);
   if (w.avg_power_w != null) extraStats.push(["Ø Leistung" + (w.max_power_w != null ? " / Max" : ""), `${Math.round(w.avg_power_w)}${w.max_power_w != null ? " / " + Math.round(w.max_power_w) : ""} W`]);
   if (w.normalized_power_w != null) extraStats.push(["Normalized Power", `${Math.round(w.normalized_power_w)} W`]);
   if (w.avg_stance_time_ms != null) extraStats.push(["Ø Bodenkontaktzeit", `${fmtNum(w.avg_stance_time_ms, 0)} ms`]);
@@ -240,7 +241,7 @@ function buildWorkoutDetailHtml(w) {
     </div>
     <p class="modal-sub">${w._date ? fmtDateFull(w._date) + " · " + w._date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) + " Uhr" : ""}</p>
     <div class="modal-stats">
-      <div class="st"><div class="l">Dauer</div><div class="v">${w.duration_min != null ? fmtNum(w.duration_min, 0) + " min" : "–"}</div></div>
+      <div class="st"><div class="l">Dauer${w.moving_time_min ? " / in Bewegung" : ""}</div><div class="v">${w.duration_min != null ? fmtNum(w.duration_min, 0) + " min" : "–"}${w.moving_time_min ? ` / ${fmtNum(w.moving_time_min, 0)} min` : ""}</div></div>
       ${noRoute ? "" : `<div class="st"><div class="l">Distanz${indoor ? " (virtuell)" : ""}</div><div class="v">${w.distance_km != null ? fmtNum(w.distance_km, 2) + " km" : "–"}</div></div>`}
       <div class="st"><div class="l">Ø HF / Max HF</div><div class="v">${w.avg_hr ?? "–"} / ${w.max_hr ?? "–"}</div></div>
       ${noRoute ? "" : `<div class="st"><div class="l">${indoor ? "Geschwindigkeit (virtuell)" : "Pace / Speed"}</div><div class="v">${paceOrSpeed}</div></div>`}

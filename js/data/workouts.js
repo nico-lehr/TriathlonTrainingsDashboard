@@ -104,9 +104,24 @@ function recomputeDerived() {
     clean.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
     RAW = { ...RAW, workouts: clean, count: clean.length };
   }
-  ALL = RAW.workouts.map(w => ({ ...w, _date: w.date ? new Date(w.date) : null, _rideEnv: rideEnvironment(w) }));
+  ALL = RAW.workouts.map(w => swimMovingPace({ ...w, _date: w.date ? new Date(w.date) : null, _rideEnv: rideEnvironment(w) }));
   DATA = ALL.filter(w => !w.is_summary);
 }
+// Beckenschwimmen: Garmin rechnet die Pace nur mit der Zeit IN BEWEGUNG
+// (Summe der aktiven Bahnen) - in den Pausen am Beckenrand laeuft die Uhr
+// weiter. Aeltere Eintraege (vor 2.4.27 eingelesen) haben die Pace aus der
+// Gesamtzeit (z. B. 2:58 statt 1:53 /100 m); hier wird sie aus den
+// gespeicherten Bahnen neu berechnet. Gleiche Regel wie parse_fit.py.
+function swimMovingPace(w) {
+  if (w.sport_raw !== "swimming" || !Array.isArray(w.lengths) || !w.lengths.length || !w.distance_km) return w;
+  const movingS = w.lengths.reduce((a, l) => a + (Number(l && l.duration_s) || 0), 0);
+  if (!(movingS > 0)) return w;
+  const sec = movingS / (w.distance_km * 10); // Sekunden je 100 m
+  w.pace_min_per_100m = `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
+  w.moving_time_min = Math.round(movingS / 60 * 10) / 10;
+  return w;
+}
+
 // Erstaufruf steht bewusst WEITER UNTEN, nach den const-Definitionen
 // (SPORT_COLOR, RIDE_ENV_*), die rideEnvironment() braucht - sonst liefe er in
 // die temporal dead zone der Konstanten.

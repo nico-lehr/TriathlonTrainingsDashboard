@@ -332,6 +332,12 @@ function fmtPacePerKm(avgSpeed) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+function fmtSwimPaceTrunc(avgSpeed) {
+  if (!avgSpeed || avgSpeed <= 0) return null;
+  const sec = 100 / avgSpeed;
+  return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
+}
+
 function fmtPacePer100m(avgSpeed) {
   if (!avgSpeed || avgSpeed <= 0) return null;
   const sec = 100 / avgSpeed;
@@ -478,6 +484,13 @@ function buildWorkoutFromParsed(fname, parsed) {
     if (strokeRates.length) avgStrokeRate = Math.round((strokeRates.reduce((a, b) => a + b, 0) / strokeRates.length) * 10) / 10;
     numActiveLengths = active.length;
   }
+  // Beckenschwimmen: Pace wie bei Garmin nur aus der Zeit IN BEWEGUNG (Summe
+  // der aktiven Bahnen), Sekunden abgeschnitten - siehe parse_fit.py.
+  let movingS = null;
+  if (sportRaw === "swimming" && lengthsOut && lengthsOut.length) {
+    movingS = lengthsOut.reduce((a, l) => a + (l.duration_s || 0), 0) || null;
+    if (movingS && distanceM) paceStr = fmtSwimPaceTrunc(distanceM / movingS);
+  }
 
   // ---- Becken/Freiwasser-Erkennung -----------------------------------------
   // Das native sub_sport-Feld ist bei Schwimmen über HealthFit nicht
@@ -535,6 +548,7 @@ function buildWorkoutFromParsed(fname, parsed) {
     min_hr: s.min_heart_rate ?? null,
     pace_min_per_km: sportRaw === "running" ? paceStr : null,
     pace_min_per_100m: sportRaw === "swimming" ? paceStr : null,
+    moving_time_min: movingS ? Math.round(movingS / 60 * 10) / 10 : null,
     speed_kmh: speedKmh,
     max_speed_kmh: maxSpeedKmh,
     elevation_gain_m: s.total_ascent ?? null,
