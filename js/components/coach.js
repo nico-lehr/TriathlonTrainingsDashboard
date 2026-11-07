@@ -759,6 +759,7 @@ function syncProfileInputsFromState() {
       const el = document.getElementById(id);
       if (el && athleteProfile[key] != null) el.value = athleteProfile[key];
     });
+  if (typeof renderProfileGarmin === "function") renderProfileGarmin();
 }
 
 
@@ -804,6 +805,11 @@ function finishOnboarding() {
     athleteProfile.limitations = onbState.limitations ? onbState.limitations.trim() || null : null;
     athleteProfile.includeStrength = !!onbState.includeStrength;
     athleteProfile.includeMobility = !!onbState.includeMobility;
+    if (onbState.garminRaw) {
+      athleteProfile.garminValues = { ...onbState.garminRaw };
+      athleteProfile.garminOverrides = Object.keys(onbState.garminRaw).filter(k => !(onbState.garminKeys || []).includes(k));
+      athleteProfile.garminSyncedAt = new Date().toISOString();
+    }
     athleteProfile.onboardingDone = true;
     saveAthleteProfile();
 

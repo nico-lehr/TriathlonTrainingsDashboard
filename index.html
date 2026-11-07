@@ -828,75 +828,107 @@
         </details>
       </div>
 
-      <div class="card">
-        <h2>Persönliche Daten</h2>
-        <p class="card-sub">Optional. Name wird z.B. in Begrüßungen genutzt, Geburtsdatum nur für eine Geburtstags-Nachricht im Dashboard - beides wird nirgends sonst ausgewertet und ersetzt nicht das Coach-Onboarding (Leistungswerte/Ziel) unten.</p>
-        <div class="goal-form">
-          <div class="goal-form-row">
-            <label for="profile-name">Name</label>
-            <input type="text" id="profile-name" class="coach-input" placeholder="z.B. Nico">
-          </div>
-          <div class="goal-form-row">
-            <label for="profile-gender">Geschlecht</label>
-            <select id="profile-gender" class="coach-input">
-              <option value="">– keine Angabe –</option>
-              <option value="m">männlich</option>
-              <option value="w">weiblich</option>
-              <option value="divers">divers</option>
-            </select>
-          </div>
-          <div class="goal-form-row">
-            <label for="profile-birthdate">Geburtsdatum</label>
-            <input type="date" id="profile-birthdate" class="coach-input">
-          </div>
+      <div class="card pf-card" id="profile-card">
+        <h2>Dein Profil</h2>
+        <div class="pf-status" id="pf-garmin-status"></div>
+        <h3 class="pf-group">Persönlich</h3>
+        <div class="settings-list pf-list">
+            <div class="settings-list-row pf-row" data-pf="name">
+              <label for="profile-name">Name</label>
+              <div class="pf-val">
+                <span class="pf-input-wrap"><input type="text" id="profile-name" class="pf-input" placeholder="z.B. Nico"></span>
+                <button type="button" class="pf-garmin-val" title="Antippen zum Ändern"></button>
+                <button type="button" class="pf-src" hidden></button>
+              </div>
+            </div>
+            <div class="settings-list-row pf-row" data-pf="gender">
+              <label for="profile-gender">Geschlecht</label>
+              <div class="pf-val">
+                <span class="pf-input-wrap"><select id="profile-gender" class="pf-input">
+                  <option value="">keine Angabe</option>
+                  <option value="m">männlich</option>
+                  <option value="w">weiblich</option>
+                  <option value="divers">divers</option>
+                </select></span>
+                <button type="button" class="pf-garmin-val" title="Antippen zum Ändern"></button>
+                <button type="button" class="pf-src" hidden></button>
+              </div>
+            </div>
+            <div class="settings-list-row pf-row" data-pf="birthDate">
+              <label for="profile-birthdate">Geburtsdatum</label>
+              <div class="pf-val">
+                <span class="pf-input-wrap"><input type="date" id="profile-birthdate" class="pf-input"></span>
+                <button type="button" class="pf-garmin-val" title="Antippen zum Ändern"></button>
+                <button type="button" class="pf-src" hidden></button>
+              </div>
+            </div>
         </div>
-      </div>
-
-      <div class="card">
-        <h2>Trainingswerte</h2>
-        <button type="button" class="mob-btn mob-btn-tinted garmin-import-btn" data-garmin-import="settings" hidden>Aus Garmin übernehmen</button>
-        <p class="card-sub">Optional — hilft dem Coach bei konkreteren Empfehlungen und schaltet einzelne Kacheln frei.</p>
-        <div class="goal-form">
-          <div class="goal-form-row">
-            <label for="profile-ftp">FTP Rad (Watt)</label>
-            <input type="number" id="profile-ftp" class="coach-input" min="0" placeholder="z.B. 250">
-          </div>
-          <div class="goal-form-row">
-            <label for="profile-run-pace">Schwellenpace Laufen (min/km)</label>
-            <input type="text" id="profile-run-pace" class="coach-input" placeholder="z.B. 4:45">
-          </div>
-          <div class="goal-form-row">
-            <label for="profile-swim-pace">CSS Schwimmen (min/100m)</label>
-            <input type="text" id="profile-swim-pace" class="coach-input" placeholder="z.B. 1:45">
-          </div>
-          <div class="goal-form-row">
-            <label for="profile-max-hr">Maximale Herzfrequenz (bpm)</label>
-            <input type="number" id="profile-max-hr" class="coach-input" min="0" placeholder="z.B. 188">
-          </div>
-          <div class="goal-form-row">
-            <label for="profile-resting-hr">Ruhe-Herzfrequenz (bpm)</label>
-            <input type="number" id="profile-resting-hr" class="coach-input" min="0" placeholder="z.B. 52">
-          </div>
-          <div class="goal-form-row">
-            <label for="profile-weight-kg">Körpergewicht (kg)</label>
-            <input type="number" id="profile-weight-kg" class="coach-input" min="0" step="0.1" placeholder="z.B. 72">
-          </div>
+        <h3 class="pf-group">Trainingswerte</h3>
+        <div class="settings-list pf-list">
+            <div class="settings-list-row pf-row" data-pf="weightKg">
+              <label for="profile-weight-kg">Körpergewicht</label>
+              <div class="pf-val">
+                <span class="pf-input-wrap"><input type="number" id="profile-weight-kg" class="pf-input" min="0" step="0.1" placeholder="72"><span class="pf-unit">kg</span></span>
+                <button type="button" class="pf-garmin-val" title="Antippen zum Ändern"></button>
+                <button type="button" class="pf-src" hidden></button>
+              </div>
+            </div>
+            <div class="settings-list-row pf-row" data-pf="maxHr">
+              <label for="profile-max-hr">Max-Puls</label>
+              <div class="pf-val">
+                <span class="pf-input-wrap"><input type="number" id="profile-max-hr" class="pf-input" min="0" placeholder="188"><span class="pf-unit">bpm</span></span>
+                <button type="button" class="pf-garmin-val" title="Antippen zum Ändern"></button>
+                <button type="button" class="pf-src" hidden></button>
+              </div>
+            </div>
+            <div class="settings-list-row pf-row" data-pf="restingHr">
+              <label for="profile-resting-hr">Ruhepuls</label>
+              <div class="pf-val">
+                <span class="pf-input-wrap"><input type="number" id="profile-resting-hr" class="pf-input" min="0" placeholder="52"><span class="pf-unit">bpm</span></span>
+                <button type="button" class="pf-garmin-val" title="Antippen zum Ändern"></button>
+                <button type="button" class="pf-src" hidden></button>
+              </div>
+            </div>
+            <div class="settings-list-row pf-row" data-pf="runThresholdPace">
+              <label for="profile-run-pace">Schwelle Laufen</label>
+              <div class="pf-val">
+                <span class="pf-input-wrap"><input type="text" id="profile-run-pace" class="pf-input" placeholder="4:45"><span class="pf-unit">/km</span></span>
+                <button type="button" class="pf-garmin-val" title="Antippen zum Ändern"></button>
+                <button type="button" class="pf-src" hidden></button>
+              </div>
+            </div>
+            <div class="settings-list-row pf-row" data-pf="ftpWatts">
+              <label for="profile-ftp">FTP Rad</label>
+              <div class="pf-val">
+                <span class="pf-input-wrap"><input type="number" id="profile-ftp" class="pf-input" min="0" placeholder="250"><span class="pf-unit">W</span></span>
+                <button type="button" class="pf-garmin-val" title="Antippen zum Ändern"></button>
+                <button type="button" class="pf-src" hidden></button>
+              </div>
+            </div>
+            <div class="settings-list-row pf-row" data-pf="swimCss">
+              <label for="profile-swim-pace">CSS Schwimmen</label>
+              <div class="pf-val">
+                <span class="pf-input-wrap"><input type="text" id="profile-swim-pace" class="pf-input" placeholder="1:45"><span class="pf-unit">/100m</span></span>
+                <button type="button" class="pf-garmin-val" title="Antippen zum Ändern"></button>
+                <button type="button" class="pf-src" hidden></button>
+              </div>
+            </div>
         </div>
-        <p class="card-sub" style="margin-top:10px;">Maximale &amp; Ruhe-Herzfrequenz werden für TRIMP und die Herzfrequenzreserve in der Trainings-Detailansicht gebraucht (Trainingsbelastung-Kachel) — ohne diese zwei Werte bleibt sie ausgeblendet. Das Körpergewicht wird nur für die Rad-VO2max-Schätzung aus Leistungsdaten (Watt) gebraucht — ohne Gewicht bleibt diese Schätzung leer, statt geraten zu werden.</p>
-      </div>
-
-      <div class="card">
-        <h2>Planung</h2>
-        <p class="card-sub">Fließt in den Trainingsplan des Coaches ein.</p>
-        <div class="goal-form-row">
-          <label for="profile-weekly-hours">Verfügbare Stunden/Woche</label>
-          <input type="number" id="profile-weekly-hours" class="coach-input" min="0" step="0.5" placeholder="z.B. 8">
-        </div>
-        <div class="goal-form-row" style="margin-top:12px;">
-          <label class="onb-checkbox-row"><input type="checkbox" id="profile-include-strength">Krafttraining in den Trainingsplan einplanen</label>
-        </div>
-        <div class="goal-form-row">
-          <label class="onb-checkbox-row"><input type="checkbox" id="profile-include-mobility">Mobility/Beweglichkeit in den Trainingsplan einplanen</label>
+        <p class="pf-foot">Werte mit „Garmin“ kommen von deiner Uhr und bleiben von selbst aktuell – zum Ändern antippen. Alles optional. Pulswerte braucht das Dashboard für Belastung und Zonen, das Gewicht für die Rad-Schätzung – fehlt ein Wert, bleibt die Auswertung leer statt geraten.</p>
+        <h3 class="pf-group">Planung</h3>
+        <div class="settings-list pf-list">
+          <div class="settings-list-row pf-row">
+            <label for="profile-weekly-hours">Zeit pro Woche</label>
+            <div class="pf-val"><span class="pf-input-wrap"><input type="number" id="profile-weekly-hours" class="pf-input" min="0" step="0.5" placeholder="8"><span class="pf-unit">h</span></span></div>
+          </div>
+          <div class="settings-list-row">
+            <label for="profile-include-strength">Krafttraining einplanen</label>
+            <input type="checkbox" id="profile-include-strength" class="switch" role="switch">
+          </div>
+          <div class="settings-list-row">
+            <label for="profile-include-mobility">Mobility einplanen</label>
+            <input type="checkbox" id="profile-include-mobility" class="switch" role="switch">
+          </div>
         </div>
       </div>
 

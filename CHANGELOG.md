@@ -4,6 +4,17 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.25
+
+Graphit auch am Computer, Garmin gleich beim Start und ein aufgeräumtes Profil.
+
+Neu in 2.4.25:
+- Die dunkle Ansicht „Graphit“ gibt es jetzt auch am Computer: dieselben Bereiche wie am Handy, nur breiter in zwei Spalten
+- Hinweis „Neue Version“ steht am Computer oben und passt zum dunklen Stil
+- Onboarding: Als Erstes wird Garmin verbunden (kurze Anleitung in 3 Schritten); Gewicht, Pulswerte, Schwellenpace, Geburtsdatum und Geschlecht kommen dann automatisch – abgefragt wird nur noch, was Garmin nicht weiß
+- Einstellungen: „Persönliche Daten“, „Trainingswerte“ und „Planung“ sind jetzt eine übersichtliche Liste „Dein Profil“
+- Werte von Garmin sind dort mit „Garmin“ markiert und gleichen sich einmal am Tag von selbst ab; antippen zum Ändern, „↺ Garmin“ nimmt wieder den Garmin-Wert
+
 ## 2.4.24
 
 Coach plant auf Zuruf um, und alle wichtigen Nachtwerte der Uhr zählen mit.

@@ -151,7 +151,7 @@ Bedarf schrittweise weiter aufgeteilt werden, sobald es sich lohnt.
 - `account.js` — „Konto“-Karte in den Einstellungen: angemeldeter Benutzer, Abmelden.
 - `update.js` — Hinweis „Neue Version verfügbar“ oben und Karte „Programm-Updates“ in den Einstellungen (nur für den Betreiber; Freunde sehen nur die Versionsnummer).
 - `garmin-settings.js` — „Garmin-Verbindung“-Karte in den Einstellungen: eigenen Personal-API-Schlüssel eintragen/entfernen, Ablaufwarnung, „Jetzt von Garmin holen“.
-- `garmin-import.js` — „Aus Garmin übernehmen“ (Einstellungen/Onboarding) und Garmin verbinden im Onboarding.
+- `garmin-import.js` — Garmin verbinden im Onboarding (Werte werden automatisch übernommen) und „Dein Profil“ in den Einstellungen: Garmin-Werte nur anzeigen, täglicher Abgleich, eigene Änderungen bleiben (`garminValues`/`garminOverrides`).
 - `invites.js` — „Freunde einladen“: Einladungen an/aus, Code teilen/erneuern, Kontenliste (nur Betreiber).
 - `ai-settings.js` — „KI-Coach“-Karte: Stand der Claude-Verbindung; Schlüssel, Modell und Freigabe nur für den Betreiber (Server: `backend/claude_api.py`). Ollama darunter aufklappbar.
 - `training-profile.js` — „Dein Trainingsprofil“: Ziele, Beschwerden, Ausschlüsse, Hilfsmittel, Mobility-Wunsch, Zusatzwünsche (Daten: `js/data/training-profile.js`).

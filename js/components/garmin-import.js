@@ -156,6 +156,7 @@ async function onbLoadGarminValues(status) {
       if (values[k] != null && values[k] !== "") { onbState[k] = values[k]; keys.push(k); }
     });
     onbState.garminKeys = keys;
+    onbState.garminRaw = Object.fromEntries(keys.map(k => [k, values[k]]));
     onbState.garminInfo = {};
     GARMIN_INFO_FIELDS.forEach(([k]) => { if (values[k] != null) onbState.garminInfo[k] = values[k]; });
   } catch (e) {
@@ -200,10 +201,128 @@ async function initOnbGarmin(root) {
   });
 }
 
+/* ----------------------------------------------------------------------
+   Einstellungen "Dein Profil": Werte, die Garmin liefert, werden nur
+   angezeigt (mit "ändern"). Das Dashboard gleicht sie einmal am Tag von
+   selbst mit Garmin ab. Was man selbst ändert, bleibt (garminOverrides),
+   bis man "Garmin-Wert nehmen" tippt.
+   athleteProfile.garminValues    – zuletzt von Garmin gelieferte Werte
+   athleteProfile.garminOverrides – Felder, die man selbst überschrieben hat
+   athleteProfile.garminSyncedAt  – letzter Abgleich (ISO)
+   ---------------------------------------------------------------------- */
+const GARMIN_NUMERIC = ["weightKg", "maxHr", "restingHr", "ftpWatts"];
+const GARMIN_SYNC_EVERY_MS = 20 * 3600 * 1000;
+
+function profileFromGarmin(key) {
+  const gv = athleteProfile.garminValues || {};
+  return gv[key] != null && !(athleteProfile.garminOverrides || []).includes(key);
+}
+
+function garminFieldFmt(key) {
+  const f = GARMIN_IMPORT_FIELDS.find(([k]) => k === key);
+  return f ? f[2] : v => String(v);
+}
+
+async function renderProfileGarmin() {
+  const card = document.getElementById("profile-card");
+  if (!card) return;
+  const gv = athleteProfile.garminValues || {};
+  card.querySelectorAll(".pf-row[data-pf]").forEach(row => {
+    const key = row.dataset.pf;
+    const fromG = profileFromGarmin(key) && athleteProfile[key] != null;
+    row.classList.toggle("is-garmin", fromG);
+    row.querySelector(".pf-garmin-val").textContent = fromG ? garminFieldFmt(key)(athleteProfile[key]) : "";
+    const src = row.querySelector(".pf-src");
+    if (fromG) { src.hidden = true; }
+    else if (gv[key] != null) { src.hidden = false; src.textContent = "↺ Garmin"; src.title = `Garmin-Wert nehmen (${garminFieldFmt(key)(gv[key])})`; src.dataset.act = "garmin"; }
+    else { src.hidden = true; }
+  });
+  const status = document.getElementById("pf-garmin-status");
+  if (!status) return;
+  const ok = await garminConnected();
+  if (ok) {
+    const at = athleteProfile.garminSyncedAt ? new Date(athleteProfile.garminSyncedAt) : null;
+    const when = at ? at.toLocaleString("de-DE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : null;
+    status.innerHTML = `<span class="pf-status-dot ok"></span><span class="pf-status-text"><b>Garmin verbunden</b><small>${when ? `Werte mit Garmin abgeglichen · ${escapeHtml(when)}` : "Werte werden mit Garmin abgeglichen"}</small></span>
+      <button type="button" class="pf-status-btn" data-pf-sync>Jetzt abgleichen</button>`;
+  } else {
+    status.innerHTML = `<span class="pf-status-dot"></span><span class="pf-status-text"><b>Garmin nicht verbunden</b><small>Verbinde Garmin, dann füllen sich Gewicht, Pulswerte und Schwellen von selbst.</small></span>
+      <button type="button" class="pf-status-btn" data-pf-connect>Verbinden</button>`;
+  }
+}
+
+function applyGarminProfileValues(values) {
+  const got = {};
+  GARMIN_IMPORT_FIELDS.forEach(([k]) => { if (values[k] != null && values[k] !== "") got[k] = values[k]; });
+  athleteProfile.garminValues = got;
+  const over = athleteProfile.garminOverrides || [];
+  Object.entries(got).forEach(([k, v]) => {
+    if (!over.includes(k)) athleteProfile[k] = GARMIN_NUMERIC.includes(k) ? Number(v) : v;
+  });
+  athleteProfile.garminSyncedAt = new Date().toISOString();
+  saveAthleteProfile();
+  if (typeof syncProfileInputsFromState === "function") syncProfileInputsFromState();
+  renderProfileGarmin();
+}
+
+// force=false: höchstens etwa einmal am Tag (beim Start des Dashboards).
+async function syncProfileFromGarmin(force, btn) {
+  if (!(await garminConnected())) return;
+  const last = athleteProfile.garminSyncedAt ? Date.parse(athleteProfile.garminSyncedAt) : 0;
+  if (!force && Date.now() - last < GARMIN_SYNC_EVERY_MS) return;
+  if (btn) { btn.disabled = true; btn.textContent = "Gleiche ab …"; }
+  try {
+    const values = (await apiCall("garmin/profile", "GET", null, { timeoutMs: 60000 })).data.values || {};
+    applyGarminProfileValues(values);
+  } catch (e) {
+    if (force) await confirmDialog(e.message, { okLabel: "OK", danger: false });
+  } finally {
+    if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = "Jetzt abgleichen"; }
+  }
+}
+
+function initProfileGarmin() {
+  const card = document.getElementById("profile-card");
+  if (!card) return;
+  card.addEventListener("click", e => {
+    const src = e.target.closest(".pf-src") || e.target.closest(".pf-garmin-val");
+    if (src && !src.dataset.act) src.dataset.act = "edit";
+    if (src) {
+      const key = src.closest(".pf-row").dataset.pf;
+      const over = new Set(athleteProfile.garminOverrides || []);
+      if (src.dataset.act === "edit") {
+        over.add(key);
+        athleteProfile.garminOverrides = [...over];
+        saveAthleteProfile();
+        renderProfileGarmin();
+        const input = src.closest(".pf-row").querySelector(".pf-input");
+        if (input) input.focus();
+      } else {
+        over.delete(key);
+        athleteProfile.garminOverrides = [...over];
+        const v = (athleteProfile.garminValues || {})[key];
+        athleteProfile[key] = GARMIN_NUMERIC.includes(key) ? Number(v) : v;
+        saveAthleteProfile();
+        if (typeof syncProfileInputsFromState === "function") syncProfileInputsFromState();
+        renderProfileGarmin();
+      }
+      return;
+    }
+    const sync = e.target.closest("[data-pf-sync]");
+    if (sync) { syncProfileFromGarmin(true, sync); return; }
+    if (e.target.closest("[data-pf-connect]")) {
+      document.getElementById("garmin-settings-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
+  renderProfileGarmin();
+  syncProfileFromGarmin(false);
+}
+
 function initGarminImport() {
   document.addEventListener("click", e => {
     const b = e.target.closest("[data-garmin-import]");
     if (b) openGarminImport(b.dataset.garminImport, b);
   });
   refreshGarminImportButtons(document);
+  initProfileGarmin();
 }

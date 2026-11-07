@@ -2559,3 +2559,44 @@
   .mob-player.is-manual .mob-timer-num { font-size: 56px; }
   .mob-player.is-manual .mob-ctrl-main { background: #34c759; }
   .mob-player[data-phase="rest"] .mob-timer-bar { stroke: #34c759; }
+
+  /* --- Einstellungen "Dein Profil" (Liste im iOS-Stil, Garmin-Werte nur anzeigen) --- */
+  .pf-card h2 { margin-bottom: 12px; }
+  .pf-status { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--accent-wash); }
+  .pf-status:empty { display: none; }
+  .pf-status-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--text-muted); }
+  .pf-status-dot.ok { background: #34c46a; box-shadow: 0 0 0 4px rgba(52,196,106,0.18); }
+  .pf-status-text { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 14.5px; }
+  .pf-status-text small { font-size: 12.5px; color: var(--text-secondary); line-height: 1.4; }
+  .pf-status-btn { flex: none; border: none; border-radius: 999px; padding: 8px 14px; min-height: 36px; background: var(--surface-1, rgba(255,255,255,0.08)); color: var(--accent); font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+  .pf-status-btn:disabled { opacity: 0.6; cursor: default; }
+  .pf-group { margin: 22px 0 0; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+  .pf-list { margin-top: 8px; }
+  .pf-row label { flex: 1 0 auto; }
+  .pf-val { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; flex: 0 1 auto; }
+  .pf-input-wrap { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .pf-input {
+    width: 130px; min-height: 36px; padding: 6px 10px; box-sizing: border-box; text-align: right;
+    border: 1px solid transparent; border-radius: 10px; background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+    color: var(--text-primary); font: inherit; font-size: 15px; font-variant-numeric: tabular-nums;
+  }
+  .pf-input:focus { outline: none; border-color: var(--accent); }
+  select.pf-input { text-align-last: right; cursor: pointer; }
+  input[type="date"].pf-input { width: 150px; }
+  .pf-unit { font-size: 13.5px; color: var(--text-muted); min-width: 34px; }
+  .pf-garmin-val { border: none; background: none; padding: 6px 0; color: var(--text-primary); font: inherit; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer; }
+  .pf-garmin-val:hover { color: var(--accent); }
+  .pf-garmin-val:empty { display: none; }
+  .pf-row.is-garmin .pf-input-wrap { display: none; }
+  .pf-row.is-garmin .pf-garmin-val::after { content: "Garmin"; margin-left: 8px; padding: 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 600; color: #34c46a; background: rgba(52,196,106,0.14); vertical-align: 1px; }
+  .pf-src { border: none; background: none; padding: 4px 2px; color: var(--accent); font: inherit; font-size: 13.5px; cursor: pointer; white-space: nowrap; }
+  .pf-src[hidden] { display: none; }
+  .pf-foot { margin: 8px 2px 0; font-size: 12.5px; line-height: 1.45; color: var(--text-muted); }
+  @media (max-width: 600px) {
+    .pf-row { flex-wrap: nowrap !important; }
+    .pf-input { width: 96px; }
+    input[type="date"].pf-input { width: 140px; }
+    .pf-unit { min-width: 0; }
+    .pf-status { flex-wrap: wrap; }
+    .pf-status-btn { margin-left: 22px; }
+  }
