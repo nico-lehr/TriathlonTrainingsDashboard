@@ -52,7 +52,7 @@ function initUpdates() {
       : `Neue Version ${latest.version} verfügbar (du hast ${st.current}).`;
     banner.appendChild(text);
     if (st.install.running) return;
-    banner.appendChild(button("Was ist neu?", "chip", () => { openSettingsView(); document.getElementById("app-update-card").scrollIntoView({ behavior: "smooth" }); }));
+    banner.appendChild(button("Was ist neu?", "chip", () => openSettingsPanel("updates")));
     banner.appendChild(button("Installieren", "update-btn", install));
     banner.appendChild(button("Später", "reset-link", () => {
       try { localStorage.setItem(UPDATE_DISMISS_KEY, latest.version); } catch (e) { /* nur Komfort */ }

@@ -682,12 +682,17 @@
   <div id="view-settings" class="view">
     <section class="card full settings-page-head">
       <button type="button" class="reset-link settings-back-btn" id="settings-back-btn">← Zurück</button>
-      <h2>Einstellungen</h2>
-      <p class="card-sub">Gelten für das ganze Dashboard, nicht nur den Coach-Tab. Profil und Trainingsdaten liegen auf dem Dashboard-Server (nur für dich sichtbar), die Verbindungs-Einstellungen nur auf diesem Gerät.</p>
+      <h2 id="settings-title">Einstellungen</h2>
     </section>
+    <div class="sh-hub" id="settings-hub"></div>
+    <div class="sh-panel-head" id="settings-panel-head" hidden>
+      <button type="button" class="sh-back" id="settings-panel-back">‹ Einstellungen</button>
+      <h2 class="sh-panel-title" id="settings-panel-title"></h2>
+      <p class="sh-panel-sub" id="settings-panel-sub"></p>
+    </div>
 
-    <div class="dash-grid">
-      <div class="card full">
+    <div class="dash-grid" id="settings-panels">
+      <div class="card full" id="account-card" data-sp="konto">
         <h2>Konto</h2>
         <p class="card-sub">Angemeldet als <b id="account-username">…</b>. Beim Abmelden wird alles Persönliche aus diesem Browser entfernt.</p>
         <div class="settings-list">
@@ -699,7 +704,7 @@
         <button type="button" class="cal-today-btn" id="logout-btn">Abmelden</button>
       </div>
 
-      <div class="card full" id="invite-card" hidden>
+      <div class="card full" id="invite-card" data-sp="einladen" hidden>
         <h2>Freunde einladen</h2>
         <p class="card-sub">Mit dem Einladungscode erstellt sich jede Person auf der Anmeldeseite selbst ein Konto – mit eigenem, getrenntem Bereich. Ohne Code kann niemand ein Konto anlegen.</p>
         <div class="settings-list">
@@ -724,13 +729,22 @@
         <ul class="invite-accounts" id="invite-accounts"></ul>
       </div>
 
-      <div class="card full" id="training-profile-card">
-        <h2>Dein Trainingsprofil</h2>
-        <p class="card-sub">Alle deine Wünsche an einer Stelle. Claude berücksichtigt sie bei jedem Trainingsplan und jeder Mobility-Einheit.</p>
+      <div class="card full" id="training-profile-card" data-sp="training">
+        <h3 class="pf-group">Planung</h3>
+        <div class="settings-list pf-list">
+          <div class="settings-list-row pf-row">
+            <label for="profile-weekly-hours">Zeit pro Woche</label>
+            <div class="pf-val"><span class="pf-input-wrap"><input type="number" id="profile-weekly-hours" class="pf-input" min="0" step="0.5" placeholder="8"><span class="pf-unit">h</span></span></div>
+          </div>
+          <div class="settings-list-row">
+            <label for="profile-include-strength">Krafttraining einplanen</label>
+            <input type="checkbox" id="profile-include-strength" class="switch" role="switch">
+          </div>
+        </div>
         <div id="training-profile-body"></div>
       </div>
 
-      <div class="card full" id="app-update-card">
+      <div class="card full" id="app-update-card" data-sp="updates">
         <h2>Programm-Updates</h2>
         <p class="card-sub" id="app-update-version">Version …</p>
         <div id="app-update-admin" hidden>
@@ -750,7 +764,7 @@
         </div>
       </div>
 
-      <div class="card full" id="garmin-settings-card">
+      <div class="card full" id="garmin-settings-card" data-sp="garmin">
         <h2>Garmin-Verbindung
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Offizielle Garmin-Schnittstelle („Personal API“): Mit deinem eigenen Schlüssel holt der Dashboard-Server deine Trainings (als .fit-Datei) und Gesundheitsdaten (Schlaf, HRV, Ruhepuls, Gewicht, Schritte; Body Battery, soweit Garmin sie dort liefert) – nur lesen, ohne dein Garmin-Passwort. Workouts auf die Uhr schicken kann dieser Schlüssel nicht. VO2max und Trainingszustand liefert die Schnittstelle nicht; das Dashboard schätzt VO2max dann selbst.</div></span>
         </h2>
@@ -772,7 +786,7 @@
         <button type="button" class="reset-link" id="garmin-api-delete-btn" hidden>Schlüssel entfernen</button>
       </div>
 
-      <div class="card full" id="ai-settings-card">
+      <div class="card full" id="ai-settings-card" data-sp="ki">
         <h2>KI-Coach</h2>
         <p class="card-sub">Claude erstellt Trainingspläne, Mobility-Einheiten und Auswertungen – abgestimmt auf dein Trainingsprofil.</p>
         <div class="ai-status-row">
@@ -828,8 +842,7 @@
         </details>
       </div>
 
-      <div class="card pf-card" id="profile-card">
-        <h2>Dein Profil</h2>
+      <div class="card full pf-card" id="profile-card" data-sp="profil">
         <div class="pf-status" id="pf-garmin-status"></div>
         <h3 class="pf-group">Persönlich</h3>
         <div class="settings-list pf-list">
@@ -915,24 +928,8 @@
             </div>
         </div>
         <p class="pf-foot">Werte mit „Garmin“ kommen von deiner Uhr und bleiben von selbst aktuell – zum Ändern antippen. Alles optional. Pulswerte braucht das Dashboard für Belastung und Zonen, das Gewicht für die Rad-Schätzung – fehlt ein Wert, bleibt die Auswertung leer statt geraten.</p>
-        <h3 class="pf-group">Planung</h3>
-        <div class="settings-list pf-list">
-          <div class="settings-list-row pf-row">
-            <label for="profile-weekly-hours">Zeit pro Woche</label>
-            <div class="pf-val"><span class="pf-input-wrap"><input type="number" id="profile-weekly-hours" class="pf-input" min="0" step="0.5" placeholder="8"><span class="pf-unit">h</span></span></div>
-          </div>
-          <div class="settings-list-row">
-            <label for="profile-include-strength">Krafttraining einplanen</label>
-            <input type="checkbox" id="profile-include-strength" class="switch" role="switch">
-          </div>
-          <div class="settings-list-row">
-            <label for="profile-include-mobility">Mobility einplanen</label>
-            <input type="checkbox" id="profile-include-mobility" class="switch" role="switch">
-          </div>
         </div>
-      </div>
-
-      <div class="card" id="profile-balance-card">
+      <div class="card full" id="profile-balance-card" data-sp="training">
         <h2>Sport-Balance
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Zielverteilung deiner Trainingszeit für die Karte „Sport-Balance" im Analyse-Tab. Gespeichert wird nur, wenn die drei Werte zusammen 100 % ergeben.</div></span>
         </h2>
@@ -957,7 +954,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card full" id="ical-card" data-sp="kalender">
         <h2>Kalender-Abo (iCal)
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Geplante Einheiten als abonnierbaren Kalender-Feed (webcal), z.B. für Apple/Google Kalender. Braucht den lokalen Backend-Server (siehe DEPLOYMENT.md) - funktioniert nur, während "python backend/app.py" auf diesem Rechner läuft, noch nicht "online" von unterwegs.</div></span>
         </h2>
@@ -972,7 +969,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card full" id="weather-card" data-sp="wetter">
         <h2>Wetter im Kalender
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">7-Tage-Vorhersage von Open-Meteo (kostenlos, ohne Konto) für deinen Heimatort. Sie steht im Kalender an Outdoor-Einheiten: Rad und Laufen, außer der Titel nennt Indoor, Rolle, Ergometer, Laufband, Halle o. Ä.; Schwimmen nur mit „Freiwasser“, „Open Water“, „See“ oder „Meer“ im Titel. Die Vorhersage holt der Dashboard-Server, gespeichert wird nur der Ort.</div></span>
         </h2>
@@ -989,7 +986,7 @@
         <button type="button" class="reset-link weather-clear-btn" id="weather-location-clear-btn" hidden>Heimatort entfernen</button>
       </div>
 
-      <div class="card">
+      <div class="card full" id="equipment-card" data-sp="equipment">
         <h2>Equipment
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Kilometerstand von Laufschuhen/Rad wird automatisch aus deinen Trainings gezählt, solange ein Item als "Standard" für die Sportart markiert ist. Verschleißteile (Kette, Reifen, Bremsbeläge) teilen sich die Kilometer des zugehörigen Rads. Zeigt "bald fällig", sobald 90 % eines Service-/Austausch-Intervalls erreicht sind. Einzelne Trainings kannst du in deren Detailansicht ausdrücklich einem Schuh/Rad zuordnen.</div></span>
         </h2>
@@ -1204,6 +1201,7 @@
 <script src="js/components/mobility.js"></script>
 <script src="js/components/m-app.js"></script>
 <script src="js/components/m-admin.js"></script>
+<script src="js/components/settings-hub.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

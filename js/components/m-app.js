@@ -664,6 +664,7 @@ function mOpenClassic(view, scrollTo) {
 }
 
 function mBack() {
+  if (mState.classic === "settings" && typeof settingsPanelBack === "function" && settingsPanelBack()) return;
   mState.classic = null;
   mState.anim = true;
   activateView("overview");
@@ -753,12 +754,11 @@ async function mAction(btn) {
     const k = mStrengthSession();
     if (k) mStartStrength(k.session);
   } else if (act === "strength-detail" && id) mStrengthDetail(id);
-  else if (act === "profile") { mState.classic = "settings"; openTrainingProfile(); renderMApp(); }
-  else if (act === "garmin") { mState.classic = "settings"; openSettingsView(); renderMApp(); const c = document.getElementById("garmin-settings-card"); if (c) c.scrollIntoView({ block: "start" }); }
+  else if (act === "profile") { mState.classic = "settings"; openSettingsView(); renderMApp(); openTrainingProfile(); }
+  else if (act === "garmin") { mState.classic = "settings"; openSettingsView(); renderMApp(); openSettingsPanel("garmin"); }
   else if (act === "garmin-sync") {
     try { await startGarminSync(); } catch (e) {
-      mState.classic = "settings"; openSettingsView(); renderMApp();
-      const c = document.getElementById("garmin-settings-card"); if (c) c.scrollIntoView({ block: "start" });
+      mState.classic = "settings"; openSettingsView(); renderMApp(); openSettingsPanel("garmin");
     }
     renderMApp();
   }

@@ -3,9 +3,7 @@
 // sofort gespeichert; ein kurzes "Gespeichert" bestätigt es.
 
 function openTrainingProfile() {
-  openSettingsView();
-  const card = document.getElementById("training-profile-card");
-  if (card) requestAnimationFrame(() => card.scrollIntoView({ behavior: "smooth", block: "start" }));
+  openSettingsPanel("training");
 }
 
 function initTrainingProfile() {
@@ -29,33 +27,45 @@ function initTrainingProfile() {
       </div>
     </div>`;
 
+  // Körperstellen, Ausstattung ... nur auf Wunsch aufklappen (bleibt offen).
+  let tpMoreOpen = false;
+  const tpMoreSummary = tp => {
+    const n = tp.focusAreas.length + tp.painAreas.length + tp.avoid.length + tp.equipment.length;
+    return n ? `${n} ${n === 1 ? "Angabe" : "Angaben"} – Körperstellen, Beschwerden, Ausstattung` : "Körperstellen, Beschwerden, Ausstattung";
+  };
+
   function render() {
     const tp = trainingProfile();
     body.innerHTML = `
-      <div class="tp-section">
-        <label class="tp-label" for="tp-goals">Was möchtest du erreichen?</label>
-        <textarea id="tp-goals" class="coach-input tp-textarea" rows="2" placeholder="z. B. Hüfte lockerer für die Aero-Position, nach dem Laufen weniger steife Waden">${escapeHtml(tp.goals)}</textarea>
-      </div>
-      ${chipGroup("focusAreas", MOBILITY_AREAS, tp.focusAreas, "Wo möchtest du beweglicher werden?")}
-      ${chipGroup("painAreas", MOBILITY_AREAS, tp.painAreas, "Wo hast du Beschwerden? <span class=\"tp-hint\">Dort wird nur sanft gearbeitet.</span>")}
-      <div class="tp-section">
-        <label class="tp-label" for="tp-limitations">Verletzungen oder Einschränkungen</label>
-        <textarea id="tp-limitations" class="coach-input tp-textarea" rows="2" placeholder="z. B. Knie nach Meniskus-OP, Schulter links empfindlich">${escapeHtml(athleteProfile.limitations || "")}</textarea>
-      </div>
-      ${chipGroup("avoid", MOBILITY_AVOID, tp.avoid, "Was soll nicht vorkommen?")}
-      ${chipGroup("equipment", MOBILITY_EQUIPMENT, tp.equipment, "Was hast du zu Hause? <span class=\"tp-hint\">Eine Matte oder Teppich reicht immer.</span>")}
-      <div class="tp-section tp-mobility">
+      <div class="tp-section tp-mobility${athleteProfile.includeMobility ? "" : " is-off"}">
         <div class="tp-row tp-switch-row">
-          <label class="tp-label" for="tp-include-mobility">Mobility in den Trainingsplan einbauen</label>
+          <label class="tp-label" for="tp-include-mobility">Mobility einplanen</label>
           <input type="checkbox" id="tp-include-mobility" class="switch" role="switch" ${athleteProfile.includeMobility ? "checked" : ""}>
         </div>
         ${segmented("mobilityPerWeek", [1, 2, 3, 4], tp.mobilityPerWeek, "×", "Pro Woche")}
         ${segmented("mobilityMinutes", [10, 15, 20, 30], tp.mobilityMinutes, " Min", "Dauer")}
       </div>
+      <h3 class="pf-group tp-wish-head">Deine Wünsche</h3>
+      <p class="tp-intro">Claude berücksichtigt sie bei jedem Trainingsplan und jeder Mobility-Einheit.</p>
+      <div class="tp-section">
+        <label class="tp-label" for="tp-goals">Was möchtest du erreichen?</label>
+        <textarea id="tp-goals" class="coach-input tp-textarea" rows="2" placeholder="z. B. Hüfte lockerer für die Aero-Position, nach dem Laufen weniger steife Waden">${escapeHtml(tp.goals)}</textarea>
+      </div>
+      <div class="tp-section">
+        <label class="tp-label" for="tp-limitations">Verletzungen oder Einschränkungen</label>
+        <textarea id="tp-limitations" class="coach-input tp-textarea" rows="2" placeholder="z. B. Knie nach Meniskus-OP, Schulter links empfindlich">${escapeHtml(athleteProfile.limitations || "")}</textarea>
+      </div>
       <div class="tp-section">
         <label class="tp-label" for="tp-wishes">Weitere Wünsche an deinen Trainingsplan</label>
         <textarea id="tp-wishes" class="coach-input tp-textarea" rows="2" placeholder="z. B. montags kein Rad, 1× pro Woche Zugseil">${escapeHtml(athleteProfile.customPlanWishes || "")}</textarea>
       </div>
+      <details class="tp-more"${tpMoreOpen ? " open" : ""}>
+        <summary><span>Mobility genauer einstellen<small>${escapeHtml(tpMoreSummary(tp))}</small></span></summary>
+        ${chipGroup("focusAreas", MOBILITY_AREAS, tp.focusAreas, "Wo möchtest du beweglicher werden?")}
+        ${chipGroup("painAreas", MOBILITY_AREAS, tp.painAreas, "Wo hast du Beschwerden? <span class=\"tp-hint\">Dort wird nur sanft gearbeitet.</span>")}
+        ${chipGroup("avoid", MOBILITY_AVOID, tp.avoid, "Was soll nicht vorkommen?")}
+        ${chipGroup("equipment", MOBILITY_EQUIPMENT, tp.equipment, "Was hast du zu Hause? <span class=\"tp-hint\">Eine Matte oder Teppich reicht immer.</span>")}
+      </details>
       <p class="tp-saved" id="tp-saved" role="status" aria-live="polite"></p>`;
     bind();
   }
@@ -71,6 +81,8 @@ function initTrainingProfile() {
   }
 
   function bind() {
+    const more = body.querySelector(".tp-more");
+    if (more) more.addEventListener("toggle", () => { tpMoreOpen = more.open; });
     body.querySelectorAll(".mob-chips[data-group]").forEach(group => {
       group.addEventListener("click", e => {
         const chip = e.target.closest(".mob-chip");
@@ -103,6 +115,7 @@ function initTrainingProfile() {
     text("tp-wishes", v => { athleteProfile.customPlanWishes = v; saveAthleteProfile(); });
     document.getElementById("tp-include-mobility").addEventListener("change", e => {
       athleteProfile.includeMobility = e.target.checked;
+      e.target.closest(".tp-mobility").classList.toggle("is-off", !e.target.checked);
       saveAthleteProfile();
       const old = document.getElementById("profile-include-mobility");
       if (old) old.checked = e.target.checked;

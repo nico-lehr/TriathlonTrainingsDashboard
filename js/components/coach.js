@@ -1064,9 +1064,11 @@ function openSettingsView() {
   const activeTab = document.querySelector(".tab-btn.active");
   settingsPreviousView = activeTab ? activeTab.dataset.view : "overview";
   activateView("settings");
+  if (typeof showSettingsHub === "function") showSettingsHub();
   window.scrollTo(0, 0);
 }
 function closeSettingsView() {
+  if (typeof settingsPanelBack === "function" && settingsPanelBack()) return;
   activateView(settingsPreviousView || "overview");
 }
 if (globalSettingsBtn) {

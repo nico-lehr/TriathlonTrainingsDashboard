@@ -311,7 +311,7 @@ function initProfileGarmin() {
     const sync = e.target.closest("[data-pf-sync]");
     if (sync) { syncProfileFromGarmin(true, sync); return; }
     if (e.target.closest("[data-pf-connect]")) {
-      document.getElementById("garmin-settings-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      openSettingsPanel("garmin");
     }
   });
   renderProfileGarmin();

@@ -8,7 +8,7 @@ function initAccount() {
   if (logoutBtn) logoutBtn.addEventListener("click", logout);
   if (nameEl) {
     apiCall("auth/me")
-      .then(r => { nameEl.textContent = r.data.username || r.data.name || "–"; })
+      .then(r => { nameEl.textContent = r.data.username || r.data.name || "–"; if (typeof renderSettingsHub === "function") renderSettingsHub(); })
       .catch(() => { /* Name ist nur Anzeige */ });
   }
 }

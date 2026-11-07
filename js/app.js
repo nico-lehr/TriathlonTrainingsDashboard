@@ -102,6 +102,7 @@ function checkAutoReplan() {
   initAnalysis();
   renderAll();
   initMApp();
+  initSettingsHub();
   if (typeof initUsageTracking === "function") initUsageTracking();
   checkAutoReplan();
   // Automatische Risiko-Kontrolle (ACWR/TSB/Monotonie + Erholungs-Check) für
