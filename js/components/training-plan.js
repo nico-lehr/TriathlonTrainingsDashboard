@@ -170,6 +170,7 @@ function refreshGarminSendUi(id) {
 async function sendToGarminFromUi(id) {
   const p = plannedWorkouts.find(x => x.id === id);
   if (!p || (garminSendState.get(id) || {}).loading) return;
+  if (typeof mTrack === "function") mTrack("feature", "garmin-send");
   if (p.garminSentAt && !(await confirmDialog(`Diese Einheit wurde am ${fmtDateFull(new Date(p.garminSentAt))} schon an Garmin gesendet. Nochmal senden? In Garmin Connect steht sie dann zweimal.`, { okLabel: "Nochmal senden", danger: false }))) return;
   garminSendState.set(id, { loading: true });
   refreshGarminSendUi(id);

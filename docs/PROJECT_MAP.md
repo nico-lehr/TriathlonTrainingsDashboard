@@ -159,6 +159,7 @@ Bedarf schrittweise weiter aufgeteilt werden, sobald es sich lohnt.
 - `mobility-player.js` — Mitmach-Modus im Vollbild: Timer, Seitenwechsel, Ton/Ansage, Wake Lock, Rückmeldung am Ende.
 - `mobility-figure.js` — bewegte Strichfigur als SVG (Skelett mit festen Knochenlängen, Zwei-Knochen-IK, ein gemeinsamer Animationstakt).
 - `m-app.js` — Handy-Ansicht „Graphit“ (bis 700 px, abschaltbar unter Einstellungen → Konto): Übersicht (Erholung/Woche/Schlaf-Ringe, Heute, Woche, Form, Ziel), Kalender, Coach, Training (Mobility | Kraft), Mehr (öffnet die bisherigen Seiten). Stil: `css/m-graphit.css`.
+- `m-admin.js` — Nutzungszähler `mTrack()` (nur feste Namen, gesammelt an `/usage`) und die Seite „Admin · Statistik“ unter Mehr (nur Betreiber, `/admin/stats`): nur Zahlen je Person, keine Inhalte.
 
 ### `js/app.js` — Einstiegspunkt
 Definiert `renderAll()` (ruft die Render-Funktionen aller Tabs auf) und
@@ -201,6 +202,7 @@ einmalig `backend/import_workouts_json.py`, siehe `docs/DEPLOYMENT.md`.
 | `dashboard_routes.py` | `/store`, `/workouts/full`, `/wellness/daily`, `/ical-link`. |
 | `ai_routes.py` | `/ai/chat`, `/ai/models` – Weiterleitung an Ollama; `/ai/claude` (Stand/Schlüssel, nur Betreiber ändert) und `/ai/claude/chat`. |
 | `invites.py` / `invite_routes.py` | Einladungscode für „Konto erstellen“ (`~/.triathlon/invite.json`), Verwaltung nur Betreiber (`/invites`). |
+| `usage.py` | Admin-Statistik: Tageszähler je Person in `usage_daily` (Öffnen, Bereiche, Funktionen, Login, Claude, Garmin-Abruf); `POST /usage` (feste Namensliste), `GET /admin/stats` nur Betreiber. Keine Inhalte. |
 | `claude_api.py` | Claude über das Anthropic-SDK: Schlüssel in `~/.triathlon/claude_api.json` (0600), Prüfen, Modelle, verständliche Fehler. |
 | `equipment_routes.py` | `/equipment…` – Material anlegen/ändern/löschen, Zuordnungen, einmaliger Import. |
 | `updater.py` | Programm-Updates: neueste GitHub-Release prüfen (einmal am Tag), Paket prüfen, sichern, installieren (ZIP oder `git`), Neustart anstoßen. Nutzerdaten sind geschützt. |

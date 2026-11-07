@@ -137,7 +137,18 @@ def claude_chat():
         return response_error("Für Claude ist noch kein Schlüssel hinterlegt.", "claude_not_configured", 409)
     if not st["available"] and st["sdk"]:
         return response_error("Der Betreiber hat Claude für andere Personen nicht freigegeben.", "claude_not_shared", 403)
+    from .usage import record
+    athlete_id = get_current_athlete_id()
+    tokens = {}
     try:
-        return response_success({"response": claude_api.chat(prompt, task=task, schema=schema)})
+        text = claude_api.chat(prompt, task=task, schema=schema, usage_out=tokens)
     except claude_api.ClaudeError as e:
+        record(athlete_id, "ai_error", (e.code or "fehler")[:40])
+        if tokens:
+            record(athlete_id, "ai_tokens", "in", tokens.get("in", 0))
+            record(athlete_id, "ai_tokens", "out", tokens.get("out", 0))
         return _claude_error(e)
+    record(athlete_id, "ai", task or "chat")
+    record(athlete_id, "ai_tokens", "in", tokens.get("in", 0))
+    record(athlete_id, "ai_tokens", "out", tokens.get("out", 0))
+    return response_success({"response": text})

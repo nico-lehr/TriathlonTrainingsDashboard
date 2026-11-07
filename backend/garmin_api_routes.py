@@ -104,6 +104,8 @@ def _run_sync(athlete_id):
         result = {"ok": False, "message": message}
     finally:
         # Immer: sonst stuende der Abruf fuer immer auf "laeuft".
+        from .usage import record  # Statistik fuer den Betreiber: Abruf geklappt oder nicht
+        record(athlete_id, "garmin", "ok" if result.get("ok") else "fehler", session_factory=Session)
         Session.remove()
         with _sync_lock:
             _sync_state[athlete_id] = {"running": False, "at": datetime.now().isoformat(timespec="seconds"), **result}

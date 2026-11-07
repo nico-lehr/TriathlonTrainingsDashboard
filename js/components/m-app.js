@@ -547,7 +547,8 @@ function mRenderMehr() {
   return mHeaderHtml("Weitere Bereiche", "Mehr")
     + mCols(`<section class="m-card m-navlist">${rows.map(([v, l]) => `<button type="button" class="m-nav-row" data-m-classic="${v}"><span>${l}</span><i>›</i></button>`).join("")}</section>`,
       `<section class="m-card m-navlist"><button type="button" class="m-nav-row" data-m-act="profile"><span>Dein Trainingsprofil</span><i>›</i></button>
-        <button type="button" class="m-nav-row" data-m-act="m-off"><span>Klassische Ansicht verwenden</span><i>›</i></button></section>`);
+        <button type="button" class="m-nav-row" data-m-act="m-off"><span>Klassische Ansicht verwenden</span><i>›</i></button></section>`
+      + (typeof mAdmin !== "undefined" && mAdmin.isAdmin ? `<section class="m-card m-navlist"><button type="button" class="m-nav-row" data-m-page="admin"><span>Admin · Statistik</span><i>›</i></button></section>` : ""));
 }
 
 /* ------------------------------------------------------------ Rahmen */
@@ -595,14 +596,14 @@ function renderMApp() {
   if (!active) { host.hidden = true; return; }
   host.hidden = false; // bei bisherigen Seiten blendet CSS den Inhalt aus (am Computer bleibt die Seitenleiste)
   document.querySelectorAll("#m-tabs button").forEach(b => {
-    const on = !mState.classic && b.dataset.mPage === mState.page;
+    const on = !mState.classic && b.dataset.mPage === (mState.page === "admin" ? "mehr" : mState.page);
     b.classList.toggle("on", on);
     if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
   });
   mMoveTabIndicator();
   if (mState.classic) return;
   const body = document.getElementById("m-body");
-  const html = { heute: mRenderHeute, kalender: mRenderKalender, coach: mRenderCoach, training: mRenderTraining, mehr: mRenderMehr }[mState.page]();
+  const html = { heute: mRenderHeute, kalender: mRenderKalender, coach: mRenderCoach, training: mRenderTraining, mehr: mRenderMehr, admin: mRenderAdmin }[mState.page]();
   const focused = document.activeElement && document.activeElement.id === "m-coach-note" ? document.activeElement : null;
   const sel = focused ? [focused.selectionStart, focused.selectionEnd] : null;
   body.innerHTML = html;
@@ -640,7 +641,7 @@ function mMoveTabIndicator() {
 }
 
 function mShow(page) {
-  if (page !== mState.page) mState.anim = true;
+  if (page !== mState.page) { mState.anim = true; if (typeof mTrack === "function") mTrack("page", page); }
   mState.page = page;
   mState.classic = null;
   renderMApp();
@@ -650,6 +651,7 @@ function mShow(page) {
 // Bisherige Seite öffnen (Ernährung, Rekorde ...) - mit Zurück-Leiste oben.
 function mOpenClassic(view, scrollTo) {
   mState.classic = view;
+  if (typeof mTrack === "function") mTrack("page", view);
   if (view === "settings") openSettingsView(); else activateView(view);
   renderMApp();
   const title = document.getElementById("m-classic-title");
@@ -669,9 +671,17 @@ function mBack() {
   window.scrollTo({ top: 0 });
 }
 
+// Welche Knöpfe in der Admin-Statistik als "Funktion benutzt" zählen.
+const M_TRACK_ACTS = { "coach-note": "coach-note", "coach-undo": "coach-undo", outlook: "outlook", "start-mob": "mob-start", "start-mob-now": "mob-start",
+  "start-strength": "strength-start", "start-strength-now": "strength-start", "mob-claude": "mob-claude", "plan-new": "plan-new", plan: "plan-open",
+  workout: "workout-open", "m-off": "classic-view" };
+
 async function mAction(btn) {
   const act = btn.dataset.mAct;
   const id = btn.dataset.id;
+  if (M_TRACK_ACTS[act] && typeof mTrack === "function") mTrack("feature", M_TRACK_ACTS[act]);
+  if (act === "adm-days") { mAdmin.days = Number(btn.dataset.days) || 30; mLoadAdminStats(true); renderMApp(); return; }
+  if (act === "adm-reload") { mLoadAdminStats(true); renderMApp(); return; }
   if (act === "plan" && id) {
     const pw = plannedWorkouts.find(p => p.id === id);
     if (pw && (pw.sport === "Kraft" || pw.sport === "Mobility")) mOpenPlannedTraining(pw);

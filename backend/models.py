@@ -381,3 +381,25 @@ class EquipmentWorkout(Base):
     workout_file = Column(String(255), nullable=False)
 
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class UsageDaily(Base):
+    """Nutzungszaehler fuer die Admin-Statistik (Mehr -> Statistik, nur Betreiber).
+
+    Nur Zahlen je Person und Tag - keine Inhalte: z. B. ("page", "coach") = 4
+    heisst "am Tag 4-mal den Coach geoeffnet". Neue Tabelle statt neuer
+    Spalten (create_all legt sie in einer vorhandenen training.db an).
+    Fuellt backend/usage.py.
+    """
+    __tablename__ = "usage_daily"
+    __table_args__ = (
+        UniqueConstraint("athlete_id", "day", "kind", "name", name="uq_usage_daily"),
+        Index("idx_usage_day", "day"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    athlete_id = Column(Integer, nullable=False)
+    day = Column(Date, nullable=False)
+    kind = Column(String(20), nullable=False)   # open, login, page, feature, ai, ai_tokens, garmin, error
+    name = Column(String(40), nullable=False)
+    count = Column(Integer, nullable=False, default=0)

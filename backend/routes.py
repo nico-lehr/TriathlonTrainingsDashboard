@@ -203,6 +203,12 @@ def login():
             note_failed_login(ip, data.get("username"))
             return response_error("Benutzername oder Passwort falsch", "invalid_credentials", 401)
         athlete = session.query(Athlete).filter_by(athlete_id=athlete_id).first()
+        try:  # Statistik fuer den Betreiber (nur ein Zaehler)
+            from .usage import bump
+            bump(session, athlete_id, "login", "ok")
+            session.commit()
+        except Exception:
+            session.rollback()
         remember = data.get("remember") is not False  # Standard: angemeldet bleiben
         return response_success({"token": make_token(athlete_id, remember=remember), "athlete": serialize_athlete(athlete)})
     finally:

@@ -178,8 +178,9 @@ def verify_key(key, model):
         raise _translate(anthropic, e)
 
 
-def chat(prompt, task="", schema=None):
-    """Ein Text-Aufruf. Mit schema kommt garantiert gueltiges JSON zurueck."""
+def chat(prompt, task="", schema=None, usage_out=None):
+    """Ein Text-Aufruf. Mit schema kommt garantiert gueltiges JSON zurueck.
+    usage_out (dict): bekommt die verbrauchten Tokens (fuer die Admin-Statistik)."""
     data = _read()
     key = data.get("key")
     if not key:
@@ -203,6 +204,10 @@ def chat(prompt, task="", schema=None):
     except anthropic.AnthropicError as e:
         raise _translate(anthropic, e)
 
+    if usage_out is not None:
+        u = getattr(response, "usage", None)
+        usage_out["in"] = int(getattr(u, "input_tokens", 0) or 0)
+        usage_out["out"] = int(getattr(u, "output_tokens", 0) or 0)
     if response.stop_reason == "refusal":
         raise ClaudeError("Claude hat diese Anfrage abgelehnt. Bitte anders formulieren.", "claude_refusal", 422)
     if response.stop_reason == "max_tokens":
