@@ -71,7 +71,7 @@ from . import claude_api, get_current_athlete_id  # noqa: E402
 from .auth import is_admin  # noqa: E402
 from .routes import get_session  # noqa: E402
 
-TASK_NAMES = {"plan", "analysis", "recommendation", "lessons", "focus", "perfSummary", "mobility"}
+TASK_NAMES = {"plan", "analysis", "recommendation", "lessons", "focus", "perfSummary", "mobility", "dailycheck"}
 
 
 def _is_admin():

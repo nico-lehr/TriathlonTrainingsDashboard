@@ -113,7 +113,22 @@ const STRENGTH_KEYWORDS = ["zugseil", "klimmzug", "liegestütz", "liegestuetz", 
 // Prüft/bereinigt die vom Modell gelieferten Vorschläge, bevor sie
 // gespeichert werden - ungültige/unplausible Einträge werden übersprungen
 // statt ungeprüft übernommen (siehe AI_RULES: KI-Output nie blind vertrauen).
-function parsePlanResponse(rawText, windowDates) {
+// Gängige Schreibweisen der KI auf die festen Namen abbilden, statt eine
+// sonst gute Einheit wegen "Radfahren" oder "locker" zu verwerfen.
+const PLAN_SPORT_ALIASES = {
+  schwimmen: "Schwimmen", swim: "Schwimmen", swimming: "Schwimmen",
+  rad: "Rad", radfahren: "Rad", fahrrad: "Rad", bike: "Rad", cycling: "Rad", radtraining: "Rad",
+  laufen: "Laufen", lauf: "Laufen", run: "Laufen", running: "Laufen", joggen: "Laufen",
+  kraft: "Kraft", krafttraining: "Kraft", strength: "Kraft",
+  mobility: "Mobility", mobilität: "Mobility", beweglichkeit: "Mobility", dehnen: "Mobility", stretching: "Mobility",
+};
+const PLAN_INTENSITY_ALIASES = { leicht: "leicht", locker: "leicht", easy: "leicht", niedrig: "leicht", mittel: "mittel", moderat: "mittel", moderate: "mittel", hart: "hart", hoch: "hart", intensiv: "hart", hard: "hart" };
+const normalizePlanSport = x => PLAN_SPORT_ALIASES[String(x || "").trim().toLowerCase()] || String(x || "").trim();
+const normalizePlanIntensity = x => PLAN_INTENSITY_ALIASES[String(x || "").trim().toLowerCase()] || null;
+
+// report (optional): bekommt in report.dropped jede verworfene Einheit mit
+// Grund ({ date, sport, reason }) - für den Plan-Bericht nach der Planung.
+function parsePlanResponse(rawText, windowDates, report) {
   let data;
   try {
     // Modelle liefern trotz format:"json" gelegentlich noch Text drumherum
@@ -129,19 +144,22 @@ function parsePlanResponse(rawText, windowDates) {
   const windowSet = new Set(windowDates);
   const seen = new Set(); // "date|sport" gegen Duplikate am selben Tag
   const valid = [];
-  list.forEach(entry => {
-    if (!entry || typeof entry !== "object") return;
-    if (!windowSet.has(entry.date)) return; // Datum außerhalb des angefragten Fensters
-    if (!PLAN_ALLOWED_SPORTS.includes(entry.sport)) return;
+  const dropped = report ? (report.dropped = report.dropped || []) : [];
+  list.forEach(raw => {
+    if (!raw || typeof raw !== "object") return;
+    const entry = { ...raw, sport: normalizePlanSport(raw.sport) };
+    const drop = reason => { dropped.push({ date: entry.date || null, sport: entry.sport || null, reason }); };
+    if (!windowSet.has(entry.date)) return drop("Datum außerhalb des Planungszeitraums");
+    if (!PLAN_ALLOWED_SPORTS.includes(entry.sport)) return drop("unbekannte Sportart");
     const dur = Number(entry.duration_min);
-    if (!isFinite(dur) || dur <= 0 || dur > 480) return; // unplausible Dauer (>8h) verwerfen
+    if (!isFinite(dur) || dur <= 0 || dur > 480) return drop("unplausible Dauer"); // >8h verwerfen
 
     // Konsistenz-Check: Titel/Beschreibung müssen zur gewählten Sportart
     // passen, sonst widersprechen sich zwei Felder derselben Antwort (siehe
     // STRENGTH_KEYWORDS oben) - lieber den Vorschlag verwerfen als eine
     // Einheit mit falscher Sportart speichern.
     const textLower = `${entry.title || ""} ${entry.description || ""}`.toLowerCase();
-    if (entry.sport !== "Kraft" && STRENGTH_KEYWORDS.some(kw => textLower.includes(kw))) return;
+    if (entry.sport !== "Kraft" && STRENGTH_KEYWORDS.some(kw => textLower.includes(kw))) return drop("Beschreibung passt nicht zur Sportart");
 
     // Konsistenz-Check: bei Kraft/Mobility nennt die Beschreibung oft selbst
     // eine Gesamtdauer am Anfang (z.B. "20min Zugseiltraining ...") - weicht
@@ -151,14 +169,14 @@ function parsePlanResponse(rawText, windowDates) {
       const textDurMatch = entry.description && String(entry.description).match(/^\s*(\d{1,3})\s*min\b/i);
       if (textDurMatch) {
         const textDur = Number(textDurMatch[1]);
-        if (textDur > 0 && (dur > textDur * 1.5 || dur < textDur * 0.67)) return;
+        if (textDur > 0 && (dur > textDur * 1.5 || dur < textDur * 0.67)) return drop("Dauer widerspricht der Beschreibung");
       }
     }
 
     const dedupeKey = entry.date + "|" + entry.sport;
-    if (seen.has(dedupeKey)) return;
+    if (seen.has(dedupeKey)) return drop("doppelt am selben Tag");
     seen.add(dedupeKey);
-    const intensity = ["leicht", "mittel", "hart"].includes(entry.intensity) ? entry.intensity : null;
+    const intensity = normalizePlanIntensity(entry.intensity);
     const exercises = (entry.sport === "Kraft" || entry.sport === "Mobility") && Array.isArray(entry.exercises)
       ? entry.exercises.filter(x => x && (x.name || x.id)).map(x => {
           // Mobility-Übung aus der Sammlung (js/data/mobility-exercises.js): id
@@ -294,10 +312,13 @@ async function generateTrainingPlan(goalId, { replace = false } = {}) {
     // Die Phase bekommt jede Einheit selbst aus ihrem Datum (buildPlannedWorkout).
     const defaults = { goalId: goal.id, source: "ai" };
     const planUntil = windowDates[windowDates.length - 1];
+    let report = {};
     const result = await checkedPlanFromAi({
       ask: async violations => {
         const prompt = buildPlanPrompt(goal, windowDates) + buildPlanRulesPrompt(goal) + buildPlanWishesPrompt(wishes) + buildPlanRetryPrompt(violations);
-        const entries = parsePlanResponse(await callAiText(prompt, { task: "plan", json: true }), windowDates);
+        report = {};
+        const entries = parsePlanResponse(await callAiText(prompt, { task: "plan", json: true }), windowDates, report);
+        report.aiCount = entries.length;
         // Basis erst nach der (langen) KI-Anfrage lesen - Änderungen, die in
         // der Zwischenzeit gemacht wurden, bleiben so erhalten.
         const base = plannedWorkouts;
@@ -308,10 +329,23 @@ async function generateTrainingPlan(goalId, { replace = false } = {}) {
       fix: (list, suggestion) => applyPlanSuggestion(list, suggestion, defaults),
     });
     if (result.list) {
-      replacePlannedWorkouts(result.list);
+      // Sicherheitsnetz (js/analytics/plan-guard.js): Trainingstage, die die KI
+      // leer gelassen hat, bekommen eine lockere Einheit - innerhalb der Regeln
+      // (ein freier Tag pro Woche, Wochenumfang, keine neuen Verstöße).
+      let finalList = result.list, filled = { added: [], skipped: [] };
+      if (typeof planCheckFill === "function") {
+        filled = planCheckFill(result.list, goal, windowDates[0], planUntil);
+        finalList = filled.list;
+      }
+      replacePlannedWorkouts(finalList);
       goal.lastPlannedAt = new Date().toISOString();
       goal._planError = null;
-      planCheckNotes = { goalId: goal.id, corrected: result.corrected, hints: result.violations.map(v => v.text) };
+      planCheckNotes = {
+        goalId: goal.id, corrected: result.corrected, hints: result.violations.map(v => v.text),
+        aiCount: report.aiCount || 0, dropped: report.dropped || [],
+        filled: filled.added.map(p => ({ date: p.date, sport: p.sport, title: p.title, duration_min: p.duration_min })),
+        skipped: filled.skipped,
+      };
     } else {
       goal._planError = `Der KI-Vorschlag verstößt auch nach ${PLAN_AI_MAX_ATTEMPTS} Versuchen gegen Trainingsregeln und wurde deshalb nicht gespeichert: ${result.violations.map(v => v.text).join(" ")}`;
       restoreRemoved();
@@ -364,6 +398,11 @@ async function replanFromCoachNote(note) {
   });
   if (!result.list) throw new Error(`Der neue Plan verstößt gegen Trainingsregeln und wurde nicht übernommen: ${result.violations.map(v => v.text).join(" ")}`);
   replacePlannedWorkouts(result.list);
+  // Tage, die der Coach auf deine Nachricht hin leer gemacht hat, bleiben frei
+  // (der tägliche Plan-Check füllt sie nicht wieder auf).
+  if (typeof planCheckMarkFree === "function") {
+    oldPlan.map(p => p.date).filter(d => !result.list.some(p => p.date === d)).forEach(d => planCheckMarkFree(d, "coach"));
+  }
   if (typeof renderTrainingPlanCard === "function") renderTrainingPlanCard();
   if (typeof renderCalendar === "function") renderCalendar();
   return {

@@ -686,3 +686,22 @@ body.m-graphit #modal-overlay .modal-stats .st { background: var(--m-surface); b
   letter-spacing: .02em; color: var(--m-accent, #7fb2ff); background: color-mix(in srgb, var(--m-accent, #7fb2ff) 16%, transparent);
 }
 .m-soon { margin-left: 8px; vertical-align: 1px; }
+
+/* Plan-Check (js/components/plan-check.js) */
+.m-pcheck { border: 1px solid color-mix(in srgb, var(--m-accent) 35%, transparent); }
+.m-pc-list { list-style: none; margin: 4px 0 12px; padding: 0; display: grid; gap: 10px; }
+.m-pc-list li { display: grid; grid-template-columns: 58px 1fr; gap: 10px; font-size: 14.5px; line-height: 1.4; }
+.m-pc-list b { font-weight: 600; color: var(--m-muted); font-size: 13px; padding-top: 1px; }
+.m-pc-list small { display: block; margin-top: 2px; font-size: 13px; color: var(--m-muted); }
+.m-pc-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -2px 0 10px; font-size: 13px; color: var(--m-muted); }
+.m-pc-status span { display: inline-flex; align-items: center; gap: 8px; }
+.m-pc-status i { width: 7px; height: 7px; border-radius: 50%; background: var(--m-good, #30d158); }
+.m-pc-status i.run { background: var(--m-accent); animation: m-pulse 1s ease-in-out infinite alternate; }
+.m-pc-status .m-link { padding: 0; }
+.m-pc-report { margin: 0 0 12px; font-size: 13.5px; color: var(--m-muted); }
+.m-pc-report summary { cursor: pointer; color: var(--m-text); }
+.m-pc-report ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+@keyframes m-pulse { from { opacity: .35; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .m-pc-status i.run { animation: none; } }
+.m-pc-new { font-style: normal; font-size: 11px; font-weight: 600; letter-spacing: .02em; padding: 1px 6px; margin-right: 6px; border-radius: 6px; vertical-align: 1px;
+  color: var(--m-accent); background: color-mix(in srgb, var(--m-accent) 15%, transparent); }

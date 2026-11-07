@@ -190,13 +190,29 @@ async function sendToGarminFromUi(id) {
 // und welche Hinweise ("warn") geblieben sind (planCheckNotes, js/ai/ollama.js).
 function planCheckNotesHtml(goal) {
   const n = planCheckNotes;
-  if (!n || n.goalId !== goal.id || (!n.corrected.length && !n.hints.length)) return "";
+  if (!n || n.goalId !== goal.id) return "";
+  const lines = planReportLines(n);
+  if (!lines.length && !n.corrected.length && !n.hints.length) return "";
   const list = items => `<ul>${items.map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>`;
   return `
     <div class="plan-check-notes">
+      ${lines.length ? `<p>So ist der Plan entstanden</p>${list(lines)}` : ""}
       ${n.corrected.length ? `<p>Vom Regelwerk angepasst</p>${list(n.corrected)}` : ""}
       ${n.hints.length ? `<p>Hinweise zum neuen Plan</p>${list(n.hints)}` : ""}
     </div>`;
+}
+
+// Plan-Bericht in einfachen Sätzen: was die KI geliefert hat, was verworfen,
+// was ergänzt und warum ein Trainingstag frei geblieben ist.
+function planReportLines(n) {
+  const day = d => new Date(d + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" });
+  const out = [];
+  if (n.aiCount != null) out.push(`Der KI-Coach hat ${n.aiCount} ${n.aiCount === 1 ? "Einheit" : "Einheiten"} geplant.`);
+  (n.dropped || []).forEach(d => out.push(`Verworfen${d.date ? ` (${day(d.date)})` : ""}: ${d.sport || "Einheit"} – ${d.reason}.`));
+  if ((n.filled || []).length) out.push(`Leere Trainingstage ergänzt: ${n.filled.map(f => `${day(f.date)} ${f.title} ${f.duration_min} min`).join(", ")}.`);
+  const why = { rest: "bleibt als freier Tag der Woche zur Erholung", volume: "frei, weil der Wochenumfang schon erreicht ist (langsamer Aufbau schützt vor Verletzungen)", rules: "frei, weil eine Einheit dort eine Trainingsregel verletzen würde" };
+  (n.skipped || []).forEach(s => out.push(`${day(s.date)} ${why[s.reason] || "bleibt frei"}.`));
+  return out;
 }
 
 /* ---------- Trainingsplan-Zeitleiste: grobe Periodisierungs-Übersicht ----------

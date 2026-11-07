@@ -167,6 +167,15 @@ class ClaudeTest(unittest.TestCase):
         self.assertEqual(kw["max_tokens"], claude_api.MAX_TOKENS["mobility"])
         self.assertNotIn("thinking", kw)
 
+    def test_tages_check_aufgabe(self):
+        self.put(self.admin, key=KEY)
+        schema = {"type": "object", "properties": {"pruefung": {"type": "string"}}, "required": ["pruefung"], "additionalProperties": False}
+        self.client.post("/api/v1/ai/claude/chat", headers=self.admin, json={"prompt": "Heute?", "task": "dailycheck", "schema": schema})
+        _, kw = FakeClient.calls[-1]
+        self.assertEqual(kw["output_config"]["effort"], "medium")
+        self.assertEqual(kw["output_config"]["format"], {"type": "json_schema", "schema": schema})
+        self.assertEqual(kw["max_tokens"], claude_api.MAX_TOKENS_DEFAULT)
+
     def test_haiku_ohne_fallback(self):
         self.put(self.admin, key=KEY, model="claude-haiku-5-5")
         self.client.post("/api/v1/ai/claude/chat", headers=self.admin, json={"prompt": "x"})

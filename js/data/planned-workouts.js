@@ -118,8 +118,11 @@ function updatePlannedWorkout(id, patch) {
 }
 
 function deletePlannedWorkout(id) {
+  const gone = plannedWorkouts.find(p => p.id === id);
   plannedWorkouts = plannedWorkouts.filter(p => p.id !== id);
   savePlannedWorkouts();
+  // Bewusst gelöscht: der Plan-Check füllt diesen Tag nicht wieder auf.
+  if (gone && !plannedWorkouts.some(p => p.date === gone.date) && typeof planCheckMarkFree === "function") planCheckMarkFree(gone.date, "user");
 }
 
 function plannedWorkoutsOfDay(dayDate) {

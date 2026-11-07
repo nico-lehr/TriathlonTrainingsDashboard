@@ -71,5 +71,7 @@ function loadRecoveryCheck() {
 function saveRecoveryCheck() {
   recoveryCheck.date = todayStr();
   storeSet(RECOVERY_KEY, recoveryCheck);
+  // Neues Gefühl -> Plan für heute/morgen sofort neu prüfen (js/components/plan-check.js)
+  if (typeof schedulePlanCheck === "function") schedulePlanCheck();
 }
 

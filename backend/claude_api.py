@@ -37,7 +37,7 @@ PROMPT_MAX_CHARS = 120_000
 MAX_TOKENS = {"plan": 16000, "mobility": 8000}
 MAX_TOKENS_DEFAULT = 6000
 # Gruendlichkeit je Aufgabe: kurze Texte brauchen wenig Nachdenken.
-EFFORT = {"plan": "medium", "mobility": "medium"}
+EFFORT = {"plan": "medium", "mobility": "medium", "dailycheck": "medium"}
 EFFORT_DEFAULT = "low"
 TIMEOUT_S = 300
 

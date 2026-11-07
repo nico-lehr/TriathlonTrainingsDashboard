@@ -328,6 +328,7 @@ function mRenderHeute() {
 
   return mHeaderHtml(now.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" }), "Heute", mSyncPill())
     + mCols3(`<section class="m-card m-hero" aria-label="Dein Zustand heute">${rings}</section>`
+    + mPlanCheckCard()
     + `<section class="m-card"><div class="m-head"><h2>Heute geplant</h2><button type="button" class="m-link" data-m-page="coach">Plan</button></div>${todayCard}</section>`
     + nextCard,
     `<section class="m-card"><div class="m-head"><h2>Diese Woche</h2><button type="button" class="m-link" data-m-page="kalender">Kalender</button></div>
@@ -400,6 +401,39 @@ function mRenderKalender() {
     + `<button type="button" class="m-more" data-m-classic="calendar">Großer Kalender mit Wetter</button>`, "cal");
 }
 
+// Karte "Plan-Check" (js/components/plan-check.js): was heute automatisch am
+// Plan geändert wurde, mit Grund, Rückgängig und OK.
+function mPlanCheckCard() {
+  const list = typeof currentPlanCheckEntries === "function" ? currentPlanCheckEntries() : [];
+  return list.slice(0, 2).map(mPlanCheckEntryCard).join("");
+}
+
+function mPlanCheckEntryCard(e) {
+  const time = new Date(e.at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  const onlyAdded = e.items.every(i => i.kind === "added");
+  const intro = e.note || (onlyAdded ? "Ein paar Trainingstage waren leer – ich habe ruhige Einheiten ergänzt."
+    : "Ich habe deinen Plan an deine Verfassung angepasst.");
+  const items = e.items.slice(0, 7).map(i => `<li><b>${mEsc(i.day)}</b><span>${i.kind === "added" ? `<em class="m-pc-new">Neu</em>` : ""}${mEsc(i.text)}${i.why ? `<small>${mEsc(i.why)}</small>` : ""}</span></li>`).join("");
+  return `<section class="m-card m-pcheck" aria-live="polite"><div class="m-head"><h2>Plan-Check</h2><span class="m-head-note">${time}</span></div>
+      <p class="m-say">${mEsc(intro)}</p><ul class="m-pc-list">${items}</ul>
+      ${e.fixed && e.fixed.length ? `<p class="m-say small">Regelwerk: ${mEsc(e.fixed.join(" "))}</p>` : ""}
+      <div class="m-actions"><button type="button" class="m-btn soft" data-m-act="pc-undo" data-id="${mEsc(e.id)}">Rückgängig</button><button type="button" class="m-btn primary" data-m-act="pc-ok" data-id="${mEsc(e.id)}">Passt</button></div></section>`;
+}
+
+// Kurze Statuszeile im Coach-Bereich: wann zuletzt geprüft, KI-Einschätzung,
+// und - nach "Plan neu erstellen" - der Plan-Bericht.
+function mPlanCheckStatus() {
+  if (typeof planCheckStatus !== "function") return "";
+  const s = planCheckStatus();
+  const today = todayStr();
+  const when = s.at ? (localDateStr(new Date(s.at)) === today ? `heute ${new Date(s.at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}` : new Date(s.at).toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" })) : null;
+  const note = s.lastAi && s.lastAi.date === today && s.lastAi.text ? `<p class="m-say small">${mEsc(s.lastAi.text)}</p>` : "";
+  const goal = typeof getPrimaryGoal === "function" ? getPrimaryGoal() : null;
+  const report = goal && typeof planCheckNotes !== "undefined" && planCheckNotes && planCheckNotes.goalId === goal.id && typeof planReportLines === "function" ? planReportLines(planCheckNotes) : [];
+  return `<div class="m-pc-status"><span><i class="${s.running ? "run" : ""}"></i>${s.running ? "Plan-Check läuft …" : when ? `Plan-Check: ${when} geprüft` : "Plan-Check: noch nicht gelaufen"}</span><button type="button" class="m-link" data-m-act="pc-run"${s.running ? " disabled" : ""}>Jetzt prüfen</button></div>${note}
+    ${report.length ? `<details class="m-pc-report"><summary>So ist dein Plan entstanden</summary><ul>${report.map(t => `<li>${mEsc(t)}</li>`).join("")}</ul></details>` : ""}`;
+}
+
 function mSeg(field, options, current) {
   return `<div class="m-seg" data-m-check="${field}">${options.map(o => `<button type="button" class="${o.value === current ? "on" : ""}" data-value="${o.value}">${mEsc(o.label)}</button>`).join("")}</div>`;
 }
@@ -456,7 +490,7 @@ function mRenderCoach() {
         <div class="m-check"><span>Verletzung</span>${mSeg("injury", inj, rc.injury || "no")}</div></section>`
     + `<section class="m-card"><div class="m-head"><h2>Empfehlung</h2><button type="button" class="m-link" data-m-act="outlook">${typeof outlook !== "undefined" && outlook.loading ? "…" : "Neu"}</button></div>${say}</section>`,
     noteCard + goalCard,
-    `<section class="m-card"><div class="m-head"><h2>Nächste Einheiten</h2><button type="button" class="m-link" data-m-classic="coach" data-m-scroll="trainingplan">Plan bearbeiten</button></div><div class="m-cdays">${nextHtml}</div></section>`
+    `<section class="m-card"><div class="m-head"><h2>Nächste Einheiten</h2><button type="button" class="m-link" data-m-classic="coach" data-m-scroll="trainingplan">Plan bearbeiten</button></div>${mPlanCheckStatus()}<div class="m-cdays">${nextHtml}</div></section>`
     + `<button type="button" class="m-more" data-m-classic="coach">Ganzer Coach-Bereich</button>`);
 }
 
@@ -753,6 +787,18 @@ async function mAction(btn) {
     } catch (e) {
       mState.coachNote = { error: typeof describeAiError === "function" && !/Ziel|Schreib|Trainingsregeln/.test(e.message || "") ? describeAiError(e) : (e.message || String(e)) };
     }
+    renderMApp();
+  } else if (act === "pc-undo" && id) {
+    if (typeof undoPlanCheck === "function") undoPlanCheck(id);
+    renderMApp();
+  } else if (act === "pc-ok" && id) {
+    if (typeof dismissPlanCheck === "function") dismissPlanCheck(id);
+    renderMApp();
+  } else if (act === "pc-run") {
+    if (typeof runPlanCheck !== "function") return;
+    const p = runPlanCheck({ force: true });
+    renderMApp();
+    await p;
     renderMApp();
   } else if (act === "coach-undo") {
     const cn = mState.coachNote;

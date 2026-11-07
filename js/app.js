@@ -106,10 +106,12 @@ function checkAutoReplan() {
   initSettingsHub();
   if (typeof initUsageTracking === "function") initUsageTracking();
   checkAutoReplan();
-  // Automatische Risiko-Kontrolle (ACWR/TSB/Monotonie + Erholungs-Check) für
-  // die naechsten 1-2 Tage - siehe js/components/risk-adjust.js. Wie
-  // checkAutoReplan() bewusst nicht awaited (Rest der App soll nicht auf
-  // eine evtl. KI-Anfrage warten) und läuft intern selbst nur einmal pro Tag.
-  checkTrainingRiskAdjustment();
+  // Täglicher Plan-Check (js/components/plan-check.js): heute/morgen passend
+  // zur Verfassung, leere Trainingstage füllen, gestaffelt bis 4 Wochen voraus.
+  // Ersetzt die frühere Risiko-Kontrolle (risk-adjust.js), die nur einen
+  // Vorschlag zeigte - der Plan-Check ändert selbst und lässt sich rückgängig
+  // machen. Nicht awaited: die App wartet nicht auf eine evtl. KI-Anfrage.
+  if (typeof initPlanCheck === "function") initPlanCheck();
+  else checkTrainingRiskAdjustment();
 })();
 

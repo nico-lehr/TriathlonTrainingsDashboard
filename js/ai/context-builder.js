@@ -10,6 +10,84 @@ function periodWeekText(w) {
   return w.targetMin != null ? `${label}, Zielumfang ${w.targetMin} min (${pct})` : `${label}, Zielumfang ${pct} (in Minuten noch unbekannt)`;
 }
 
+// Gemessene Erholung der letzten Nacht (Garmin) als kurze Textbausteine -
+// für den Coach-Kontext und den täglichen Plan-Check (js/components/plan-check.js).
+function garminRecoveryBits() {
+  const wellBits = [];
+  if (typeof latestWellness !== "function") return wellBits;
+  const hrv = wellnessDeviation("hrv_ms");
+  if (hrv) {
+    const d = Math.round(hrv.deltaPct);
+    wellBits.push(`HRV ${Math.round(hrv.value)} ms (${d >= 0 ? "+" : ""}${d}% ggue. 30-Tage-Mittel ${Math.round(hrv.baseline)} ms)`);
+  }
+  const hrvStatus = latestWellness("hrv_status");
+  if (hrvStatus) wellBits.push(`HRV-Status laut Garmin: ${hrvStatus.value}`);
+  const rhr = wellnessDeviation("resting_hr");
+  if (rhr) {
+    const d = Math.round(rhr.value - rhr.baseline);
+    wellBits.push(`Ruhepuls ${Math.round(rhr.value)} bpm (${d >= 0 ? "+" : ""}${d} ggue. Mittel ${Math.round(rhr.baseline)})`);
+  }
+  const sleep = latestWellness("sleep_min");
+  if (sleep) {
+    const base = wellnessBaseline("sleep_min");
+    const h = Math.floor(sleep.value / 60), m = Math.round(sleep.value % 60);
+    wellBits.push(`Schlaf ${h}:${String(m).padStart(2, "0")} h${base ? ` (Mittel ${fmtNum(base / 60, 1)} h)` : ""}`);
+  }
+  const score = latestWellness("sleep_score");
+  if (score) wellBits.push(`Schlafscore ${Math.round(score.value)}/100`);
+  // Schlafphasen: sagen mehr ueber die Erholungsqualitaet aus als die reine
+  // Dauer - 7 Stunden mit wenig Tiefschlaf erholen schlechter als 6,5 mit viel.
+  const deep = latestWellness("sleep_deep_min"), rem = latestWellness("sleep_rem_min");
+  if (deep || rem) {
+    const parts = [];
+    if (deep) parts.push(`Tiefschlaf ${Math.round(deep.value)} min`);
+    if (rem) parts.push(`REM ${Math.round(rem.value)} min`);
+    wellBits.push(parts.join(", "));
+  }
+  // Garmins eigener Normbereich - die Einordnung "innerhalb/ausserhalb" stammt
+  // damit von Garmin selbst und nicht aus unserer 30-Tage-Naeherung.
+  const bLow = latestWellness("hrv_baseline_low"), bHigh = latestWellness("hrv_baseline_high");
+  if (bLow && bHigh) wellBits.push(`HRV-Normbereich laut Garmin: ${Math.round(bLow.value)}-${Math.round(bHigh.value)} ms`);
+  const bb = latestWellness("body_battery_high"), bbLow = latestWellness("body_battery_low");
+  if (bb) {
+    // Tagestief mitgeben: ein Hoch von 90 sagt wenig, wenn der Wert auf 5 faellt.
+    wellBits.push(`Body Battery ${Math.round(bb.value)} max${bbLow ? ` / ${Math.round(bbLow.value)} min` : ""}`);
+  }
+  const steps = latestWellness("steps");
+  if (steps) wellBits.push(`Schritte ${Math.round(steps.value).toLocaleString("de-DE")}`);
+  const ts = latestWellness("training_status");
+  if (ts) wellBits.push(`Trainingszustand laut Garmin: ${ts.value}`);
+  // Weitere Nachtwerte der Uhr - Temperatur, Atmung und Sauerstoff sind
+  // oft die ersten Zeichen eines Infekts, noch bevor man sich krank fühlt.
+  const ready = latestWellness("readiness_score", 2);
+  if (ready) {
+    const lvl = latestWellness("readiness_level", 2);
+    wellBits.push(`Trainingsbereitschaft laut Garmin ${Math.round(ready.value)}/100${lvl ? ` (${lvl.value})` : ""}`);
+  }
+  const hrvWeek = latestWellness("hrv_weekly_avg", 3);
+  if (hrvWeek) wellBits.push(`HRV 7-Tage-Schnitt laut Garmin ${Math.round(hrvWeek.value)} ms`);
+  const temp = latestWellness("skin_temp_dev_c", 3);
+  if (temp) wellBits.push(`Handgelenktemperatur nachts ${temp.value >= 0 ? "+" : "−"}${fmtNum(Math.abs(temp.value), 1)} °C ggue. eigenem Normalwert${temp.value >= 0.8 ? " (erhöht - möglicher Infekt)" : ""}`);
+  const resp = wellnessDeviation("resp_sleep");
+  if (resp) {
+    const d = resp.value - resp.baseline;
+    wellBits.push(`Atemfrequenz im Schlaf ${fmtNum(resp.value, 1)}/min (${d >= 0 ? "+" : "−"}${fmtNum(Math.abs(d), 1)} ggue. 30-Tage-Mittel)`);
+  } else {
+    const r = latestWellness("resp_sleep", 3) || latestWellness("resp_waking", 3);
+    if (r) wellBits.push(`Atemfrequenz ${fmtNum(r.value, 1)}/min`);
+  }
+  const spo2 = latestWellness("spo2_avg", 3);
+  if (spo2) {
+    const low = latestWellness("spo2_low", 3);
+    wellBits.push(`Blutsauerstoff (SpO2) Ø ${Math.round(spo2.value)} %${low ? `, tiefster Wert ${Math.round(low.value)} %` : ""}`);
+  }
+  const stress = wellnessDeviation("stress_avg");
+  if (stress) wellBits.push(`Stress (Garmin, 0-100) Ø ${Math.round(stress.value)} (30-Tage-Mittel ${Math.round(stress.baseline)})`);
+  const sleepStress = latestWellness("sleep_stress", 2);
+  if (sleepStress) wellBits.push(`Stress im Schlaf Ø ${Math.round(sleepStress.value)}`);
+  return wellBits;
+}
+
 // `goal` ist optional - ohne Ziel (z.B. für die allgemeine KI-
 // Leistungszustand-Zusammenfassung im Coach-Tab, siehe buildPerformanceSummaryPrompt()
 // in prompts.js) werden die zielspezifischen Zeilen (Ziel/Unterdisziplinen/
@@ -139,79 +217,7 @@ function buildCompactContext(goal) {
   // ausgegeben, nicht als nackte Zahl: ein HRV-Wert von 62 ms ist ohne
   // Vergleichsgroesse bedeutungslos, "12% unter dem eigenen 30-Tage-Mittel"
   // dagegen eine Aussage. Fehlende Tage bleiben Luecken (nie 0).
-  const wellBits = [];
-  if (typeof latestWellness === "function") {
-    const hrv = wellnessDeviation("hrv_ms");
-    if (hrv) {
-      const d = Math.round(hrv.deltaPct);
-      wellBits.push(`HRV ${Math.round(hrv.value)} ms (${d >= 0 ? "+" : ""}${d}% ggue. 30-Tage-Mittel ${Math.round(hrv.baseline)} ms)`);
-    }
-    const hrvStatus = latestWellness("hrv_status");
-    if (hrvStatus) wellBits.push(`HRV-Status laut Garmin: ${hrvStatus.value}`);
-    const rhr = wellnessDeviation("resting_hr");
-    if (rhr) {
-      const d = Math.round(rhr.value - rhr.baseline);
-      wellBits.push(`Ruhepuls ${Math.round(rhr.value)} bpm (${d >= 0 ? "+" : ""}${d} ggue. Mittel ${Math.round(rhr.baseline)})`);
-    }
-    const sleep = latestWellness("sleep_min");
-    if (sleep) {
-      const base = wellnessBaseline("sleep_min");
-      const h = Math.floor(sleep.value / 60), m = Math.round(sleep.value % 60);
-      wellBits.push(`Schlaf ${h}:${String(m).padStart(2, "0")} h${base ? ` (Mittel ${fmtNum(base / 60, 1)} h)` : ""}`);
-    }
-    const score = latestWellness("sleep_score");
-    if (score) wellBits.push(`Schlafscore ${Math.round(score.value)}/100`);
-    // Schlafphasen: sagen mehr ueber die Erholungsqualitaet aus als die reine
-    // Dauer - 7 Stunden mit wenig Tiefschlaf erholen schlechter als 6,5 mit viel.
-    const deep = latestWellness("sleep_deep_min"), rem = latestWellness("sleep_rem_min");
-    if (deep || rem) {
-      const parts = [];
-      if (deep) parts.push(`Tiefschlaf ${Math.round(deep.value)} min`);
-      if (rem) parts.push(`REM ${Math.round(rem.value)} min`);
-      wellBits.push(parts.join(", "));
-    }
-    // Garmins eigener Normbereich - die Einordnung "innerhalb/ausserhalb" stammt
-    // damit von Garmin selbst und nicht aus unserer 30-Tage-Naeherung.
-    const bLow = latestWellness("hrv_baseline_low"), bHigh = latestWellness("hrv_baseline_high");
-    if (bLow && bHigh) wellBits.push(`HRV-Normbereich laut Garmin: ${Math.round(bLow.value)}-${Math.round(bHigh.value)} ms`);
-    const bb = latestWellness("body_battery_high"), bbLow = latestWellness("body_battery_low");
-    if (bb) {
-      // Tagestief mitgeben: ein Hoch von 90 sagt wenig, wenn der Wert auf 5 faellt.
-      wellBits.push(`Body Battery ${Math.round(bb.value)} max${bbLow ? ` / ${Math.round(bbLow.value)} min` : ""}`);
-    }
-    const steps = latestWellness("steps");
-    if (steps) wellBits.push(`Schritte ${Math.round(steps.value).toLocaleString("de-DE")}`);
-    const ts = latestWellness("training_status");
-    if (ts) wellBits.push(`Trainingszustand laut Garmin: ${ts.value}`);
-    // Weitere Nachtwerte der Uhr - Temperatur, Atmung und Sauerstoff sind
-    // oft die ersten Zeichen eines Infekts, noch bevor man sich krank fühlt.
-    const ready = latestWellness("readiness_score", 2);
-    if (ready) {
-      const lvl = latestWellness("readiness_level", 2);
-      wellBits.push(`Trainingsbereitschaft laut Garmin ${Math.round(ready.value)}/100${lvl ? ` (${lvl.value})` : ""}`);
-    }
-    const hrvWeek = latestWellness("hrv_weekly_avg", 3);
-    if (hrvWeek) wellBits.push(`HRV 7-Tage-Schnitt laut Garmin ${Math.round(hrvWeek.value)} ms`);
-    const temp = latestWellness("skin_temp_dev_c", 3);
-    if (temp) wellBits.push(`Handgelenktemperatur nachts ${temp.value >= 0 ? "+" : "−"}${fmtNum(Math.abs(temp.value), 1)} °C ggue. eigenem Normalwert${temp.value >= 0.8 ? " (erhöht - möglicher Infekt)" : ""}`);
-    const resp = wellnessDeviation("resp_sleep");
-    if (resp) {
-      const d = resp.value - resp.baseline;
-      wellBits.push(`Atemfrequenz im Schlaf ${fmtNum(resp.value, 1)}/min (${d >= 0 ? "+" : "−"}${fmtNum(Math.abs(d), 1)} ggue. 30-Tage-Mittel)`);
-    } else {
-      const r = latestWellness("resp_sleep", 3) || latestWellness("resp_waking", 3);
-      if (r) wellBits.push(`Atemfrequenz ${fmtNum(r.value, 1)}/min`);
-    }
-    const spo2 = latestWellness("spo2_avg", 3);
-    if (spo2) {
-      const low = latestWellness("spo2_low", 3);
-      wellBits.push(`Blutsauerstoff (SpO2) Ø ${Math.round(spo2.value)} %${low ? `, tiefster Wert ${Math.round(low.value)} %` : ""}`);
-    }
-    const stress = wellnessDeviation("stress_avg");
-    if (stress) wellBits.push(`Stress (Garmin, 0-100) Ø ${Math.round(stress.value)} (30-Tage-Mittel ${Math.round(stress.baseline)})`);
-    const sleepStress = latestWellness("sleep_stress", 2);
-    if (sleepStress) wellBits.push(`Stress im Schlaf Ø ${Math.round(sleepStress.value)}`);
-  }
+  const wellBits = garminRecoveryBits();
 
   // Koerperzusammensetzung als eigene Zeile mit Trend - fuer die Bewertung von
   // Gewichtsveraenderungen ist entscheidend, OB Muskelmasse oder Fett schwankt.
