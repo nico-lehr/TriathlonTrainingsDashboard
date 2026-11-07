@@ -79,7 +79,12 @@ function initGarminSettings() {
   const syncBtn = document.getElementById("garmin-api-sync-btn");
   const syncStatusEl = document.getElementById("garmin-api-sync-status");
   const deleteBtn = document.getElementById("garmin-api-delete-btn");
-  if (!statusEl || !keyInput || !expiresInput || !saveBtn || !syncBtn || !syncStatusEl || !deleteBtn) return;
+  const actions = document.getElementById("garmin-api-actions");
+  const form = document.getElementById("garmin-api-form");
+  const changeBtn = document.getElementById("garmin-api-change-btn");
+  const cancelBtn = document.getElementById("garmin-api-cancel-btn");
+  let changing = false; // Schlüssel-Felder nur zeigen, wenn keiner da ist oder "Ändern" angetippt
+  if (!actions || !form || !changeBtn || !cancelBtn || !statusEl || !keyInput || !expiresInput || !saveBtn || !syncBtn || !syncStatusEl || !deleteBtn) return;
 
   function setStatus(el, text, kind) {
     el.textContent = text || "";
@@ -89,20 +94,22 @@ function initGarminSettings() {
 
   function keyText(st) {
     if (!st.configured) {
-      return ["Noch kein Schlüssel hinterlegt. Trainings und Gesundheitsdaten kommen nur über diesen Schlüssel.", ""];
+      return ["Noch nicht verbunden.", ""];
     }
-    if (st.days_left == null) return ["Schlüssel hinterlegt.", "ok"];
+    if (st.days_left == null) return ["Verbunden.", "ok"];
     const until = fmtDateFull(new Date(st.expires + "T00:00:00"));
-    if (st.days_left < 0) return [`Schlüssel abgelaufen (seit ${until}) – bitte in Garmin Connect einen neuen erstellen und hier eintragen.`, "err"];
-    if (st.days_left <= 14) return [`Schlüssel läuft bald ab (${until}, noch ${st.days_left} ${st.days_left === 1 ? "Tag" : "Tage"}) – rechtzeitig einen neuen erstellen.`, "warn"];
-    return [`Schlüssel hinterlegt – gültig bis ${until} (noch ${st.days_left} Tage).`, "ok"];
+    if (st.days_left < 0) return [`Schlüssel abgelaufen seit ${until} – bitte einen neuen eintragen.`, "err"];
+    if (st.days_left <= 14) return [`Schlüssel läuft am ${until} ab – bald einen neuen eintragen.`, "warn"];
+    return [`Verbunden · gültig bis ${until}.`, "ok"];
   }
 
   function render(st) {
     const [text, kind] = keyText(st);
     setStatus(statusEl, text, kind);
-    deleteBtn.hidden = !st.configured;
-    syncBtn.hidden = !st.configured;
+    if (!st.configured) changing = false;
+    actions.hidden = !st.configured || changing;
+    form.hidden = !!st.configured && !changing;
+    cancelBtn.hidden = !st.configured;
     if (typeof garminConnectedCache !== "undefined" && garminConnectedCache !== !!st.configured) {
       garminConnectedCache = !!st.configured;
       refreshGarminImportButtons(document);
@@ -111,10 +118,10 @@ function initGarminSettings() {
     syncBtn.disabled = !!sync.running;
     syncStatusEl.replaceChildren();
     if (sync.running) {
-      setStatus(syncStatusEl, "Abruf läuft … beim ersten Mal kann das einige Minuten dauern. Die Daten erscheinen danach von selbst.", "");
+      setStatus(syncStatusEl, "Hole Daten … beim ersten Mal dauert das einige Minuten.", "");
     } else if (sync.at) {
       const when = new Date(sync.at);
-      setStatus(syncStatusEl, `Letzter Abruf ${fmtDate(when)} ${when.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}: ${sync.message || ""}`, sync.ok ? "ok" : "err");
+      setStatus(syncStatusEl, `Zuletzt geholt ${fmtDate(when)}, ${when.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr${sync.ok ? "" : ` – ${sync.message || "fehlgeschlagen"}`}`, sync.ok ? "" : "err");
     } else {
       setStatus(syncStatusEl, "", "");
     }
@@ -135,6 +142,7 @@ function initGarminSettings() {
       const res = await apiCall("garmin/personal-api", "PUT", { key, expires: expiresInput.value || null }, { timeoutMs: 45000 });
       keyInput.value = "";
       expiresInput.value = "";
+      changing = false;
       setGarminState(res.data); // der Server startet gleich den ersten Abruf
     } catch (e) {
       setStatus(statusEl, e.message, "err");
@@ -166,6 +174,8 @@ function initGarminSettings() {
   keyInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); save(); } });
   syncBtn.addEventListener("click", startSync);
   deleteBtn.addEventListener("click", remove);
+  changeBtn.addEventListener("click", () => { changing = true; render(garminState); keyInput.focus(); });
+  cancelBtn.addEventListener("click", () => { changing = false; keyInput.value = ""; render(garminState); });
   onGarminState(render);
   refresh();
 }

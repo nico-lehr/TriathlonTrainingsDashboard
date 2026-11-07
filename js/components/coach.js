@@ -1017,7 +1017,7 @@ function initIcalSettings() {
   if (!hint || !row || !urlInput) return;
 
   const pruefBtn = document.getElementById("ical-check-btn");
-  hint.textContent = "Optional: dein Trainingsplan als Kalender-Abo.";
+  hint.textContent = "Deine Einheiten in der Kalender-App.";
   row.hidden = true;
   if (pruefBtn) pruefBtn.hidden = false;
 
@@ -1025,7 +1025,7 @@ function initIcalSettings() {
     hint.textContent = "Lade ...";
     apiCall("ical-link")
       .then(r => {
-        hint.textContent = "Diese persönliche Adresse in deiner Kalender-App als Internetkalender-Abo hinzufügen. Nicht weitergeben – wer sie kennt, sieht deinen Plan.";
+        hint.textContent = "In der Kalender-App als Abo hinzufügen. Nicht weitergeben.";
         urlInput.value = new URL(r.data.path, window.location.href).href;
         row.hidden = false;
       })

@@ -45,9 +45,9 @@ function gpOfficialHtml() {
   if (o.connected) return `<p class="card-sub gp-official ok">Offizielle Garmin-Schnittstelle verbunden – Trainings laufen über Garmins Training API.</p>
     <button type="button" class="reset-link" id="gp-official-off">Offizielle Verbindung trennen</button>`;
   if (o.available) return `<div class="coach-settings-row"><button type="button" class="cal-today-btn" id="gp-official-on">Offiziell mit Garmin verbinden</button></div>
-    <p class="card-sub">Empfohlen: Du stimmst direkt bei Garmin zu, ganz ohne Passwort im Dashboard.</p>`;
+    <p class="card-sub">Ohne Passwort – du stimmst direkt bei Garmin zu.</p>`;
   return `<details class="settings-disclosure gp-official"><summary>Offizielle Garmin-Schnittstelle</summary>
-    <p class="card-sub">Ist vorbereitet. Sobald Garmin das Dashboard für die Training API freischaltet, kannst du hier mit einem Tipp offiziell verbinden – dann ganz ohne Garmin-Passwort.</p></details>`;
+    <p class="card-sub">Vorbereitet. Sobald Garmin sie freischaltet, verbindest du hier ohne Passwort.</p></details>`;
 }
 
 function gpMsgHtml() {
@@ -61,7 +61,6 @@ function renderGarminPushCard() {
   if (!garminPush.connected) {
     const mfa = gpForm.step === "mfa";
     body.innerHTML = `
-      <div class="ai-status-row"><span class="ai-status-dot" aria-hidden="true"></span><span class="ai-status-text">Noch nicht verbunden</span></div>
       <form id="gp-login-form" autocomplete="on">
         <div class="settings-list">
           ${mfa ? `
@@ -73,7 +72,7 @@ function renderGarminPushCard() {
             <input type="password" id="gp-password" class="coach-input" autocomplete="current-password"></div>`}
         </div>
         <p class="card-sub settings-list-foot">${mfa ? "Garmin hat dir einen Code geschickt (E-Mail oder App). Bitte hier eingeben."
-          : "Dein Passwort wird <b>nicht gespeichert</b>: Der Dashboard-Server tauscht es einmal gegen eine Anmeldung, die sich danach selbst erneuert. Bitte nur über eine sichere Verbindung (zu Hause oder https)."}</p>
+          : "Dein Passwort wird nicht gespeichert."}</p>
         <div class="coach-settings-row">
           <button type="submit" class="update-btn" id="gp-login-btn"${gpForm.busy ? " disabled" : ""}>${gpForm.busy ? "Melde an … (kann 30 s dauern)" : mfa ? "Code bestätigen" : "Mit Garmin anmelden"}</button>
           ${mfa ? `<button type="button" class="reset-link" id="gp-mfa-cancel">Abbrechen</button>` : ""}
@@ -88,21 +87,20 @@ function renderGarminPushCard() {
   const err = garminPush.error || stopped;
   body.innerHTML = `
     <div class="ai-status-row"><span class="ai-status-dot on" aria-hidden="true"></span>
-      <span class="ai-status-text">Verbunden${garminPush.last_run_at ? ` · zuletzt abgeglichen ${gpEsc(gpWhen(garminPush.last_run_at))}${r ? ` (${gpEsc(gpResultText(r))})` : ""}` : ""}</span></div>
+      <span class="ai-status-text">Verbunden${garminPush.last_run_at ? ` · abgeglichen ${gpEsc(gpWhen(garminPush.last_run_at))}` : ""}</span></div>
     ${err ? `<p class="coach-test-status err">${gpEsc(err)}</p>` : ""}
     <div class="settings-list">
-      <label class="settings-list-row" for="gp-auto"><span>Automatisch senden<small class="gp-sub">Nächste 7 Tage, Änderungen inklusive</small></span>
+      <label class="settings-list-row" for="gp-auto"><span>Automatisch senden</span>
         <input type="checkbox" id="gp-auto" class="switch" role="switch"${garminPush.auto ? " checked" : ""}></label>
     </div>
     <h3 class="gp-h">Nächste 7 Tage</h3>
     ${gpUpcomingHtml()}
-    <div class="coach-settings-row">
-      <button type="button" class="cal-today-btn" id="gp-sync-now"${garminPush.busy || !garminPush.auto ? " disabled" : ""}>${garminPush.busy ? "Gleiche ab …" : "Jetzt abgleichen"}</button>
-    </div>
     ${gpMsgHtml()}
-    <p class="card-sub gp-foot">Die Uhr holt neue Workouts beim nächsten Sync mit der Garmin-App. Erledigte und vergangene Einheiten bleiben in Garmin, wie sie sind.</p>
-    ${gpOfficialHtml()}
-    <button type="button" class="reset-link gp-logout" id="gp-logout">Bei Garmin abmelden</button>`;
+    <div class="sh-actions">
+      <button type="button" class="cal-today-btn" id="gp-sync-now"${garminPush.busy || !garminPush.auto ? " disabled" : ""}>${garminPush.busy ? "Gleiche ab …" : "Jetzt abgleichen"}</button>
+      <button type="button" class="reset-link" id="gp-logout">Abmelden</button>
+    </div>
+    ${gpOfficialHtml()}`;
 }
 
 function gpSetMsg(msg, kind = "") { gpForm.msg = msg; gpForm.msgKind = kind; }

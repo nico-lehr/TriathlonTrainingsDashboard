@@ -12,6 +12,15 @@ function initAiSettings() {
   const saveBtn = document.getElementById("claude-save-btn");
   const deleteBtn = document.getElementById("claude-delete-btn");
   const statusEl = document.getElementById("claude-test-status");
+  const keyRow = document.getElementById("claude-key-row");
+  const keyActions = document.getElementById("claude-key-actions");
+  const keyHint = document.getElementById("claude-key-hint");
+  const manage = document.getElementById("claude-manage");
+  const changeBtn = document.getElementById("claude-change-btn");
+  const cancelBtn = document.getElementById("claude-cancel-btn");
+  let changing = false; // Schlüssel-Feld nur ohne Schlüssel oder nach "Schlüssel ändern"
+  let last = null;
+  if (!keyRow || !keyActions || !keyHint || !manage || !changeBtn || !cancelBtn) return;
   if (!dot || !text || !adminBox || !keyInput || !modelSelect || !sharedInput || !saveBtn || !deleteBtn || !statusEl) return;
   forgetLegacyClaudeKey();
 
@@ -26,6 +35,7 @@ function initAiSettings() {
   }
 
   function render(st) {
+    last = st;
     dot.className = "ai-status-dot";
     if (!st) {
       text.textContent = "Der Dashboard-Server ist gerade nicht erreichbar.";
@@ -43,7 +53,7 @@ function initAiSettings() {
       text.textContent = "Claude ist eingerichtet, aber nicht für dich freigegeben. Bis dahin antwortet die lokale KI.";
       dot.classList.add("off");
     } else if (st.admin) {
-      text.textContent = "Noch nicht verbunden. Trag unten deinen Claude-Schlüssel ein.";
+      text.textContent = "Noch nicht verbunden.";
       dot.classList.add("off");
     } else {
       text.textContent = "Claude richtet der Betreiber des Dashboards ein. Bis dahin antwortet die lokale KI.";
@@ -56,9 +66,12 @@ function initAiSettings() {
     }
     modelSelect.value = st.model;
     sharedInput.checked = !!st.shared;
-    keyInput.placeholder = st.configured ? "•••••••• (gespeichert – nur zum Ersetzen ausfüllen)" : "sk-ant-…";
-    saveBtn.textContent = st.configured ? "Neuen Schlüssel prüfen & speichern" : "Schlüssel prüfen & speichern";
-    deleteBtn.hidden = !st.configured;
+    keyInput.placeholder = st.configured ? "Neuer Schlüssel" : "sk-ant-…";
+    if (!st.configured) changing = false;
+    const edit = !st.configured || changing;
+    keyRow.hidden = keyActions.hidden = keyHint.hidden = !edit;
+    manage.hidden = edit;
+    cancelBtn.hidden = !st.configured;
     modelSelect.disabled = sharedInput.disabled = !st.configured;
   }
 
@@ -81,13 +94,15 @@ function initAiSettings() {
     saveBtn.disabled = true;
     const ok = await put({ key, model: modelSelect.value || null, shared: sharedInput.checked }, "Prüfe den Schlüssel bei Claude …");
     saveBtn.disabled = false;
-    if (ok) { keyInput.value = ""; setStatus("Gespeichert. Claude ist ab jetzt auf allen Geräten verfügbar.", "ok"); }
+    if (ok) { keyInput.value = ""; changing = false; render(last); setStatus("Gespeichert.", "ok"); }
   });
   keyInput.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); saveBtn.click(); } });
+  changeBtn.addEventListener("click", () => { changing = true; setStatus(""); render(last); keyInput.focus(); });
+  cancelBtn.addEventListener("click", () => { changing = false; keyInput.value = ""; setStatus(""); render(last); });
   modelSelect.addEventListener("change", async () => { if (await put({ model: modelSelect.value }, "Speichere …")) setStatus("Modell gespeichert.", "ok"); });
   sharedInput.addEventListener("change", async () => {
     if (await put({ shared: sharedInput.checked }, "Speichere …")) {
-      setStatus(sharedInput.checked ? "Freigegeben – alle Personen im Dashboard nutzen jetzt Claude." : "Nur noch du nutzt Claude.", "ok");
+      setStatus(sharedInput.checked ? "Für alle freigegeben." : "Nur noch für dich.", "ok");
     }
   });
   deleteBtn.addEventListener("click", async () => {

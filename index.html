@@ -706,7 +706,7 @@
 
       <div class="card full" id="invite-card" data-sp="einladen" hidden>
         <h2>Freunde einladen</h2>
-        <p class="card-sub">Mit dem Einladungscode erstellt sich jede Person auf der Anmeldeseite selbst ein Konto – mit eigenem, getrenntem Bereich. Ohne Code kann niemand ein Konto anlegen.</p>
+        <p class="card-sub">Mit dem Code legt sich jede Person ein eigenes Konto an.</p>
         <div class="settings-list">
           <div class="settings-list-row">
             <label for="invite-enabled">Einladungen erlauben</label>
@@ -722,7 +722,7 @@
               <button type="button" class="mob-btn mob-btn-secondary" id="invite-renew-btn">Neuer Code</button>
             </div>
           </div>
-          <p class="card-sub">„Einladung senden“ teilt einen Link, der direkt „Konto erstellen“ mit dem Code öffnet. „Neuer Code“ macht den alten sofort ungültig – bestehende Konten bleiben.</p>
+          
         </div>
         <p class="coach-test-status" id="invite-status" role="status" aria-live="polite"></p>
         <h3 class="invite-accounts-title" id="invite-accounts-title">Konten</h3>
@@ -752,7 +752,7 @@
           <div class="app-update-notes" id="app-update-notes" hidden></div>
           <div class="settings-list app-update-auto">
             <div class="settings-list-row">
-              <label for="app-update-auto">Automatisch installieren<small>Nachts zwischen 3 und 5 Uhr, vorher wird alles gesichert</small></label>
+              <label for="app-update-auto">Automatisch installieren<small>Nachts zwischen 3 und 5 Uhr</small></label>
               <input type="checkbox" id="app-update-auto" class="switch" role="switch">
             </div>
           </div>
@@ -760,7 +760,7 @@
             <button type="button" class="cal-today-btn" id="app-update-check-btn">Jetzt prüfen</button>
             <button type="button" class="update-btn" id="app-update-install-btn" hidden>Installieren</button>
           </div>
-          <p class="card-sub">Vor dem Installieren werden Datenbank und Programm in <code>backups/</code> gesichert. Deine Daten (Trainings, Einstellungen, <code>.env</code>) werden nie ersetzt. Der Server startet danach neu – Freunde sind kurz getrennt (meist unter einer Minute).</p>
+          <p class="card-sub">Vorher wird alles gesichert – deine Daten bleiben.</p>
         </div>
       </div>
 
@@ -768,8 +768,16 @@
         <h2>Daten von Garmin
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Offizielle Garmin-Schnittstelle („Personal API“): Mit deinem eigenen Schlüssel holt der Dashboard-Server deine Trainings (als .fit-Datei) und Gesundheitsdaten (Schlaf, HRV, Ruhepuls, Gewicht, Schritte; Body Battery, soweit Garmin sie dort liefert) – nur lesen, ohne dein Garmin-Passwort. Workouts auf die Uhr schicken kann dieser Schlüssel nicht. VO2max und Trainingszustand liefert die Schnittstelle nicht; das Dashboard schätzt VO2max dann selbst.</div></span>
         </h2>
-        <p class="card-sub">Schlüssel in Garmin Connect erstellen: <a href="https://connect.garmin.com/app/settings/personalApiToken" target="_blank" rel="noopener">Einstellungen → Personal API</a>. Er wird nur einmal angezeigt – gleich hier einfügen. Bitte nur über eine sichere Verbindung eintragen (zu Hause oder über die https-Adresse).</p>
+        <h3 class="sh-sec">Daten holen</h3>
         <p class="coach-test-status" id="garmin-api-status"></p>
+        <p class="coach-test-status" id="garmin-api-sync-status"></p>
+        <div class="sh-actions" id="garmin-api-actions" hidden>
+          <button type="button" class="cal-today-btn" id="garmin-api-sync-btn">Jetzt holen</button>
+          <button type="button" class="reset-link" id="garmin-api-change-btn">Schlüssel ändern</button>
+          <button type="button" class="reset-link" id="garmin-api-delete-btn">Entfernen</button>
+        </div>
+        <div id="garmin-api-form">
+        <p class="card-sub">Schlüssel in Garmin Connect erstellen: <a href="https://connect.garmin.com/app/settings/personalApiToken" target="_blank" rel="noopener">Einstellungen → Personal API</a>.</p>
         <div class="coach-settings-row">
           <label for="garmin-api-key">Schlüssel</label>
           <input type="password" id="garmin-api-key" class="coach-input" autocomplete="off" spellcheck="false" placeholder="Schlüssel einfügen">
@@ -779,16 +787,16 @@
           <input type="date" id="garmin-api-expires" class="coach-input">
         </div>
         <div class="coach-settings-row">
-          <button type="button" class="cal-today-btn" id="garmin-api-save-btn">Schlüssel prüfen &amp; speichern</button>
-          <button type="button" class="cal-today-btn" id="garmin-api-sync-btn" hidden>Jetzt von Garmin holen</button>
+          <button type="button" class="update-btn" id="garmin-api-save-btn">Speichern</button>
+          <button type="button" class="reset-link" id="garmin-api-cancel-btn" hidden>Abbrechen</button>
         </div>
-        <p class="coach-test-status" id="garmin-api-sync-status"></p>
-        <button type="button" class="reset-link" id="garmin-api-delete-btn" hidden>Schlüssel entfernen</button>
+        </div>
       </div>
 
       <div class="card full" id="garmin-push-card" data-sp="garmin">
         <h2>Trainings auf die Uhr</h2>
-        <p class="card-sub">Deine geplanten Einheiten der nächsten 7 Tage landen automatisch im Garmin-Kalender und auf deiner Uhr – mit allen Schritten, Zielbereichen, Übungen und Hinweisen. Änderst du den Plan, zieht Garmin mit.</p>
+        <h3 class="sh-sec">Trainings auf die Uhr</h3>
+        <p class="card-sub">Deine Einheiten der nächsten 7 Tage – Änderungen inklusive.</p>
         <div id="gp-body"><p class="card-sub">Lade …</p></div>
       </div>
 
@@ -801,7 +809,7 @@
         </div>
         <div id="claude-admin" hidden>
           <div class="settings-list">
-            <div class="settings-list-row">
+            <div class="settings-list-row" id="claude-key-row">
               <label for="claude-api-key">Schlüssel</label>
               <input type="password" id="claude-api-key" class="coach-input" autocomplete="off" spellcheck="false" placeholder="sk-ant-…">
             </div>
@@ -814,17 +822,21 @@
               <input type="checkbox" id="claude-shared" class="switch" role="switch">
             </div>
           </div>
-          <p class="card-sub settings-list-foot">Freigegeben laufen auch die Anfragen deiner Freunde über deinen Schlüssel – und damit über dein Guthaben.</p>
-          <div class="coach-settings-row">
-            <button type="button" class="update-btn" id="claude-save-btn">Schlüssel prüfen &amp; speichern</button>
-            <button type="button" class="reset-link" id="claude-delete-btn" hidden>Schlüssel entfernen</button>
+          <p class="card-sub settings-list-foot">Freigegeben zahlen Anfragen deiner Freunde über dein Guthaben.</p>
+          <div class="coach-settings-row" id="claude-key-actions">
+            <button type="button" class="update-btn" id="claude-save-btn">Speichern</button>
+            <button type="button" class="reset-link" id="claude-cancel-btn" hidden>Abbrechen</button>
+          </div>
+          <p class="card-sub coach-setup-hint" id="claude-key-hint">Schlüssel erstellen: <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> → API Keys.</p>
+          <div class="sh-actions" id="claude-manage" hidden>
+            <button type="button" class="reset-link" id="claude-change-btn">Schlüssel ändern</button>
+            <button type="button" class="reset-link" id="claude-delete-btn">Entfernen</button>
           </div>
           <p class="coach-test-status" id="claude-test-status" role="status"></p>
-          <p class="card-sub coach-setup-hint">Schlüssel erstellen: <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> → API Keys. Er liegt danach nur auf dem Dashboard-Server, nie im Browser.</p>
         </div>
         <details class="settings-disclosure">
           <summary>Ohne Claude: lokale KI (Ollama)</summary>
-          <p class="card-sub">Nur nötig, wenn Claude nicht eingerichtet ist. Ollama läuft auf dem Dashboard-PC – deine Daten verlassen das eigene Netz nicht.</p>
+          <p class="card-sub">Nur nötig, wenn Claude nicht eingerichtet ist.</p>
           <div class="coach-settings-row" hidden>
             <label for="coach-ollama-url">Adresse</label>
             <input type="text" id="coach-ollama-url" class="coach-input" placeholder="http://localhost:11434">
@@ -933,13 +945,13 @@
               </div>
             </div>
         </div>
-        <p class="pf-foot">Werte mit „Garmin“ kommen von deiner Uhr und bleiben von selbst aktuell – zum Ändern antippen. Alles optional. Pulswerte braucht das Dashboard für Belastung und Zonen, das Gewicht für die Rad-Schätzung – fehlt ein Wert, bleibt die Auswertung leer statt geraten.</p>
+        <p class="pf-foot">Alles optional. Werte mit „Garmin“ kommen von deiner Uhr – zum Ändern antippen.</p>
         </div>
       <div class="card full" id="profile-balance-card" data-sp="training">
         <h2>Sport-Balance
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Zielverteilung deiner Trainingszeit für die Karte „Sport-Balance" im Analyse-Tab. Gespeichert wird nur, wenn die drei Werte zusammen 100 % ergeben.</div></span>
         </h2>
-        <p class="card-sub">Ziel-Anteil der Trainingszeit je Sportart (zusammen 100 %).</p>
+        <p class="card-sub">Anteil je Sportart, zusammen 100 %.</p>
         <div class="goal-form">
           <div class="goal-form-row">
             <label for="profile-balance-swim">Schwimmen (%)</label>
@@ -955,7 +967,7 @@
           </div>
         </div>
         <div class="ana-settings-actions">
-          <button type="button" class="cal-today-btn" id="profile-balance-reset-btn">Standard 15/50/35</button>
+          <button type="button" class="reset-link" id="profile-balance-reset-btn">Zurück auf 15/50/35</button>
           <span class="coach-test-status" id="profile-balance-status"></span>
         </div>
       </div>
@@ -964,10 +976,11 @@
         <h2>Kalender-Abo (iCal)
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Geplante Einheiten als abonnierbaren Kalender-Feed (webcal), z.B. für Apple/Google Kalender. Braucht den lokalen Backend-Server (siehe DEPLOYMENT.md) - funktioniert nur, während "python backend/app.py" auf diesem Rechner läuft, noch nicht "online" von unterwegs.</div></span>
         </h2>
+        <h3 class="sh-sec">Kalender-Abo</h3>
         <p class="card-sub" id="ical-status-hint">Optional: Trainingsplan als Kalender-Abo.</p>
-        <button type="button" class="update-btn" id="ical-check-btn" hidden style="margin-bottom:8px;">Abo-Adresse anzeigen</button>
+        <button type="button" class="cal-today-btn" id="ical-check-btn" hidden>Abo-Adresse anzeigen</button>
         <div class="goal-form-row goal-form-row-wide" id="ical-url-row" hidden>
-          <label for="ical-url-input">Abo-Adresse (in Kalender-App als Internetkalender/webcal hinzufügen)</label>
+          <label for="ical-url-input" class="sr-only">Abo-Adresse</label>
           <div class="wd-rating-elevation-inputs">
             <input type="text" id="ical-url-input" class="coach-input" readonly style="flex:1;">
             <button type="button" class="chip" id="ical-copy-btn">Kopieren</button>
@@ -975,15 +988,16 @@
         </div>
       </div>
 
-      <div class="card full" id="weather-card" data-sp="wetter">
+      <div class="card full" id="weather-card" data-sp="kalender">
         <h2>Wetter im Kalender
           <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">7-Tage-Vorhersage von Open-Meteo (kostenlos, ohne Konto) für deinen Heimatort. Sie steht im Kalender an Outdoor-Einheiten: Rad und Laufen, außer der Titel nennt Indoor, Rolle, Ergometer, Laufband, Halle o. Ä.; Schwimmen nur mit „Freiwasser“, „Open Water“, „See“ oder „Meer“ im Titel. Die Vorhersage holt der Dashboard-Server, gespeichert wird nur der Ort.</div></span>
         </h2>
+        <h3 class="sh-sec">Wetter</h3>
         <p class="card-sub">Optional — Wetter an Outdoor-Einheiten der nächsten 7 Tage.</p>
         <div class="coach-settings-row">
-          <label for="weather-location-input">Heimatort suchen</label>
+          <label for="weather-location-input" class="sr-only">Heimatort suchen</label>
           <div class="weather-search-row">
-            <input type="text" id="weather-location-input" class="coach-input" maxlength="100" placeholder="z.B. Heidelberg">
+            <input type="text" id="weather-location-input" class="coach-input" maxlength="100" placeholder="Heimatort, z. B. Heidelberg">
             <button type="button" class="cal-today-btn" id="weather-location-search-btn">Suchen</button>
           </div>
         </div>

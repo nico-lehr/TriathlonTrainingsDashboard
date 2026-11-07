@@ -18,7 +18,7 @@ function initWeatherSettings() {
 
   function showCurrent() {
     const loc = athleteProfile.homeLocation;
-    showStatus(loc ? `Heimatort: ${loc.name}` : "Noch kein Heimatort eingetragen – ohne Ort zeigt der Kalender kein Wetter.", loc ? "ok" : "");
+    showStatus(loc ? `Heimatort: ${loc.name}` : "Kein Ort – dann zeigt der Kalender kein Wetter.", loc ? "ok" : "");
     clearBtn.hidden = !loc;
   }
 

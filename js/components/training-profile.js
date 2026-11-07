@@ -46,7 +46,7 @@ function initTrainingProfile() {
         ${segmented("mobilityMinutes", [10, 15, 20, 30], tp.mobilityMinutes, " Min", "Dauer")}
       </div>
       <h3 class="pf-group tp-wish-head">Deine Wünsche</h3>
-      <p class="tp-intro">Claude berücksichtigt sie bei jedem Trainingsplan und jeder Mobility-Einheit.</p>
+      <p class="tp-intro">Fließen in jeden Plan ein.</p>
       <div class="tp-section">
         <label class="tp-label" for="tp-goals">Was möchtest du erreichen?</label>
         <textarea id="tp-goals" class="coach-input tp-textarea" rows="2" placeholder="z. B. Hüfte lockerer für die Aero-Position, nach dem Laufen weniger steife Waden">${escapeHtml(tp.goals)}</textarea>

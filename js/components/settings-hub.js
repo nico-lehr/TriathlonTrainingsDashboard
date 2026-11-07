@@ -21,15 +21,14 @@ const SH_ICONS = {
 };
 
 const SH_PANELS = {
-  profil: ["Profil", "Persönliche Angaben und Trainingswerte. Werte mit „Garmin“ kommen von deiner Uhr."],
-  training: ["Training & Planung", "Wie viel Zeit du hast, was eingeplant wird und deine Wünsche an den Plan."],
-  garmin: ["Garmin", "Deine Daten von Garmin holen – und geplante Trainings automatisch auf die Uhr bringen."],
-  ki: ["KI-Coach", "Claude erstellt Pläne, Mobility-Einheiten und Auswertungen."],
-  kalender: ["Kalender-Abo", "Deine geplanten Einheiten in der Kalender-App auf Handy und Computer."],
-  wetter: ["Wetter", "Vorhersage an Outdoor-Einheiten der nächsten 7 Tage."],
-  equipment: ["Equipment", "Kilometerstand von Schuhen und Rad, automatisch aus deinen Trainings."],
+  profil: ["Profil", ""],
+  training: ["Training & Planung", ""],
+  garmin: ["Garmin", ""],
+  ki: ["KI-Coach", "Claude erstellt Pläne, Mobility und Auswertungen."],
+  kalender: ["Kalender & Wetter", ""],
+  equipment: ["Equipment", "Kilometer von Schuhen und Rad, automatisch gezählt."],
   updates: ["Programm-Updates", ""],
-  einladen: ["Freunde einladen", "Mit einem Code legen sich Freunde selbst ein eigenes Konto an."],
+  einladen: ["Freunde einladen", ""],
 };
 
 let shPanel = null;
@@ -61,8 +60,7 @@ function shStatus(id) {
       if (typeof claudeAvailable !== "function") return "";
       return claudeAvailable() ? { text: "Claude aktiv", ok: true } : "Aus";
     }
-    case "kalender": return "Abo-Link";
-    case "wetter": return p.homeLocation ? p.homeLocation.name.replace(/ \(.*\)$/, "") : "Kein Ort";
+    case "kalender": return p.homeLocation ? p.homeLocation.name.replace(/ \(.*\)$/, "") : "";
     case "equipment": {
       const n = typeof equipmentItems !== "undefined" ? equipmentItems.filter(e => !e.retired).length : 0;
       return n ? `${n} ${n === 1 ? "Teil" : "Teile"}` : "Keins";
@@ -105,20 +103,17 @@ function renderSettingsHub() {
     <div class="sh-group"><h3>Du</h3><div class="sh-list">
       ${shRow("profil", "Profil")}
       ${shRow("training", "Training & Planung")}
+      ${shRow("equipment", "Equipment")}
     </div></div>
     <div class="sh-group"><h3>Verbindungen</h3><div class="sh-list">
       ${shRow("garmin", "Garmin")}
       ${shRow("ki", "KI-Coach")}
-      ${shRow("kalender", "Kalender-Abo")}
-      ${shRow("wetter", "Wetter")}
-    </div></div>
-    <div class="sh-group"><h3>Ausrüstung</h3><div class="sh-list">
-      ${shRow("equipment", "Equipment")}
+      ${shRow("kalender", "Kalender & Wetter")}
     </div></div>
     <div class="sh-group"><h3>App</h3><div class="sh-list">
       <label class="sh-row sh-switch-row">
         <span class="sh-ic" style="--c:${SH_ICONS.darstellung[0]}"><svg viewBox="0 0 24 24" aria-hidden="true">${SH_ICONS.darstellung[1]}</svg></span>
-        <span class="sh-label">Neue Ansicht „Graphit“<small>Gilt für dieses Gerät</small></span>
+        <span class="sh-label">Neue Ansicht „Graphit“</span>
         <input type="checkbox" class="switch" id="sh-graphit" role="switch" ${graphitOn ? "checked" : ""}>
       </label>
       ${shRow("updates", "Programm-Updates")}
@@ -127,7 +122,7 @@ function renderSettingsHub() {
     </div></div>
     <div class="sh-group"><div class="sh-list">
       <button type="button" class="sh-row sh-logout" id="sh-logout">Abmelden</button>
-    </div><p class="sh-foot">Beim Abmelden wird alles Persönliche aus diesem Browser entfernt. Deine Daten bleiben auf dem Dashboard-Server.</p></div>`;
+    </div></div>`;
 }
 
 function showSettingsHub() {
@@ -143,6 +138,7 @@ function showSettingsHub() {
 
 function openSettingsPanel(id) {
   if (id === "statistik") { if (typeof mShow === "function") mShow("admin"); return; }
+  if (id === "wetter") id = "kalender"; // früher eigener Bereich
   if (!SH_PANELS[id]) return;
   const view = document.getElementById("view-settings");
   if (!view || !view.classList.contains("active")) openSettingsView();
@@ -151,7 +147,9 @@ function openSettingsPanel(id) {
   const [title, sub] = SH_PANELS[id];
   document.getElementById("settings-panel-head").hidden = false;
   document.getElementById("settings-panel-title").textContent = title;
-  document.getElementById("settings-panel-sub").textContent = sub;
+  const subEl = document.getElementById("settings-panel-sub");
+  subEl.textContent = sub;
+  subEl.hidden = !sub;
   document.querySelectorAll("#settings-panels [data-sp]").forEach(c => c.classList.toggle("sh-show", c.dataset.sp === id));
   const t = document.getElementById("m-classic-title");
   if (t && document.body.classList.contains("m-classic")) t.textContent = title;
