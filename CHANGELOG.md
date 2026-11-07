@@ -4,6 +4,19 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.32
+
+Dein Plan passt jetzt besser auf dich auf – und deine Garmin-Events sind automatisch da.
+
+Neu in 2.4.32:
+- Events aus Garmin Connect: Wettkämpfe, die du im Garmin-Kalender eingetragen hast, erscheinen automatisch als Ziele (mit Datum, Sportart, Distanz, Zielzeit und Ort). Steht dasselbe Event schon bei deinen Zielen, wird es nur verknüpft – keine Doppelten
+- Nichts wird gelöscht: Ein Ziel, das du selbst löschst, kommt nicht wieder. Dein Hauptevent wird nur gesetzt, wenn du noch keins hast
+- Unter Einstellungen → Garmin kannst du die Events jederzeit mit „Events jetzt holen“ abrufen
+- Plan-Check: Der Coach schaut jeden Tag auf heute und morgen, alle 3 Tage auf die restliche Woche und einmal pro Woche weiter in die Zukunft – nach einer ausgelassenen Einheit oder einer Verletzung sofort
+- Leere Trainingstage werden automatisch aufgefüllt, und wenn du erschöpft bist, wird eine harte Einheit locker gemacht. Auf „Heute“ siehst du, was geändert wurde, und kannst es mit einem Tipp rückgängig machen
+- Beim Plan erstellen gehen keine Einheiten mehr still verloren; du siehst, was ergänzt wurde
+- Kraft: Wähle, womit du trainierst – Eigengewicht, Kurzhanteln, Kettlebell, Band oder Studio. Dazu 35 neue Übungen mit Strichfiguren
+
 ## 2.4.31
 
 Der Kalender zeigt dir jetzt, was als Nächstes kommt.
