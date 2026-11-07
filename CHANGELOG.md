@@ -4,6 +4,19 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.27
+
+Einstellungen gehen nicht mehr verloren, eine aufgeräumte Einstellungsseite und die richtige Schwimm-Pace.
+
+Neu in 2.4.27:
+- Wichtige Korrektur: Beim Öffnen des Dashboards konnten Profil-Angaben (Name, FTP, Pulswerte …) und von Hand eingetragene Gewichte verloren gehen, sobald Garmin ein Gewicht lieferte. Das ist behoben – bitte fehlende Angaben einmal neu eintragen, danach bleiben sie
+- Speichern ist jetzt viel robuster: Änderungen von Handy und Computer werden zusammengeführt statt überschrieben, bei schlechtem Netz im Gerät zwischengespeichert und automatisch nachgeschickt, und beim Schließen der App noch abgeschickt
+- Profilfelder speichern schon beim Tippen; selbst eingetragene Werte überschreibt der Garmin-Abgleich nicht mehr (zurück mit „↺ Garmin“)
+- Einstellungen neu als übersichtliche Liste wie am iPhone: Profil, Training & Planung, Garmin, KI-Coach, Kalender-Abo, Wetter, Equipment – mit dem aktuellen Stand rechts in jeder Zeile
+- „Mobility einplanen“ gibt es nur noch einmal (unter Training & Planung); Details zu Körperstellen und Ausstattung sind eingeklappt
+- Schwimmen im Becken: Die Pace wird jetzt wie bei Garmin aus der Zeit in Bewegung berechnet (ohne Pausen am Beckenrand) – auch für ältere Einheiten. Neu in der Trainingsansicht: „Dauer / in Bewegung“
+- Für den Betreiber: „Admin · Statistik“ unter Mehr – wie oft das Dashboard genutzt wird, welche Bereiche beliebt sind, Claude und Garmin. Nur Zahlen je Person, keine Inhalte
+
 ## 2.4.26
 
 Am Computer wie eine richtige App, das Menü steht fest, und alles bewegt sich ein bisschen.
