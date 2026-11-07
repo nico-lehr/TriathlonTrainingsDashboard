@@ -290,6 +290,7 @@ function renderGoals() {
             <button class="goal-primary-star${goal.isPrimary ? " active" : ""}" title="${goal.isPrimary ? "Hauptevent" : "Als Hauptevent für den Trainingsplan markieren"}" data-id="${goal.id}" type="button">★</button>
             <span class="sport-dot" style="background:${sportColor(goal.sport)}"></span><span class="goal-name">${escapeHtml(goal.name)}</span>
             ${goal.priority ? `<span class="goal-priority-badge goal-priority-${goal.priority}" title="${goal.priority}-Rennen">${goal.priority}</span>` : ""}
+            ${goal.garminEventId ? `<span class="goal-garmin-badge" title="Aus deinem Garmin-Connect-Kalender">Garmin</span>` : ""}
           </div>
           <div class="goal-head-right">
             ${readinessBadgeHtml}

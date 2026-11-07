@@ -31,6 +31,8 @@ async function refreshGarminState() {
 async function reloadGarminData() {
   await Promise.all([loadPersistedWorkouts(), loadWellness()]);
   if (typeof syncGarminWeightIntoLog === "function") syncGarminWeightIntoLog();
+  // Neue/geänderte Events aus dem Garmin-Kalender gleich mit übernehmen
+  if (typeof syncGarminEvents === "function") await syncGarminEvents({ force: true }).catch(() => null);
   renderAll();
 }
 

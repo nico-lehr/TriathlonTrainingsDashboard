@@ -328,6 +328,7 @@ function mRenderHeute() {
 
   return mHeaderHtml(now.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" }), "Heute", mSyncPill())
     + mCols3(`<section class="m-card m-hero" aria-label="Dein Zustand heute">${rings}</section>`
+    + mGarminEventsCard()
     + mPlanCheckCard()
     + `<section class="m-card"><div class="m-head"><h2>Heute geplant</h2><button type="button" class="m-link" data-m-page="coach">Plan</button></div>${todayCard}</section>`
     + nextCard,
@@ -399,6 +400,27 @@ function mRenderKalender() {
     `<section class="m-card"><div class="m-head"><h2>${listTitle}</h2><span class="m-arrows">${fromToday ? "" : `<button type="button" class="m-chip" data-m-act="week" data-dir="-1" aria-label="Früher">‹</button>`}<span class="m-head-note">${mNum(weekMin / 60, 1)} h</span><button type="button" class="m-chip" data-m-act="week" data-dir="1" aria-label="Später">›</button></span></div>
         <div class="m-agenda">${agenda}</div></section>`
     + `<button type="button" class="m-more" data-m-classic="calendar">Großer Kalender mit Wetter</button>`, "cal");
+}
+
+// Hinweis: neue Events aus dem Garmin-Kalender wurden als Ziel übernommen
+// (js/data/garmin-events.js). Verschwindet mit "OK".
+function mGarminEventsCard() {
+  if (typeof garminEventsState !== "function") return "";
+  const st = garminEventsState();
+  const last = st.last;
+  if (st.noticeSeen || !last || !((last.added || []).length || (last.linked || []).length)) return "";
+  const linked = new Set(last.linked || []);
+  const fmt = g => {
+    const notes = [linked.has(g.name) ? "war schon da – jetzt mit Garmin verknüpft" : "", g.isPrimary ? "dein Hauptevent" : ""].filter(Boolean).join(" · ");
+    return `<li><b>${mEsc(new Date(g.date + "T12:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" }))}</b><span>${mEsc(g.name)}${notes ? `<small>${mEsc(notes)}</small>` : ""}</span></li>`;
+  };
+  const names = new Set([...(last.added || []), ...linked]);
+  const list = goals.filter(g => g.garminEventId && names.has(g.name)).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 5);
+  if (!list.length) return "";
+  return `<section class="m-card m-pcheck"><div class="m-head"><h2>Neu aus Garmin</h2></div>
+      <p class="m-say">${list.length === 1 ? "Ein Event aus deinem Garmin-Kalender ist jetzt bei deinen Zielen." : `${list.length} Events aus deinem Garmin-Kalender sind jetzt bei deinen Zielen.`}</p>
+      <ul class="m-pc-list">${list.map(fmt).join("")}</ul>
+      <div class="m-actions"><button type="button" class="m-btn soft" data-m-classic="coach">Ziele ansehen</button><button type="button" class="m-btn primary" data-m-act="ge-ok">OK</button></div></section>`;
 }
 
 // Karte "Plan-Check" (js/components/plan-check.js): was heute automatisch am
@@ -787,6 +809,9 @@ async function mAction(btn) {
     } catch (e) {
       mState.coachNote = { error: typeof describeAiError === "function" && !/Ziel|Schreib|Trainingsregeln/.test(e.message || "") ? describeAiError(e) : (e.message || String(e)) };
     }
+    renderMApp();
+  } else if (act === "ge-ok") {
+    if (typeof dismissGarminEventsNotice === "function") dismissGarminEventsNotice();
     renderMApp();
   } else if (act === "pc-undo" && id) {
     if (typeof undoPlanCheck === "function") undoPlanCheck(id);

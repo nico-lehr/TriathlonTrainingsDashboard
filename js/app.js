@@ -111,6 +111,10 @@ function checkAutoReplan() {
   // Ersetzt die frühere Risiko-Kontrolle (risk-adjust.js), die nur einen
   // Vorschlag zeigte - der Plan-Check ändert selbst und lässt sich rückgängig
   // machen. Nicht awaited: die App wartet nicht auf eine evtl. KI-Anfrage.
+  // Events aus dem Garmin-Kalender als Ziele übernehmen (höchstens einmal am Tag,
+  // js/data/garmin-events.js) - vor dem Plan-Check, der das Hauptevent braucht.
+  if (typeof initGarminEvents === "function") initGarminEvents();
+  if (typeof syncGarminEvents === "function") syncGarminEvents().catch(() => {});
   if (typeof initPlanCheck === "function") initPlanCheck();
   else checkTrainingRiskAdjustment();
 })();

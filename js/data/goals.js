@@ -85,6 +85,9 @@ function addGoal(e) {
 
 
 function deleteGoal(id) {
+  const gone = goals.find(g => g.id === id);
+  // Aus Garmin übernommen? Dann beim nächsten Abgleich nicht wieder anlegen.
+  if (gone && gone.garminEventId && typeof dismissGarminEvent === "function") dismissGarminEvent(gone.garminEventId);
   goals = goals.filter(g => g.id !== id);
   saveGoals();
   renderGoals();

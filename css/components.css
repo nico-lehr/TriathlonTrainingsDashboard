@@ -2713,3 +2713,6 @@ body.m-graphit .settings-page-head, body.m-graphit .sh-back { display: none; }
 #view-settings .app-update-auto .settings-list-row label { flex: 1; min-width: 0; }
 #view-settings .app-update-auto .settings-list-row { flex-wrap: nowrap; }
 #view-settings #ical-card .card-sub, #view-settings #weather-card .card-sub { margin-bottom: 10px; }
+
+/* Ziel aus dem Garmin-Kalender (js/data/garmin-events.js) */
+.goal-garmin-badge { font-size: 10.5px; font-weight: 600; letter-spacing: .02em; padding: 1px 6px; border-radius: 6px; color: var(--text-secondary); border: 1px solid var(--border, rgba(127,127,127,.35)); }
