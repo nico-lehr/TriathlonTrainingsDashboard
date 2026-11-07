@@ -143,18 +143,46 @@ if (coachWorkoutsFullLink) coachWorkoutsFullLink.addEventListener("click", e => 
 
 /* ---------- Detail-Modal ---------- */
 
+// Die Einheit öffnet als eigene Seite (Graphit): oben "‹ Zurück" und
+// "Vergleichen", die Seite dahinter steht still (kein Mitscrollen), und die
+// Zurück-Geste des Handys/Browsers schließt sie wieder.
 const modalOverlay = document.getElementById("modal-overlay");
-document.getElementById("modal-close").addEventListener("click", closeDetail);
+let detailWorkout = null;
+let detailHistory = false; // eigener Verlaufseintrag, damit "Zurück" die Seite schließt
+document.getElementById("modal-close").addEventListener("click", () => closeDetail());
+document.getElementById("wd-back").addEventListener("click", () => closeDetail());
+document.getElementById("wd-compare").addEventListener("click", () => {
+  if (detailWorkout && typeof openComparePicker === "function") openComparePicker(detailWorkout);
+});
 modalOverlay.addEventListener("click", e => { if (e.target === modalOverlay) closeDetail(); });
-document.addEventListener("keydown", e => { if (e.key === "Escape") closeDetail(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && modalOverlay.classList.contains("open") && !document.querySelector(".modal-overlay.open:not(#modal-overlay)")) closeDetail();
+});
+window.addEventListener("popstate", () => {
+  if (detailHistory && modalOverlay.classList.contains("open")) { detailHistory = false; closeDetail(true); }
+});
 
-function closeDetail() { modalOverlay.classList.remove("open"); }
-
+function closeDetail(fromHistory = false) {
+  if (!modalOverlay.classList.contains("open")) return;
+  modalOverlay.classList.remove("open");
+  document.documentElement.classList.remove("wd-lock");
+  detailWorkout = null;
+  if (!fromHistory && detailHistory) { detailHistory = false; history.back(); }
+}
 
 function openDetail(w) {
   const body = document.getElementById("modal-body");
+  detailWorkout = w;
   body.innerHTML = buildWorkoutDetailHtml(w);
+  document.getElementById("wd-bar-title").textContent = w.title || w.name || w.sport || "Training";
+  document.getElementById("wd-compare").hidden = !w.file;
+  if (!modalOverlay.classList.contains("open") && !detailHistory) {
+    try { history.pushState({ wdDetail: true }, ""); detailHistory = true; } catch (e) { /* ohne Verlauf geht es auch */ }
+  }
   modalOverlay.classList.add("open");
+  document.documentElement.classList.add("wd-lock");
+  modalOverlay.scrollTop = 0;
+  body.scrollTop = 0;
   renderWorkoutDetailCharts(w, body);
   const compareBtn = body.querySelector(".wd-compare-btn");
   if (compareBtn) compareBtn.addEventListener("click", () => { if (typeof openComparePicker === "function") openComparePicker(w); });
@@ -237,7 +265,7 @@ function buildWorkoutDetailHtml(w) {
     <div class="modal-head">
       <span class="sport-dot" style="background:${sportColor(w.sport)}"></span>
       <h3>${w.sport}</h3>${rideEnvBadgeHtml(w)}
-      <button type="button" class="chip wd-compare-btn" data-file="${encodeURIComponent(w.file)}" title="Diese Einheit mit anderen vergleichen">⚖ Vergleichen</button>
+      <button type="button" class="wd-compare-btn" data-file="${encodeURIComponent(w.file)}" title="Diese Einheit mit anderen vergleichen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5h16M7 16V9M12 16V5M17 16v-4"/></svg><span>Vergleichen</span></button>
     </div>
     <p class="modal-sub">${w._date ? fmtDateFull(w._date) + " · " + w._date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) + " Uhr" : ""}</p>
     <div class="modal-stats">

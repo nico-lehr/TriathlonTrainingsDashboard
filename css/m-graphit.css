@@ -605,3 +605,61 @@ body.m-graphit.m-classic #m-body { display: none; }
 .m-sh-note.m-watch i { display: inline-block; width: 7px; height: 7px; margin: 0 7px 1px 0; vertical-align: middle; border-radius: 50%; background: var(--m-good); }
 .m-sh-note.m-watch.wait { color: var(--m-muted, #9aa0a6); }
 .m-sh-note.m-watch.wait i { background: none; border: 1.5px solid currentColor; box-sizing: border-box; }
+
+/* ---- Training-Details als eigene Seite (js/components/workout-card.js) ----
+   Vollbild statt Fenster: eigene Scroll-Fläche, die Seite dahinter ist
+   gesperrt (html.wd-lock), oben "‹ Zurück" und "Vergleichen". Am Computer
+   bleibt die Seitenleiste sichtbar. */
+.wd-bar { display: none; }
+.wd-compare-btn, .wd-bar-act {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; border: none; cursor: pointer;
+  padding: 7px 13px 7px 11px; min-height: 34px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent, #7fb2ff) 16%, transparent); color: var(--accent, #7fb2ff);
+  font: inherit; font-size: 14px; font-weight: 650; letter-spacing: -0.01em; transition: background .2s ease, transform .15s ease;
+}
+.wd-compare-btn { margin-left: auto; }
+.wd-compare-btn:hover, .wd-bar-act:hover { background: color-mix(in srgb, var(--accent, #7fb2ff) 26%, transparent); }
+.wd-compare-btn:active, .wd-bar-act:active { transform: scale(.96); }
+.wd-compare-btn svg, .wd-bar-act svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.wd-bar-act[hidden] { display: none; }
+
+html.wd-lock, html.wd-lock body { overflow: hidden; }
+body.m-graphit #modal-overlay {
+  display: block; padding: 0; background: var(--m-bg); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+}
+body.m-graphit #modal-overlay .modal-card {
+  display: block; max-width: 900px; max-height: none; overflow: visible; margin: 0 auto; border: none; border-radius: 0;
+  background: transparent; box-shadow: none; padding: 0 16px calc(36px + env(safe-area-inset-bottom));
+  transform: translateX(28px); transition: transform .3s cubic-bezier(.16,1,.3,1);
+}
+body.m-graphit #modal-overlay.open .modal-card { transform: none; }
+body.m-graphit #modal-overlay #modal-body { overflow: visible; }
+body.m-graphit #modal-overlay .modal-close { display: none; }
+body.m-graphit #modal-overlay .wd-bar {
+  display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 5;
+  margin: 0 -16px 14px; padding: calc(8px + env(safe-area-inset-top)) 12px 8px 8px;
+  background: color-mix(in srgb, var(--m-bg) 90%, transparent);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border-bottom: 1px solid var(--m-line);
+}
+.wd-back { border: none; background: none; color: var(--m-accent, #7fb2ff); font: inherit; font-size: 16px; font-weight: 600; padding: 6px; min-height: 40px; cursor: pointer; flex: none; }
+.wd-bar-title { flex: 1; min-width: 0; font-size: 16px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.m-graphit #modal-overlay .modal-head { position: static; background: none; padding-top: 0; }
+body.m-graphit #modal-overlay .modal-head h3 { font-size: 26px; letter-spacing: -0.02em; }
+body.m-graphit #modal-overlay .modal-head .wd-compare-btn { display: none; } /* steht oben in der Leiste */
+body.m-graphit #modal-overlay .modal-stats .st { background: var(--m-surface); border: 1px solid var(--m-line); }
+@media (min-width: 1100px) {
+  body.m-graphit #modal-overlay { left: var(--m-side); }
+  body.m-graphit #modal-overlay .modal-card { padding: 0 32px 48px; }
+  body.m-graphit #modal-overlay .wd-bar { margin: 0 -32px 18px; padding: 12px 32px; }
+}
+
+/* ---- Leiste oben am Handy: ruhiger Hintergrund hinter der Statusleiste,
+   kein dunkler Schatten-Verlauf unter der Leiste, etwas Luft nach oben ---- */
+@media (max-width: 1099px) {
+  body.m-graphit::before {
+    content: ""; position: fixed; left: 0; right: 0; top: 0; height: calc(10px + env(safe-area-inset-top)); z-index: 19;
+    background: var(--m-bg); pointer-events: none;
+  }
+  .m-tabs { top: calc(10px + env(safe-area-inset-top)); margin-top: 10px; box-shadow: none; background: var(--m-surface); }
+  body.m-graphit.m-classic::before { display: none; }
+}

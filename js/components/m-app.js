@@ -998,6 +998,7 @@ function initMApp() {
 
   document.getElementById("m-back").addEventListener("click", mBack);
   host.addEventListener("click", e => {
+    if (e.target.closest("#m-tabs") && typeof closeDetail === "function") closeDetail(); // Training-Seite schließen
     const tab = e.target.closest("[data-m-page]");
     if (tab) { mShow(tab.dataset.mPage); return; }
     const sub = e.target.closest("[data-m-sub]");
