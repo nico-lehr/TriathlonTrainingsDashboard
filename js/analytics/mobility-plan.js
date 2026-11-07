@@ -219,7 +219,7 @@ function parseMobilityResponse(text, allowedIds, minutes) {
     const m = String(text).match(/\{[\s\S]*\}/);
     data = JSON.parse(m ? m[0] : text);
   } catch (e) {
-    throw new Error("Die Antwort von Claude war nicht lesbar.");
+    throw new Error("Die Antwort vom KI-Coach war nicht lesbar.");
   }
   const allowed = new Set(allowedIds);
   const seen = new Set();
@@ -232,7 +232,7 @@ function parseMobilityResponse(text, allowedIds, minutes) {
     seconds: Math.min(90, Math.max(20, Math.round(Number(x.seconds) || MOBILITY_BY_ID[x.id].seconds))),
     note: x.note ? String(x.note).slice(0, 120) : null,
   }));
-  if (exercises.length < 2) throw new Error("Claude hat zu wenige passende Übungen geliefert.");
+  if (exercises.length < 2) throw new Error("Der KI-Coach hat zu wenige passende Übungen geliefert.");
   // Deutlich zu kurz geraten? Halte-Zeiten anheben (höchstens 90 s), damit
   // die gewünschte Dauer ungefähr stimmt.
   const sum = () => exercises.reduce((s, x) => s + mobilityExerciseSeconds(MOBILITY_BY_ID[x.id], x.seconds) + MOBILITY_TRANSITION_S, 0);

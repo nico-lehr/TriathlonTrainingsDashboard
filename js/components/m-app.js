@@ -405,7 +405,7 @@ function mRenderCoach() {
   const en = rc.energy;
 
   let say;
-  if (typeof outlook !== "undefined" && outlook.loading) say = `<p class="m-say muted">Claude denkt nach …</p>`;
+  if (typeof outlook !== "undefined" && outlook.loading) say = `<p class="m-say muted">Der KI-Coach denkt nach …</p>`;
   else if (typeof outlook !== "undefined" && outlook.result && outlook.result.heute && outlook.result.heute.empfehlung) {
     const h = outlook.result.heute, w = outlook.result.diese_woche || {};
     say = `<p class="m-say">${mEsc(h.empfehlung)}</p>${h.begruendung ? `<p class="m-say small">${mEsc(h.begruendung)}</p>` : ""}${w.empfehlung ? `<p class="m-say small"><b>Diese Woche:</b> ${mEsc(w.empfehlung)}</p>` : ""}`;
@@ -441,7 +441,7 @@ function mRenderCoach() {
       ${cn.reply ? `<div class="m-reply"><p class="m-say">${mEsc(cn.reply)}</p>${(cn.hints || []).map(h => `<p class="m-say small">${mEsc(h)}</p>`).join("")}${cn.undo ? `<button type="button" class="m-link" data-m-act="coach-undo">Rückgängig</button>` : ""}</div>` : ""}
     </section>`;
 
-  return mHeaderHtml("Dein Coach", "Coach", typeof claudeAvailable === "function" && claudeAvailable() ? `<span class="m-pill"><i></i>Claude</span>` : "")
+  return mHeaderHtml("Dein Coach", "Coach", typeof claudeAvailable === "function" && claudeAvailable() ? `<span class="m-pill"><i></i>KI-Coach</span>` : "")
     + mCols3(`<section class="m-card"><div class="m-head"><h2>Wie fühlst du dich?</h2><span class="m-head-note">heute</span></div>
         <div class="m-check"><span>Muskelkater</span>${mSeg("soreness", sore, so)}</div>
         <div class="m-check"><span>Energie</span>${mSeg("energy", energy, en)}</div>
@@ -499,7 +499,7 @@ function mMobilitySession() {
     if (rules) return { session: { ...rules, title: focus.title || rules.title, plannedId: focus.id }, label: mWhenLabel(focus), planned: focus, filled: true };
   }
   const { session, kind } = mobActiveSession();
-  const label = { claude: "Von Claude für dich", planned: "Heute eingeplant", saved: "Für dich heute", rules: "Für dich heute" }[kind] || "Für dich heute";
+  const label = { claude: "Vom KI-Coach für dich", planned: "Heute eingeplant", saved: "Für dich heute", rules: "Für dich heute" }[kind] || "Für dich heute";
   return { session, label, planned: null };
 }
 
@@ -538,7 +538,7 @@ function mRenderTraining() {
     + mCols(`<section class="m-card m-hero-ex"><div class="m-fig-lg" data-m-fig="m:${session.exercises[0].id}"></div>
         <div><b class="m-hero-title">${mEsc(session.title)}</b><small class="m-row-meta">${Math.max(1, Math.round(mobilitySessionSeconds(session) / 60))} min · ${session.exercises.length} Übungen</small></div>
         <button type="button" class="m-btn primary wide" data-m-act="start-mob-now">Starten</button>
-        ${!mk.planned && typeof claudeAvailable === "function" && claudeAvailable() ? `<button type="button" class="m-btn ghost wide" data-m-act="mob-claude">${mState.busy ? "Claude stellt zusammen …" : "Mit Claude anpassen"}</button>` : ""}</section>`,
+        ${!mk.planned && typeof claudeAvailable === "function" && claudeAvailable() ? `<button type="button" class="m-btn ghost wide" data-m-act="mob-claude">${mState.busy ? "KI-Coach stellt zusammen …" : "Mit Claude anpassen"}</button>` : ""}</section>`,
     `<section class="m-card"><div class="m-head"><h2>Ablauf</h2><button type="button" class="m-link" data-m-classic="mobility">Alle Übungen</button></div><div class="m-list">${rows}</div></section>`, "train");
 }
 

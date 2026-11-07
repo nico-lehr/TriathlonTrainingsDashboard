@@ -134,9 +134,9 @@ def claude_chat():
     schema = data.get("schema") if isinstance(data.get("schema"), dict) else None
     st = claude_api.status(_is_admin())
     if not st["configured"]:
-        return response_error("Für Claude ist noch kein Schlüssel hinterlegt.", "claude_not_configured", 409)
+        return response_error("Für den KI-Coach ist noch kein Schlüssel hinterlegt.", "claude_not_configured", 409)
     if not st["available"] and st["sdk"]:
-        return response_error("Der Betreiber hat Claude für andere Personen nicht freigegeben.", "claude_not_shared", 403)
+        return response_error("Der Betreiber hat den KI-Coach für andere Personen nicht freigegeben.", "claude_not_shared", 403)
     from .usage import record
     athlete_id = get_current_athlete_id()
     tokens = {}

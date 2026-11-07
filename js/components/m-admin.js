@@ -55,7 +55,7 @@ async function mLoadAdminStats(force) {
 const M_PAGE_NAMES = { heute: "Übersicht", kalender: "Kalender", coach: "Coach", training: "Training", mehr: "Mehr",
   overview: "Alle Diagramme", nutrition: "Ernährung", records: "Rekorde", analysis: "Analyse", settings: "Einstellungen", calendar: "Kalender (klassisch)", mobility: "Mobility (klassisch)" };
 const M_FEATURE_NAMES = { "coach-note": "Coach-Nachricht", "coach-undo": "Coach rückgängig", outlook: "Ausblick erstellt", "mob-start": "Mobility gestartet",
-  "strength-start": "Kraft gestartet", "mob-claude": "Mobility mit Claude", "plan-new": "Einheit geplant", "plan-open": "Geplante Einheit geöffnet",
+  "strength-start": "Kraft gestartet", "mob-claude": "Mobility mit KI-Coach", "plan-new": "Einheit geplant", "plan-open": "Geplante Einheit geöffnet",
   "workout-open": "Training angesehen", "garmin-send": "An Garmin gesendet", "classic-view": "Klassische Ansicht" };
 
 function mAdminAgo(iso) {
@@ -95,7 +95,7 @@ function mAdminUserCard(u) {
     <div class="m-stats">
       <div class="m-num"><small>Aktive Tage</small><b>${u.active_days}</b></div>
       <div class="m-num"><small>Geöffnet</small><b>${opens}</b></div>
-      <div class="m-num"><small>Claude</small><b>${u.ai_requests}</b></div>
+      <div class="m-num"><small>KI-Coach</small><b>${u.ai_requests}</b></div>
       <div class="m-num"><small>Trainings</small><b>${u.workouts}</b></div>
       <div class="m-num"><small>Stunden</small><b>${mNum(u.hours, 1)}</b></div>
       <div class="m-num"><small>Garmin-Abrufe</small><b class="${u.garmin.fehler ? "warn" : ""}">${u.garmin.ok}${u.garmin.fehler ? `<em class="down"> +${u.garmin.fehler} ✕</em>` : ""}</b></div>
@@ -105,7 +105,7 @@ function mAdminUserCard(u) {
       ${topPages ? `<span>Am meisten: ${mEsc(topPages)}</span>` : ""}
     </div>
     <div class="m-adm-flags"><span>${mAdminYesNo(u.garmin.connected)} Garmin</span><span>${mAdminYesNo(u.goal)} Ziel</span><span>${mAdminYesNo(u.onboarding)} Einrichtung</span>
-      ${u.ai_errors ? `<span class="warn">${u.ai_errors} Claude-Fehler</span>` : ""}${u.js_errors ? `<span class="warn">${u.js_errors} App-Fehler</span>` : ""}</div>
+      ${u.ai_errors ? `<span class="warn">${u.ai_errors} KI-Coach-Fehler</span>` : ""}${u.js_errors ? `<span class="warn">${u.js_errors} App-Fehler</span>` : ""}</div>
     <div class="m-adm-since">Konto seit ${u.since ? mEsc(new Date(u.since + "T12:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short", year: "numeric" })) : "–"} · ${u.workouts_total} Trainings insgesamt</div>
   </section>`;
 }
@@ -129,7 +129,7 @@ function mRenderAdmin() {
       <div class="m-num"><small>Aktiv (${d.days} T.)</small><b class="good">${t.active}</b></div>
       <div class="m-num"><small>Aktiv (7 T.)</small><b>${t.active_7d}</b></div>
       <div class="m-num"><small>Geöffnet</small><b>${t.opens_mobile + t.opens_desktop}</b></div>
-      <div class="m-num"><small>Claude-Anfragen</small><b>${t.ai_requests}</b></div>
+      <div class="m-num"><small>KI-Coach-Anfragen</small><b>${t.ai_requests}</b></div>
       <div class="m-num"><small>Trainings</small><b>${t.workouts}</b></div>
     </div>
     <div class="m-adm-meta"><span>Handy ${t.opens_mobile} · Computer ${t.opens_desktop}</span><span>${mNum(t.hours, 1)} h trainiert</span></div></section>`;
@@ -142,8 +142,8 @@ function mRenderAdmin() {
   const tech = `<section class="m-card"><div class="m-head"><h2>Technik</h2></div><div class="m-list">
       <div class="m-row"><span class="m-grow"><span class="m-row-title">Garmin verbunden</span></span><b>${t.garmin_connected} von ${t.accounts}</b></div>
       <div class="m-row"><span class="m-grow"><span class="m-row-title">Garmin-Abrufe</span><span class="m-row-meta">geklappt / fehlgeschlagen</span></span><b>${t.garmin_ok} / <span class="${t.garmin_fehler ? "m-adm-warn" : ""}">${t.garmin_fehler}</span></b></div>
-      <div class="m-row"><span class="m-grow"><span class="m-row-title">Claude-Fehler</span></span><b class="${t.ai_errors ? "m-adm-warn" : ""}">${t.ai_errors}</b></div>
-      <div class="m-row"><span class="m-grow"><span class="m-row-title">Claude-Tokens</span><span class="m-row-meta">gelesen / geschrieben</span></span><b>${tokens ? `${mNum(t.ai_tokens_in / 1000, 1)}k / ${mNum(t.ai_tokens_out / 1000, 1)}k` : "–"}</b></div>
+      <div class="m-row"><span class="m-grow"><span class="m-row-title">KI-Coach-Fehler</span></span><b class="${t.ai_errors ? "m-adm-warn" : ""}">${t.ai_errors}</b></div>
+      <div class="m-row"><span class="m-grow"><span class="m-row-title">KI-Coach-Tokens</span><span class="m-row-meta">gelesen / geschrieben</span></span><b>${tokens ? `${mNum(t.ai_tokens_in / 1000, 1)}k / ${mNum(t.ai_tokens_out / 1000, 1)}k` : "–"}</b></div>
       <div class="m-row"><span class="m-grow"><span class="m-row-title">App-Fehler im Browser</span></span><b class="${t.js_errors ? "m-adm-warn" : ""}">${t.js_errors}</b></div>
     </div></section>`;
   const usage = `<section class="m-card"><div class="m-head"><h2>Beliebteste Bereiche</h2></div>${mAdminRank(d.pages, M_PAGE_NAMES, "var(--m-accent)")}</section>

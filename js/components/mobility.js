@@ -56,7 +56,7 @@ function renderMobilityView() {
   const { session, kind } = mobActiveSession();
 
   // Kopf
-  const eyebrow = { claude: "Von Claude für dich", planned: "Heute eingeplant", saved: "Für dich heute", rules: "Für dich heute", none: "Mobility" }[kind];
+  const eyebrow = { claude: "Vom KI-Coach für dich", planned: "Heute eingeplant", saved: "Für dich heute", rules: "Für dich heute", none: "Mobility" }[kind];
   document.getElementById("mob-eyebrow").textContent = eyebrow;
   document.getElementById("mob-title").textContent = session ? session.title : "Keine passende Übung";
   document.getElementById("mob-intro").textContent = session ? session.intro || "" : "Mit deinen aktuellen Einstellungen im Trainingsprofil passt gerade keine Übung. Prüfe Hilfsmittel und Ausschlüsse.";
@@ -65,7 +65,7 @@ function renderMobilityView() {
   document.getElementById("mob-start-btn").disabled = !session;
   const claudeBtn = document.getElementById("mob-claude-btn");
   claudeBtn.hidden = !claudeAvailable();
-  claudeBtn.textContent = kind === "claude" ? "Neu mit Claude erstellen" : "Mit Claude persönlich anpassen";
+  claudeBtn.textContent = kind === "claude" ? "Neu mit dem KI-Coach erstellen" : "Mit dem KI-Coach persönlich anpassen";
   const heroFig = document.getElementById("mob-hero-fig");
   const firstEx = session && MOBILITY_BY_ID[(session.exercises[0] || {}).id];
   const heroKey = firstEx ? firstEx.id : "";
@@ -276,7 +276,7 @@ async function mobGenerateWithClaude() {
   mobUi.busy = true;
   btn.disabled = true;
   btn.classList.add("is-busy");
-  mobStatus("Claude stellt deine Einheit zusammen …", "");
+  mobStatus("Der KI-Coach stellt deine Einheit zusammen …", "");
   try {
     const minutes = mobUi.minutes || tp.mobilityMinutes;
     const contextLines = [...trainingProfileContextLines()];

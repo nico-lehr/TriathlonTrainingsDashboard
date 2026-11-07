@@ -40,11 +40,11 @@ async function callClaudeApi(prompt, { json = false, task = "", schema = null } 
     : prompt;
   const res = await apiCall("ai/claude/chat", "POST", { prompt: fullPrompt, task, schema }, { timeoutMs: CLAUDE_CHAT_TIMEOUT_MS });
   const text = ((res.data && res.data.response) || "").trim();
-  if (!text) throw new Error("Claude hat keine Antwort geliefert. Bitte noch einmal versuchen.");
+  if (!text) throw new Error("Der KI-Coach hat keine Antwort geliefert. Bitte noch einmal versuchen.");
   return text;
 }
 
 // Die Meldungen des Servers sind schon verständlich formuliert.
 function describeClaudeError(e) {
-  return String((e && e.message) || e || "Unbekannter Fehler bei Claude.");
+  return String((e && e.message) || e || "Unbekannter Fehler beim KI-Coach.");
 }

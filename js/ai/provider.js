@@ -14,7 +14,7 @@ async function callAiText(prompt, { task = "recommendation", json = false, schem
 }
 
 function currentAiProviderLabel() {
-  return claudeAvailable() ? "Claude" : "Ollama (lokal)";
+  return claudeAvailable() ? "KI-Coach" : "Ollama (lokal)";
 }
 
 function describeAiError(e) {

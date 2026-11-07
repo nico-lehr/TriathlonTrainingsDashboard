@@ -150,23 +150,23 @@ def _client(key):
 def _translate(anthropic, e):
     """SDK-Fehler -> verstaendliche Meldung (spezifisch zuerst)."""
     if isinstance(e, anthropic.AuthenticationError):
-        return ClaudeError("Claude hat den Schlüssel abgelehnt. Bitte in den Einstellungen einen gültigen eintragen.", "claude_key_rejected", 502)
+        return ClaudeError("Der KI-Coach kommt nicht an: der Schlüssel wurde abgelehnt. Bitte in den Einstellungen einen gültigen eintragen.", "claude_key_rejected", 502)
     if isinstance(e, anthropic.PermissionDeniedError):
         return ClaudeError("Der Schlüssel darf dieses Modell nicht nutzen. Bitte ein anderes Modell wählen.", "claude_forbidden", 502)
     if isinstance(e, anthropic.NotFoundError):
-        return ClaudeError("Dieses Claude-Modell gibt es nicht (mehr). Bitte in den Einstellungen ein anderes wählen.", "claude_model", 502)
+        return ClaudeError("Das gewählte KI-Modell gibt es nicht (mehr). Bitte in den Einstellungen ein anderes wählen.", "claude_model", 502)
     if isinstance(e, anthropic.RateLimitError):
-        return ClaudeError("Claude ist gerade ausgelastet oder das Guthaben-Limit ist erreicht. Bitte kurz warten.", "claude_rate_limit", 429)
+        return ClaudeError("Der KI-Coach ist gerade ausgelastet oder das Guthaben-Limit ist erreicht. Bitte kurz warten.", "claude_rate_limit", 429)
     if isinstance(e, anthropic.BadRequestError):
         msg = str(getattr(e, "message", "") or "")
         if "credit" in msg.lower() or "balance" in msg.lower():
-            return ClaudeError("Das Claude-Guthaben ist aufgebraucht. Bitte in der Anthropic Console aufladen.", "claude_credit", 402)
-        return ClaudeError("Claude konnte die Anfrage nicht verarbeiten.", "claude_bad_request", 502)
+            return ClaudeError("Das KI-Guthaben ist aufgebraucht. Bitte in der Anthropic Console aufladen.", "claude_credit", 402)
+        return ClaudeError("Der KI-Coach konnte die Anfrage nicht verarbeiten.", "claude_bad_request", 502)
     if isinstance(e, anthropic.APIStatusError):
-        return ClaudeError("Claude meldet gerade einen Fehler. Bitte gleich noch einmal versuchen.", "claude_server", 502)
+        return ClaudeError("Der KI-Coach meldet gerade einen Fehler. Bitte gleich noch einmal versuchen.", "claude_server", 502)
     if isinstance(e, anthropic.APIConnectionError):
-        return ClaudeError("Claude ist vom Dashboard-Server aus nicht erreichbar (Internet?).", "claude_unreachable", 502)
-    return ClaudeError("Unerwarteter Fehler bei der Anfrage an Claude.", "claude_error", 502)
+        return ClaudeError("Der KI-Coach ist vom Dashboard-Server aus nicht erreichbar (Internet?).", "claude_unreachable", 502)
+    return ClaudeError("Unerwarteter Fehler bei der Anfrage an den KI-Coach.", "claude_error", 502)
 
 
 def verify_key(key, model):
@@ -184,7 +184,7 @@ def chat(prompt, task="", schema=None, usage_out=None):
     data = _read()
     key = data.get("key")
     if not key:
-        raise ClaudeError("Für Claude ist noch kein Schlüssel hinterlegt.", "claude_not_configured", 409)
+        raise ClaudeError("Für den KI-Coach ist noch kein Schlüssel hinterlegt.", "claude_not_configured", 409)
     model = data.get("model") if data.get("model") in MODELS else DEFAULT_MODEL
     anthropic, client = _client(key)
     output_config = {"effort": EFFORT.get(task, EFFORT_DEFAULT)}
@@ -209,10 +209,10 @@ def chat(prompt, task="", schema=None, usage_out=None):
         usage_out["in"] = int(getattr(u, "input_tokens", 0) or 0)
         usage_out["out"] = int(getattr(u, "output_tokens", 0) or 0)
     if response.stop_reason == "refusal":
-        raise ClaudeError("Claude hat diese Anfrage abgelehnt. Bitte anders formulieren.", "claude_refusal", 422)
+        raise ClaudeError("Der KI-Coach hat diese Anfrage abgelehnt. Bitte anders formulieren.", "claude_refusal", 422)
     if response.stop_reason == "max_tokens":
-        raise ClaudeError("Die Antwort von Claude war zu lang und wurde abgeschnitten. Bitte einen kürzeren Zeitraum wählen.", "claude_too_long", 502)
+        raise ClaudeError("Die Antwort vom KI-Coach war zu lang und wurde abgeschnitten. Bitte einen kürzeren Zeitraum wählen.", "claude_too_long", 502)
     text = "".join(b.text for b in response.content if getattr(b, "type", "") == "text").strip()
     if not text:
-        raise ClaudeError("Claude hat keine Antwort geliefert. Bitte noch einmal versuchen.", "claude_empty", 502)
+        raise ClaudeError("Der KI-Coach hat keine Antwort geliefert. Bitte noch einmal versuchen.", "claude_empty", 502)
     return text
