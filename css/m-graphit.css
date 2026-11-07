@@ -1,7 +1,6 @@
-/* Handy-Ansicht "Graphit" (js/components/m-app.js). Greift nur, wenn
-   body.m-graphit gesetzt ist - also am Handy (bis 700 px) und solange die
-   Ansicht in den Einstellungen nicht abgeschaltet ist. Am Computer ändert
-   diese Datei nichts. */
+/* Ansicht "Graphit" (js/components/m-app.js). Greift nur, wenn
+   body.m-graphit gesetzt ist - auf allen Bildschirmen, solange die Ansicht in
+   den Einstellungen nicht abgeschaltet ist. Am Computer mehrspaltig (unten). */
 
 #m-app[hidden], .m-backbar { display: none; }
 
@@ -389,3 +388,49 @@ body.m-graphit { min-height: 100vh; min-height: 100dvh; }
 .m-night span { display: flex; flex-direction: column; align-items: center; font-size: 14px; font-weight: 650; color: var(--m-text); font-variant-numeric: tabular-nums; }
 .m-night small { font-size: 11px; font-weight: 500; color: var(--m-muted); }
 .m-night span.bad { color: var(--m-bad); }
+
+/* Spalten: am Handy untereinander (wie bisher), am Computer nebeneinander */
+.m-cols, .m-col { display: contents; }
+
+@media (min-width: 900px) {
+  #m-app { max-width: 1180px; padding: 0 32px 48px; }
+  .m-body { gap: 18px; }
+  .m-tabs { margin: 0 0 14px; padding: 18px 0 14px; gap: 8px; }
+  .m-tabs button { font-size: 15px; padding: 9px 18px; min-height: 40px; }
+  .m-title { font-size: 40px; }
+  .m-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .m-cols.cal { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+  .m-cols.train { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+  .m-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  .m-card { padding: 20px 22px; }
+  .m-ring { max-width: 132px; }
+  .m-ring-txt b { font-size: 28px; }
+  .m-subseg { max-width: 420px; }
+  .m-planbar { max-width: none; }
+  .m-more { max-width: none; }
+  .m-row { padding: 12px 0; }
+  .m-row:hover .m-row-title, .m-nav-row:hover span { color: var(--m-accent); }
+  .m-card, .m-more, .m-tabs button { transition: border-color .15s ease, background-color .15s ease; }
+  .m-more:hover, .m-tabs button:not(.on):hover { border-color: color-mix(in srgb, var(--m-accent) 40%, transparent); }
+
+  /* Bisherige Seiten (über "Mehr") am Computer: dieselbe Breite wie Graphit */
+  body.m-graphit.m-classic .m-backbar { padding: 12px max(32px, calc((100vw - 1180px) / 2 + 32px)); }
+}
+
+/* Hinweisbanner (neue Version, Server-Fehler) im dunklen Graphit-Stil.
+   Am Computer stehen sie oben über den Bereichen, am Handy bleiben sie unten. */
+body.m-graphit .app-update-banner,
+body.m-graphit .api-error-banner {
+  border-radius: 16px; background: var(--m-surface); border: 1px solid var(--m-line);
+  color: var(--m-text); font-size: 13.5px; padding: 12px 16px;
+}
+body.m-graphit .app-update-banner { border-color: color-mix(in srgb, var(--m-accent) 45%, transparent); }
+@media (min-width: 900px) {
+  body.m-graphit:not(.m-classic) { display: flex; flex-direction: column; }
+  body.m-graphit:not(.m-classic) .page {
+    order: -1; box-sizing: border-box; width: 100%; max-width: 1180px; margin: 0 auto;
+    padding: 16px 32px 0; min-height: 0;
+  }
+  body.m-graphit:not(.m-classic) .app-update-banner,
+  body.m-graphit:not(.m-classic) .api-error-banner { margin: 0; }
+}

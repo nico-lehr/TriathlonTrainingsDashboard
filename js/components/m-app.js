@@ -26,9 +26,14 @@ const mState = { page: "heute", sub: "mobility", planId: null, range: 30, calMon
 function mEnabled() {
   try { return localStorage.getItem(M_KEY) !== "off"; } catch (e) { return true; }
 }
+// Graphit gilt seit 2.4.25 auf allen Bildschirmen (am Computer mehrspaltig,
+// siehe css/m-graphit.css); abschaltbar je Gerät in den Einstellungen.
 function mActive() {
-  return mEnabled() && window.matchMedia && window.matchMedia(M_QUERY).matches;
+  return mEnabled();
 }
+
+// Zwei Spalten am Computer, am Handy einfach untereinander (gleiche Reihenfolge).
+const mCols = (left, right, cls = "") => `<div class="m-cols ${cls}"><div class="m-col">${left}</div><div class="m-col">${right}</div></div>`;
 
 const mEsc = s => escapeHtml(String(s == null ? "" : s));
 const mSport = s => M_SPORT[s] || M_SPORT[String(s).replace(/\s*\(.*\)$/, "")] || M_SPORT_OTHER;
@@ -314,13 +319,13 @@ function mRenderHeute() {
     : `<p class="m-empty">Noch keine Trainings. Verbinde Garmin oder importiere .fit-Dateien.</p>`;
 
   return mHeaderHtml(now.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" }), "Heute", mSyncPill())
-    + `<section class="m-card m-hero" aria-label="Dein Zustand heute">${rings}</section>`
+    + mCols(`<section class="m-card m-hero" aria-label="Dein Zustand heute">${rings}</section>`
     + `<section class="m-card"><div class="m-head"><h2>Heute geplant</h2><button type="button" class="m-link" data-m-page="coach">Plan</button></div>${todayCard}</section>`
     + `<section class="m-card"><div class="m-head"><h2>Diese Woche</h2><button type="button" class="m-link" data-m-page="kalender">Kalender</button></div>
         <div class="m-days">${days}</div>
         <div class="m-week-num"><span><b>${mNum(doneMin / 60, 1)} h</b> von ${mNum(targetMin / 60, 1)} h</span><span>${weekWorkouts.length} Einheiten</span></div>
-        <div class="m-bar" role="img" aria-label="Stunden je Sportart diese Woche">${bar}</div>${legend ? `<div class="m-legend">${legend}</div>` : ""}</section>`
-    + formCard + goalCard
+        <div class="m-bar" role="img" aria-label="Stunden je Sportart diese Woche">${bar}</div>${legend ? `<div class="m-legend">${legend}</div>` : ""}</section>`,
+    formCard + goalCard
     + `<section class="m-card"><div class="m-head"><h2>Letzte ${mEsc(rangeLabel)}</h2><button type="button" class="m-chip" data-m-act="range" aria-label="Zeitraum ändern">${mEsc(rangeLabel)} ▾</button></div>
         <div class="m-stats">
           <div class="m-num"><small>Einheiten</small><b>${inRange.length}</b></div>
@@ -331,7 +336,7 @@ function mRenderHeute() {
           <div class="m-num"><small style="color:var(--m-run)">Laufen</small><b>${mNum(km("Laufen"), 0)} km</b></div>
         </div></section>`
     + `<section class="m-card"><div class="m-head"><h2>Letzte Einheiten</h2><button type="button" class="m-link" data-m-classic="overview" data-m-scroll="workouts">Alle</button></div><div class="m-list">${recentHtml}</div></section>`
-    + `<button type="button" class="m-more" data-m-classic="overview">Alle Diagramme und Auswertungen</button>`;
+    + `<button type="button" class="m-more" data-m-classic="overview">Alle Diagramme und Auswertungen</button>`);
 }
 
 function mRenderKalender() {
@@ -368,11 +373,11 @@ function mRenderKalender() {
   const weekMin = [0, 1, 2, 3, 4, 5, 6].reduce((s, i) => s + mWorkoutsOn(mAddDays(mState.calWeek, i)).reduce((a, w) => a + (w.duration_min || 0), 0), 0);
   return mHeaderHtml(`Woche ${wkNo} · ${mState.calWeek.toLocaleDateString("de-DE", { day: "numeric", month: "short" })} – ${mAddDays(mState.calWeek, 6).toLocaleDateString("de-DE", { day: "numeric", month: "short" })}`, "Kalender",
     `<button type="button" class="m-icon" data-m-act="plan-new" data-date="${todayStr()}" aria-label="Neue Einheit">+</button>`)
-    + `<section class="m-card"><div class="m-head"><h2>${m.toLocaleDateString("de-DE", { month: "long", year: "numeric" })}</h2><span class="m-arrows"><button type="button" class="m-chip" data-m-act="month" data-dir="-1" aria-label="Vormonat">‹</button><button type="button" class="m-chip" data-m-act="month" data-dir="1" aria-label="Nächster Monat">›</button></span></div>
-        <div class="m-month">${cells}</div></section>`
-    + `<section class="m-card"><div class="m-head"><h2>Woche</h2><span class="m-arrows"><button type="button" class="m-chip" data-m-act="week" data-dir="-1" aria-label="Vorwoche">‹</button><span class="m-head-note">${mNum(weekMin / 60, 1)} h</span><button type="button" class="m-chip" data-m-act="week" data-dir="1" aria-label="Nächste Woche">›</button></span></div>
+    + mCols(`<section class="m-card"><div class="m-head"><h2>${m.toLocaleDateString("de-DE", { month: "long", year: "numeric" })}</h2><span class="m-arrows"><button type="button" class="m-chip" data-m-act="month" data-dir="-1" aria-label="Vormonat">‹</button><button type="button" class="m-chip" data-m-act="month" data-dir="1" aria-label="Nächster Monat">›</button></span></div>
+        <div class="m-month">${cells}</div></section>`,
+    `<section class="m-card"><div class="m-head"><h2>Woche</h2><span class="m-arrows"><button type="button" class="m-chip" data-m-act="week" data-dir="-1" aria-label="Vorwoche">‹</button><span class="m-head-note">${mNum(weekMin / 60, 1)} h</span><button type="button" class="m-chip" data-m-act="week" data-dir="1" aria-label="Nächste Woche">›</button></span></div>
         <div class="m-agenda">${agenda}</div></section>`
-    + `<button type="button" class="m-more" data-m-classic="calendar">Großer Kalender mit Wetter</button>`;
+    + `<button type="button" class="m-more" data-m-classic="calendar">Großer Kalender mit Wetter</button>`, "cal");
 }
 
 function mSeg(field, options, current) {
@@ -425,15 +430,15 @@ function mRenderCoach() {
     </section>`;
 
   return mHeaderHtml("Dein Coach", "Coach", typeof claudeAvailable === "function" && claudeAvailable() ? `<span class="m-pill"><i></i>Claude</span>` : "")
-    + `<section class="m-card"><div class="m-head"><h2>Wie fühlst du dich?</h2><span class="m-head-note">heute</span></div>
+    + mCols(`<section class="m-card"><div class="m-head"><h2>Wie fühlst du dich?</h2><span class="m-head-note">heute</span></div>
         <div class="m-check"><span>Muskelkater</span>${mSeg("soreness", sore, so)}</div>
         <div class="m-check"><span>Energie</span>${mSeg("energy", energy, en)}</div>
         <div class="m-check"><span>Verletzung</span>${mSeg("injury", inj, rc.injury || "no")}</div></section>`
     + `<section class="m-card"><div class="m-head"><h2>Empfehlung</h2><button type="button" class="m-link" data-m-act="outlook">${typeof outlook !== "undefined" && outlook.loading ? "…" : "Neu"}</button></div>${say}</section>`
     + goalCard
-    + noteCard
-    + `<section class="m-card"><div class="m-head"><h2>Nächste Einheiten</h2><button type="button" class="m-link" data-m-classic="coach" data-m-scroll="trainingplan">Plan bearbeiten</button></div><div class="m-cdays">${nextHtml}</div></section>`
-    + `<button type="button" class="m-more" data-m-classic="coach">Ganzer Coach-Bereich</button>`;
+    + noteCard,
+    `<section class="m-card"><div class="m-head"><h2>Nächste Einheiten</h2><button type="button" class="m-link" data-m-classic="coach" data-m-scroll="trainingplan">Plan bearbeiten</button></div><div class="m-cdays">${nextHtml}</div></section>`
+    + `<button type="button" class="m-more" data-m-classic="coach">Ganzer Coach-Bereich</button>`);
 }
 
 // Geplante Kraft-/Mobility-Einheit, die gerade unter "Training" gezeigt wird
@@ -506,10 +511,10 @@ function mRenderTraining() {
     }).join("");
     const needs = [...new Set(s.exercises.flatMap(x => STRENGTH_BY_ID[x.id].equipment))].map(e => MOBILITY_EQUIPMENT[e].split(" ")[0]);
     return mHeaderHtml(k.when, "Training") + seg + mPlanBanner(k)
-      + `<section class="m-card m-hero-ex"><div class="m-fig-lg" data-m-fig="s:${s.exercises[0].id}"></div>
+      + mCols(`<section class="m-card m-hero-ex"><div class="m-fig-lg" data-m-fig="s:${s.exercises[0].id}"></div>
           <div><b class="m-hero-title">${mEsc(s.title)}</b><small class="m-row-meta">${s.minutes || Math.round(strengthSessionSeconds(s) / 60)} min · ${s.exercises.length} Übungen${needs.length ? ` · ${mEsc(needs.join(" & "))}` : " · ohne Geräte"}</small></div>
-          <button type="button" class="m-btn primary wide" data-m-act="start-strength-now">Training starten</button></section>`
-      + `<section class="m-card"><div class="m-head"><h2>Übungen</h2><button type="button" class="m-link" data-m-act="profile">Hilfsmittel</button></div><div class="m-list">${rows}</div></section>`;
+          <button type="button" class="m-btn primary wide" data-m-act="start-strength-now">Training starten</button></section>`,
+      `<section class="m-card"><div class="m-head"><h2>Übungen</h2><button type="button" class="m-link" data-m-act="profile">Hilfsmittel</button></div><div class="m-list">${rows}</div></section>`, "train");
   }
   const mk = mMobilitySession();
   const session = mk.session;
@@ -519,19 +524,19 @@ function mRenderTraining() {
     return `<button type="button" class="m-row" data-m-act="mob-detail" data-id="${ex.id}"><span class="m-fig-sm" data-m-fig="m:${ex.id}"></span><span class="m-grow"><span class="m-row-title">${mEsc(ex.name)}</span><span class="m-row-meta">${mEsc(mobExerciseMeta(ex, x.seconds))} · ${mEsc(MOBILITY_AREAS[ex.areas[0]])}</span></span></button>`;
   }).join("");
   return mHeaderHtml(mk.label, "Training") + seg + mPlanBanner(mk)
-    + `<section class="m-card m-hero-ex"><div class="m-fig-lg" data-m-fig="m:${session.exercises[0].id}"></div>
+    + mCols(`<section class="m-card m-hero-ex"><div class="m-fig-lg" data-m-fig="m:${session.exercises[0].id}"></div>
         <div><b class="m-hero-title">${mEsc(session.title)}</b><small class="m-row-meta">${Math.max(1, Math.round(mobilitySessionSeconds(session) / 60))} min · ${session.exercises.length} Übungen</small></div>
         <button type="button" class="m-btn primary wide" data-m-act="start-mob-now">Starten</button>
-        ${!mk.planned && typeof claudeAvailable === "function" && claudeAvailable() ? `<button type="button" class="m-btn ghost wide" data-m-act="mob-claude">${mState.busy ? "Claude stellt zusammen …" : "Mit Claude anpassen"}</button>` : ""}</section>`
-    + `<section class="m-card"><div class="m-head"><h2>Ablauf</h2><button type="button" class="m-link" data-m-classic="mobility">Alle Übungen</button></div><div class="m-list">${rows}</div></section>`;
+        ${!mk.planned && typeof claudeAvailable === "function" && claudeAvailable() ? `<button type="button" class="m-btn ghost wide" data-m-act="mob-claude">${mState.busy ? "Claude stellt zusammen …" : "Mit Claude anpassen"}</button>` : ""}</section>`,
+    `<section class="m-card"><div class="m-head"><h2>Ablauf</h2><button type="button" class="m-link" data-m-classic="mobility">Alle Übungen</button></div><div class="m-list">${rows}</div></section>`, "train");
 }
 
 function mRenderMehr() {
   const rows = [["nutrition", "Ernährung"], ["records", "Rekorde"], ["analysis", "Analyse"], ["overview", "Alle Diagramme"], ["settings", "Einstellungen"]];
   return mHeaderHtml("Weitere Bereiche", "Mehr")
-    + `<section class="m-card m-navlist">${rows.map(([v, l]) => `<button type="button" class="m-nav-row" data-m-classic="${v}"><span>${l}</span><i>›</i></button>`).join("")}</section>`
-    + `<section class="m-card m-navlist"><button type="button" class="m-nav-row" data-m-act="profile"><span>Dein Trainingsprofil</span><i>›</i></button>
-        <button type="button" class="m-nav-row" data-m-act="m-off"><span>Klassische Ansicht verwenden</span><i>›</i></button></section>`;
+    + mCols(`<section class="m-card m-navlist">${rows.map(([v, l]) => `<button type="button" class="m-nav-row" data-m-classic="${v}"><span>${l}</span><i>›</i></button>`).join("")}</section>`,
+      `<section class="m-card m-navlist"><button type="button" class="m-nav-row" data-m-act="profile"><span>Dein Trainingsprofil</span><i>›</i></button>
+        <button type="button" class="m-nav-row" data-m-act="m-off"><span>Klassische Ansicht verwenden</span><i>›</i></button></section>`);
 }
 
 /* ------------------------------------------------------------ Rahmen */
