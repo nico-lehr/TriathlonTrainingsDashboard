@@ -4,6 +4,20 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.30
+
+Trainings auf der Uhr sind jetzt so detailliert wie beim Garmin Coach.
+
+Neu in 2.4.30:
+- Jede Einheit auf der Uhr hat jetzt einen richtigen Ablauf: Aufwärmen, Hauptteil als Wiederholungen mit Pausen, Ausklang – mit kurzem Hinweis bei jedem Abschnitt
+- Schwimmen in Metern wie beim Garmin Coach: Einschwimmen, Technik-Bahnen, z. B. 10 × 100 m Kraul mit 20 s Pause, Ausschwimmen – mit Schwimmstil und 25-m-Bahn
+- Laufen und Rad je nach Intensität: lockere Grundlage mit Steigerungen, Tempo- oder Sweet-Spot-Blöcke, harte Intervalle. Zielbereiche aus deinem Profil (Pace, Watt oder Puls)
+- Steht im Titel ein Satz wie „6 × 800 m“ oder „5 × 4 min“, wird genau der auf der Uhr angelegt
+- Auch Einheiten, die schon auf der Uhr sind, werden beim nächsten Abgleich automatisch aktualisiert
+- Nur noch das neue Design: die klassische Ansicht ist archiviert
+- Abgeschlossene Trainings öffnen sich als eigene Seite, mit schönerem „Vergleichen“-Knopf; die Leiste oben am Handy ist ruhiger
+- Ernährung ist vorerst ausgeblendet („Coming soon“)
+
 ## 2.4.29
 
 Mobility-Einheiten dauern jetzt wirklich so lange wie geplant.
