@@ -351,7 +351,7 @@ function mRenderHeute() {
 function mRenderKalender() {
   const today = mDay(new Date());
   if (!mState.calMonth) mState.calMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  if (!mState.calWeek) mState.calWeek = mMonday(today);
+  if (!mState.calWeek) mState.calWeek = today; // Liste: 7 Tage ab diesem Tag (Standard: heute)
   const m = mState.calMonth;
   const first = new Date(m.getFullYear(), m.getMonth(), 1);
   const daysIn = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
@@ -374,20 +374,28 @@ function mRenderKalender() {
   }
   const agenda = [0, 1, 2, 3, 4, 5, 6].map(i => {
     const d = mAddDays(mState.calWeek, i);
+    const wd = mWeekdays[(d.getDay() + 6) % 7];
     const k = localDateStr(d);
     const items = [];
     mWorkoutsOn(d).forEach(w => items.push(`<button type="button" class="m-ev" data-m-act="workout" data-file="${mEsc(w.file || w.id || "")}"><span class="m-ev-stripe" style="background:${mSport(sportGroup(w.sport)).color}"></span>${mIcon(sportGroup(w.sport) === "Sonstiges" ? w.sport : sportGroup(w.sport), "sm")}<span class="m-grow"><span class="m-row-title">${mEsc(w.title || w.name || w.sport)}</span><span class="m-row-meta">${mDur(w.duration_min || 0)}${w.distance_km ? ` · ${mNum(w.distance_km, 1)} km` : ""}</span></span><span class="m-tag done">✓</span></button>`));
     mPlannedOn(k).filter(p => p.status !== "erledigt" || !mWorkoutsOn(d).length).forEach(p => items.push(`<button type="button" class="m-ev" data-m-act="plan" data-id="${mEsc(p.id)}"><span class="m-ev-stripe" style="background:${mSport(p.sport).color}"></span>${mIcon(p.sport, "sm")}<span class="m-grow"><span class="m-row-title">${mEsc(p.title || p.sport)}</span><span class="m-row-meta">${p.duration_min ? mDur(p.duration_min) : ""}${p.intensity ? ` · ${mEsc(p.intensity)}` : ""}</span></span><span class="m-tag ${p.status === "erledigt" ? "done" : p.status === "uebersprungen" ? "bad" : "plan"}">${p.status === "erledigt" ? "✓" : p.status === "uebersprungen" ? "übersprungen" : "geplant"}</span></button>`));
-    return `<div class="m-ag-day${k === localDateStr(today) ? " today" : ""}"><div class="m-ag-date"><b>${mWeekdays[i]}</b><span>${d.getDate()}.</span></div>
+    return `<div class="m-ag-day${k === localDateStr(today) ? " today" : ""}"><div class="m-ag-date"><b>${k === localDateStr(today) ? "Heute" : wd}</b><span>${d.getDate()}.</span></div>
       <div class="m-ag-items">${items.join("") || `<button type="button" class="m-ag-add" data-m-act="plan-new" data-date="${k}">${k < localDateStr(today) ? "–" : "+ Einheit"}</button>`}</div></div>`;
   }).join("");
-  const wkNo = (() => { const d = new Date(mState.calWeek); d.setDate(d.getDate() + 3); const y = new Date(d.getFullYear(), 0, 4); return 1 + Math.round(((d - y) / 86400000 - 3 + ((y.getDay() + 6) % 7)) / 7); })();
-  const weekMin = [0, 1, 2, 3, 4, 5, 6].reduce((s, i) => s + mWorkoutsOn(mAddDays(mState.calWeek, i)).reduce((a, w) => a + (w.duration_min || 0), 0), 0);
-  return mHeaderHtml(`Woche ${wkNo} · ${mState.calWeek.toLocaleDateString("de-DE", { day: "numeric", month: "short" })} – ${mAddDays(mState.calWeek, 6).toLocaleDateString("de-DE", { day: "numeric", month: "short" })}`, "Kalender",
+  // Stunden der 7 Tage: Erledigtes plus noch Geplantes
+  const weekMin = [0, 1, 2, 3, 4, 5, 6].reduce((s, i) => {
+    const d = mAddDays(mState.calWeek, i);
+    return s + mWorkoutsOn(d).reduce((a, w) => a + (w.duration_min || 0), 0)
+      + mPlannedOn(localDateStr(d)).filter(p => p.status === "geplant").reduce((a, p) => a + (Number(p.duration_min) || 0), 0);
+  }, 0);
+  const fromToday = weekKey === localDateStr(today);
+  const span = `${mState.calWeek.toLocaleDateString("de-DE", { day: "numeric", month: "short" })} – ${mAddDays(mState.calWeek, 6).toLocaleDateString("de-DE", { day: "numeric", month: "short" })}`;
+  const listTitle = fromToday ? "Nächste 7 Tage" : weekKey < localDateStr(today) ? "Rückblick" : "Danach";
+  return mHeaderHtml(fromToday ? `Ab heute · ${span}` : span, "Kalender",
     `<button type="button" class="m-icon" data-m-act="plan-new" data-date="${todayStr()}" aria-label="Neue Einheit">+</button>`)
     + mCols(`<section class="m-card"><div class="m-head"><h2>${m.toLocaleDateString("de-DE", { month: "long", year: "numeric" })}</h2><span class="m-arrows"><button type="button" class="m-chip" data-m-act="month" data-dir="-1" aria-label="Vormonat">‹</button><button type="button" class="m-chip" data-m-act="month" data-dir="1" aria-label="Nächster Monat">›</button></span></div>
         <div class="m-month">${cells}</div></section>`,
-    `<section class="m-card"><div class="m-head"><h2>Woche</h2><span class="m-arrows"><button type="button" class="m-chip" data-m-act="week" data-dir="-1" aria-label="Vorwoche">‹</button><span class="m-head-note">${mNum(weekMin / 60, 1)} h</span><button type="button" class="m-chip" data-m-act="week" data-dir="1" aria-label="Nächste Woche">›</button></span></div>
+    `<section class="m-card"><div class="m-head"><h2>${listTitle}</h2><span class="m-arrows">${fromToday ? "" : `<button type="button" class="m-chip" data-m-act="week" data-dir="-1" aria-label="Früher">‹</button>`}<span class="m-head-note">${mNum(weekMin / 60, 1)} h</span><button type="button" class="m-chip" data-m-act="week" data-dir="1" aria-label="Später">›</button></span></div>
         <div class="m-agenda">${agenda}</div></section>`
     + `<button type="button" class="m-more" data-m-classic="calendar">Großer Kalender mit Wetter</button>`, "cal");
 }
@@ -641,7 +649,12 @@ function mMoveTabIndicator() {
 }
 
 function mShow(page) {
-  if (page !== mState.page) { mState.anim = true; if (typeof mTrack === "function") mTrack("page", page); }
+  if (page !== mState.page) {
+    mState.anim = true;
+    if (typeof mTrack === "function") mTrack("page", page);
+    if (page === "kalender" && !mState.calPicked) { mState.calWeek = null; mState.calMonth = null; } // Kalender öffnet immer ab heute
+  }
+  mState.calPicked = false;
   mState.page = page;
   mState.classic = null;
   renderMApp();
@@ -700,15 +713,19 @@ async function mAction(btn) {
     renderMApp();
   } else if (act === "cal-day") {
     const d = new Date(btn.dataset.date + "T12:00:00");
-    mState.calWeek = mMonday(d);
+    mState.calWeek = mDay(d); // Liste ab dem angetippten Tag
     mState.calMonth = new Date(d.getFullYear(), d.getMonth(), 1);
-    if (mState.page !== "kalender") mShow("kalender"); else renderMApp();
+    mState.calPicked = true;
+    if (mState.page !== "kalender") mShow("kalender"); else { mState.calPicked = false; renderMApp(); }
   } else if (act === "month") {
     const m = mState.calMonth;
     mState.calMonth = new Date(m.getFullYear(), m.getMonth() + Number(btn.dataset.dir), 1);
     renderMApp();
   } else if (act === "week") {
+    const today = mDay(new Date());
     mState.calWeek = mAddDays(mState.calWeek, 7 * Number(btn.dataset.dir));
+    // zurück nie vor heute - außer man war schon (per Tipp auf einen Tag) davor
+    if (Number(btn.dataset.dir) < 0 && mState.calWeek < today && mAddDays(mState.calWeek, 7) >= today) mState.calWeek = today;
     mState.calMonth = new Date(mState.calWeek.getFullYear(), mState.calWeek.getMonth(), 1);
     renderMApp();
   } else if (act === "coach-note") {
