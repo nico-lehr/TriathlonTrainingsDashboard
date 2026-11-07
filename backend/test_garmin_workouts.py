@@ -23,7 +23,7 @@ except ImportError:
 import tools.garmin_sync
 from backend import auth, create_app
 from backend.config import config
-from backend.models import AthleteStore
+from backend.models import AthleteStore, GarminPushState, GarminWorkoutLink
 
 config.SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
 config.SECRET_KEY = "nur-fuer-tests"
@@ -50,6 +50,7 @@ class GarminWorkoutTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app, session_factory = create_app()
+        cls.session_factory = session_factory
         session = session_factory()
         cls.ids = {name: auth.create_login(session, name, "langes-passwort-1") for name in ("anna", "ben")}
         session.add(AthleteStore(athlete_id=cls.ids["anna"], key=KEY, value=[
@@ -63,6 +64,11 @@ class GarminWorkoutTest(unittest.TestCase):
         cls.headers = {"Authorization": f"Bearer {token}"}
 
     def setUp(self):
+        session = self.session_factory()
+        session.query(GarminWorkoutLink).delete()  # jeder Test startet ohne gesendete Workouts
+        session.query(GarminPushState).delete()
+        session.commit()
+        session.close()
         self.client = self.app.test_client()
         self.token_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.token_dir)
@@ -90,7 +96,7 @@ class GarminWorkoutTest(unittest.TestCase):
         self.assertEqual(r.status_code, 200, r.get_json())
         self.assertEqual(r.get_json()["data"], {"garmin_workout_id": 4711, "scheduled_date": "2026-10-14"})
         self.garmin.return_value.login.assert_called_once_with(tools.garmin_sync.token_path(self.ids["anna"]))
-        self.garmin.return_value.schedule_workout.assert_called_once_with(4711, "2026-10-14")
+        self.garmin.return_value.schedule_workout.assert_called_once_with("4711", "2026-10-14")
 
         payload = self.garmin.return_value.upload_workout.call_args.args[0]
         self.assertEqual(payload["workoutName"], "6x400m")
@@ -108,8 +114,12 @@ class GarminWorkoutTest(unittest.TestCase):
     def test_ohne_schritte_ein_block_ueber_die_dauer(self):
         self.connect_garmin()
         self.assertEqual(self.send().status_code, 200)
+        # Wie defaultWorkoutSteps() im Browser: 50 min hart -> 10 / 35 (Zone 4) / 5 min
         steps = self.garmin.return_value.upload_workout.call_args.args[0]["workoutSegments"][0]["workoutSteps"]
-        self.assertEqual([(s["stepType"]["stepTypeKey"], s["endConditionValue"]) for s in steps], [("interval", 3000.0)])
+        self.assertEqual([(s["stepType"]["stepTypeKey"], s["endConditionValue"]) for s in steps],
+                         [("warmup", 600.0), ("interval", 2100.0), ("cooldown", 300.0)])
+        self.assertEqual(steps[1]["zoneNumber"], 4)
+        self.assertIn("Zone 4", steps[1]["description"])
 
     def test_kalender_klappt_nicht_workout_trotzdem_gesendet(self):
         self.connect_garmin()
@@ -122,7 +132,7 @@ class GarminWorkoutTest(unittest.TestCase):
         r = self.send()
         self.assertEqual(r.status_code, 409)
         self.assertEqual(r.get_json()["code"], "garmin_not_connected")
-        self.assertIn(f"--login --athlete {self.ids['anna']}", r.get_json()["error"])
+        self.assertIn("Trainings auf die Uhr", r.get_json()["error"])
         self.garmin.assert_not_called()
 
     def test_token_abgelaufen(self):
@@ -153,10 +163,36 @@ class GarminWorkoutTest(unittest.TestCase):
         self.assertEqual(self.send("gibt-es-nicht").status_code, 404)
         self.garmin.return_value.upload_workout.assert_not_called()
 
-    def test_kraft_wird_nicht_unterstuetzt(self):
+    def test_kraft_ohne_uebungen_400(self):
         self.connect_garmin()
         r = self.send(STRENGTH_ID)
-        self.assertEqual((r.status_code, r.get_json()["code"]), (422, "unsupported_sport"))
+        self.assertEqual((r.status_code, r.get_json()["code"]), (400, "VALIDATION_ERROR"))
+        self.garmin.return_value.upload_workout.assert_not_called()
+
+    def test_kraft_mit_uebungen_aus_garmins_katalog(self):
+        self.connect_garmin()
+        r = self.send(STRENGTH_ID, body={"exercises": [
+            {"id": "goblet-kniebeuge", "name": "Goblet-Kniebeuge", "sets": 3, "reps": 10, "rest_s": 75, "weight_kg": 12},
+            {"name": "Eigene Übung", "reps": "8 je Seite"}]})
+        self.assertEqual(r.status_code, 200, r.get_json())
+        payload = self.garmin.return_value.upload_workout.call_args.args[0]
+        self.assertEqual(payload["sportType"]["sportTypeKey"], "strength_training")
+        group, own = payload["workoutSegments"][0]["workoutSteps"]
+        squat, rest = group["workoutSteps"]
+        self.assertEqual((group["numberOfIterations"], squat["category"], squat["exerciseName"], squat["endConditionValue"],
+                          squat["weightValue"], rest["endConditionValue"]), (3, "SQUAT", "GOBLET_SQUAT", 10.0, 12000.0, 75.0))
+        self.assertEqual((own["description"], own["endCondition"]["conditionTypeKey"], own["endConditionValue"]),
+                         ("Eigene Übung (je Seite)", "reps", 8.0))
+        self.assertNotIn("category", own)
+
+    def test_zweimal_senden_aktualisiert_statt_doppelt(self):
+        self.connect_garmin()
+        self.assertEqual(self.send(body={"steps": STEPS}).status_code, 200)
+        r = self.send(body={"steps": STEPS[:1]})
+        self.assertEqual(r.status_code, 200, r.get_json())
+        self.garmin.return_value.upload_workout.assert_called_once()
+        self.garmin.return_value.update_workout.assert_called_once()
+        self.assertEqual(self.garmin.return_value.update_workout.call_args.args[0], "4711")
 
     def test_ungueltige_schritte_400(self):
         self.connect_garmin()

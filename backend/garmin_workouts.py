@@ -34,6 +34,12 @@ MAX_STEPS = 50
 # StepType, ConditionType, TargetType) - als JSON gebaut, weil die typisierten
 # Bausteine der Bibliothek pydantic voraussetzen.
 SPORTS = {"Laufen": (1, "running", 1), "Rad": (2, "cycling", 2), "Schwimmen": (4, "swimming", 3)}
+# Kraft und Mobility: Uebungs-Workouts. Garmin kennt "mobility" erst auf neueren
+# Uhren - lehnt Garmin es ab, folgt Krafttraining, zuletzt "Sonstiges".
+EXERCISE_SPORTS = {
+    "Kraft": [(5, "strength_training", 5), (3, "other", 3)],
+    "Mobility": [(11, "mobility", 11), (5, "strength_training", 5), (3, "other", 3)],
+}
 STEP_TYPES = {"warmup": 1, "cooldown": 2, "interval": 3, "recovery": 4, "rest": 5, "repeat": 6}
 TARGETS = {"power_zone": (2, "power.zone"), "hr_zone": (4, "heart.rate.zone"), "pace_zone": (6, "pace.zone")}
 NO_TARGET = {"workoutTargetTypeId": 1, "workoutTargetTypeKey": "no.target", "displayOrder": 1}
@@ -41,6 +47,60 @@ END_TIME = {"conditionTypeId": 2, "conditionTypeKey": "time", "displayOrder": 2,
 END_DISTANCE = {"conditionTypeId": 3, "conditionTypeKey": "distance", "displayOrder": 3, "displayable": True}
 END_LAP_BUTTON = {"conditionTypeId": 1, "conditionTypeKey": "lap.button", "displayOrder": 1, "displayable": True}
 END_ITERATIONS = {"conditionTypeId": 7, "conditionTypeKey": "iterations", "displayOrder": 7, "displayable": False}
+END_REPS = {"conditionTypeId": 10, "conditionTypeKey": "reps", "displayOrder": 10, "displayable": True}
+WEIGHT_KG = {"unitId": 8, "unitKey": "kilogram", "factor": 1000.0}
+
+# Uebungen der Dashboard-Sammlungen (js/data/strength-exercises.js,
+# js/data/mobility-exercises.js) -> Garmins Uebungskatalog (Kategorie, Uebung).
+# So zeigt die Uhr die passende Uebung mit Bild/Animation; ohne Eintrag steht
+# nur der Name im Hinweis des Schritts.
+GARMIN_EXERCISES = {
+    "goblet-kniebeuge": ("SQUAT", "GOBLET_SQUAT"),
+    "ausfallschritt": ("LUNGE", "LUNGE"),
+    "step-up": ("SQUAT", "STEP_UP"),
+    "rumaenisches-kreuzheben": ("DEADLIFT", "ROMANIAN_DEADLIFT"),
+    "beckenheben-einbeinig": ("HIP_RAISE", "SINGLE_LEG_HIP_RAISE"),
+    "liegestuetz": ("PUSH_UP", "PUSH_UP"),
+    "schulterdruecken": ("SHOULDER_PRESS", "DUMBBELL_SHOULDER_PRESS"),
+    "rudern-vorgebeugt": ("ROW", "DUMBBELL_ROW"),
+    "zugseil": ("BANDED_EXERCISES", "ROW"),
+    "face-pull": ("ROW", "FACE_PULL"),
+    "latzug-band": ("PULL_UP", "KNEELING_LAT_PULLDOWN"),
+    "unterarmstuetz": ("PLANK", "PLANK"),
+    "dead-bug": ("HIP_STABILITY", "DEAD_BUG"),
+    "vogel-hund": ("WARM_UP", "OPPOSITE_ARM_AND_LEG_BALANCE"),
+    "wadenheben": ("CALF_RAISE", "STANDING_CALF_RAISE"),
+    # Mobility
+    "hueftbeuger-kniend": ("WARM_UP", "STRETCH_LUNGING_HIP_FLEXOR"),
+    "hueftbeuger-stehend": ("WARM_UP", "STRETCH_HIP_FLEXOR_AND_QUAD"),
+    "couch-stretch": ("WARM_UP", "STRETCH_HIP_FLEXOR_AND_QUAD"),
+    "taube": ("WARM_UP", "STRETCH_PIGEON_POSE"),
+    "liegende-vier": ("WARM_UP", "STRETCH_LYING_PIRIFORMIS"),
+    "beinpendel": ("WARM_UP", "FORWARD_AND_BACKWARD_LEG_SWINGS"),
+    "frosch": ("WARM_UP", "STRETCH_BUTTERFLY"),
+    "beckenheben": ("HIP_RAISE", "HIP_RAISE"),
+    "weltbeste-dehnung": ("WARM_UP", "STRETCH_LUNGE_WITH_SPINAL_TWIST"),
+    "beinrueckseite-liegend": ("WARM_UP", "STRETCH_HAMSTRING"),
+    "vorbeuge-stehend": ("WARM_UP", "STANDING_HAMSTRING_STRETCH"),
+    "beinrueckseite-kniend": ("WARM_UP", "STRETCH_HAMSTRING"),
+    "wade-wand": ("WARM_UP", "STRETCH_CALF"),
+    "wade-tief": ("WARM_UP", "STRETCH_CALF"),
+    "knie-zur-wand": ("WARM_UP", "ANKLE_DORSIFLEXION_WITH_BAND"),
+    "oberschenkel-stehend": ("WARM_UP", "STRETCH_QUAD"),
+    "katze-kuh": ("WARM_UP", "STRETCH_CAT_COW"),
+    "kindhaltung": ("WARM_UP", "STRETCH_CHILDS_POSE"),
+    "knie-zur-brust": ("WARM_UP", "STRETCH_LYING_KNEE_TO_CHEST"),
+    "sphinx": ("WARM_UP", "STRETCH_COBRA"),
+    "vierfuessler-drehung": ("WARM_UP", "THORACIC_ROTATION"),
+    "nadel-einfaedeln": ("WARM_UP", "THORACIC_ROTATION"),
+    "wandrutschen": ("LATERAL_RAISE", "WALL_SLIDE"),
+    "brust-tuerrahmen": ("WARM_UP", "STRETCH_PECTORAL"),
+    "schulter-band": ("BANDED_EXERCISES", "PULL_APART"),
+    "lat-dehnung": ("WARM_UP", "STRETCH_LAT"),
+    "armkreisen": ("WARM_UP", "ARM_CIRCLES"),
+    "raupe": ("CORE", "INCHWORM"),
+}
+MAX_EXERCISES = 20
 
 RECONNECT = "python tools/garmin_sync.py --login --athlete {id}"
 FIT_HINT = "Bis dahin die Einheit als .fit-Datei herunterladen."
@@ -62,6 +122,38 @@ def minutes_or_zero(value):
     except (TypeError, ValueError):
         return 0.0
     return number if math.isfinite(number) and number > 0 else 0.0
+
+
+WARMUP_WORD = {"Laufen": "einlaufen", "Rad": "einrollen", "Schwimmen": "einschwimmen"}
+COOLDOWN_WORD = {"Laufen": "auslaufen", "Rad": "ausrollen", "Schwimmen": "ausschwimmen"}
+ZONE_WORDS = {1: "sehr locker", 2: "locker, Reden geht", 3: "zügig", 4: "hart, an der Schwelle", 5: "sehr hart"}
+
+
+def pace_text(mps, sport):
+    """m/s -> "5:10" (je km) bzw. je 100 m beim Schwimmen."""
+    seconds = (100 if sport == "Schwimmen" else 1000) / mps
+    return f"{int(seconds // 60)}:{int(round(seconds % 60)):02d}".replace(":60", ":59")
+
+
+def step_note(step, sport):
+    """Kurzer Hinweis, den die Uhr beim Schritt zeigt - eigener Text (note) geht vor."""
+    note = step.get("note")
+    if isinstance(note, str) and note.strip():
+        return note.strip()[:100]
+    target = step.get("target") if isinstance(step.get("target"), dict) else {}
+    kind, zone = target.get("kind"), target.get("zone")
+    if kind == "hr_zone" and whole(zone, 1, 5):
+        aim = f"Puls Zone {zone} · {ZONE_WORDS[zone]}"
+    elif kind == "power_zone" and whole(zone, 1, 5):
+        aim = f"Leistung Zone {zone} · {ZONE_WORDS[zone]}"
+    elif kind == "pace_zone" and positive(target.get("low_mps"), 50) and positive(target.get("high_mps"), 50):
+        unit = "/100 m" if sport == "Schwimmen" else "/km"
+        aim = f"Pace {pace_text(target['high_mps'], sport)}–{pace_text(target['low_mps'], sport)} {unit}"
+    else:
+        aim = ""
+    lead = {"warmup": f"Locker {WARMUP_WORD.get(sport, 'aufwärmen')}", "cooldown": f"Locker {COOLDOWN_WORD.get(sport, 'abwärmen')}",
+            "recovery": "Erholen", "rest": "Pause"}.get(step.get("type"))
+    return " · ".join(x for x in (lead, aim) if x) or None
 
 
 def garmin_target(step):
@@ -102,7 +194,7 @@ def garmin_end(step):
     return {"endCondition": END_LAP_BUTTON}  # ohne Dauer/Distanz: weiter per Lap-Taste
 
 
-def garmin_steps(steps, counter, nested=False):
+def garmin_steps(steps, counter, nested=False, sport=None):
     """Schritte im Dashboard-Format -> workoutSteps von Garmin. stepOrder zaehlt
     durch alle Ebenen fortlaufend (Wiederholung vor ihren Schritten)."""
     if not isinstance(steps, list) or not steps:
@@ -121,10 +213,14 @@ def garmin_steps(steps, counter, nested=False):
             if nested or not whole(count, 1, 50):
                 raise ValueError("Wiederholung ungültig")
             out.append({"type": "RepeatGroupDTO", **base, "numberOfIterations": count,
-                        "workoutSteps": garmin_steps(step.get("steps"), counter, nested=True),
+                        "workoutSteps": garmin_steps(step.get("steps"), counter, nested=True, sport=sport),
                         "endCondition": END_ITERATIONS, "endConditionValue": float(count), "smartRepeat": False})
         else:
-            out.append({"type": "ExecutableStepDTO", **base, **garmin_end(step), **garmin_target(step)})
+            item = {"type": "ExecutableStepDTO", **base, **garmin_end(step), **garmin_target(step)}
+            note = step_note(step, sport)
+            if note:
+                item["description"] = note
+            out.append(item)
     return out
 
 
@@ -139,21 +235,183 @@ def timed_seconds(steps):
     return total
 
 
+INTENSITY_TEXT = {"leicht": "Locker", "mittel": "Mittel", "hart": "Hart"}
+
+
+def workout_description(entry):
+    """Beschreibung in Garmin Connect: Text des Coaches + Intensitaet."""
+    parts = []
+    if entry.get("description"):
+        parts.append(str(entry["description"]).strip())
+    if entry.get("intensity") in INTENSITY_TEXT:
+        parts.append(f"Intensität: {INTENSITY_TEXT[entry['intensity']]}")
+    parts.append("Aus deinem Triathlon-Dashboard")
+    return "\n".join(parts)[:1000]
+
+
 def garmin_workout(entry, steps):
     """Geplante Einheit + Schritte -> JSON fuer Garmin.upload_workout(). Wirft
     ValueError bei ungueltigen Schritten."""
     sport_id, sport_key, order = SPORTS[entry["sport"]]
     sport = {"sportTypeId": sport_id, "sportTypeKey": sport_key, "displayOrder": order}
-    workout_steps = garmin_steps(steps, [0])
-    payload = {
+    workout_steps = garmin_steps(steps, [0], sport=entry["sport"])
+    return {
         "workoutName": str(entry.get("title") or entry["sport"])[:80],
         "sportType": sport,
         "estimatedDurationInSecs": int(timed_seconds(workout_steps) or minutes_or_zero(entry.get("duration_min")) * 60),
         "workoutSegments": [{"segmentOrder": 1, "sportType": sport, "workoutSteps": workout_steps}],
+        "description": workout_description(entry),
     }
-    if entry.get("description"):
-        payload["description"] = str(entry["description"])[:500]
-    return payload
+
+
+def number_in(text):
+    """Erste ganze Zahl in "8 je Seite" / "12" -> 8 / 12, sonst None."""
+    m = re.search(r"\d+", str(text or ""))
+    return int(m.group()) if m else None
+
+
+def clean_exercise(x):
+    """Uebung aus dem Browser (garminExercises) oder roh aus der Ablage ->
+    {id, name, sets, reps, seconds, sides, rest_s, weight_kg, note}. None = unbrauchbar."""
+    if not isinstance(x, dict):
+        return None
+    name = str(x.get("name") or "").strip()[:60]
+    if not name:
+        return None
+    reps_text = x.get("reps")
+    reps = x.get("reps") if whole(x.get("reps"), 1, 500) else number_in(reps_text)
+    seconds = x.get("seconds") if positive(x.get("seconds"), 3600) else None
+    if seconds is None and isinstance(reps_text, str) and re.search(r"\d+\s*(s|sek|min)", reps_text):
+        seconds = number_in(reps_text) * (60 if "min" in reps_text else 1)
+        reps = None
+    sets = x.get("sets") if whole(x.get("sets"), 1, 20) else 1
+    rest = x.get("rest_s") if positive(x.get("rest_s"), 600) else None
+    weight = x.get("weight_kg") if positive(x.get("weight_kg"), 500) else None
+    sides = bool(x.get("sides")) or bool(re.search(r"je Seite", str(reps_text or "")))
+    note = str(x.get("note") or "").strip()[:80] or None
+    return {"id": str(x.get("id") or "")[:60] or None, "name": name, "sets": sets, "reps": reps if whole(reps, 1, 500) else None,
+            "seconds": seconds, "sides": sides, "rest_s": rest, "weight_kg": weight, "note": note}
+
+
+def exercise_steps(exercises, mobility, with_catalog, counter):
+    """Uebungen -> Garmin-Schritte. Kraft: je Uebung "Saetze x (Uebung, Pause)".
+    Mobility: je Uebung (und Seite) ein Zeit-Schritt, kurze Wechselpause."""
+    out = []
+
+    def step(kind, end, value, x=None, label=None):
+        counter[0] += 1
+        if counter[0] > MAX_STEPS:
+            raise ValueError(f"höchstens {MAX_STEPS} Schritte")
+        type_id = STEP_TYPES[kind]
+        item = {"type": "ExecutableStepDTO", "stepOrder": counter[0],
+                "stepType": {"stepTypeId": type_id, "stepTypeKey": kind, "displayOrder": type_id},
+                "endCondition": end, "targetType": NO_TARGET}
+        if value is not None:
+            item["endConditionValue"] = float(value)
+        if x is not None:
+            text = label or x["name"]
+            if x["note"]:
+                text = f"{text} · {x['note']}"
+            item["description"] = text[:100]
+            if with_catalog and x["id"] in GARMIN_EXERCISES:
+                item["category"], item["exerciseName"] = GARMIN_EXERCISES[x["id"]]
+            if x["weight_kg"]:
+                item["weightValue"] = float(x["weight_kg"]) * 1000.0
+                item["weightUnit"] = dict(WEIGHT_KG)
+        return item
+
+    def work(x, label=None):
+        if x["seconds"]:
+            return step("interval", END_TIME, x["seconds"], x, label)
+        if x["reps"]:
+            return step("interval", END_REPS, x["reps"], x, label)
+        return step("interval", END_LAP_BUTTON, None, x, label)
+
+    for x in exercises:
+        if mobility:
+            labels = [f"{x['name']} links", f"{x['name']} rechts"] if x["sides"] and x["seconds"] else [x["name"]]
+            for label in labels:
+                out.append(work(x, label))
+            out.append(step("rest", END_TIME, 10))
+            continue
+        label = f"{x['name']} (je Seite)" if x["sides"] else x["name"]
+        rest = x["rest_s"] or 60
+        if x["sets"] > 1:
+            counter[0] += 1
+            order = counter[0]
+            inner = [work(x, label), step("rest", END_TIME, rest)]
+            out.append({"type": "RepeatGroupDTO", "stepOrder": order,
+                        "stepType": {"stepTypeId": 6, "stepTypeKey": "repeat", "displayOrder": 6},
+                        "numberOfIterations": x["sets"], "workoutSteps": inner,
+                        "endCondition": END_ITERATIONS, "endConditionValue": float(x["sets"]), "smartRepeat": False})
+        else:
+            out.append(work(x, label))
+            out.append(step("rest", END_TIME, rest))
+    if out and out[-1]["type"] == "ExecutableStepDTO" and out[-1]["stepType"]["stepTypeKey"] == "rest":
+        out.pop()  # keine Pause nach der letzten Uebung
+    renumber(out, [0])
+    return out
+
+
+def renumber(steps, counter):
+    """stepOrder lueckenlos 1, 2, 3 ... (Wiederholung vor ihren Schritten)."""
+    for s in steps:
+        counter[0] += 1
+        s["stepOrder"] = counter[0]
+        if s["type"] == "RepeatGroupDTO":
+            renumber(s["workoutSteps"], counter)
+
+
+def exercise_workouts(entry, exercises):
+    """Kraft/Mobility -> Liste von Varianten (beste zuerst): erst mit Garmins
+    Uebungskatalog und eigener Sportart, dann vorsichtiger. Lehnt Garmin eine
+    Variante ab, wird die naechste versucht (siehe backend/garmin_push.py)."""
+    cleaned = [c for c in (clean_exercise(x) for x in (exercises or [])) if c][:MAX_EXERCISES]
+    if not cleaned:
+        raise ValueError("keine Übungen")
+    mobility = entry["sport"] == "Mobility"
+    variants = []
+    sports = EXERCISE_SPORTS[entry["sport"]]
+    for i, (sport_id, sport_key, order) in enumerate(sports):
+        with_catalog = i < len(sports) - 1  # letzte Stufe: ohne Katalog, nur Namen
+        sport = {"sportTypeId": sport_id, "sportTypeKey": sport_key, "displayOrder": order}
+        steps = exercise_steps(cleaned, mobility, with_catalog, [0])
+        variants.append({
+            "workoutName": str(entry.get("title") or entry["sport"])[:80],
+            "sportType": sport,
+            "estimatedDurationInSecs": int(minutes_or_zero(entry.get("duration_min")) * 60) or int(timed_seconds(steps)),
+            "workoutSegments": [{"segmentOrder": 1, "sportType": sport, "workoutSteps": steps}],
+            "description": workout_description(entry),
+        })
+    return variants
+
+
+DEFAULT_HR_ZONE = {"leicht": 2, "mittel": 3, "hart": 4}
+
+
+def default_steps(entry):
+    """Wie defaultWorkoutSteps() in js/data/planned-workouts.js - fuer Einheiten,
+    deren Schritte der Browser (noch) nicht geschickt hat."""
+    d = minutes_or_zero(entry.get("duration_min")) or None
+    zone = DEFAULT_HR_ZONE.get(entry.get("intensity")) if entry.get("sport") != "Schwimmen" else None
+    main = {"kind": "hr_zone", "zone": zone} if zone else {"kind": "none"}
+
+    def st(kind, minutes, target):
+        return {"type": kind, "duration_min": minutes, "target": target} if minutes else {"type": kind, "target": target}
+    if not d or d < 30:
+        return [st("interval", d, main)]
+    warm, cool = (15, 10) if d >= 60 else (10, 5)
+    return [st("warmup", warm, {"kind": "none"}), st("interval", d - warm - cool, main), st("cooldown", cool, {"kind": "none"})]
+
+
+def workout_variants(entry, steps=None, exercises=None):
+    """Alle Sportarten: Liste der Garmin-Workouts (beste Variante zuerst)."""
+    sport = entry.get("sport")
+    if sport in EXERCISE_SPORTS:
+        return exercise_workouts(entry, exercises if exercises else entry.get("exercises"))
+    if sport in SPORTS:
+        return [garmin_workout(entry, steps or entry.get("steps") or default_steps(entry))]
+    raise ValueError("Sportart nicht unterstützt")
 
 
 def find_planned_workout(athlete_id, workout_id):
@@ -186,49 +444,41 @@ def garmin_error(e, athlete_id):
 
 @api_bp.route("/planned-workouts/<workout_id>/send-to-garmin", methods=["POST"])
 def send_planned_workout_to_garmin(workout_id):
-    """POST - Einheit als Garmin-Workout hochladen -> {garmin_workout_id, scheduled_date}."""
+    """POST - Einheit jetzt an Garmin (anlegen oder aktualisieren, nie doppelt)
+    -> {garmin_workout_id, scheduled_date}. Body: {steps?, exercises?}."""
+    from . import Session
+    from .garmin_push import PushStopped, library_available, open_client, run_push
+
     athlete_id = get_current_athlete_id()
     entry = find_planned_workout(athlete_id, workout_id)
     if entry is None:
         return response_error("Diese geplante Einheit gibt es nicht (mehr). Seite neu laden und erneut versuchen.",
                               "not_found", 404)
-    if not isinstance(entry.get("sport"), str) or entry["sport"] not in SPORTS:
-        return response_error(f"{entry.get('sport') or 'Diese'}-Einheiten kann Garmin nicht als Workout übernehmen "
-                              "(nur Laufen, Rad, Schwimmen). Lade die Einheit stattdessen als .fit-Datei herunter.",
-                              "unsupported_sport", 422)
+    if not isinstance(entry.get("sport"), str) or entry["sport"] not in SPORTS and entry["sport"] not in EXERCISE_SPORTS:
+        return response_error(f"{entry.get('sport') or 'Diese'}-Einheiten kann Garmin nicht als Workout übernehmen. "
+                              "Lade die Einheit stattdessen als .fit-Datei herunter.", "unsupported_sport", 422)
     body = request.get_json(silent=True)
     body = body if isinstance(body, dict) else {}  # z. B. [1, 2] oder "x" -> wie ohne Body
-    steps = body.get("steps") or entry.get("steps") or [{"type": "interval", "duration_min": entry.get("duration_min")}]
+    if body.get("steps") is not None and not isinstance(body.get("steps"), list):
+        return response_error("Die Schritte dieser Einheit sind ungültig. Bitte im Bearbeiten-Fenster prüfen.",
+                              "VALIDATION_ERROR", 400)
+    steps = body.get("steps") or None
+    exercises = body.get("exercises") if isinstance(body.get("exercises"), list) else None
     try:
-        payload = garmin_workout(entry, steps)
+        workout_variants(entry, steps, exercises)
     except ValueError as e:
         return response_error(f"Die Schritte dieser Einheit sind ungültig ({e}). Bitte im Bearbeiten-Fenster prüfen.",
                               "VALIDATION_ERROR", 400)
-
-    if importlib.util.find_spec("garminconnect") is None:
+    if importlib.util.find_spec("garminconnect") is None and not library_available():
         return response_error("Auf dem Dashboard-PC fehlt die Garmin-Bibliothek: "
                               "python -m pip install -r requirements.txt", "garmin_library_missing", 503)
-    if not os.path.isdir(token_path(athlete_id)):
-        return response_error("Garmin ist für dich noch nicht verbunden. Einmalig auf dem Dashboard-PC anmelden: "
-                              f"{RECONNECT.format(id=athlete_id)} (siehe docs/GARMIN_SYNC_GUIDE.md). {FIT_HINT}",
-                              "garmin_not_connected", 409)
-    try:
-        client = connect(athlete_id)
-        result = client.upload_workout(payload)
-    except Exception as e:  # jede Garmin-/Netzwerk-Panne wird zu einer verstaendlichen Meldung
-        return garmin_error(e, athlete_id)
-    garmin_id = result.get("workoutId") if isinstance(result, dict) else None
-    if not garmin_id:
-        return response_error("Garmin hat das Workout ohne Nummer bestätigt - bitte in Garmin Connect nachsehen.",
-                              "garmin_error", 502)
-
-    # In den Garmin-Kalender legen: erst dann landet es auf der Uhr. Klappt das
-    # nicht, ist das Workout trotzdem in Garmin Connect (unter "Workouts").
-    scheduled = None
-    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(entry.get("date") or "")):
-        try:
-            client.schedule_workout(garmin_id, entry["date"])
-            scheduled = entry["date"]
-        except Exception as e:
-            print(f"Garmin-Kalender Nutzer {athlete_id}: {describe_error(e, athlete_id)}", flush=True)
-    return response_success({"garmin_workout_id": garmin_id, "scheduled_date": scheduled})
+    item = {"id": workout_id, **({"steps": steps} if steps else {}), **({"exercises": exercises} if exercises else {})}
+    result = run_push(athlete_id, Session, items=[item], only=[workout_id], pin=True, client_factory=open_client)
+    if result["stopped"]:
+        st = result["stopped"]
+        return response_error(f"{st['message']} {FIT_HINT}", st["code"], st["status"])
+    link = result["links"].get(workout_id)
+    if result["failed"] or link is None:
+        return response_error("Garmin hat das Workout nicht angenommen oder ist nicht erreichbar. Später erneut "
+                              "versuchen - oder die Einheit als .fit-Datei herunterladen.", "garmin_error", 502)
+    return response_success({"garmin_workout_id": link["garmin_workout_id"], "scheduled_date": link["date"]})

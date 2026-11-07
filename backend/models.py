@@ -403,3 +403,51 @@ class UsageDaily(Base):
     kind = Column(String(20), nullable=False)   # open, login, page, feature, ai, ai_tokens, garmin, error
     name = Column(String(40), nullable=False)
     count = Column(Integer, nullable=False, default=0)
+
+
+class GarminWorkoutLink(Base):
+    """Welche geplante Einheit (id aus der Ablage) als welches Garmin-Workout
+    in Garmin Connect liegt - damit Aenderungen nachgezogen werden und nichts
+    doppelt entsteht. Fuellt backend/garmin_push.py.
+
+    state: "active" (liegt in Garmin) | "removed" (in Garmin geloescht).
+    Zeilen werden nie geloescht, nur auf "removed" gesetzt.
+    pinned: von Hand gesendet - bleibt auch ausserhalb der 7 Tage in Garmin.
+    """
+    __tablename__ = "garmin_workout_links"
+    __table_args__ = (
+        UniqueConstraint("athlete_id", "planned_id", name="uq_garmin_link"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    athlete_id = Column(Integer, nullable=False, index=True)
+    planned_id = Column(String(64), nullable=False)
+    garmin_workout_id = Column(String(32))
+    date = Column(String(10))
+    payload_hash = Column(String(64))
+    variant = Column(Integer, default=0)
+    title = Column(String(120))
+    sport = Column(String(20))
+    state = Column(String(16), nullable=False, default="active")
+    pinned = Column(Boolean, nullable=False, default=False)
+    via = Column(String(16), default="connect")  # "connect" (garminconnect) | "official" (Training API)
+    sent_at = Column(DateTime)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class GarminPushState(Base):
+    """Einstellungen und letzter Stand von "Trainings auf die Uhr" je Person.
+
+    auto: die naechsten 7 Tage automatisch abgleichen.
+    details: {planned_id: {steps, exercises}} - die Schritte so, wie der
+    Browser sie berechnet (Pace-Bereiche aus den eigenen Zonen), damit auch
+    der naechtliche Abgleich sie hat.
+    """
+    __tablename__ = "garmin_push_state"
+
+    athlete_id = Column(Integer, primary_key=True)
+    auto = Column(Boolean, nullable=False, default=True)
+    details = Column(JSON)
+    last_run_at = Column(DateTime)
+    last_result = Column(JSON)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

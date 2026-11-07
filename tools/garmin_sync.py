@@ -809,6 +809,8 @@ def main():
     ap.add_argument("--since", help="Startdatum YYYY-MM-DD (hat Vorrang vor --days)")
     ap.add_argument("--activities-only", action="store_true", help="nur Aktivitaeten laden")
     ap.add_argument("--wellness-only", action="store_true", help="nur Gesundheitsdaten laden")
+    ap.add_argument("--no-push", action="store_true",
+                    help="geplante Trainings NICHT auf die Uhr bringen (sonst: naechste 7 Tage abgleichen)")
     args = ap.parse_args()
     if args.login and args.athlete is None:
         raise SystemExit("--login braucht --athlete, z.B.:  python3 tools/garmin_sync.py --login --athlete 2")
@@ -823,6 +825,13 @@ def main():
         start = end - timedelta(days=args.days)
 
     session_factory = open_db()
+    if not args.login and not args.no_push and args.athlete is None:
+        # Trainings auf die Uhr: neue Tage ruecken ins 7-Tage-Fenster (backend/garmin_push.py).
+        try:
+            from backend.garmin_push import run_scheduled_pushes
+            run_scheduled_pushes(session_factory, log=log)
+        except Exception as e:  # der Daten-Sync laeuft trotzdem
+            log(f"Trainings auf die Uhr: FEHLER {type(e).__name__}")
     athlete_ids = [args.athlete] if args.athlete is not None else athletes_with_token()
     if not athlete_ids:
         raise SystemExit("Noch kein Benutzer mit Garmin-Zugang. Einrichten: Garmin-Schluessel in den\n"
