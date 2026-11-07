@@ -4,6 +4,18 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.28
+
+Trainings landen automatisch auf deiner Garmin-Uhr, und die Einstellungen sind schlichter.
+
+Neu in 2.4.28:
+- Trainings auf die Uhr: Deine geplanten Einheiten der nächsten 7 Tage kommen automatisch in den Garmin-Kalender und auf die Uhr – mit Schritten, Zielbereichen und Hinweisen. Änderst, verschiebst oder löschst du eine Einheit, zieht Garmin mit. Einmal einrichten unter Einstellungen → Garmin
+- Auch Kraft und Mobility gehen jetzt auf die Uhr, mit Übungen, Sätzen, Wiederholungen und Gewicht
+- An jeder geplanten Einheit siehst du, ob sie schon „Auf der Uhr“ ist
+- Überall im Dashboard heißt es jetzt „KI-Coach“ statt „Claude“
+- Am Computer stehen „Analyse“ und „Insights“ (früher „Alle Diagramme“) direkt in der Seitenleiste
+- Einstellungen aufgeräumt: kürzere Texte, Schlüssel-Felder erst nach „Schlüssel ändern“, Kalender-Abo und Wetter in einem Bereich, Equipment unter „Du“
+
 ## 2.4.27
 
 Einstellungen gehen nicht mehr verloren, eine aufgeräumte Einstellungsseite und die richtige Schwimm-Pace.
