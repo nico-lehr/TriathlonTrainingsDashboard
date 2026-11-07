@@ -243,6 +243,10 @@ function createMobilityFigure(exercise, { animate = true, label = true } = {}) {
       const el = svgEl("path", { class: "mob-fig-band" });
       return { pr, el, late: true };
     }
+    if (pr.type === "weight") { // Kurzhantel/Gewicht an einer Hand (Kraftübungen)
+      const el = svgEl("path", { class: "mob-fig-weight" });
+      return { pr, el, late: true };
+    }
     return null;
   }).filter(Boolean);
 
@@ -288,9 +292,16 @@ function createMobilityFigure(exercise, { animate = true, label = true } = {}) {
         el.setAttribute("cx", x.toFixed(2));
         el.setAttribute("cy", (FIG_VIEW.floor - 5).toFixed(2));
       } else if (pr.type === "band") {
-        const a = figPoint(pts, pr.from), b = figPoint(pts, pr.to);
+        // "to" darf auch ein fester Punkt sein ([x, y], z. B. Band am Türrahmen)
+        const a = figPoint(pts, pr.from), b = Array.isArray(pr.to) ? pr.to : figPoint(pts, pr.to);
         if (!a || !b) return;
         el.setAttribute("d", line(a, b));
+      } else if (pr.type === "weight") {
+        const at = figPoint(pts, pr.at);
+        if (!at) return;
+        const [x, y] = tx(at);
+        const w = pr.w || 5;
+        el.setAttribute("d", `M${(x - w).toFixed(2)} ${y.toFixed(2)} L${(x + w).toFixed(2)} ${y.toFixed(2)}`);
       }
     });
     (fig.focus || []).forEach((name, i) => {
