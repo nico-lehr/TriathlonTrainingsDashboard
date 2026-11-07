@@ -112,28 +112,69 @@ async function openGarminImport(target, btn) {
   });
 }
 
-// Onboarding, erster Schritt: Garmin verbinden (Schlüssel) oder - wenn schon
-// verbunden - gleich die Werte übernehmen.
+// Onboarding, erster Schritt: Garmin verbinden (Schlüssel). Sobald Garmin
+// verbunden ist, holt das Onboarding die Werte selbst und trägt sie ein –
+// diese Felder werden in den späteren Schritten nicht mehr abgefragt.
 function onbGarminBlockHtml() {
+  const st = typeof onbState !== "undefined" ? onbState : {};
+  const got = GARMIN_IMPORT_FIELDS.filter(([k]) => (st.garminKeys || []).includes(k) && st[k] != null && st[k] !== "");
+  const info = GARMIN_INFO_FIELDS.filter(([k]) => st.garminInfo && st.garminInfo[k] != null);
   return `<div class="onb-garmin">
-      <div class="onb-garmin-text"><b>Mit Garmin schneller starten</b>
-        <span>Gewicht, Pulswerte und Schwellen werden übernommen, und deine Trainings kommen von selbst ins Dashboard.</span></div>
-      <div class="onb-garmin-form" data-onb-garmin-form hidden>
-        <input type="password" class="coach-input" data-onb-garmin-key autocomplete="off" spellcheck="false" placeholder="Garmin-Schlüssel einfügen" aria-label="Garmin-Schlüssel">
-        <button type="button" class="mob-btn mob-btn-primary" data-onb-garmin-connect>Verbinden</button>
-        <a href="https://connect.garmin.com/app/settings/personalApiToken" target="_blank" rel="noopener">Schlüssel in Garmin Connect erstellen ↗</a>
+      <div class="onb-garmin-text" data-onb-garmin-intro hidden><b>Garmin verbinden</b>
+        <span>Dafür brauchst du einen Schlüssel aus Garmin Connect – das geht in einer Minute. Dein Garmin-Passwort brauchst du nicht.</span></div>
+      <ol class="onb-garmin-steps" data-onb-garmin-form hidden>
+        <li><a href="https://connect.garmin.com/app/settings/personalApiToken" target="_blank" rel="noopener">Garmin Connect öffnen ↗</a> und dort „Schlüssel erstellen“ tippen</li>
+        <li>Den Schlüssel kopieren</li>
+        <li>Hier einfügen:
+          <div class="onb-garmin-form">
+            <input type="password" class="coach-input" data-onb-garmin-key autocomplete="off" spellcheck="false" placeholder="Garmin-Schlüssel einfügen" aria-label="Garmin-Schlüssel">
+            <button type="button" class="mob-btn mob-btn-primary" data-onb-garmin-connect>Verbinden</button>
+          </div>
+        </li>
+      </ol>
+      <div class="onb-garmin-ok" data-onb-garmin-ok hidden>
+        <b>✓ Mit Garmin verbunden</b>
+        ${got.length ? `<span>Übernommen: ${got.map(([k, label, fmt]) => `${escapeHtml(label)} ${escapeHtml(fmt(st[k]))}`).join(" · ")}</span>`
+          : st.garminLoaded ? `<span>Garmin hat noch keine Profilwerte geliefert – du kannst sie gleich selbst eintragen.</span>` : `<span>Hole deine Werte von Garmin …</span>`}
+        ${info.length ? `<span>Außerdem: ${info.map(([k, label, fmt]) => `${escapeHtml(label)} ${escapeHtml(fmt(st.garminInfo[k]))}`).join(" · ")}</span>` : ""}
+        <span>Deine Trainings und Schlafwerte kommen ab jetzt von selbst.</span>
       </div>
-      <button type="button" class="mob-btn mob-btn-primary" data-garmin-import="onboarding" hidden>Werte aus Garmin übernehmen</button>
       <p class="coach-test-status" data-onb-garmin-status></p>
+      <p class="onb-hint" data-onb-garmin-skip hidden>Keine Garmin-Uhr? Einfach auf „Weiter“ – dann fragen wir die Werte kurz ab.</p>
     </div>`;
+}
+
+// Garmin-Werte ins Onboarding übernehmen (ohne Rückfrage – der Nutzer
+// kann jeden Wert später mit "ändern" selbst überschreiben).
+async function onbLoadGarminValues(status) {
+  if (typeof onbState === "undefined" || onbState.garminLoaded) return;
+  onbState.garminLoaded = true;
+  try {
+    const values = (await apiCall("garmin/profile", "GET", null, { timeoutMs: 60000 })).data.values || {};
+    const keys = [];
+    GARMIN_IMPORT_FIELDS.forEach(([k]) => {
+      if (values[k] != null && values[k] !== "") { onbState[k] = values[k]; keys.push(k); }
+    });
+    onbState.garminKeys = keys;
+    onbState.garminInfo = {};
+    GARMIN_INFO_FIELDS.forEach(([k]) => { if (values[k] != null) onbState.garminInfo[k] = values[k]; });
+  } catch (e) {
+    if (status) { status.textContent = e.message; status.className = "coach-test-status err"; }
+    return;
+  }
+  if (document.getElementById("onb-overlay")?.classList.contains("open")) renderOnbStep();
 }
 
 async function initOnbGarmin(root) {
   const form = root.querySelector("[data-onb-garmin-form]");
   const connected = await refreshGarminImportButtons(root);
   if (!form) return;
-  form.hidden = connected;
   const status = root.querySelector("[data-onb-garmin-status]");
+  form.hidden = connected;
+  root.querySelector("[data-onb-garmin-intro]").hidden = connected;
+  root.querySelector("[data-onb-garmin-skip]").hidden = connected;
+  root.querySelector("[data-onb-garmin-ok]").hidden = !connected;
+  if (connected) { onbLoadGarminValues(status); return; }
   const input = root.querySelector("[data-onb-garmin-key]");
   const btn = root.querySelector("[data-onb-garmin-connect]");
   btn.addEventListener("click", async () => {
@@ -146,12 +187,10 @@ async function initOnbGarmin(root) {
       await apiCall("garmin/personal-api", "PUT", { key, expires: null }, { timeoutMs: 45000 });
       input.value = "";
       garminConnectedCache = true;
-      form.hidden = true;
-      status.textContent = "Verbunden. Deine Trainings werden ab jetzt automatisch geholt.";
-      status.className = "coach-test-status ok";
-      await refreshGarminImportButtons(root);
+      status.textContent = "";
       apiCall("garmin/sync", "POST").catch(() => { /* erster Abruf ist nur Komfort */ });
-      openGarminImport("onboarding");
+      if (typeof onbState !== "undefined") onbState.garminLoaded = false;
+      renderOnbStep(); // zeigt "verbunden" und holt die Werte
     } catch (e) {
       status.textContent = e.message;
       status.className = "coach-test-status err";

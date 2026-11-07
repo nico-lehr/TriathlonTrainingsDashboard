@@ -2536,6 +2536,18 @@
   .onb-garmin-form .coach-input { flex: 1 1 220px; min-height: 40px; }
   .onb-garmin-form a { flex-basis: 100%; font-size: 13px; }
   .onb-garmin [hidden] { display: none !important; }
+  .onb-garmin-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+  .onb-garmin-steps .onb-garmin-form { margin-top: 8px; }
+  .onb-garmin-ok { display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+  .onb-garmin-ok b { color: var(--c-tsb-pos, #2e9e5b); }
+  .onb-garmin-ok span { color: var(--text-secondary); font-size: 13.5px; line-height: 1.45; }
+  .onb-from-garmin { margin: 4px 0 16px; padding: 10px 14px; border-radius: 14px; background: var(--accent-wash); }
+  .onb-from-garmin-head { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
+  .onb-from-garmin-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 14px; border-top: 1px solid var(--border); }
+  .onb-from-garmin-head + .onb-from-garmin-row { border-top: none; }
+  .onb-from-garmin-row span { flex: 1; color: var(--text-secondary); }
+  .onb-from-garmin-edit { border: none; background: none; color: var(--accent); font: inherit; font-size: 13px; cursor: pointer; padding: 4px; }
+  .onb-row:not(:has(*)), .onb-row-3:not(:has(*)) { display: none; }
 
   .update-menu-sync.ok { color: var(--c-good-text); }
   .update-menu-sync.err { color: var(--c-crit-text); }

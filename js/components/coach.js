@@ -381,7 +381,7 @@ function renderGoals() {
    "Fertig" in athleteProfile/goals + localStorage.
    ---------------------------------------------------------------------- */
 
-const ONB_STEPS = 7;
+const ONB_STEPS = 8;
 
 let onbStep = 0;
 
@@ -413,8 +413,30 @@ function resetOnbState() {
     includeMobility: athleteProfile.includeMobility || false,
     goalName: "", goalSport: "Triathlon", goalDate: "", goalTime: "", goalDistance: "", goalNotes: "",
     goalIsPrimary: true,
+    // Welche Felder Garmin geliefert hat (werden dann nicht abgefragt,
+    // sondern als "von Garmin" angezeigt) und was Garmin sonst noch weiß.
+    garminKeys: [],
+    garminInfo: {},
+    garminLoaded: false,
   };
 }
+
+const onbFromGarmin = key => (onbState.garminKeys || []).includes(key);
+
+// Kacheln "von Garmin" für die übergebenen Felder (nur die, die Garmin
+// tatsächlich geliefert hat). "Ändern" blendet das normale Eingabefeld ein.
+function onbGarminTiles(keys) {
+  if (typeof GARMIN_IMPORT_FIELDS === "undefined") return "";
+  const rows = GARMIN_IMPORT_FIELDS.filter(([k]) => keys.includes(k) && onbFromGarmin(k) && onbState[k] != null && onbState[k] !== "");
+  if (!rows.length) return "";
+  return `<div class="onb-from-garmin">
+    <div class="onb-from-garmin-head">Von Garmin übernommen</div>
+    ${rows.map(([k, label, fmt]) => `<div class="onb-from-garmin-row"><span>${escapeHtml(label)}</span><b>${escapeHtml(fmt(onbState[k]))}</b><button type="button" class="onb-from-garmin-edit" data-onb-unlock="${k}">ändern</button></div>`).join("")}
+  </div>`;
+}
+
+// Eingabefeld nur zeigen, wenn Garmin den Wert nicht liefert.
+const onbAsk = (key, html) => (onbFromGarmin(key) ? "" : html);
 
 
 function onbRadioChips(name, options, selected) {
@@ -490,6 +512,7 @@ function buildOnbSummary() {
   if (onbState.name) personalBits.push(onbState.name);
   if (onbState.birthDate) personalBits.push(`geb. ${onbState.birthDate}`);
   if (personalBits.length) lines.push(`<div>Person: <b>${escapeHtml(personalBits.join(" · "))}</b></div>`);
+  if ((onbState.garminKeys || []).length) lines.push(`<div>Garmin: <b>verbunden · ${onbState.garminKeys.length} Werte übernommen</b></div>`);
   const expLabel = ONB_EXP_LABELS[onbState.experienceLevel];
   const introBits = [];
   if (expLabel) introBits.push(expLabel);
@@ -542,22 +565,26 @@ function renderOnbStep() {
     html = `<div class="onb-step">
       <div class="onb-brand">🏊🚴🏃 <span class="gradient-text">Trainings-Dashboard</span></div>
       <h3>Willkommen!</h3>
-      <p class="onb-sub">Ein paar Angaben zum Start, damit dein Coach von Anfang an konkrete, auf dich zugeschnittene Empfehlungen geben kann - alles optional und jederzeit unter ⚙️ Einstellungen änderbar.</p>
-      <div class="onb-field"><label for="onb-name">Name</label><input type="text" id="onb-name" class="coach-input" placeholder="z.B. Nico"></div>
-      <div class="onb-row">
-        <div class="onb-field"><label for="onb-gender">Geschlecht</label>
+      <p class="onb-sub">Zuerst verbinden wir deine Garmin-Uhr. Dann trägt das Dashboard Gewicht, Pulswerte, Schwellen und mehr selbst ein – du musst nur noch angeben, was Garmin nicht weiß.</p>
+      ${onbGarminBlockHtml()}
+    </div>`;
+  } else if (onbStep === 1) {
+    const personalAsk = onbAsk("gender", `<div class="onb-field"><label for="onb-gender">Geschlecht</label>
           <select id="onb-gender" class="coach-input">
             <option value="">– keine Angabe –</option>
             <option value="m">männlich</option>
             <option value="w">weiblich</option>
             <option value="divers">divers</option>
           </select>
-        </div>
-        <div class="onb-field"><label for="onb-birthdate">Geburtsdatum</label><input type="date" id="onb-birthdate" class="coach-input"></div>
-      </div>
-      ${onbGarminBlockHtml()}
+        </div>`) + onbAsk("birthDate", `<div class="onb-field"><label for="onb-birthdate">Geburtsdatum</label><input type="date" id="onb-birthdate" class="coach-input"></div>`);
+    html = `<div class="onb-step">
+      <h3>Persönliches</h3>
+      <p class="onb-sub">Alles optional und jederzeit unter ⚙️ Einstellungen änderbar.</p>
+      <div class="onb-field"><label for="onb-name">Name</label><input type="text" id="onb-name" class="coach-input" placeholder="z.B. Nico"></div>
+      ${personalAsk ? `<div class="onb-row">${personalAsk}</div>` : ""}
+      ${onbGarminTiles(["gender", "birthDate"])}
     </div>`;
-  } else if (onbStep === 1) {
+  } else if (onbStep === 2) {
     html = `<div class="onb-step">
       <h3>Über dich</h3>
       <p class="onb-sub">Hilft dem Coach, den Trainingsplan realistisch zu gestalten.</p>
@@ -578,7 +605,7 @@ function renderOnbStep() {
         </div>
       </div>
     </div>`;
-  } else if (onbStep === 2) {
+  } else if (onbStep === 3) {
     html = `<div class="onb-step">
       <h3>Verfügbarkeit</h3>
       <p class="onb-sub">Wie viel Zeit realistisch für Training da ist, bestimmt die Wochenstruktur.</p>
@@ -603,24 +630,24 @@ function renderOnbStep() {
         <div class="onb-field"><label for="onb-hours">Stunden pro Woche insgesamt (optional)</label><input type="number" id="onb-hours" class="coach-input" min="0" step="0.5" placeholder="z.B. 8"></div>
       </div>
     </div>`;
-  } else if (onbStep === 3) {
+  } else if (onbStep === 4) {
     html = `<div class="onb-step">
       <h3>Leistungswerte <span style="font-weight:500;color:var(--text-muted)">(optional)</span></h3>
-      <p class="onb-sub">Falls bekannt — macht die Empfehlung konkreter. Sonst einfach leer lassen.</p>
-      <button type="button" class="mob-btn mob-btn-tinted garmin-import-btn" data-garmin-import="onboarding" hidden>Aus Garmin übernehmen</button>
-      <div class="onb-field"><label for="onb-ftp">FTP Rad (Watt)</label><input type="number" id="onb-ftp" class="coach-input" min="0" placeholder="z.B. 250"></div>
+      ${onbGarminTiles(["weightKg", "maxHr", "restingHr", "runThresholdPace", "ftpWatts"])}
+      <p class="onb-sub">${(onbState.garminKeys || []).length ? "Was Garmin nicht liefert, kannst du hier ergänzen – sonst einfach leer lassen." : "Falls bekannt — macht die Empfehlung konkreter. Sonst einfach leer lassen."}</p>
+      ${onbAsk("ftpWatts", `<div class="onb-field"><label for="onb-ftp">FTP Rad (Watt)</label><input type="number" id="onb-ftp" class="coach-input" min="0" placeholder="z.B. 250"></div>`)}
       <div class="onb-row">
-        <div class="onb-field"><label for="onb-run-pace">Schwellenpace Laufen (min/km)</label><input type="text" id="onb-run-pace" class="coach-input" placeholder="z.B. 4:45"></div>
+        ${onbAsk("runThresholdPace", `<div class="onb-field"><label for="onb-run-pace">Schwellenpace Laufen (min/km)</label><input type="text" id="onb-run-pace" class="coach-input" placeholder="z.B. 4:45"></div>`)}
         <div class="onb-field"><label for="onb-swim-pace">CSS Schwimmen (min/100m)</label><input type="text" id="onb-swim-pace" class="coach-input" placeholder="z.B. 1:45"></div>
       </div>
       <div class="onb-row-3">
-        <div class="onb-field"><label for="onb-max-hr">Maximale Herzfrequenz (bpm)</label><input type="number" id="onb-max-hr" class="coach-input" min="0" placeholder="z.B. 190"></div>
-        <div class="onb-field"><label for="onb-resting-hr">Ruhe-Herzfrequenz (bpm)</label><input type="number" id="onb-resting-hr" class="coach-input" min="0" placeholder="z.B. 50"></div>
-        <div class="onb-field"><label for="onb-weight-kg">Körpergewicht (kg)</label><input type="number" id="onb-weight-kg" class="coach-input" min="0" step="0.1" placeholder="z.B. 75"></div>
+        ${onbAsk("maxHr", `<div class="onb-field"><label for="onb-max-hr">Maximale Herzfrequenz (bpm)</label><input type="number" id="onb-max-hr" class="coach-input" min="0" placeholder="z.B. 190"></div>`)}
+        ${onbAsk("restingHr", `<div class="onb-field"><label for="onb-resting-hr">Ruhe-Herzfrequenz (bpm)</label><input type="number" id="onb-resting-hr" class="coach-input" min="0" placeholder="z.B. 50"></div>`)}
+        ${onbAsk("weightKg", `<div class="onb-field"><label for="onb-weight-kg">Körpergewicht (kg)</label><input type="number" id="onb-weight-kg" class="coach-input" min="0" step="0.1" placeholder="z.B. 75"></div>`)}
       </div>
-      <p class="onb-hint">Max./Ruhe-Herzfrequenz werden für Trainingsbelastung (TRIMP) und Herzfrequenz-Zonen gebraucht, das Gewicht nur für die Rad-Leistungsschätzung aus Watt-Daten — ohne diese Werte bleiben die jeweiligen Auswertungen einfach ausgeblendet, statt geraten zu werden.</p>
+      ${["maxHr", "restingHr", "weightKg"].every(onbFromGarmin) ? "" : `<p class="onb-hint">Max./Ruhe-Herzfrequenz werden für Trainingsbelastung (TRIMP) und Herzfrequenz-Zonen gebraucht, das Gewicht nur für die Rad-Leistungsschätzung aus Watt-Daten — ohne diese Werte bleiben die jeweiligen Auswertungen einfach ausgeblendet, statt geraten zu werden.</p>`}
     </div>`;
-  } else if (onbStep === 4) {
+  } else if (onbStep === 5) {
     html = `<div class="onb-step">
       <h3>Trainingsplan <span style="font-weight:500;color:var(--text-muted)">(optional)</span></h3>
       <p class="onb-sub">Der Coach kann dir automatisch konkrete Workout-Vorschläge für die nächsten Tage erstellen (im Kalender + Coach-Tab sichtbar, per Drag & Drop verschiebbar). Sollen dabei auch diese Einheiten mit eingeplant werden?</p>
@@ -637,7 +664,7 @@ function renderOnbStep() {
       </div>
       <p class="onb-hint">Wird bei der KI-Trainingsplan-Erstellung berücksichtigt, um passende Einheiten/Übungen vorzuschlagen — ersetzt keine ärztliche/physiotherapeutische Beratung.</p>
     </div>`;
-  } else if (onbStep === 5) {
+  } else if (onbStep === 6) {
     html = `<div class="onb-step">
       <h3>Dein Ziel</h3>
       <p class="onb-sub">Das Event, auf das der Coach dich vorbereiten soll (optional — kann auch später ergänzt werden).</p>
@@ -673,6 +700,12 @@ function renderOnbStep() {
 
 
 function wireOnbStepInputs() {
+  document.querySelectorAll("#onb-step-body [data-onb-unlock]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      onbState.garminKeys = (onbState.garminKeys || []).filter(k => k !== btn.dataset.onbUnlock);
+      renderOnbStep();
+    });
+  });
   document.querySelectorAll("#onb-step-body .onb-radio-chip").forEach(btn => {
     const group = btn.closest(".onb-radio-group");
     const field = group.dataset.field;
