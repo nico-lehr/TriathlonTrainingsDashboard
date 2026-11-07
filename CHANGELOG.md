@@ -4,6 +4,17 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.22
+
+Handy: Mitmachen auf einen Blick und aufgeräumte Trainings-Ansicht.
+
+Neu in 2.4.22:
+- Mitmach-Modus (Mobility und Kraft) passt jetzt komplett auf den Handy-Bildschirm – Zeichnung, Uhr und Knöpfe sind immer sichtbar
+- Tippst du auf eine geplante Einheit, öffnet sich eine übersichtliche Ansicht: Dauer, Intensität, Ablauf als farbige Zeitleiste wie auf der Uhr und die Hinweise als kurze Punkte
+- Direkt dort: „An Garmin senden“, „Bearbeiten“, „Erledigt“ und „Überspringen“
+- Das Bearbeiten-Fenster ist heller und klarer, das Beschreibungsfeld größer
+- „Heute geplant“ zeigt den Ablauf in Kurzform (z. B. 15′ Aufwärmen · 45′ Zone 2 · 10′ Abwärmen)
+
 ## 2.4.21
 
 Neue Handy-Ansicht „Graphit“ und Krafttraining zum Mitmachen.
