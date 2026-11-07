@@ -4,6 +4,18 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.24
+
+Coach plant auf Zuruf um, und alle wichtigen Nachtwerte der Uhr zählen mit.
+
+Neu in 2.4.24:
+- Coach am Handy: „Sag dem Coach Bescheid“ – kurz schreiben, was sich ändert (z. B. „Heute spontan 45 min schwimmen“), der Coach plant die nächsten 7 Tage um und sagt, was er geändert hat; mit „Rückgängig“
+- „Nächste Einheiten“ nach Tagen getrennt: Heute, Morgen, Wochentag mit Datum und Gesamtdauer
+- Garmin: Handgelenktemperatur, Atemfrequenz, Blutsauerstoff (SpO2), Stress und Trainingsbereitschaft werden jetzt gelesen
+- Diese Werte fließen in den Erholungsring, die Planprüfung und alle Empfehlungen des Coachs ein – erhöhte Temperatur oder schnellere Atmung im Schlaf gelten als mögliches Infektzeichen
+- Übersicht am Handy: Nachtwerte unter den Ringen, auffällige Werte rot
+- Erholungs-Karte: neue Kacheln und Verläufe, sobald die Uhr diese Werte liefert
+
 ## 2.4.23
 
 Garmin holt sofort, Mobility wird erkannt, Training direkt aus dem Kalender.
