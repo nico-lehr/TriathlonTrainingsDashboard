@@ -9,7 +9,7 @@ const mobDateLabel = d => new Date(d + "T12:00:00").toLocaleDateString("de-DE", 
 
 function mobExerciseMeta(ex, seconds) {
   const s = seconds || ex.seconds;
-  const amount = ex.kind === "reps" ? `${ex.reps}×` : `${s} s`;
+  const amount = ex.kind === "reps" ? `${mobilityRepsFor(ex, s)}×` : `${s} s`;
   return amount + (ex.sides ? " je Seite" : "");
 }
 

@@ -269,5 +269,5 @@ function mobilityPlanRule() {
   if (typeof allowedMobilityExercises !== "function") return "- Bei \"Mobility\": \"exercises\"-Array mit 4-8 Übungen (Name, Wiederholungen, kurzer Hinweis).";
   const allowed = allowedMobilityExercises(trainingProfile(), mobilityPainfulIds(todayStr()));
   const list = allowed.map(ex => `${ex.id} (${ex.name})`).join(", ");
-  return `- Bei "Mobility": "exercises"-Array mit 4-8 Übungen AUSSCHLIESSLICH aus dieser Liste, je Eintrag {"id": exakt die id, "name": Name, "seconds": Dauer je Seite 20-90, "reps": z.B. "40 s je Seite", "note": kurzer Tipp}. Erlaubt: ${list}. Dauer passend zum Mobility-Wunsch im Profil.`;
+  return `- Bei "Mobility": "exercises"-Array mit 4-8 Übungen AUSSCHLIESSLICH aus dieser Liste, je Eintrag {"id": exakt die id, "name": Name, "seconds": Dauer je Seite, "reps": z.B. "45 s je Seite", "note": kurzer Tipp}. Erlaubt: ${list}. Dauer passend zum Mobility-Wunsch im Profil. WICHTIG: Die Übungen müssen zusammen "duration_min" ergeben. Rechnung je Übung: seconds (bei "je Seite" doppelt) + 10 s Wechsel. Beispiel 10 Minuten: 5 Übungen à 45 s je Seite ≈ 10 Min. Dehnungen mindestens 30 s halten, höchstens 90 s.`;
 }

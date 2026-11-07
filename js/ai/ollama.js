@@ -182,6 +182,7 @@ function parsePlanResponse(rawText, windowDates) {
           return out;
         }).filter(x => x.name && x.name !== "undefined")
       : null;
+    if (entry.sport === "Mobility" && exercises && typeof fitMobilityExercises === "function") fitPlanMobility(exercises, dur);
     valid.push({
       date: entry.date,
       sport: entry.sport,
@@ -194,6 +195,23 @@ function parsePlanResponse(rawText, windowDates) {
   });
   if (!valid.length) throw new Error("Keine gültigen Trainingsvorschläge in der Antwort gefunden.");
   return valid;
+}
+
+// Mobility aus einem KI-Plan: Die Sekunden der Übungen müssen zusammen
+// ungefähr die geplante Dauer ergeben (der KI-Coach verrechnet sich gern -
+// 10 Minuten geplant, aber nur 3 Minuten Übungen). Ändert die Liste direkt.
+function fitPlanMobility(exercises, minutes) {
+  const lib = exercises.filter(x => x.id && MOBILITY_BY_ID[x.id]);
+  if (!lib.length) return;
+  const fitted = fitMobilityExercises(lib, minutes, mobilityFillPool());
+  const others = exercises.filter(x => !(x.id && MOBILITY_BY_ID[x.id]));
+  const out = fitted.map(f => {
+    const ex = MOBILITY_BY_ID[f.id];
+    const old = lib.find(x => x.id === f.id) || {};
+    return { name: ex.name, sets: null, note: old.note || f.note || null, id: ex.id, seconds: f.seconds,
+      reps: ex.kind === "reps" ? `${mobilityRepsFor(ex, f.seconds)}×${ex.sides ? " je Seite" : ""}` : `${f.seconds} s${ex.sides ? " je Seite" : ""}` };
+  });
+  exercises.splice(0, exercises.length, ...out, ...others);
 }
 
 /* ---------- Regelprüfung für KI-Pläne (js/analytics/plan-rules.js) ---------- */

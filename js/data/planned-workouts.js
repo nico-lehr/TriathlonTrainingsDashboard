@@ -12,6 +12,28 @@ let plannedWorkouts = [];
 function loadPlannedWorkouts() {
   plannedWorkouts = storeGet(PLANNED_WORKOUTS_KEY) || [];
   if (!Array.isArray(plannedWorkouts)) plannedWorkouts = [];
+  fixPlannedMobilityTimes();
+}
+
+// Ältere Mobility-Einheiten aus KI-Plänen: Übungszeiten passten oft nicht zur
+// geplanten Dauer (10 Min geplant, 3 Min Übungen). Kommende Einheiten hier
+// einmal passend machen und speichern - erledigte bleiben, wie sie waren.
+function fixPlannedMobilityTimes() {
+  if (typeof fitPlanMobility !== "function" || typeof mobilityTotalSeconds !== "function") return;
+  const today = todayStr();
+  let changed = false;
+  plannedWorkouts.forEach(p => {
+    if (p.sport !== "Mobility" || p.date < today || (p.status || "geplant") !== "geplant" || !Array.isArray(p.exercises) || !(p.duration_min > 0)) return;
+    const lib = p.exercises.filter(x => x && x.id && MOBILITY_BY_ID[x.id]);
+    if (!lib.length) return;
+    const total = mobilityTotalSeconds(lib);
+    if (total >= p.duration_min * 60 * 0.85 && total <= p.duration_min * 60 * 1.15) return;
+    const list = p.exercises.slice();
+    fitPlanMobility(list, p.duration_min);
+    p.exercises = list;
+    changed = true;
+  });
+  if (changed) storeSet(PLANNED_WORKOUTS_KEY, plannedWorkouts);
 }
 
 function savePlannedWorkouts() {

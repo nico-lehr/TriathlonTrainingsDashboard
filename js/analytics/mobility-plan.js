@@ -127,14 +127,15 @@ function buildMobilitySession(options) {
     if (!grew) break;
   }
 
+  const exercises = fitMobilityExercises(items.map(it => ({ id: it.ex.id, seconds: it.seconds, note: null })), minutes, allowed);
   return {
     title: mobilitySessionTitle(areas, minutes),
     intro: mobilitySessionReason(focus, recent, tp),
-    minutes: Math.max(1, Math.round(used / 60)),
+    minutes: Math.max(1, Math.round(mobilityTotalSeconds(exercises) / 60)),
     focus: areas,
     source: "rules",
     createdAt: new Date().toISOString(),
-    exercises: items.map(it => ({ id: it.ex.id, seconds: it.seconds, note: null })),
+    exercises,
   };
 }
 
@@ -205,7 +206,8 @@ ${catalog}
 Regeln:
 - Beginne mit einer sanften Bewegungsübung, ende mit einer ruhigen Halte-Übung.
 - Beachte Beschwerden, Ausschlüsse und Rückmeldungen. Bei "zu schwer" sanfter, bei "zu leicht" etwas fordernder.
-- seconds = Dauer je Seite, zwischen 20 und 90.
+- seconds = Dauer je Seite. Dehnungen (halten) 30–90 s, Bewegungsübungen so lange wie angegeben bis 60 s.
+- WICHTIG: Alle Übungen zusammen müssen ca. ${minutes} Minuten ergeben. Rechne nach: je Übung seconds (bei "je Seite" ×2 + 5 s) + ${MOBILITY_TRANSITION_S} s Wechsel. Lieber weniger Übungen länger halten als viele kurz.
 - title: kurz (max. 40 Zeichen), z. B. "Lockere Hüfte nach dem Lauf".
 - intro: 1–2 Sätze in einfachem Deutsch, per du, warum diese Einheit heute passt.
 - note: ein kurzer persönlicher Tipp je Übung (max. 90 Zeichen) oder leer.
@@ -229,19 +231,15 @@ function parseMobilityResponse(text, allowedIds, minutes) {
     return true;
   }).map(x => ({
     id: x.id,
-    seconds: Math.min(90, Math.max(20, Math.round(Number(x.seconds) || MOBILITY_BY_ID[x.id].seconds))),
+    seconds: Number(x.seconds) || MOBILITY_BY_ID[x.id].seconds,
     note: x.note ? String(x.note).slice(0, 120) : null,
   }));
   if (exercises.length < 2) throw new Error("Der KI-Coach hat zu wenige passende Übungen geliefert.");
-  // Deutlich zu kurz geraten? Halte-Zeiten anheben (höchstens 90 s), damit
-  // die gewünschte Dauer ungefähr stimmt.
-  const sum = () => exercises.reduce((s, x) => s + mobilityExerciseSeconds(MOBILITY_BY_ID[x.id], x.seconds) + MOBILITY_TRANSITION_S, 0);
-  if (minutes && sum() < minutes * 60 * 0.8) {
-    for (let round = 0; round < 14 && sum() < minutes * 60 * 0.95; round++) {
-      exercises.forEach(x => { if (MOBILITY_BY_ID[x.id].kind === "hold" && x.seconds < 90) x.seconds += 5; });
-    }
-  }
-  const total = exercises.reduce((s, x) => s + mobilityExerciseSeconds(MOBILITY_BY_ID[x.id], x.seconds) + MOBILITY_TRANSITION_S, 0);
+  // Zeiten auf die gewünschte Dauer bringen - der KI-Coach verrechnet sich gern.
+  const pool = [...allowed].map(id => MOBILITY_BY_ID[id]).filter(Boolean);
+  const fitted = minutes ? fitMobilityExercises(exercises, minutes, pool) : fitMobilityExercises(exercises, mobilityTotalSeconds(exercises) / 60);
+  exercises.splice(0, exercises.length, ...fitted);
+  const total = mobilityTotalSeconds(exercises);
   return {
     title: String(data.title || "Deine Mobility-Einheit").slice(0, 60),
     intro: String(data.intro || "").slice(0, 300),
@@ -254,11 +252,103 @@ function parseMobilityResponse(text, allowedIds, minutes) {
   };
 }
 
-function mobilitySessionSeconds(session) {
-  return session.exercises.reduce((s, x) => {
+/* -------------------------------------------- Dauer passend machen */
+
+// Grenzen je Übung (Sekunden je Seite): Dehnungen unter 30 s bringen kaum
+// etwas, Bewegungsübungen brauchen mindestens ihre Zeit für die Wiederholungen.
+function mobilitySecondsRange(ex) {
+  return ex.kind === "hold" ? [30, 90] : [Math.max(20, ex.seconds), 60];
+}
+
+function mobilityTotalSeconds(exercises) {
+  return exercises.reduce((s, x) => {
     const ex = MOBILITY_BY_ID[x.id];
     return ex ? s + mobilityExerciseSeconds(ex, x.seconds) + MOBILITY_TRANSITION_S : s;
   }, 0);
+}
+
+// Bringt die Zeiten einer Einheit auf die gewünschte Dauer (±8 %) - egal ob
+// sie von den Regeln, vom KI-Coach oder aus einem KI-Trainingsplan kommt:
+// erst Zeiten je Übung strecken/kürzen (in den Grenzen oben), reicht das
+// nicht, passende Übungen aus "pool" ergänzen bzw. Übungen weglassen.
+// Aufwärmen (erste) und ruhiger Abschluss (letzte) bleiben stehen.
+// exercises: [{ id, seconds, note }] (nur Übungen aus der Sammlung).
+function fitMobilityExercises(exercises, minutes, pool = []) {
+  const list = exercises.filter(x => x && MOBILITY_BY_ID[x.id]).map(x => {
+    const ex = MOBILITY_BY_ID[x.id];
+    const [lo, hi] = mobilitySecondsRange(ex);
+    const sec = Math.round((Number(x.seconds) || ex.seconds) / 5) * 5;
+    return { ...x, seconds: Math.min(hi, Math.max(lo, sec)) };
+  });
+  const target = Math.round(Number(minutes) * 60);
+  if (!list.length || !(target > 0)) return list;
+  const low = target * 0.92, high = target * 1.08;
+  const total = () => mobilityTotalSeconds(list);
+  // Schrittweise allen gleich viel geben bzw. nehmen - Halten zuerst.
+  const step = (dir, cap = Infinity) => {
+    let changed = false;
+    for (const kind of ["hold", "reps"]) {
+      list.forEach(x => {
+        const ex = MOBILITY_BY_ID[x.id];
+        if (ex.kind !== kind || (dir > 0 ? total() >= low : total() <= high)) return;
+        const [lo, hi] = mobilitySecondsRange(ex);
+        const next = x.seconds + dir * 5;
+        if (next < lo || next > Math.min(hi, cap)) return;
+        x.seconds = next;
+        changed = true;
+      });
+      if (dir > 0 ? total() >= low : total() <= high) break;
+    }
+    return changed;
+  };
+  // Erst bis 60 s je Seite strecken, dann lieber eine Übung mehr, erst
+  // danach länger halten (bis 90 s).
+  for (let i = 0; i < 40 && total() < low && step(1, 60); i++);
+  // Zu kurz: Übungen ergänzen, am liebsten für dieselben Bereiche.
+  const used = new Set(list.map(x => x.id));
+  const areas = new Set(list.flatMap(x => MOBILITY_BY_ID[x.id].areas));
+  // Keine Variante einer schon gewählten Übung (z. B. Hüftbeuger kniend + im Stehen),
+  // und nicht zu oft derselbe Hauptbereich.
+  const family = id => id.split("-")[0];
+  const families = new Set(list.map(x => family(x.id)));
+  const primary = a => list.filter(x => MOBILITY_BY_ID[x.id].areas[0] === a).length;
+  const extra = pool.filter(ex => ex && MOBILITY_BY_ID[ex.id] && !used.has(ex.id) && !families.has(family(ex.id)))
+    .map(ex => ({ ex, s: ex.areas.filter(a => areas.has(a)).length + (ex.kind === "hold" ? 0.5 : 0) - (ex.level - 1) * 0.3 - primary(ex.areas[0]) * 0.8 }))
+    .sort((a, b) => b.s - a.s).map(r => r.ex);
+  while (total() < low && extra.length) {
+    const ex = extra.shift();
+    if (families.has(family(ex.id))) continue;
+    families.add(family(ex.id));
+    const [, hi] = mobilitySecondsRange(ex);
+    const gap = target - total() - MOBILITY_TRANSITION_S - (ex.sides ? 5 : 0);
+    const per = Math.round(Math.min(hi, 60, Math.max(mobilitySecondsRange(ex)[0], gap / (ex.sides ? 2 : 1))) / 5) * 5;
+    list.splice(Math.max(1, list.length - 1), 0, { id: ex.id, seconds: per, note: null });
+  }
+  for (let i = 0; i < 40 && total() < low && step(1); i++);
+  for (let i = 0; i < 40 && total() > high && step(-1); i++);
+  // Immer noch zu lang: von hinten (vor dem Abschluss) Übungen weglassen.
+  while (total() > high && list.length > 2) {
+    const without = list.filter((_, i) => i !== list.length - 2);
+    if (mobilityTotalSeconds(without) < low) break;
+    list.splice(list.length - 2, 1);
+  }
+  return list;
+}
+
+// Übungen, die für diese Person erlaubt sind (zum Ergänzen) - leer, wenn das
+// Trainingsprofil nicht geladen ist (z. B. in Tests ohne Profil).
+function mobilityFillPool() {
+  try {
+    if (typeof trainingProfile !== "function" || typeof allowedMobilityExercises !== "function") return [];
+    const painful = typeof mobilityPainfulIds === "function" ? mobilityPainfulIds(todayStr()) : new Set();
+    return allowedMobilityExercises(trainingProfile(), painful);
+  } catch (e) {
+    return [];
+  }
+}
+
+function mobilitySessionSeconds(session) {
+  return mobilityTotalSeconds(session.exercises);
 }
 
 // Für den Kalender: Mobility-Einheit -> geplante Einheit (js/data/planned-workouts.js).
@@ -272,7 +362,7 @@ function mobilitySessionToPlanned(session, date) {
     description: session.intro || null,
     exercises: session.exercises.filter(x => MOBILITY_BY_ID[x.id]).map(x => {
       const ex = MOBILITY_BY_ID[x.id];
-      return { id: x.id, name: ex.name, sets: null, reps: ex.kind === "reps" ? `${ex.reps}×` : `${x.seconds} s${ex.sides ? " je Seite" : ""}`, note: x.note || null, seconds: x.seconds };
+      return { id: x.id, name: ex.name, sets: null, reps: ex.kind === "reps" ? `${mobilityRepsFor(ex, x.seconds)}×${ex.sides ? " je Seite" : ""}` : `${x.seconds} s${ex.sides ? " je Seite" : ""}`, note: x.note || null, seconds: x.seconds };
     }),
     source: "mobility",
   };
@@ -280,11 +370,14 @@ function mobilitySessionToPlanned(session, date) {
 
 // Umgekehrt: geplante Einheit mit Übungen aus der Sammlung -> abspielbare Einheit.
 function plannedToMobilitySession(pw) {
-  const exercises = (pw.exercises || []).filter(x => x && MOBILITY_BY_ID[x.id]).map(x => ({
+  const raw = (pw.exercises || []).filter(x => x && MOBILITY_BY_ID[x.id]).map(x => ({
     id: x.id,
-    seconds: Number(x.seconds) > 0 ? Math.min(90, Math.max(15, Math.round(Number(x.seconds)))) : MOBILITY_BY_ID[x.id].seconds,
+    seconds: Number(x.seconds) > 0 ? Number(x.seconds) : MOBILITY_BY_ID[x.id].seconds,
     note: x.note || null,
   }));
-  if (!exercises.length) return null;
+  if (!raw.length) return null;
+  // Ältere Einheiten aus KI-Plänen waren oft viel kürzer als geplant: beim
+  // Abspielen auf die geplante Dauer bringen.
+  const exercises = Number(pw.duration_min) > 0 ? fitMobilityExercises(raw, pw.duration_min, mobilityFillPool()) : raw;
   return { title: pw.title || "Mobility", intro: pw.description || "", minutes: pw.duration_min, focus: [], source: "plan", plannedId: pw.id, exercises };
 }

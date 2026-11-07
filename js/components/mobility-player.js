@@ -7,8 +7,8 @@
 // leise Töne kurz vor jedem Wechsel, optional Sprachansage.
 
 const MOB_SOUND_KEY = "triathlon_dashboard_mobility_sound_v1";
-const MOB_PREP_S = 5;
-const MOB_SWITCH_S = 4;
+const MOB_PREP_S = 10; // = MOBILITY_TRANSITION_S, damit die angezeigte Dauer stimmt
+const MOB_SWITCH_S = 5; // Seitenwechsel, wie in mobilityExerciseSeconds
 
 const MOB_ICONS = {
   close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
@@ -205,7 +205,7 @@ function openMobilityPlayer(session, { onFinish } = {}) {
     } else if (ph.type === "prep") {
       badge.hidden = false;
       badge.textContent = "Gleich geht's los";
-      subEl.textContent = ph.ex.kind === "reps" ? `${ph.ex.reps} Wiederholungen${ph.ex.sides ? " je Seite" : ""} – in deinem Tempo` : (ph.ex.sides ? "Erst links, dann rechts" : "Ruhig halten und atmen");
+      subEl.textContent = ph.ex.kind === "reps" ? `${mobilityRepsFor(ph.ex, ph.x.seconds)} Wiederholungen${ph.ex.sides ? " je Seite" : ""} – in deinem Tempo` : (ph.ex.sides ? "Erst links, dann rechts" : "Ruhig halten und atmen");
     } else if (ph.type === "switch") {
       badge.hidden = false;
       badge.textContent = "Seite wechseln";

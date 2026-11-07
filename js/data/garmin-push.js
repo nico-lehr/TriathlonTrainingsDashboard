@@ -36,13 +36,18 @@ async function refreshGarminPush() {
 // Übungen einer Kraft-/Mobility-Einheit so, wie Garmin sie braucht - mit
 // Namen, Sätzen, Wiederholungen bzw. Sekunden und Gewicht aus der Sammlung.
 function garminExercises(pw) {
-  const list = Array.isArray(pw && pw.exercises) ? pw.exercises : [];
+  let list = Array.isArray(pw && pw.exercises) ? pw.exercises : [];
+  // Mobility: dieselben (auf die geplante Dauer gebrachten) Zeiten wie im Mitmach-Modus.
+  if (pw && pw.sport === "Mobility" && typeof plannedToMobilitySession === "function" && typeof MOBILITY_BY_ID !== "undefined") {
+    const s = plannedToMobilitySession(pw);
+    if (s) list = [...s.exercises, ...list.filter(x => x && !(x.id && MOBILITY_BY_ID[x.id]))];
+  }
   return list.filter(x => x && (x.name || x.id)).map(x => {
     const mob = pw.sport === "Mobility" && typeof MOBILITY_BY_ID !== "undefined" ? MOBILITY_BY_ID[x.id] : null;
     if (mob) {
       return { id: mob.id, name: mob.name, sides: !!mob.sides, note: x.note || null,
         seconds: mob.kind === "reps" ? null : (Number(x.seconds) || mob.seconds || null),
-        reps: mob.kind === "reps" ? (Number(mob.reps) || null) : null };
+        reps: mob.kind === "reps" ? (typeof mobilityRepsFor === "function" ? mobilityRepsFor(mob, x.seconds) : Number(mob.reps) || null) : null };
     }
     const str = pw.sport === "Kraft" && typeof STRENGTH_BY_ID !== "undefined" ? STRENGTH_BY_ID[x.id] : null;
     if (str) {

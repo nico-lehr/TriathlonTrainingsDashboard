@@ -185,6 +185,73 @@ test("KI-Trainingsplan: Mobility-Übungen aus der Sammlung behalten id, fremde N
   assert.strictEqual(entry.exercises[0].id, "taube");
   assert.strictEqual(entry.exercises[0].name, "Taube");
   assert.strictEqual(entry.exercises[0].seconds, 90);
-  assert.strictEqual(entry.exercises[1].id, undefined);
-  assert.strictEqual(entry.exercises[1].name, "Eigene Übung");
+  const own = entry.exercises[entry.exercises.length - 1];
+  assert.strictEqual(own.id, undefined);
+  assert.strictEqual(own.name, "Eigene Übung");
+});
+
+// Der gemeldete Fehler: 10 Minuten geplant, aber die Übungen dauerten
+// zusammen nur ein paar Minuten.
+const totalOf = list => run(`mobilityTotalSeconds(${JSON.stringify(list)})`);
+
+test("KI-Trainingsplan: viel zu kurze Mobility wird auf die geplanten Minuten gebracht", () => {
+  [10, 15, 20].forEach(min => {
+    const text = JSON.stringify({ workouts: [{ date: "2026-11-07", sport: "Mobility", title: "Mobility", duration_min: min, intensity: "leicht", description: "x",
+      exercises: ["katze-kuh", "taube", "wade-wand", "kindhaltung"].map(id => ({ id, seconds: 15, reps: "15 s" })) }] });
+    const [entry] = plain(run(`parsePlanResponse(${JSON.stringify(text)}, ["2026-11-07"])`));
+    const total = totalOf(entry.exercises);
+    assert.ok(total >= min * 60 * 0.92 && total <= min * 60 * 1.08, `${min} Min geplant, aber ${Math.round(total / 6) / 10} Min Übungen`);
+    entry.exercises.forEach(x => {
+      const ex = EXERCISES.find(e => e.id === x.id);
+      if (ex.kind === "hold") assert.ok(x.seconds >= 30, `${x.id}: Dehnung nur ${x.seconds} s`);
+      if (ex.kind === "hold") assert.match(x.reps, new RegExp(`^${x.seconds} s`), "Anzeige passt zu den Sekunden");
+    });
+    assert.strictEqual(entry.exercises[0].id, "katze-kuh", "Aufwärmen bleibt vorn");
+  });
+});
+
+test("KI-Trainingsplan: viel zu lange Mobility wird gekürzt", () => {
+  const ids = EXERCISES.filter(e => !e.equipment.length).slice(0, 10).map(e => e.id);
+  const text = JSON.stringify({ workouts: [{ date: "2026-11-07", sport: "Mobility", title: "Mobility", duration_min: 10, intensity: "leicht", description: "x",
+    exercises: ids.map(id => ({ id, seconds: 90 })) }] });
+  const [entry] = plain(run(`parsePlanResponse(${JSON.stringify(text)}, ["2026-11-07"])`));
+  const total = totalOf(entry.exercises);
+  assert.ok(total >= 600 * 0.92 && total <= 600 * 1.08, `${total} s statt 600 s`);
+});
+
+test("Claude-Mobility und Abspielen aus dem Plan: Dauer stimmt ±8 %", () => {
+  const text = JSON.stringify({ title: "Kurz", intro: "", exercises: ["beinpendel", "taube", "wade-wand"].map(id => ({ id, seconds: 20, note: "" })) });
+  [10, 20].forEach(min => {
+    const s = plain(run(`parseMobilityResponse(${JSON.stringify(text)}, ${JSON.stringify(EXERCISES.map(e => e.id))}, ${min})`));
+    const total = totalOf(s.exercises);
+    assert.ok(total >= min * 60 * 0.92 && total <= min * 60 * 1.08, `Claude ${min} Min: ${total} s`);
+  });
+  // Ältere, zu kurze Einheit im Kalender wird beim Starten passend gemacht.
+  const pw = { id: "alt", sport: "Mobility", title: "Alt", duration_min: 10,
+    exercises: [{ id: "taube", seconds: 15 }, { id: "wade-wand", seconds: 15 }, { id: "kindhaltung", seconds: 15 }] };
+  const back = plain(run(`plannedToMobilitySession(${JSON.stringify(pw)})`));
+  const total = totalOf(back.exercises);
+  assert.ok(total >= 600 * 0.92 && total <= 600 * 1.08, `aus dem Plan: ${total} s`);
+});
+
+test("Mitmach-Modus dauert so lange wie berechnet", () => {
+  const src = fs.readFileSync(path.join(ROOT, "js/components/mobility-player.js"), "utf8");
+  const prep = Number(src.match(/const MOB_PREP_S = (\d+)/)[1]);
+  const sw = Number(src.match(/const MOB_SWITCH_S = (\d+)/)[1]);
+  assert.strictEqual(prep, run("MOBILITY_TRANSITION_S"));
+  const sided = EXERCISES.find(e => e.sides);
+  assert.strictEqual(run(`mobilityExerciseSeconds(MOBILITY_BY_ID["${sided.id}"], 40)`), 80 + sw);
+});
+
+test("Gespeicherter Plan: kommende, zu kurze Mobility wird beim Laden repariert, erledigte nicht", () => {
+  const short = [{ id: "taube", name: "Taube", seconds: 15, reps: "15 s je Seite" }, { id: "wade-wand", name: "Wade", seconds: 15, reps: "15 s" }];
+  store[run("PLANNED_WORKOUTS_KEY")] = [
+    { id: "a", date: "2099-01-01", sport: "Mobility", duration_min: 10, status: "geplant", exercises: plain(short) },
+    { id: "b", date: "2000-01-01", sport: "Mobility", duration_min: 10, status: "erledigt", exercises: plain(short) },
+  ];
+  run("loadPlannedWorkouts()");
+  const [a, b] = plain(run("plannedWorkouts"));
+  const total = totalOf(a.exercises);
+  assert.ok(total >= 600 * 0.92 && total <= 600 * 1.08, `${total} s`);
+  assert.deepStrictEqual(b.exercises, short);
 });

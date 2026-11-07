@@ -701,6 +701,14 @@ function mobilityExerciseSeconds(ex, seconds) {
   return ex.sides ? per * 2 + 5 : per;
 }
 
+// Wiederholungen passend zur Zeit: Läuft eine Bewegungsübung länger als ihr
+// Standard, werden es entsprechend mehr (gleiches ruhiges Tempo).
+function mobilityRepsFor(ex, seconds) {
+  if (!ex || ex.kind !== "reps") return null;
+  const s = Number(seconds) || ex.seconds;
+  return Math.max(ex.reps, Math.round(ex.reps * s / ex.seconds));
+}
+
 function mobilityVideoUrl(ex) {
   return "https://www.youtube.com/results?search_query=" + encodeURIComponent(ex.video || ex.name + " Übung Anleitung");
 }
