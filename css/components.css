@@ -2540,3 +2540,10 @@
   .update-menu-sync.ok { color: var(--c-good-text); }
   .update-menu-sync.err { color: var(--c-crit-text); }
   .update-menu-sync a.sync-hint { color: var(--accent); }
+  /* Kraft im Mitmach-Modus: Gewicht anpassen, Satz-Knopf mit Haken */
+  .mob-weight { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+  .mob-weight .mob-icon-btn { width: 40px; height: 40px; font-size: 22px; font-weight: 600; }
+  .mob-weight-val { min-width: 84px; text-align: center; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .mob-player.is-manual .mob-timer-num { font-size: 56px; }
+  .mob-player.is-manual .mob-ctrl-main { background: #34c759; }
+  .mob-player[data-phase="rest"] .mob-timer-bar { stroke: #34c759; }

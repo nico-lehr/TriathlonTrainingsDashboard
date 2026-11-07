@@ -4,6 +4,18 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.21
+
+Neue Handy-Ansicht „Graphit“ und Krafttraining zum Mitmachen.
+
+Neu in 2.4.21:
+- Am Handy: neue, dunkle Ansicht mit dem Wichtigsten zuerst – Erholung, Woche und Schlaf als Ringe, heute geplant, Wochenpunkte, Form, Ziel und letzte Einheiten
+- Bereiche oben: Übersicht, Kalender, Coach, Training und Mehr (Ernährung, Rekorde, Analyse, Einstellungen öffnen sich wie gewohnt)
+- Training: Mobility und Kraft zusammen; Kraft-Einheiten mit Strichfiguren, Sätzen, Pausen und „Satz geschafft“
+- Gewicht pro Übung mit −/+ einstellbar, das Dashboard merkt es sich fürs nächste Mal
+- Der KI-Trainingsplan wählt Kraftübungen aus der Sammlung, damit jede eine Zeichnung hat
+- Lieber die alte Ansicht? Einstellungen → Konto → „Neue Handy-Ansicht“ ausschalten. Am Computer ändert sich nichts.
+
 ## 2.4.2
 
 Garmin: genaue Fehlermeldung statt „nicht erreichbar“.

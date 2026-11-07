@@ -16,6 +16,7 @@ const MOB_ICONS = {
   pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>',
   back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M6 5h2v14H6zM19 5.5v13L9.5 12z"/></svg>',
   next: '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M16 5h2v14h-2zM5 5.5v13L14.5 12z"/></svg>',
+  check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke-width="2.6"/></svg>',
   soundOn: '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9a4 4 0 010 6M18.5 6.5a7.5 7.5 0 010 11"/></svg>',
   soundOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="fill" d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 9.5l5 5M21.5 9.5l-5 5"/></svg>',
 };
@@ -24,13 +25,29 @@ function mobSoundOn() {
   try { return localStorage.getItem(MOB_SOUND_KEY) !== "off"; } catch (e) { return true; }
 }
 
+// Übung zur id: Mobility- oder Kraft-Sammlung (session.kind === "strength").
+function playerLibrary(session) {
+  return session.kind === "strength" && typeof STRENGTH_BY_ID !== "undefined" ? STRENGTH_BY_ID : MOBILITY_BY_ID;
+}
+
 // Ablauf: Vorbereitung -> Übung (ggf. links, Wechsel, rechts) -> nächste ...
+// Kraft: Vorbereitung -> Satz 1 -> Pause -> Satz 2 ... Ein Satz mit
+// Wiederholungen läuft ohne Uhr, bis "Satz geschafft" getippt wird.
 function mobilityPhases(session) {
   const phases = [];
+  const lib = playerLibrary(session);
   session.exercises.forEach((x, i) => {
-    const ex = MOBILITY_BY_ID[x.id];
+    const ex = lib[x.id];
     if (!ex) return;
     phases.push({ type: "prep", i, ex, x, dur: MOB_PREP_S });
+    if (session.kind === "strength") {
+      const sets = x.sets || ex.sets;
+      for (let n = 1; n <= sets; n++) {
+        phases.push({ type: "set", i, ex, x, set: n, of: sets, dur: ex.hold ? (x.hold || ex.hold) : 0 });
+        if (n < sets) phases.push({ type: "rest", i, ex, x, set: n + 1, of: sets, dur: x.rest || ex.rest });
+      }
+      return;
+    }
     if (ex.sides) {
       phases.push({ type: "work", i, ex, x, side: "Linke Seite", dur: x.seconds });
       phases.push({ type: "switch", i, ex, x, dur: MOB_SWITCH_S });
@@ -50,7 +67,9 @@ function fmtClock(s) {
 function openMobilityPlayer(session, { onFinish } = {}) {
   const phases = mobilityPhases(session);
   if (!phases.length) return;
-  const exCount = session.exercises.filter(x => MOBILITY_BY_ID[x.id]).length;
+  const lib = playerLibrary(session);
+  const strength = session.kind === "strength";
+  const exCount = session.exercises.filter(x => lib[x.id]).length;
   const lastFocus = document.activeElement;
 
   const root = document.createElement("div");
@@ -61,7 +80,7 @@ function openMobilityPlayer(session, { onFinish } = {}) {
   root.innerHTML = `
     <div class="mob-player-top">
       <button type="button" class="mob-icon-btn" data-act="close" aria-label="Einheit beenden">${MOB_ICONS.close}</button>
-      <div class="mob-progress" aria-hidden="true">${session.exercises.filter(x => MOBILITY_BY_ID[x.id]).map(() => '<span class="mob-progress-seg"><span class="mob-progress-fill"></span></span>').join("")}</div>
+      <div class="mob-progress" aria-hidden="true">${session.exercises.filter(x => lib[x.id]).map(() => '<span class="mob-progress-seg"><span class="mob-progress-fill"></span></span>').join("")}</div>
       <button type="button" class="mob-icon-btn" data-act="sound" aria-pressed="${mobSoundOn()}" aria-label="Ton">${mobSoundOn() ? MOB_ICONS.soundOn : MOB_ICONS.soundOff}</button>
     </div>
     <div class="mob-player-body">
@@ -75,6 +94,11 @@ function openMobilityPlayer(session, { onFinish } = {}) {
           <span class="mob-timer-num"></span>
         </div>
         <p class="mob-player-sub"></p>
+        <div class="mob-weight" hidden>
+          <button type="button" class="mob-icon-btn" data-act="minus" aria-label="Weniger Gewicht">−</button>
+          <span class="mob-weight-val" aria-live="polite"></span>
+          <button type="button" class="mob-icon-btn" data-act="plus" aria-label="Mehr Gewicht">+</button>
+        </div>
         <div class="mob-player-controls">
           <button type="button" class="mob-icon-btn mob-ctrl" data-act="back" aria-label="Zurück">${MOB_ICONS.back}</button>
           <button type="button" class="mob-icon-btn mob-ctrl mob-ctrl-main" data-act="toggle" aria-label="Pause">${MOB_ICONS.pause}</button>
@@ -95,6 +119,9 @@ function openMobilityPlayer(session, { onFinish } = {}) {
   const toggleBtn = $('[data-act="toggle"]'), soundBtn = $('[data-act="sound"]');
   const howtoList = $(".mob-player-howto ol"), feelEl = $(".mob-player-feel"), live = $("[data-live]");
   const segs = [...root.querySelectorAll(".mob-progress-fill")];
+  const weightBox = $(".mob-weight"), weightVal = $(".mob-weight-val");
+  const fmtKg = kg => (kg > 0 ? `${String(kg).replace(".", ",")} kg` : "ohne Gewicht");
+  const manualSet = ph => ph.type === "set" && !ph.dur;
   const RING = 2 * Math.PI * 52;
   timerBar.style.strokeDasharray = RING;
 
@@ -143,14 +170,39 @@ function openMobilityPlayer(session, { onFinish } = {}) {
     feelEl.textContent = "Spüren: " + ph.ex.feel;
   }
 
+  function changeWeight(dir) {
+    const ph = phases[idx];
+    if (!ph || !ph.ex.weight) return;
+    const kg = ph.x.kg != null ? ph.x.kg : (ph.ex.startKg || 0);
+    const step = kg < 10 || (kg === 10 && dir < 0) ? 1 : 2;
+    ph.x.kg = Math.max(0, kg + dir * step);
+    if (typeof setStrengthWeight === "function") setStrengthWeight(ph.ex.id, ph.x.kg);
+    render();
+  }
+
   function render() {
     const ph = phases[idx];
     showExercise(ph);
     const n = ph.i + 1;
     const nextEx = phases.slice(idx + 1).find(p => p.i !== ph.i);
-    kicker.textContent = `Übung ${n} von ${exCount}` + (ph.side ? ` · ${ph.side}` : "");
+    kicker.textContent = `Übung ${n} von ${exCount}` + (ph.side ? ` · ${ph.side}` : "") + (ph.set ? ` · Satz ${ph.set} von ${ph.of}` : "");
     root.dataset.phase = ph.type;
-    if (ph.type === "prep") {
+    const showWeight = strength && ph.ex.weight && ph.type !== "rest";
+    weightBox.hidden = !showWeight;
+    if (showWeight) weightVal.textContent = fmtKg(ph.x.kg != null ? ph.x.kg : (ph.ex.startKg || 0));
+    const amount = ph.ex.hold ? `${ph.x.hold || ph.ex.hold} s halten` : String(ph.x.reps || ph.ex.reps).replace(/^(\S+)(.*)$/, "$1 Wiederholungen$2");
+    if (strength && ph.type === "prep") {
+      badge.hidden = false;
+      badge.textContent = "Gleich geht's los";
+      subEl.textContent = `${ph.x.sets || ph.ex.sets} Sätze · ${amount}`;
+    } else if (ph.type === "set") {
+      badge.hidden = true;
+      subEl.textContent = ph.dur ? "Halten und ruhig atmen" : `${amount} – dann „Satz geschafft“`;
+    } else if (ph.type === "rest") {
+      badge.hidden = false;
+      badge.textContent = "Pause";
+      subEl.textContent = `Gleich: Satz ${ph.set} von ${ph.of}`;
+    } else if (ph.type === "prep") {
       badge.hidden = false;
       badge.textContent = "Gleich geht's los";
       subEl.textContent = ph.ex.kind === "reps" ? `${ph.ex.reps} Wiederholungen${ph.ex.sides ? " je Seite" : ""} – in deinem Tempo` : (ph.ex.sides ? "Erst links, dann rechts" : "Ruhig halten und atmen");
@@ -162,22 +214,32 @@ function openMobilityPlayer(session, { onFinish } = {}) {
       badge.hidden = true;
       subEl.textContent = nextEx ? `Danach: ${nextEx.ex.name}` : "Letzte Übung";
     }
-    const frac = ph.dur ? Math.max(0, remaining) / ph.dur : 0;
+    const frac = manualSet(ph) ? 1 : ph.dur ? Math.max(0, remaining) / ph.dur : 0;
     timerBar.style.strokeDashoffset = String(RING * (1 - frac));
-    timerNum.textContent = fmtClock(remaining);
+    timerNum.textContent = manualSet(ph) ? String(parseInt(ph.x.reps || ph.ex.reps, 10) || ph.x.reps || ph.ex.reps) : fmtClock(remaining);
+    root.classList.toggle("is-manual", manualSet(ph));
     segs.forEach((s, i) => {
       let w = 0;
       if (i < ph.i) w = 1;
       else if (i === ph.i) {
-        const own = phases.filter(p => p.i === i && p.type === "work");
-        const total = own.reduce((t, p) => t + p.dur, 0);
-        const before = own.filter(p => phases.indexOf(p) < idx).reduce((t, p) => t + p.dur, 0);
-        w = total ? (before + (ph.type === "work" ? ph.dur - Math.max(0, remaining) : 0)) / total : 0;
+        const own = phases.filter(p => p.i === i && (p.type === "work" || p.type === "set"));
+        if (strength) {
+          w = own.filter(p => phases.indexOf(p) < idx).length / Math.max(1, own.length);
+        } else {
+          const total = own.reduce((t, p) => t + p.dur, 0);
+          const before = own.filter(p => phases.indexOf(p) < idx).reduce((t, p) => t + p.dur, 0);
+          w = total ? (before + (ph.type === "work" ? ph.dur - Math.max(0, remaining) : 0)) / total : 0;
+        }
       }
       s.style.transform = `scaleX(${Math.min(1, w)})`;
     });
-    toggleBtn.innerHTML = paused ? MOB_ICONS.play : MOB_ICONS.pause;
-    toggleBtn.setAttribute("aria-label", paused ? "Weiter" : "Pause");
+    if (manualSet(ph)) {
+      toggleBtn.innerHTML = MOB_ICONS.check;
+      toggleBtn.setAttribute("aria-label", "Satz geschafft");
+    } else {
+      toggleBtn.innerHTML = paused ? MOB_ICONS.play : MOB_ICONS.pause;
+      toggleBtn.setAttribute("aria-label", paused ? "Weiter" : "Pause");
+    }
     root.classList.toggle("is-paused", paused);
     figAnimator.setPaused(figHost.firstChild, paused);
   }
@@ -186,6 +248,8 @@ function openMobilityPlayer(session, { onFinish } = {}) {
     if (ph.type === "prep") say(`${ph.ex.name}.`);
     else if (ph.type === "switch") say("Seite wechseln.");
     else if (ph.type === "work") { beep(1046, 0.18); if (ph.side) say(ph.side === "Linke Seite" ? "Links." : "Rechts."); }
+    else if (ph.type === "set") { beep(1046, 0.18); say(`Satz ${ph.set}.`); }
+    else if (ph.type === "rest") say("Pause.");
   }
 
   function go(to) {
@@ -201,9 +265,10 @@ function openMobilityPlayer(session, { onFinish } = {}) {
     const dt = (now - lastTick) / 1000;
     lastTick = now;
     if (paused || done) return;
+    if (manualSet(phases[idx])) { worked += Math.min(dt, 1); return; } // wartet auf "Satz geschafft"
     const before = Math.ceil(remaining);
     remaining -= dt;
-    if (phases[idx].type === "work") worked += Math.min(dt, 1);
+    if (phases[idx].type === "work" || phases[idx].type === "set") worked += Math.min(dt, 1);
     const after = Math.ceil(remaining);
     if (after !== before && after > 0 && after <= 3) beep(660, 0.08, 0.05);
     if (remaining <= 0) go(idx + 1);
@@ -271,7 +336,7 @@ function openMobilityPlayer(session, { onFinish } = {}) {
         </fieldset>
         <fieldset class="mob-done-group">
           <legend>Hat etwas weh getan? <span class="tp-hint">Antippen – kommt dann 3 Wochen nicht mehr vor.</span></legend>
-          <div class="mob-chips">${session.exercises.filter(x => MOBILITY_BY_ID[x.id]).map(x => `<button type="button" class="mob-chip" aria-pressed="false" data-pain="${x.id}">${escapeHtml(MOBILITY_BY_ID[x.id].name)}</button>`).join("")}</div>
+          <div class="mob-chips">${session.exercises.filter(x => lib[x.id]).map(x => `<button type="button" class="mob-chip" aria-pressed="false" data-pain="${x.id}">${escapeHtml(lib[x.id].name)}</button>`).join("")}</div>
         </fieldset>
         <button type="button" class="mob-btn mob-btn-primary mob-done-btn" data-act="save">Fertig</button>
       </div>`;
@@ -295,6 +360,8 @@ function openMobilityPlayer(session, { onFinish } = {}) {
         rating: rating ? rating.rating : "ok",
         pain: [...body.querySelectorAll("[data-pain].is-on")].map(c => c.dataset.pain),
         source: session.source || null,
+        kind: session.kind || "mobility",
+        weights: strength ? Object.fromEntries(session.exercises.filter(x => x.kg != null).map(x => [x.id, x.kg])) : undefined,
       };
       close();
       if (onFinish) onFinish(result);
@@ -306,7 +373,11 @@ function openMobilityPlayer(session, { onFinish } = {}) {
     if (document.querySelector("#confirm-overlay.open, .modal-overlay.open")) return;
     if (e.key === "Escape") { e.preventDefault(); askClose(); }
     if (done) return;
-    if (e.key === " " && !(e.target && e.target.tagName === "BUTTON")) { e.preventDefault(); paused = !paused; lastTick = performance.now(); render(); }
+    if (e.key === " " && !(e.target && e.target.tagName === "BUTTON")) {
+      e.preventDefault();
+      if (manualSet(phases[idx])) { go(idx + 1); return; }
+      paused = !paused; lastTick = performance.now(); render();
+    }
     if (e.key === "ArrowRight") next();
     if (e.key === "ArrowLeft") back();
   }
@@ -320,7 +391,16 @@ function openMobilityPlayer(session, { onFinish } = {}) {
     if (!btn) return;
     const act = btn.dataset.act;
     if (act === "close") askClose();
-    else if (act === "toggle") { paused = !paused; lastTick = performance.now(); render(); }
+    else if (act === "toggle") {
+      if (manualSet(phases[idx])) { go(idx + 1); return; }
+      paused = !paused; lastTick = performance.now(); render();
+    }
+    else if (act === "minus" || act === "plus") {
+      changeWeight(act === "plus" ? 1 : -1);
+      // Mit Maus/Finger getippt: Fokus lösen, damit die Leertaste danach
+      // wieder "Satz geschafft" bedeutet (mit der Tastatur bleibt er stehen).
+      if (e.detail > 0) btn.blur();
+    }
     else if (act === "next") next();
     else if (act === "back") back();
     else if (act === "sound") {

@@ -28,6 +28,7 @@
 <link rel="stylesheet" href="css/main.css">
 <link rel="stylesheet" href="css/components.css">
 <link rel="stylesheet" href="css/responsive.css">
+<link rel="stylesheet" href="css/m-graphit.css">
 </head>
 <body>
 <div class="parallax-bg">
@@ -689,6 +690,12 @@
       <div class="card full">
         <h2>Konto</h2>
         <p class="card-sub">Angemeldet als <b id="account-username">…</b>. Beim Abmelden wird alles Persönliche aus diesem Browser entfernt.</p>
+        <div class="settings-list">
+          <div class="settings-list-row">
+            <label for="m-graphit-switch">Neue Handy-Ansicht <span class="card-sub">(nur am Handy, gilt für dieses Gerät)</span></label>
+            <input type="checkbox" id="m-graphit-switch" class="switch" role="switch" checked>
+          </div>
+        </div>
         <button type="button" class="cal-today-btn" id="logout-btn">Abmelden</button>
       </div>
 
@@ -1122,8 +1129,10 @@
 <script src="js/analytics/achievements.js"></script>
 <script src="js/analytics/triathlon.js"></script>
 <script src="js/data/mobility-exercises.js"></script>
+<script src="js/data/strength-exercises.js"></script>
 <script src="js/data/training-profile.js"></script>
 <script src="js/analytics/mobility-plan.js"></script>
+<script src="js/analytics/strength-plan.js"></script>
 <script src="js/ai/context-builder.js"></script>
 <script src="js/ai/prompts.js"></script>
 <script src="js/ai/ollama.js"></script>
@@ -1161,6 +1170,7 @@
 <script src="js/components/mobility-figure.js"></script>
 <script src="js/components/mobility-player.js"></script>
 <script src="js/components/mobility.js"></script>
+<script src="js/components/m-app.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

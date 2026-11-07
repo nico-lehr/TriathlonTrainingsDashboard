@@ -192,3 +192,15 @@ Auftrag (2026-11-07): Mobility über die ganze Seite; Garmin-Daten nur noch übe
 
 - Die Regeldateien AI_RULES.md, DESIGN_GUIDE.md und docs/TECH_DESIGN_2026.md gibt es nicht. Entscheidung (mit dir abgestimmt): Regeln aus deinen Nachrichten; Farben, Radien und Schatten aus `css/variables.css`.
 - Tailscale-Fragen 2, 3 und 5: Empfehlungen übernommen (geheimer Kalender-Link, Ablage pro Person, alle Browser-Daten auf den Server).
+
+## Zusatz M: Handy-Ansicht „Graphit“ und Kraft mit Strichfiguren (2.4.21)
+
+Auftrag (2026-11-07): Übersicht am Handy nach dem Vorbild von Trainings-Apps (Demo „Graphit“ abgenommen); Kraft-Einheiten wie Mobility mit Strichfiguren; Mobility und Kraft unter „Training“.
+
+| Schritt | Status |
+|---|---|
+| M1 Kraft-Sammlung (15 Übungen, Figuren geprüft) + `strength-plan.js` | fertig |
+| M2 Mitmach-Modus für Kraft: Sätze, „Satz geschafft“, Pause, Gewicht −/+ (wird gemerkt) | fertig |
+| M3 KI-Trainingsplan: Kraft nur aus der Sammlung (id bleibt), abspielbar | fertig |
+| M4 Handy-Ansicht `m-app.js` + `css/m-graphit.css`: Übersicht, Kalender, Coach, Training, Mehr | fertig |
+| M5 Tests (Server 187, JS 173) + Prüfung im Browser (iPhone, Desktop unverändert) | fertig |

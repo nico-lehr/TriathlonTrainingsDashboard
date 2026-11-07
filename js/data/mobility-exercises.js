@@ -30,6 +30,9 @@ const MOBILITY_EQUIPMENT = {
   band: "Widerstandsband",
   strap: "Gurt oder Handtuch",
   block: "Yoga-Block oder dickes Buch",
+  dumbbells: "Kurzhanteln",
+  bench: "Bank, Stuhl oder Stufe",
+  pullup: "Klimmzugstange",
 };
 
 const MOBILITY_AVOID = {

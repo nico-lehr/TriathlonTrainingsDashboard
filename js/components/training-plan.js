@@ -701,6 +701,8 @@ function openPlanEdit(id, defaults) {
         ex.id = lib.id;
         ex.seconds = Number(row.dataset.exSeconds) || lib.seconds;
       }
+      const slib = row.dataset.exId && typeof STRENGTH_BY_ID !== "undefined" ? STRENGTH_BY_ID[row.dataset.exId] : null;
+      if (slib && slib.name === ex.name && currentSport === "Kraft") ex.id = slib.id;
       return ex;
     }).filter(ex => ex.name) : null;
     let steps = null;

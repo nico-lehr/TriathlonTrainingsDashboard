@@ -163,16 +163,21 @@ function parsePlanResponse(rawText, windowDates) {
       ? entry.exercises.filter(x => x && (x.name || x.id)).map(x => {
           // Mobility-Übung aus der Sammlung (js/data/mobility-exercises.js): id
           // behalten, damit Zeichnung und Mitmach-Modus funktionieren.
-          const lib = entry.sport === "Mobility" && typeof MOBILITY_BY_ID !== "undefined" ? MOBILITY_BY_ID[x.id] : null;
+          const lib = entry.sport === "Mobility" && typeof MOBILITY_BY_ID !== "undefined" ? MOBILITY_BY_ID[x.id]
+            : entry.sport === "Kraft" && typeof STRENGTH_BY_ID !== "undefined" ? STRENGTH_BY_ID[x.id] : null;
           const out = {
             name: lib ? lib.name : String(x.name).slice(0, 80),
             sets: x.sets != null ? Number(x.sets) || null : null,
             reps: x.reps != null ? String(x.reps).slice(0, 20) : null,
             note: x.note ? String(x.note).slice(0, 200) : null,
           };
-          if (lib) {
+          if (lib && entry.sport === "Mobility") {
             out.id = lib.id;
             out.seconds = Math.min(90, Math.max(15, Math.round(Number(x.seconds) || lib.seconds)));
+          } else if (lib) {
+            out.id = lib.id;
+            out.sets = out.sets ? Math.min(6, Math.max(1, out.sets)) : lib.sets;
+            if (!out.reps) out.reps = lib.hold ? `${lib.hold} s` : lib.reps;
           }
           return out;
         }).filter(x => x.name && x.name !== "undefined")

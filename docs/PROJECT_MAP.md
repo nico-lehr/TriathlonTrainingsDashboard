@@ -90,6 +90,7 @@ Claude-API-Key, Kartenreihenfolge).
 - `goals.js` — Ziel-Events (Laden/Speichern/Anlegen/Löschen).
 - `athlete.js` — Athletenprofil (Laden/Speichern), Trainingstage-Konstanten.
 - `health.js` — Erholungs-Check-Zustand inkl. täglichem Reset + Logbuch-Archivierung.
+- `strength-exercises.js` — Kraft-Sammlung (15 Übungen) mit Sätzen, Wiederholungen, Pausen, Startgewicht und Strichfigur (Hilfsmittel-Namen in `mobility-exercises.js`).
 - `planned-workouts.js` — geplante/KI-vorgeschlagene Trainingseinheiten (Laden/Speichern/Anlegen/Verschieben), getrennt von den echten Workouts (`ALL`/`DATA`); setzt die Phase je Einheit (`getPhase`), prüft Verschiebungen gegen die Planregeln (`planRuleViolations`, `applyPlanSuggestion`), nimmt KI-Pläne nur geprüft an (`checkedPlanFromAi`) und hält die Schritte einer Einheit (`validateWorkoutSteps`, `defaultWorkoutSteps`), siehe `docs/DATA_MODEL.md`.
 - `plan-wishes.js` — Terminwünsche für den Trainingsplan („Do 60 min Schwimmen“), werden bei der nächsten KI-Planung fest eingeplant.
 - `fit-workout-writer.js` — schreibt eine geplante Einheit als importierbare `.fit`-Workout-Datei für Garmin Connect (Gegenrichtung zu `fit-parser.js`) und schickt sie auf Wunsch direkt an Garmin (`sendPlannedWorkoutToGarmin` → `backend/garmin_workouts.py`), siehe `docs/DATA_MODEL.md`.
@@ -100,6 +101,7 @@ Claude-API-Key, Kartenreihenfolge).
 
 ### `js/analytics/` — reine Berechnungen, kein UI
 - `mobility-plan.js` — stellt eine Mobility-Einheit aus der Sammlung zusammen (Regeln) bzw. baut den Claude-Auftrag samt JSON-Schema und prüft die Antwort; Umwandlung in/aus geplanten Einheiten.
+- `strength-plan.js` — stellt eine Kraft-Einheit aus der Kraft-Sammlung zusammen (je Bewegungsmuster eine Übung), merkt Gewichte und Verlauf (`triathlon_dashboard_strength_v1`), macht geplante Kraft-Einheiten abspielbar.
 - `training-load.js` — CTL/ATL/TSB (PMC), ACWR-Zeitreihen, Trainingsmonotonie/-Strain nach Foster (1998, `computeMonotonyStrainSeries`) und der Monatsvergleich (`computeMonthComparison`, aktueller vs. vorheriger Kalendermonat).
 - `performance.js` — kompakte Bestzeiten-Zusammenfassung für den KI-Kontext, sowie die getrennte VO2max-Schätzung + Trend für Laufen und Rad (`computeVo2MaxEstimate`, primär per Pace/Watt-Puls-Regression) für die zwei Kennzahlen-Kacheln ganz oben im Überblick.
 - `workout-comparison.js` — findet vergleichbare frühere Einheiten (gleiche Sportart, Distanz/Dauer ±20%) für die KI-Auswertung je Einheit.
@@ -156,6 +158,7 @@ Bedarf schrittweise weiter aufgeteilt werden, sobald es sich lohnt.
 - `mobility.js` — Tab „Mobility“: Einheit für heute, Dauer/Schwerpunkt, Ablauf mit Austauschen, „Mit Claude persönlich anpassen“, Übungs-Sammlung, Anleitung (Bottom-Sheet), Verlauf.
 - `mobility-player.js` — Mitmach-Modus im Vollbild: Timer, Seitenwechsel, Ton/Ansage, Wake Lock, Rückmeldung am Ende.
 - `mobility-figure.js` — bewegte Strichfigur als SVG (Skelett mit festen Knochenlängen, Zwei-Knochen-IK, ein gemeinsamer Animationstakt).
+- `m-app.js` — Handy-Ansicht „Graphit“ (bis 700 px, abschaltbar unter Einstellungen → Konto): Übersicht (Erholung/Woche/Schlaf-Ringe, Heute, Woche, Form, Ziel), Kalender, Coach, Training (Mobility | Kraft), Mehr (öffnet die bisherigen Seiten). Stil: `css/m-graphit.css`.
 
 ### `js/app.js` — Einstiegspunkt
 Definiert `renderAll()` (ruft die Render-Funktionen aller Tabs auf) und

@@ -92,9 +92,11 @@ function checkAutoReplan() {
   initGarminImport();
   initGarminMenu();
   initMobility();
+  loadStrengthState();
   initWeatherSettings();
   initAnalysis();
   renderAll();
+  initMApp();
   checkAutoReplan();
   // Automatische Risiko-Kontrolle (ACWR/TSB/Monotonie + Erholungs-Check) für
   // die naechsten 1-2 Tage - siehe js/components/risk-adjust.js. Wie
