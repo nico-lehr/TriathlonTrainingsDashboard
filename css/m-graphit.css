@@ -410,6 +410,8 @@ body.m-graphit .api-error-banner {
 body.m-graphit .app-update-banner { border-color: color-mix(in srgb, var(--m-accent) 45%, transparent); }
 /* Nur am Computer sichtbare Teile */
 .m-brand, .m-tab-ic, .m-mc-evs, .m-desk-only { display: none; }
+/* Analyse/Insights: am Computer in der Seitenleiste, sonst unter "Mehr" */
+.m-tabs button.m-side-only { display: none; }
 /* Bisherige Seite geöffnet: Graphit-Inhalt weg; am Handy auch die Bereiche oben. */
 body.m-graphit.m-classic #m-body { display: none; }
 @media (max-width: 1099px) { body.m-graphit.m-classic #m-app { display: none; } }
@@ -498,6 +500,8 @@ body.m-graphit.m-classic #m-body { display: none; }
     border-radius: 12px; color: var(--m-muted); font-size: 15px; text-align: left; overflow: visible;
   }
   .m-tabs button.on { color: var(--m-text); }
+  .m-tabs button.m-side-only { display: flex; }
+  .m-nav-row.m-side-hide { display: none; }
   .m-tab-ind { background: var(--m-surface-2); box-shadow: none; }
   .m-tabs button.on .m-tab-ic { stroke: var(--m-accent); }
   .m-tabs button:not(.on):hover { color: var(--m-text); background: color-mix(in srgb, var(--m-text) 4%, transparent); }

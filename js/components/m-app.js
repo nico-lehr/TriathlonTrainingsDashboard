@@ -345,7 +345,7 @@ function mRenderHeute() {
           <div class="m-num"><small style="color:var(--m-run)">Laufen</small><b>${mNum(km("Laufen"), 0)} km</b></div>
         </div></section>`
     + `<section class="m-card"><div class="m-head"><h2>Letzte Einheiten</h2><button type="button" class="m-link" data-m-classic="overview" data-m-scroll="workouts">Alle</button></div><div class="m-list">${recentHtml}</div></section>`
-    + `<button type="button" class="m-more" data-m-classic="overview">Alle Diagramme und Auswertungen</button>`);
+    + `<button type="button" class="m-more" data-m-classic="overview">Insights – alle Diagramme und Auswertungen</button>`);
 }
 
 function mRenderKalender() {
@@ -538,14 +538,15 @@ function mRenderTraining() {
     + mCols(`<section class="m-card m-hero-ex"><div class="m-fig-lg" data-m-fig="m:${session.exercises[0].id}"></div>
         <div><b class="m-hero-title">${mEsc(session.title)}</b><small class="m-row-meta">${Math.max(1, Math.round(mobilitySessionSeconds(session) / 60))} min · ${session.exercises.length} Übungen</small></div>
         <button type="button" class="m-btn primary wide" data-m-act="start-mob-now">Starten</button>
-        ${!mk.planned && typeof claudeAvailable === "function" && claudeAvailable() ? `<button type="button" class="m-btn ghost wide" data-m-act="mob-claude">${mState.busy ? "KI-Coach stellt zusammen …" : "Mit Claude anpassen"}</button>` : ""}</section>`,
+        ${!mk.planned && typeof claudeAvailable === "function" && claudeAvailable() ? `<button type="button" class="m-btn ghost wide" data-m-act="mob-claude">${mState.busy ? "KI-Coach stellt zusammen …" : "Mit dem KI-Coach anpassen"}</button>` : ""}</section>`,
     `<section class="m-card"><div class="m-head"><h2>Ablauf</h2><button type="button" class="m-link" data-m-classic="mobility">Alle Übungen</button></div><div class="m-list">${rows}</div></section>`, "train");
 }
 
 function mRenderMehr() {
-  const rows = [["nutrition", "Ernährung"], ["records", "Rekorde"], ["analysis", "Analyse"], ["overview", "Alle Diagramme"], ["settings", "Einstellungen"]];
+  // Analyse und Insights stehen am Computer direkt in der Seitenleiste - hier nur am Handy/Tablet.
+  const rows = [["nutrition", "Ernährung"], ["records", "Rekorde"], ["analysis", "Analyse", true], ["overview", "Insights", true], ["settings", "Einstellungen"]];
   return mHeaderHtml("Weitere Bereiche", "Mehr")
-    + mCols(`<section class="m-card m-navlist">${rows.map(([v, l]) => `<button type="button" class="m-nav-row" data-m-classic="${v}"><span>${l}</span><i>›</i></button>`).join("")}</section>`,
+    + mCols(`<section class="m-card m-navlist">${rows.map(([v, l, side]) => `<button type="button" class="m-nav-row${side ? " m-side-hide" : ""}" data-m-classic="${v}"><span>${l}</span><i>›</i></button>`).join("")}</section>`,
       `<section class="m-card m-navlist"><button type="button" class="m-nav-row" data-m-act="profile"><span>Dein Trainingsprofil</span><i>›</i></button>
         <button type="button" class="m-nav-row" data-m-act="m-off"><span>Klassische Ansicht verwenden</span><i>›</i></button></section>`
       + (typeof mAdmin !== "undefined" && mAdmin.isAdmin ? `<section class="m-card m-navlist"><button type="button" class="m-nav-row" data-m-page="admin"><span>Admin · Statistik</span><i>›</i></button></section>` : ""));
@@ -596,7 +597,7 @@ function renderMApp() {
   if (!active) { host.hidden = true; return; }
   host.hidden = false; // bei bisherigen Seiten blendet CSS den Inhalt aus (am Computer bleibt die Seitenleiste)
   document.querySelectorAll("#m-tabs button").forEach(b => {
-    const on = !mState.classic && b.dataset.mPage === (mState.page === "admin" ? "mehr" : mState.page);
+    const on = mState.classic ? b.dataset.mClassic === mState.classic : b.dataset.mPage === (mState.page === "admin" ? "mehr" : mState.page);
     b.classList.toggle("on", on);
     if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
   });
@@ -655,7 +656,7 @@ function mOpenClassic(view, scrollTo) {
   if (view === "settings") openSettingsView(); else activateView(view);
   renderMApp();
   const title = document.getElementById("m-classic-title");
-  if (title) title.textContent = { overview: "Alle Diagramme", nutrition: "Ernährung", records: "Rekorde", analysis: "Analyse", settings: "Einstellungen", coach: "Coach", calendar: "Kalender", mobility: "Mobility" }[view] || "";
+  if (title) title.textContent = { overview: "Insights", nutrition: "Ernährung", records: "Rekorde", analysis: "Analyse", settings: "Einstellungen", coach: "Coach", calendar: "Kalender", mobility: "Mobility" }[view] || "";
   window.scrollTo({ top: 0 });
   if (scrollTo) {
     const el = document.querySelector(`[data-card-id="${scrollTo}"]`);
@@ -996,6 +997,8 @@ function initMApp() {
       <button type="button" data-m-page="kalender"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></svg>Kalender</button>
       <button type="button" data-m-page="coach"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.5V16h0.5A2.5 2.5 0 0 1 5 13.5z"/></svg>Coach</button>
       <button type="button" data-m-page="training"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.5v5M6.5 7.5v9M17.5 7.5v9M20.5 9.5v5M6.5 12h11"/></svg>Training</button>
+      <button type="button" class="m-side-only" data-m-classic="analysis"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5h16M6.5 16l4-5 3.5 3 5-7"/></svg>Analyse</button>
+      <button type="button" class="m-side-only" data-m-classic="overview"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19.5V12M10 19.5V7M15 19.5v-5M20 19.5V4.5"/></svg>Insights</button>
       <button type="button" data-m-page="mehr"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/></svg>Mehr</button>
     </nav>
     <main id="m-body" class="m-body"></main>`;
