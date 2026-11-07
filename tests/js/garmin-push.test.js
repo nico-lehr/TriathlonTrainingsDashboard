@@ -52,13 +52,17 @@ test("Mit geht nur Geplantes der nächsten 7 Tage (plus von Hand Gesendetes)", (
 
 test("Abgleich schickt Schritte mit, Stand je Einheit", async () => {
   calls.length = 0;
-  app.replacePlannedWorkouts([{ id: "a", date: day(1), sport: "Laufen", duration_min: 40, intensity: "leicht", status: "geplant" }]);
+  app.replacePlannedWorkouts([{ id: "a", date: day(1), sport: "Laufen", duration_min: 40, intensity: "leicht", status: "geplant" },
+    { id: "z", date: day(30), sport: "Schwimmen", duration_min: 45, intensity: "mittel", status: "geplant" }]);
   vm.runInContext("garminPush = { ...garminPush, loaded: true, connected: true, auto: true, links: {}, busy: false }", app);
   assert.deepStrictEqual(plain(app.garminWatchStatus({ id: "a" })), { text: "Kommt auf die Uhr", kind: "wait" });
   await app.runGarminPush();
   const sync = calls.find(c => c.url === "garmin/workouts/sync");
   assert.strictEqual(sync.body.items[0].id, "a");
-  assert.strictEqual(sync.body.items[0].steps.length, 3);
+  // detaillierter Ablauf: Einlaufen, Grundlage, 4× Steigerung, Auslaufen
+  assert.deepStrictEqual(plain(sync.body.items[0].steps.map(s => s.type)), ["warmup", "interval", "repeat", "cooldown"]);
+  // auch Einheiten weit hinter den 7 Tagen schicken ihre Schritte mit (der Server merkt sie sich)
+  assert.deepStrictEqual(plain(sync.body.items.map(i => i.id)), ["a", "z"]);
   assert.deepStrictEqual(plain(app.garminWatchStatus({ id: "a" })), { text: "Auf der Uhr", kind: "ok" });
   vm.runInContext("garminPush.connected = false", app);
   assert.strictEqual(app.garminWatchStatus({ id: "a" }), null);

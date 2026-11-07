@@ -360,9 +360,10 @@ function renderPlanEditLessons(pw) {
 
 function workoutStepText(s) {
   if (s.type === "repeat") return `${s.count}× (${s.steps.map(workoutStepText).join(" / ")})`;
-  const amount = s.duration_min ? `${fmtNum(s.duration_min, 2)} min` : s.distance_km ? `${fmtNum(s.distance_km, 2)} km` : "bis Lap-Taste";
+  const amount = s.duration_min ? `${fmtNum(s.duration_min, 2)} min` : s.distance_km ? (s.distance_km < 1 ? `${Math.round(s.distance_km * 1000)} m` : `${fmtNum(s.distance_km, 2)} km`) : "bis Lap-Taste";
   const target = s.target && s.target.kind !== "none" ? ` · ${WORKOUT_TARGET_LABELS[s.target.kind]} ${s.target.zone}` : "";
-  return `${WORKOUT_STEP_LABELS[s.type]} · ${amount}${target}`;
+  const stroke = s.stroke && s.stroke !== "any" ? ` · ${WORKOUT_STROKE_LABELS[s.stroke]}` : "";
+  return `${s.note ? s.note.split(" · ")[0] : WORKOUT_STEP_LABELS[s.type]} · ${amount}${stroke}${target}`;
 }
 
 const stepOptionHtml = (value, label, selected) => `<option value="${value}"${selected ? " selected" : ""}>${label}</option>`;
@@ -371,7 +372,7 @@ function stepRowHtml(s) {
   const t = s.target || { kind: "none" };
   const unit = s.distance_km != null ? "km" : "min";
   return `
-    <div class="pe-step-row">
+    <div class="pe-step-row" data-note="${escapeHtml(s.note || "")}" data-stroke="${escapeHtml(s.stroke || "")}">
       <select class="coach-input pe-step-type" aria-label="Art">${WORKOUT_STEP_TYPES.filter(x => x !== "repeat").map(x => stepOptionHtml(x, WORKOUT_STEP_LABELS[x], s.type === x)).join("")}</select>
       <input type="number" class="coach-input pe-step-value" min="0" step="any" value="${s.distance_km ?? s.duration_min ?? ""}" placeholder="offen" aria-label="Dauer oder Distanz">
       <select class="coach-input pe-step-unit" aria-label="Einheit">${stepOptionHtml("min", "min", unit === "min")}${stepOptionHtml("km", "km", unit === "km")}</select>
@@ -412,6 +413,8 @@ function readStepRow(row) {
   const step = { type: row.querySelector(".pe-step-type").value };
   if (raw !== "") step[row.querySelector(".pe-step-unit").value === "km" ? "distance_km" : "duration_min"] = Number(raw);
   step.target = kind === "none" ? { kind } : { kind, zone: Number(row.querySelector(".pe-step-zone").value) };
+  if (row.dataset.note) step.note = row.dataset.note;   // Hinweis und Schwimmstil bleiben beim Bearbeiten erhalten
+  if (row.dataset.stroke) step.stroke = row.dataset.stroke;
   return step;
 }
 

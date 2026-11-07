@@ -268,6 +268,8 @@ function validateWorkoutSteps(steps) {
     else if (t.kind === "none") out.target = { kind: "none" };
     else if (Number.isInteger(t.zone) && t.zone >= 1 && t.zone <= 5) out.target = { kind: t.kind, zone: t.zone };
     else errors.push(`Schritt ${nr}: Zone 1–5 angeben.`);
+    if (typeof s.stroke === "string" && WORKOUT_STROKES.includes(s.stroke)) out.stroke = s.stroke;
+    if (typeof s.note === "string" && s.note.trim()) out.note = s.note.trim().slice(0, 100);
     return out;
   };
   if (!Array.isArray(steps) || !steps.length) return { steps: null, errors: ["Keine Schritte angegeben."] };
@@ -276,23 +278,205 @@ function validateWorkoutSteps(steps) {
   return { steps: errors.length ? null : cleaned, errors };
 }
 
-// HF-Zone des Hauptteils je Intensität. Bewusst keine erfundenen Intervalle:
-// "hart" wird ein durchgehender Block in Zone 4 - Intervalle trägt man selbst ein.
-const DEFAULT_STEP_HR_ZONE = { leicht: 2, mittel: 3, hart: 4 };
+// Schwimmstile (Garmin zeigt sie am Schritt): Kraul, Rücken, Brust, Delfin,
+// Technik, Lagen, beliebig.
+const WORKOUT_STROKES = ["free", "back", "breast", "fly", "drill", "im", "any"];
+const WORKOUT_STROKE_LABELS = { free: "Kraul", back: "Rücken", breast: "Brust", fly: "Delfin", drill: "Technik", im: "Lagen", any: "beliebig" };
 
-// Standard-Schritte aus Dauer + Intensität (wenn die Einheit keine eigenen
-// hat): ab 30 min Ausdauer Aufwärmen / Hauptteil / Abwärmen, sonst ein Block.
-// Schwimmen ohne Pulsziel (Handgelenk-Puls im Wasser unzuverlässig).
+/* ---------- Detaillierte Standard-Schritte (wie ein Garmin-Coach-Workout) ----------
+   Hat eine Einheit keine eigenen Schritte, baut defaultWorkoutSteps() einen
+   vollständigen Ablauf aus Sportart, Dauer und Intensität: Einlaufen /
+   Einschwimmen, Technik oder Lauf-ABC, Hauptsatz als Wiederholung mit
+   Pausen, Ausklang. Jeder Schritt hat einen kurzen Hinweis (note), den die
+   Uhr anzeigt; Schwimmen hat Distanzen (25-m-Bahn) und den Schwimmstil.
+   Ziele: Laufen Pace-Zone (Schwellenpace im Profil) sonst Puls-Zone, Rad
+   Leistungszone (FTP im Profil) sonst Puls-Zone, Schwimmen Pace-Zone (CSS
+   im Profil) sonst ohne Ziel. Steht im Titel/Text ein Satz wie "6×800 m"
+   oder "5 x 4 min", wird genau der der Hauptsatz. Die Zeiten ergeben
+   zusammen die geplante Dauer (Schwimmen: geschätzt aus der CSS). */
+const DEFAULT_STEP_HR_ZONE = { leicht: 2, mittel: 3, hart: 4 };
+const DEFAULT_SWIM_PACE_S = 120; // ohne CSS: 2:00 /100 m
+
+function stepProfile() {
+  return typeof athleteProfile !== "undefined" && athleteProfile ? athleteProfile : {};
+}
+
+// Ziel-Zone als Target je Sportart (siehe oben).
+function stepTarget(sport, zone) {
+  if (!zone) return { kind: "none" };
+  const prof = stepProfile();
+  if (sport === "Laufen") return { kind: prof.runThresholdPace ? "pace_zone" : "hr_zone", zone };
+  if (sport === "Rad") return { kind: prof.ftpWatts ? "power_zone" : "hr_zone", zone };
+  return prof.swimCss ? { kind: "pace_zone", zone } : { kind: "none" };
+}
+
+// "6×800 m", "5 x 4 min", "10x100m", "3 × 1,5 km" aus Titel/Beschreibung -> Satz.
+// Pause dahinter optional: "/ 2 min", "mit 90 s Pause", "P 20 s".
+function parseMainSet(pw) {
+  const text = `${pw.title || ""} ${pw.description || ""}`;
+  const m = /(\d{1,2})\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(km|m|min|sek|s)\b/i.exec(text);
+  if (!m) return null;
+  const count = Number(m[1]);
+  const value = Number(m[2].replace(",", "."));
+  const unit = m[3].toLowerCase();
+  if (!(count >= 2 && count <= 30) || !(value > 0)) return null;
+  const set = { count };
+  if (unit === "km") set.distance_km = value;
+  else if (unit === "m") set.distance_km = value / 1000;
+  else if (unit === "min") set.duration_min = value;
+  else set.duration_min = value / 60;
+  if (set.distance_km != null && !(set.distance_km >= 0.025 && set.distance_km <= 20)) return null;
+  if (set.duration_min != null && !(set.duration_min >= 0.25 && set.duration_min <= 60)) return null;
+  const after = text.slice(m.index + m[0].length, m.index + m[0].length + 40);
+  const r = /(?:\/|mit|P(?:ause)?|Trabpause)\s*(\d+(?:[.,]\d+)?)\s*(min|sek|s)\b/i.exec(after);
+  if (r) {
+    const v = Number(r[1].replace(",", "."));
+    const rest = /min/i.test(r[2]) ? v : v / 60;
+    if (rest > 0 && rest <= 15) set.rest_min = rest;
+  }
+  return set;
+}
+
+const roundTo = (v, step) => Math.round(v / step) * step;
+const clampNum = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const minutesRounded = v => Math.round(v * 60) / 60; // auf ganze Sekunden
+
 function defaultWorkoutSteps(pw) {
   const d = Number(pw.duration_min) > 0 ? Number(pw.duration_min) : null;
-  const endurance = ["Laufen", "Rad", "Schwimmen"].includes(pw.sport);
-  const zone = endurance && pw.sport !== "Schwimmen" ? DEFAULT_STEP_HR_ZONE[pw.intensity] : null;
-  const main = zone ? { kind: "hr_zone", zone } : { kind: "none" };
-  const step = (type, minutes, target) => (minutes ? { type, duration_min: minutes, target } : { type, target });
-  if (!endurance || !d || d < 30) return [step("interval", d, main)];
-  const warm = d >= 60 ? 15 : 10;
+  const sport = pw.sport;
+  const intensity = ["leicht", "mittel", "hart"].includes(pw.intensity) ? pw.intensity : "leicht";
+  if (!["Laufen", "Rad", "Schwimmen"].includes(sport) || !d) {
+    const zone = ["Laufen", "Rad"].includes(sport) ? DEFAULT_STEP_HR_ZONE[pw.intensity] : null;
+    const main = zone ? stepTarget(sport, zone) : { kind: "none" };
+    return [d ? { type: "interval", duration_min: d, target: main } : { type: "interval", target: main }];
+  }
+  return sport === "Schwimmen" ? swimSteps(pw, d, intensity) : landSteps(pw, d, intensity);
+}
+
+// Wiederholungen, die in `left` Minuten passen; reicht die Zeit nicht für
+// minCount, werden Belastung und Erholung kürzer (nie unter 1 min / 30 s).
+function fitSet(left, work, rest, minCount, maxCount) {
+  let count = Math.floor(left / (work + rest));
+  if (count < minCount) {
+    count = minCount;
+    const per = left / count;
+    rest = Math.min(rest, Math.max(0.5, Math.floor(per / 3 * 2) / 2));
+    work = Math.max(1, Math.floor((per - rest) * 2) / 2);
+  }
+  count = Math.min(count, maxCount);
+  return { count, work: { duration_min: work }, workMin: work, rest };
+}
+
+const timeStep = (type, minutes, target, note) => ({ type, duration_min: minutesRounded(minutes), target, ...(note ? { note } : {}) });
+
+// Laufen und Rad: Aufwärmen, (Grundlage), Hauptsatz, Abwärmen - in Minuten.
+function landSteps(pw, d, intensity) {
+  const sport = pw.sport;
+  const run = sport === "Laufen";
+  const T = z => (z > 1 ? stepTarget(sport, z) : { kind: "none" }); // locker = ohne Ziel (kein Piepen)
+  const warm = d >= 60 ? 15 : d >= 30 ? 10 : 5;
   const cool = d >= 60 ? 10 : 5;
-  return [step("warmup", warm, { kind: "none" }), step("interval", d - warm - cool, main), step("cooldown", cool, { kind: "none" })];
+  const word = run ? ["Einlaufen", "Auslaufen", "Traben"] : ["Einrollen", "Ausrollen", "Locker kurbeln"];
+  if (d < 20) return [timeStep("interval", d, T(DEFAULT_STEP_HR_ZONE[intensity]), "Locker und gleichmäßig")];
+  const out = [timeStep("warmup", warm, T(1), `${word[0]} · ganz locker`)];
+  const left = d - warm - cool;
+
+  // Hauptsatz: aus dem Text oder je Intensität
+  const parsed = parseMainSet(pw);
+  let set = null;
+  if (parsed) {
+    const zone = intensity === "hart" ? (parsed.distance_km != null && parsed.distance_km <= 0.6 || (parsed.duration_min || 99) <= 3 ? 5 : 4) : intensity === "mittel" ? 3 : 2;
+    const paceS = run ? (paceToSeconds(stepProfile().runThresholdPace) || 330) : null;
+    const workMin = parsed.duration_min != null ? parsed.duration_min : run ? parsed.distance_km * paceS / 60 : parsed.distance_km / 0.5; // Rad ~30 km/h
+    const rest = parsed.rest_min != null ? parsed.rest_min : intensity === "hart" ? 2 : 1.5;
+    set = { count: parsed.count, work: parsed.duration_min != null ? { duration_min: minutesRounded(parsed.duration_min) } : { distance_km: parsed.distance_km },
+      workMin, rest, zone, note: `${parsed.count}× ${parsed.distance_km != null ? (parsed.distance_km < 1 ? `${Math.round(parsed.distance_km * 1000)} m` : `${parsed.distance_km} km`) : `${minutesRounded(parsed.duration_min)} min`} · Zone ${zone}` };
+  } else if (intensity === "mittel") {
+    set = fitSet(left, run ? (d >= 60 ? 10 : 8) : (d >= 75 ? 15 : 10), run ? 2 : 5, 2, run ? 5 : 4);
+    Object.assign(set, { zone: 3, note: run ? "Tempo · zügig, aber kontrolliert" : "Sweet Spot · kräftig, gleichmäßig treten" });
+  } else if (intensity === "hart") {
+    const vo2 = d < 50;
+    set = fitSet(left, run ? (vo2 ? 3 : 5) : (vo2 ? 3 : 8), run ? 2 : (vo2 ? 3 : 4), 3, vo2 ? 8 : 6);
+    Object.assign(set, { zone: vo2 ? 5 : 4, note: vo2 ? "Hart · VO2max, letzte Wiederholung gleich schnell" : "Schwelle · hart, aber gleichmäßig" });
+  }
+
+  if (set) {
+    const setMin = set.count * (set.workMin + set.rest);
+    const base = parsed ? Math.round(left - setMin) : left - setMin; // Sätze aus dem Text: geschätzt -> ganze Minuten
+    if (base >= 5) out.push(timeStep("interval", base, T(2), "Grundlage · locker, Reden geht"));
+    else if (base > 0) out[0].duration_min = minutesRounded(out[0].duration_min + base);
+    const work = { type: "interval", ...set.work, target: T(set.zone), note: set.note };
+    const rec = timeStep("recovery", set.rest, T(1), run ? "Traben · locker erholen" : "Locker kurbeln · erholen");
+    out.push({ type: "repeat", count: set.count, steps: [work, rec] });
+    out.push(timeStep("cooldown", cool, T(1), `${word[1]} · ganz locker`));
+    return out;
+  }
+
+  // leicht: Grundlage, ab 40 min mit Steigerungen (Laufen) bzw. Trittfrequenz (Rad)
+  if (d >= 40) {
+    const extra = run ? { count: 4, work: 20 / 60, rest: 40 / 60, zone: 5, note: "Steigerung · locker schnell, kein Sprint", restNote: "Gehen oder traben" }
+      : { count: 3, work: 1, rest: 2, zone: 3, note: "Hohe Trittfrequenz · über 100/min", restNote: "Locker kurbeln" };
+    const extraMin = extra.count * (extra.work + extra.rest);
+    out.push(timeStep("interval", left - extraMin, T(2), "Grundlage · locker, Reden geht"));
+    out.push({ type: "repeat", count: extra.count, steps: [
+      timeStep("interval", extra.work, run ? { kind: "none" } : T(extra.zone), extra.note),
+      timeStep("recovery", extra.rest, T(1), extra.restNote),
+    ] });
+  } else {
+    out.push(timeStep("interval", left, T(2), "Grundlage · locker, Reden geht"));
+  }
+  out.push(timeStep("cooldown", cool, T(1), `${word[1]} · ganz locker`));
+  return out;
+}
+
+// Schwimmen: Einschwimmen, Technik, Hauptsatz, Ausschwimmen - in Metern
+// (vielfache von 50 m bzw. 25 m), Zeit geschätzt aus CSS bzw. 2:00 /100 m.
+function swimSteps(pw, d, intensity) {
+  const css = paceToSeconds(stepProfile().swimCss) || DEFAULT_SWIM_PACE_S;
+  const T = z => stepTarget("Schwimmen", z);
+  const secs = (m, f) => m / 100 * css * f; // f = langsamer/schneller als CSS
+  const km = m => Math.round(m) / 1000;
+  const swim = (type, meters, stroke, target, note) => ({ type, distance_km: km(meters), stroke, target, note });
+  const rest = (s, note) => ({ type: "rest", duration_min: s / 60, target: { kind: "none" }, note: note || "Pause am Rand" });
+  let budget = d * 60;
+  const out = [];
+
+  const warmM = clampNum(roundTo(d * 60 * 0.15 / secs(1, 1.25), 50), 100, 400);
+  out.push(swim("warmup", warmM, "free", { kind: "none" }, "Einschwimmen · locker, lang gleiten"));
+  budget -= secs(warmM, 1.25);
+  const coolM = d >= 45 ? 200 : 100;
+  budget -= secs(coolM, 1.3);
+
+  if (d >= 25) {
+    const n = d >= 50 ? 8 : d >= 35 ? 6 : 4;
+    out.push({ type: "repeat", count: n, steps: [
+      swim("interval", 50, "drill", { kind: "none" }, "Technik · z. B. Abschlag, Faust, Zählen"),
+      rest(15),
+    ] });
+    budget -= n * (secs(50, 1.4) + 15) - 15;
+  }
+
+  const parsed = parseMainSet(pw);
+  let set;
+  if (parsed && parsed.distance_km != null) {
+    const len = clampNum(roundTo(parsed.distance_km * 1000, 25), 25, 1500);
+    const zone = intensity === "hart" ? (len <= 50 ? 5 : 4) : intensity === "mittel" ? 3 : 2;
+    set = { len, count: parsed.count, rest: Math.round((parsed.rest_min != null ? parsed.rest_min * 60 : len <= 100 ? 20 : 30)), zone };
+  } else {
+    const len = intensity === "leicht" ? (d >= 60 ? 300 : 200) : intensity === "mittel" ? (d >= 60 ? 200 : 100) : (d < 35 ? 50 : 100);
+    const restS = intensity === "leicht" ? 20 : intensity === "mittel" ? 15 : (len <= 50 ? 30 : 20);
+    const zone = intensity === "leicht" ? 2 : intensity === "mittel" ? 3 : (len <= 50 ? 5 : 4);
+    const f = { 2: 1.15, 3: 1.05, 4: 1.0, 5: 0.94 }[zone];
+    const count = clampNum(Math.floor((budget + restS) / (secs(len, f) + restS)), 2, 30);
+    set = { len, count, rest: restS, zone };
+  }
+  const words = { 2: "Gleichmäßig locker · saubere Technik", 3: "Zügig · gleichmäßiges Tempo", 4: "Hart · CSS-Tempo halten", 5: "Sehr schnell · volle Kraft" };
+  out.push({ type: "repeat", count: set.count, steps: [
+    swim("interval", set.len, "free", T(set.zone), `Hauptsatz · ${words[set.zone]}`),
+    rest(set.rest),
+  ] });
+  out.push(swim("cooldown", coolM, "any", { kind: "none" }, "Ausschwimmen · locker, beliebiger Stil"));
+  return out;
 }
 
 // Die Schritte, die wirklich verwendet werden (.fit-Export, Garmin-Versand):

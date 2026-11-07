@@ -819,8 +819,17 @@ function mStepTarget(s) {
 }
 
 function mStepAmount(s) {
-  return s.duration_min ? mDur(s.duration_min) : s.distance_km ? `${mNum(s.distance_km, s.distance_km < 1 ? 2 : 1)} km` : "bis Runde";
+  if (s.duration_min) return s.duration_min < 1 ? `${Math.round(s.duration_min * 60)} s` : s.duration_min % 1 ? `${Math.floor(s.duration_min)}:${String(Math.round(s.duration_min % 1 * 60)).padStart(2, "0")} min` : mDur(s.duration_min);
+  return s.distance_km ? (s.distance_km < 1 ? `${Math.round(s.distance_km * 1000)} m` : `${mNum(s.distance_km, 1)} km`) : "bis Runde";
 }
+
+// Zweite Zeile eines Schritts: Hinweis, Schwimmstil, Ziel.
+function mStepMeta(s) {
+  const stroke = s.stroke && s.stroke !== "any" && typeof WORKOUT_STROKE_LABELS !== "undefined" ? WORKOUT_STROKE_LABELS[s.stroke] : "";
+  const note = s.note && s.note.includes(" · ") ? s.note.split(" · ").slice(1).join(" · ") : ""; // Teil 1 ist der Name
+  return [stroke, mStepTarget(s), note].filter(Boolean).join(" · ");
+}
+const mStepName = s => (s.note ? s.note.split(" · ")[0] : WORKOUT_STEP_LABELS[s.type]);
 
 // Kurzform für Listen: "15′ Aufwärmen · 45′ Zone 2 · 10′ Abwärmen"
 function mStepSummary(p) {
@@ -879,9 +888,9 @@ function mPlanSheetHtml(p) {
     const rows = steps.map(s => {
       if (s.type === "repeat") {
         return `<li class="m-step"><i style="background:${sport.color}"></i><div class="m-grow"><b>${s.count}× wiederholen</b>
-          ${s.steps.map(x => `<span class="m-row-meta">${mEsc(WORKOUT_STEP_LABELS[x.type])} · ${mStepAmount(x)}${mStepTarget(x) ? ` · ${mEsc(mStepTarget(x))}` : ""}</span>`).join("")}</div></li>`;
+          ${s.steps.map(x => `<span class="m-row-meta">${mEsc(mStepName(x))} · ${mStepAmount(x)}${mStepMeta(x) ? ` · ${mEsc(mStepMeta(x))}` : ""}</span>`).join("")}</div></li>`;
       }
-      return `<li class="m-step"><i style="background:${M_STEP_COLOR[s.type] || sport.color}"></i><div class="m-grow"><b>${mEsc(WORKOUT_STEP_LABELS[s.type])}</b>${mStepTarget(s) ? `<span class="m-row-meta">${mEsc(mStepTarget(s))}</span>` : ""}</div><span class="m-step-amt">${mStepAmount(s)}</span></li>`;
+      return `<li class="m-step"><i style="background:${M_STEP_COLOR[s.type] || sport.color}"></i><div class="m-grow"><b>${mEsc(mStepName(s))}</b>${mStepMeta(s) ? `<span class="m-row-meta">${mEsc(mStepMeta(s))}</span>` : ""}</div><span class="m-step-amt">${mStepAmount(s)}</span></li>`;
     }).join("");
     flow = `<section class="m-card"><div class="m-head"><h2>Ablauf</h2><span class="m-head-note">so läuft es auf der Uhr</span></div>
       <div class="m-flowbar" aria-hidden="true">${bar}</div><ol class="m-steps">${rows}</ol></section>`;

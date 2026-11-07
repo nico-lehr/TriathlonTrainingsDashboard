@@ -158,6 +158,8 @@ SPORT = {"running": "RUNNING", "cycling": "CYCLING", "swimming": "LAP_SWIMMING",
 INTENSITY = {"warmup": "WARMUP", "cooldown": "COOLDOWN", "interval": "INTERVAL", "recovery": "RECOVERY", "rest": "REST"}
 DURATION = {"time": "TIME", "distance": "DISTANCE", "lap.button": "OPEN", "reps": "REPS"}
 TARGET = {"heart.rate.zone": "HEART_RATE", "power.zone": "POWER", "pace.zone": "PACE"}
+STROKE = {"free": "FREESTYLE", "backstroke": "BACKSTROKE", "breaststroke": "BREASTSTROKE", "fly": "BUTTERFLY",
+          "drill": "DRILL", "individual_medley": "IM"}
 
 
 def convert_step(s):
@@ -174,6 +176,9 @@ def convert_step(s):
         out["targetValue"] = s["zoneNumber"]
     if "targetValueOne" in s:
         out["targetValueLow"], out["targetValueHigh"] = s["targetValueOne"], s["targetValueTwo"]
+    stroke = STROKE.get((s.get("strokeType") or {}).get("strokeTypeKey"))
+    if stroke:
+        out["strokeType"] = stroke
     if s.get("category"):
         out["exerciseCategory"], out["exerciseName"] = s["category"], s.get("exerciseName")
     if s.get("weightValue"):
@@ -184,10 +189,14 @@ def convert_step(s):
 def convert_workout(payload):
     sport = SPORT.get(payload["sportType"]["sportTypeKey"], "GENERIC")
     segment = payload["workoutSegments"][0]
-    return {"workoutName": payload["workoutName"], "description": payload.get("description"), "sport": sport,
-            "estimatedDurationInSecs": payload.get("estimatedDurationInSecs"),
-            "workoutProvider": PROVIDER, "workoutSourceId": PROVIDER,
-            "segments": [{"segmentOrder": 1, "sport": sport, "steps": [convert_step(s) for s in segment["workoutSteps"]]}]}
+    out = {"workoutName": payload["workoutName"], "description": payload.get("description"), "sport": sport,
+           "estimatedDurationInSecs": payload.get("estimatedDurationInSecs"),
+           "workoutProvider": PROVIDER, "workoutSourceId": PROVIDER,
+           "segments": [{"segmentOrder": 1, "sport": sport, "steps": [convert_step(s) for s in segment["workoutSteps"]]}]}
+    if payload.get("poolLength"):
+        out["poolLength"], out["poolLengthUnit"] = payload["poolLength"], "METER"
+        out["segments"][0].update(poolLength=payload["poolLength"], poolLengthUnit="METER")
+    return out
 
 
 class TrainingApiClient:

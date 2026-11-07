@@ -49,6 +49,10 @@ END_LAP_BUTTON = {"conditionTypeId": 1, "conditionTypeKey": "lap.button", "displ
 END_ITERATIONS = {"conditionTypeId": 7, "conditionTypeKey": "iterations", "displayOrder": 7, "displayable": False}
 END_REPS = {"conditionTypeId": 10, "conditionTypeKey": "reps", "displayOrder": 10, "displayable": True}
 WEIGHT_KG = {"unitId": 8, "unitKey": "kilogram", "factor": 1000.0}
+# Schwimmen: Stil je Schritt (Garmin strokeType) und 25-m-Bahn.
+STROKES = {"any": (1, "any_stroke"), "back": (2, "backstroke"), "breast": (3, "breaststroke"), "drill": (4, "drill"),
+           "fly": (5, "fly"), "free": (6, "free"), "im": (7, "individual_medley")}
+POOL_25M = {"poolLength": 25.0, "poolLengthUnit": {"unitId": 1, "unitKey": "meter", "factor": 100.0}}
 
 # Uebungen der Dashboard-Sammlungen (js/data/strength-exercises.js,
 # js/data/mobility-exercises.js) -> Garmins Uebungskatalog (Kategorie, Uebung).
@@ -194,6 +198,14 @@ def garmin_end(step):
     return {"endCondition": END_LAP_BUTTON}  # ohne Dauer/Distanz: weiter per Lap-Taste
 
 
+def garmin_stroke(step):
+    stroke = step.get("stroke")
+    if isinstance(stroke, str) and stroke in STROKES:
+        sid, key = STROKES[stroke]
+        return {"strokeType": {"strokeTypeId": sid, "strokeTypeKey": key, "displayOrder": sid}}
+    return {}
+
+
 def garmin_steps(steps, counter, nested=False, sport=None):
     """Schritte im Dashboard-Format -> workoutSteps von Garmin. stepOrder zaehlt
     durch alle Ebenen fortlaufend (Wiederholung vor ihren Schritten)."""
@@ -217,6 +229,8 @@ def garmin_steps(steps, counter, nested=False, sport=None):
                         "endCondition": END_ITERATIONS, "endConditionValue": float(count), "smartRepeat": False})
         else:
             item = {"type": "ExecutableStepDTO", **base, **garmin_end(step), **garmin_target(step)}
+            if sport == "Schwimmen":
+                item.update(garmin_stroke(step))
             note = step_note(step, sport)
             if note:
                 item["description"] = note
@@ -255,13 +269,32 @@ def garmin_workout(entry, steps):
     sport_id, sport_key, order = SPORTS[entry["sport"]]
     sport = {"sportTypeId": sport_id, "sportTypeKey": sport_key, "displayOrder": order}
     workout_steps = garmin_steps(steps, [0], sport=entry["sport"])
-    return {
+    estimate = minutes_or_zero(entry.get("duration_min")) * 60 if entry["sport"] == "Schwimmen" else timed_seconds(workout_steps)
+    workout = {
         "workoutName": str(entry.get("title") or entry["sport"])[:80],
         "sportType": sport,
-        "estimatedDurationInSecs": int(timed_seconds(workout_steps) or minutes_or_zero(entry.get("duration_min")) * 60),
+        "estimatedDurationInSecs": int(estimate or timed_seconds(workout_steps) or minutes_or_zero(entry.get("duration_min")) * 60),
         "workoutSegments": [{"segmentOrder": 1, "sportType": sport, "workoutSteps": workout_steps}],
         "description": workout_description(entry),
     }
+    if entry["sport"] == "Schwimmen":
+        workout.update(POOL_25M)
+    return workout
+
+
+def without_swim_details(workout):
+    """Vorsichtige Ersatz-Variante, falls Garmin Stil/Bahnlaenge ablehnt."""
+    def strip(steps):
+        out = []
+        for st in steps:
+            st = {k: v for k, v in st.items() if k != "strokeType"}
+            if st["type"] == "RepeatGroupDTO":
+                st["workoutSteps"] = strip(st["workoutSteps"])
+            out.append(st)
+        return out
+    plain = {k: v for k, v in workout.items() if k not in POOL_25M}
+    plain["workoutSegments"] = [{**seg, "workoutSteps": strip(seg["workoutSteps"])} for seg in workout["workoutSegments"]]
+    return plain
 
 
 def number_in(text):
@@ -390,21 +423,171 @@ def exercise_workouts(entry, exercises):
 
 
 DEFAULT_HR_ZONE = {"leicht": 2, "mittel": 3, "hart": 4}
+SWIM_PACE_S = 120  # ohne CSS: 2:00 /100 m
+MAIN_SET = re.compile(r"(\d{1,2})\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(km|m|min|sek|s)\b", re.I)
+SET_REST = re.compile(r"(?:/|mit|P(?:ause)?|Trabpause)\s*(\d+(?:[.,]\d+)?)\s*(min|sek|s)\b", re.I)
+
+
+def parse_main_set(entry):
+    """Wie parseMainSet() im Browser: "6×800 m mit 2 min Trabpause" -> Satz."""
+    text = f"{entry.get('title') or ''} {entry.get('description') or ''}"
+    m = MAIN_SET.search(text)
+    if not m:
+        return None
+    count, value, unit = int(m.group(1)), float(m.group(2).replace(",", ".")), m.group(3).lower()
+    if not (2 <= count <= 30) or value <= 0:
+        return None
+    out = {"count": count}
+    if unit in ("km", "m"):
+        out["distance_km"] = value if unit == "km" else value / 1000
+        if not 0.025 <= out["distance_km"] <= 20:
+            return None
+    else:
+        out["duration_min"] = value if unit == "min" else value / 60
+        if not 0.25 <= out["duration_min"] <= 60:
+            return None
+    r = SET_REST.search(text[m.end():m.end() + 40])
+    if r:
+        v = float(r.group(1).replace(",", "."))
+        rest = v if r.group(2).lower() == "min" else v / 60
+        if 0 < rest <= 15:
+            out["rest_min"] = rest
+    return out
+
+
+def jsround(x):
+    """Runden wie Math.round im Browser (2.5 -> 3), damit beide Seiten gleich rechnen."""
+    return math.floor(x + 0.5)
+
+
+def sec_round(minutes):
+    return jsround(minutes * 60) / 60
+
+
+def tstep(kind, minutes, target, note):
+    return {"type": kind, "duration_min": sec_round(minutes), "target": target, "note": note}
+
+
+def fit_set(left, work, rest, low, high):
+    count = int(left // (work + rest))
+    if count < low:
+        count = low
+        per = left / count
+        rest = min(rest, max(0.5, math.floor(per / 3 * 2) / 2))
+        work = max(1.0, math.floor((per - rest) * 2) / 2)
+    return min(count, high), work, rest
+
+
+def land_steps(entry, d, intensity):
+    """Laufen/Rad wie landSteps() im Browser (Ziele hier immer Puls-Zonen)."""
+    run = entry["sport"] == "Laufen"
+
+    def tgt(zone):
+        return {"kind": "hr_zone", "zone": zone} if zone and zone > 1 else {"kind": "none"}
+    if d < 20:
+        return [tstep("interval", d, tgt(DEFAULT_HR_ZONE[intensity]), "Locker und gleichmäßig")]
+    warm = 15 if d >= 60 else 10 if d >= 30 else 5
+    cool = 10 if d >= 60 else 5
+    word = ("Einlaufen", "Auslaufen") if run else ("Einrollen", "Ausrollen")
+    out = [tstep("warmup", warm, tgt(1), f"{word[0]} · ganz locker")]
+    left = d - warm - cool
+    parsed = parse_main_set(entry)
+    work_end, note, zone = None, "", 2
+    if parsed:
+        short = parsed.get("distance_km", 99) <= 0.6 or parsed.get("duration_min", 99) <= 3
+        zone = (5 if short else 4) if intensity == "hart" else 3 if intensity == "mittel" else 2
+        count = parsed["count"]
+        if "duration_min" in parsed:
+            work_min = parsed["duration_min"]
+            work_end = {"duration_min": sec_round(work_min)}
+            amount = f"{sec_round(work_min):g} min"
+        else:
+            km = parsed["distance_km"]
+            work_min = km * 330 / 60 if run else km / 0.5
+            work_end = {"distance_km": km}
+            amount = f"{jsround(km * 1000)} m" if km < 1 else f"{km:g} km"
+        rest = parsed.get("rest_min", 2 if intensity == "hart" else 1.5)
+        note = f"{count}× {amount} · Zone {zone}"
+    elif intensity == "mittel":
+        count, work_min, rest = fit_set(left, (10 if d >= 60 else 8) if run else (15 if d >= 75 else 10), 2 if run else 5,
+                                        2, 5 if run else 4)
+        zone, note = 3, "Tempo · zügig, aber kontrolliert" if run else "Sweet Spot · kräftig, gleichmäßig treten"
+    elif intensity == "hart":
+        vo2 = d < 50
+        count, work_min, rest = fit_set(left, (3 if vo2 else 5) if run else (3 if vo2 else 8),
+                                        2 if run else (3 if vo2 else 4), 3, 8 if vo2 else 6)
+        zone = 5 if vo2 else 4
+        note = "Hart · VO2max, letzte Wiederholung gleich schnell" if vo2 else "Schwelle · hart, aber gleichmäßig"
+    if parsed or intensity in ("mittel", "hart"):
+        base = left - count * (work_min + rest)
+        if parsed:
+            base = jsround(base)  # Saetze aus dem Text: geschaetzt -> ganze Minuten
+        if base >= 5:
+            out.append(tstep("interval", base, tgt(2), "Grundlage · locker, Reden geht"))
+        elif base > 0:
+            out[0]["duration_min"] = sec_round(out[0]["duration_min"] + base)
+        work = {"type": "interval", **(work_end or {"duration_min": sec_round(work_min)}), "target": tgt(zone), "note": note}
+        rec = tstep("recovery", rest, tgt(1), "Traben · locker erholen" if run else "Locker kurbeln · erholen")
+        out.append({"type": "repeat", "count": count, "steps": [work, rec]})
+    elif d >= 40:
+        n, w, r, z, wn, rn = ((4, 20 / 60, 40 / 60, None, "Steigerung · locker schnell, kein Sprint", "Gehen oder traben") if run
+                              else (3, 1, 2, 3, "Hohe Trittfrequenz · über 100/min", "Locker kurbeln"))
+        out.append(tstep("interval", left - n * (w + r), tgt(2), "Grundlage · locker, Reden geht"))
+        out.append({"type": "repeat", "count": n, "steps": [tstep("interval", w, tgt(z), wn), tstep("recovery", r, tgt(1), rn)]})
+    else:
+        out.append(tstep("interval", left, tgt(2), "Grundlage · locker, Reden geht"))
+    out.append(tstep("cooldown", cool, tgt(1), f"{word[1]} · ganz locker"))
+    return out
+
+
+def swim_steps(entry, d, intensity):
+    """Schwimmen wie swimSteps() im Browser (ohne CSS: 2:00 /100 m, ohne Pace-Ziel)."""
+    def secs(m, f):
+        return m / 100 * SWIM_PACE_S * f
+
+    def swim(kind, meters, stroke, note):
+        return {"type": kind, "distance_km": jsround(meters) / 1000, "stroke": stroke, "target": {"kind": "none"}, "note": note}
+
+    def rest(s):
+        return {"type": "rest", "duration_min": s / 60, "target": {"kind": "none"}, "note": "Pause am Rand"}
+    budget = d * 60
+    warm = min(400, max(100, jsround(d * 60 * 0.15 / secs(1, 1.25) / 50) * 50))
+    cool = 200 if d >= 45 else 100
+    out = [swim("warmup", warm, "free", "Einschwimmen · locker, lang gleiten")]
+    budget -= secs(warm, 1.25) + secs(cool, 1.3)
+    if d >= 25:
+        n = 8 if d >= 50 else 6 if d >= 35 else 4
+        out.append({"type": "repeat", "count": n, "steps": [swim("interval", 50, "drill", "Technik · z. B. Abschlag, Faust, Zählen"), rest(15)]})
+        budget -= n * (secs(50, 1.4) + 15) - 15
+    parsed = parse_main_set(entry)
+    if parsed and "distance_km" in parsed:
+        length = min(1500, max(25, jsround(parsed["distance_km"] * 1000 / 25) * 25))
+        zone = (5 if length <= 50 else 4) if intensity == "hart" else 3 if intensity == "mittel" else 2
+        count = parsed["count"]
+        rest_s = jsround(parsed["rest_min"] * 60) if "rest_min" in parsed else (20 if length <= 100 else 30)
+    else:
+        length = {"leicht": 300 if d >= 60 else 200, "mittel": 200 if d >= 60 else 100, "hart": 50 if d < 35 else 100}[intensity]
+        rest_s = {"leicht": 20, "mittel": 15, "hart": 30 if length <= 50 else 20}[intensity]
+        zone = {"leicht": 2, "mittel": 3, "hart": 5 if length <= 50 else 4}[intensity]
+        f = {2: 1.15, 3: 1.05, 4: 1.0, 5: 0.94}[zone]
+        count = min(30, max(2, int((budget + rest_s) // (secs(length, f) + rest_s))))
+    words = {2: "Gleichmäßig locker · saubere Technik", 3: "Zügig · gleichmäßiges Tempo", 4: "Hart · CSS-Tempo halten",
+             5: "Sehr schnell · volle Kraft"}
+    out.append({"type": "repeat", "count": count, "steps": [swim("interval", length, "free", f"Hauptsatz · {words[zone]}"), rest(rest_s)]})
+    out.append(swim("cooldown", cool, "any", "Ausschwimmen · locker, beliebiger Stil"))
+    return out
 
 
 def default_steps(entry):
     """Wie defaultWorkoutSteps() in js/data/planned-workouts.js - fuer Einheiten,
-    deren Schritte der Browser (noch) nicht geschickt hat."""
+    deren Schritte der Browser (noch) nicht geschickt hat: vollstaendiger
+    Ablauf mit Aufwaermen, Hauptsatz als Wiederholung, Pausen, Ausklang."""
     d = minutes_or_zero(entry.get("duration_min")) or None
-    zone = DEFAULT_HR_ZONE.get(entry.get("intensity")) if entry.get("sport") != "Schwimmen" else None
-    main = {"kind": "hr_zone", "zone": zone} if zone else {"kind": "none"}
-
-    def st(kind, minutes, target):
-        return {"type": kind, "duration_min": minutes, "target": target} if minutes else {"type": kind, "target": target}
-    if not d or d < 30:
-        return [st("interval", d, main)]
-    warm, cool = (15, 10) if d >= 60 else (10, 5)
-    return [st("warmup", warm, {"kind": "none"}), st("interval", d - warm - cool, main), st("cooldown", cool, {"kind": "none"})]
+    intensity = entry.get("intensity") if entry.get("intensity") in DEFAULT_HR_ZONE else "leicht"
+    if not d:
+        zone = DEFAULT_HR_ZONE.get(entry.get("intensity")) if entry.get("sport") != "Schwimmen" else None
+        return [{"type": "interval", "target": {"kind": "hr_zone", "zone": zone} if zone else {"kind": "none"}}]
+    return swim_steps(entry, d, intensity) if entry.get("sport") == "Schwimmen" else land_steps(entry, d, intensity)
 
 
 def workout_variants(entry, steps=None, exercises=None):
@@ -413,7 +596,8 @@ def workout_variants(entry, steps=None, exercises=None):
     if sport in EXERCISE_SPORTS:
         return exercise_workouts(entry, exercises if exercises else entry.get("exercises"))
     if sport in SPORTS:
-        return [garmin_workout(entry, steps or entry.get("steps") or default_steps(entry))]
+        workout = garmin_workout(entry, steps or entry.get("steps") or default_steps(entry))
+        return [workout, without_swim_details(workout)] if sport == "Schwimmen" else [workout]
     raise ValueError("Sportart nicht unterstützt")
 
 

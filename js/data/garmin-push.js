@@ -79,13 +79,23 @@ function garminPushCandidates(today = todayStr()) {
     && (p.date <= end || (garminPush.links[p.id] && garminPush.links[p.id].pinned)));
 }
 
+// Schritte/Übungen ALLER kommenden Einheiten (nicht nur der nächsten 7 Tage):
+// Der Server merkt sie sich und legt damit später auch dann das detaillierte
+// Workout an, wenn eine Einheit ins 7-Tage-Fenster rückt, während das
+// Dashboard zu ist. Höchstens 120 (MAX_DETAILS in backend/garmin_push.py),
+// die nächsten zuerst.
+function garminPushDetailItems(today = todayStr()) {
+  return plannedWorkouts.filter(p => p.date >= today && (p.status || "geplant") === "geplant" && garminSupported(p))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).slice(0, 120).map(garminPushDetails);
+}
+
 async function runGarminPush() {
   if (!garminPush.connected || !garminPush.auto || garminPush.busy) return null;
   garminPush.busy = true;
   setGarminPush({});
   try {
     await storeSaved(PLANNED_WORKOUTS_KEY); // der Server liest den Plan aus der Ablage
-    const res = await apiCall("garmin/workouts/sync", "POST", { items: garminPushCandidates().map(garminPushDetails) }, { timeoutMs: 120000 });
+    const res = await apiCall("garmin/workouts/sync", "POST", { items: garminPushDetailItems() }, { timeoutMs: 120000 });
     const d = res.data || {};
     setGarminPush({ busy: false, error: null, links: d.links || garminPush.links,
       last_result: d.skipped ? garminPush.last_result : d, last_run_at: d.ran_at || garminPush.last_run_at });

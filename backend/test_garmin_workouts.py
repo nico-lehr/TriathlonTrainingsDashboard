@@ -111,15 +111,19 @@ class GarminWorkoutTest(unittest.TestCase):
         self.assertEqual((recovery["targetType"]["workoutTargetTypeKey"], recovery["zoneNumber"]), ("heart.rate.zone", 1))
         self.assertEqual((cooldown["stepOrder"], cooldown["endCondition"]["conditionTypeKey"], cooldown["targetType"]["workoutTargetTypeKey"]), (5, "lap.button", "no.target"))
 
-    def test_ohne_schritte_ein_block_ueber_die_dauer(self):
+    def test_ohne_schritte_detaillierter_ablauf(self):
         self.connect_garmin()
         self.assertEqual(self.send().status_code, 200)
-        # Wie defaultWorkoutSteps() im Browser: 50 min hart -> 10 / 35 (Zone 4) / 5 min
+        # Wie defaultWorkoutSteps() im Browser: "6x400m" im Titel wird der Hauptsatz
         steps = self.garmin.return_value.upload_workout.call_args.args[0]["workoutSegments"][0]["workoutSteps"]
-        self.assertEqual([(s["stepType"]["stepTypeKey"], s["endConditionValue"]) for s in steps],
-                         [("warmup", 600.0), ("interval", 2100.0), ("cooldown", 300.0)])
-        self.assertEqual(steps[1]["zoneNumber"], 4)
-        self.assertIn("Zone 4", steps[1]["description"])
+        self.assertEqual([s["stepType"]["stepTypeKey"] for s in steps], ["warmup", "interval", "repeat", "cooldown"])
+        repeat = steps[2]
+        self.assertEqual(repeat["numberOfIterations"], 6)
+        work, rec = repeat["workoutSteps"]
+        self.assertEqual((work["endCondition"]["conditionTypeKey"], work["endConditionValue"], work["zoneNumber"]), ("distance", 400.0, 5))
+        self.assertEqual(work["description"], "6× 400 m · Zone 5")
+        self.assertEqual((rec["endConditionValue"], rec["description"]), (120.0, "Traben · locker erholen"))
+        self.assertEqual(steps[0]["description"], "Einlaufen · ganz locker")
 
     def test_kalender_klappt_nicht_workout_trotzdem_gesendet(self):
         self.connect_garmin()
@@ -221,6 +225,54 @@ class GarminWorkoutTest(unittest.TestCase):
         r = self.send(TEXT_DURATION_ID, body={"steps": [{"type": "interval", "distance_km": 10}]})
         self.assertEqual(r.status_code, 200, r.get_json())
         self.assertEqual(self.garmin.return_value.upload_workout.call_args.args[0]["estimatedDurationInSecs"], 3000)
+
+
+
+class SwimAndDefaultsTest(unittest.TestCase):
+    """Umwandlung ohne Server: Schwimmstil, Bahnlaenge, Ersatz-Variante, Standard-Ablauf."""
+
+    def test_schwimmen_mit_stil_und_25m_bahn(self):
+        from backend.garmin_workouts import workout_variants
+        entry = {"sport": "Schwimmen", "title": "Technik", "duration_min": 45, "intensity": "mittel"}
+        full, plain = workout_variants(entry)
+        self.assertEqual((full["poolLength"], full["poolLengthUnit"]["unitKey"]), (25.0, "meter"))
+        warm, drills, main, cool = full["workoutSegments"][0]["workoutSteps"]
+        self.assertEqual((warm["endCondition"]["conditionTypeKey"], warm["endConditionValue"], warm["strokeType"]["strokeTypeKey"]),
+                         ("distance", 250.0, "free"))
+        self.assertEqual(drills["workoutSteps"][0]["strokeType"]["strokeTypeKey"], "drill")
+        rest = main["workoutSteps"][1]
+        self.assertEqual((rest["stepType"]["stepTypeKey"], rest["endConditionValue"]), ("rest", 15.0))
+        self.assertEqual((main["numberOfIterations"], main["workoutSteps"][0]["endConditionValue"]), (10, 100.0))
+        self.assertEqual(cool["strokeType"]["strokeTypeKey"], "any_stroke")
+        self.assertEqual(full["estimatedDurationInSecs"], 45 * 60)
+        # Ersatz-Variante ohne Stil und Bahnlaenge, sonst gleich
+        self.assertNotIn("poolLength", plain)
+        self.assertNotIn("strokeType", plain["workoutSegments"][0]["workoutSteps"][2]["workoutSteps"][0])
+        self.assertEqual(len(plain["workoutSegments"][0]["workoutSteps"]), 4)
+
+    def test_stil_nur_beim_schwimmen(self):
+        from backend.garmin_workouts import garmin_workout
+        run = garmin_workout({"sport": "Laufen", "duration_min": 10}, [{"type": "interval", "duration_min": 10, "stroke": "free"}])
+        self.assertNotIn("strokeType", run["workoutSegments"][0]["workoutSteps"][0])
+        self.assertNotIn("poolLength", run)
+
+    def test_standard_ablauf_ergibt_die_dauer(self):
+        from backend.garmin_workouts import default_steps
+
+        def minutes(steps):
+            return sum(s["count"] * minutes(s["steps"]) if s["type"] == "repeat" else s.get("duration_min", 0) for s in steps)
+        for sport in ("Laufen", "Rad"):
+            for intensity in ("leicht", "mittel", "hart"):
+                for d in (20, 30, 45, 60, 90, 180):
+                    self.assertAlmostEqual(minutes(default_steps({"sport": sport, "duration_min": d, "intensity": intensity})), d,
+                                           msg=f"{sport} {intensity} {d}")
+
+    def test_offizielle_api_bekommt_stil_und_bahn(self):
+        from backend.garmin_official import convert_workout
+        from backend.garmin_workouts import workout_variants
+        out = convert_workout(workout_variants({"sport": "Schwimmen", "duration_min": 30, "intensity": "leicht"})[0])
+        self.assertEqual((out["sport"], out["poolLength"], out["poolLengthUnit"]), ("LAP_SWIMMING", 25.0, "METER"))
+        self.assertEqual(out["segments"][0]["steps"][0]["strokeType"], "FREESTYLE")
 
 
 if __name__ == "__main__":

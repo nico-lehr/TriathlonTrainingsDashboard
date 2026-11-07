@@ -31,36 +31,96 @@ const NONE = { kind: "none" };
 
 /* ---------- Standard-Schritte aus Dauer + Intensität ---------- */
 
-test("Standard: Ausdauer ab 30 min = Aufwärmen / Hauptteil in der HF-Zone der Intensität / Abwärmen", () => {
+const flat = steps => steps.flatMap(s => (s.type === "repeat" ? Array.from({ length: s.count }, () => s.steps).flat() : [s]));
+const minutes = steps => flat(steps).reduce((a, s) => a + (s.duration_min || 0), 0);
+const near = (a, b) => Math.abs(a - b) < 1e-6;
+
+test("Standard: Laufen leicht = Einlaufen / Grundlage Zone 2 / 4× Steigerung / Auslaufen, mit Hinweisen", () => {
   assert.deepStrictEqual(defaults({ sport: "Laufen", duration_min: 50, intensity: "leicht" }), [
-    { type: "warmup", duration_min: 10, target: NONE },
-    { type: "interval", duration_min: 35, target: { kind: "hr_zone", zone: 2 } },
-    { type: "cooldown", duration_min: 5, target: NONE },
+    { type: "warmup", duration_min: 10, target: NONE, note: "Einlaufen · ganz locker" },
+    { type: "interval", duration_min: 31, target: { kind: "hr_zone", zone: 2 }, note: "Grundlage · locker, Reden geht" },
+    { type: "repeat", count: 4, steps: [
+      { type: "interval", duration_min: 1 / 3, target: NONE, note: "Steigerung · locker schnell, kein Sprint" },
+      { type: "recovery", duration_min: 2 / 3, target: NONE, note: "Gehen oder traben" },
+    ] },
+    { type: "cooldown", duration_min: 5, target: NONE, note: "Auslaufen · ganz locker" },
   ]);
-  assert.deepStrictEqual(defaults({ sport: "Rad", duration_min: 90, intensity: "hart" }), [
-    { type: "warmup", duration_min: 15, target: NONE },
-    { type: "interval", duration_min: 65, target: { kind: "hr_zone", zone: 4 } },
-    { type: "cooldown", duration_min: 10, target: NONE },
-  ]);
-  assert.deepStrictEqual(defaults({ sport: "Laufen", duration_min: 40, intensity: "mittel" })[1].target, { kind: "hr_zone", zone: 3 });
 });
 
-test("Standard: die Schritte ergeben zusammen genau die geplante Dauer", () => {
-  [30, 45, 59, 60, 75, 180].forEach(d => {
-    const sum = defaults({ sport: "Rad", duration_min: d, intensity: "leicht" }).reduce((s, x) => s + x.duration_min, 0);
-    assert.strictEqual(sum, d, `${d} min`);
-  });
+test("Standard: mittel und hart werden Intervall-Sätze wie beim Garmin Coach", () => {
+  const tempo = defaults({ sport: "Laufen", duration_min: 60, intensity: "mittel" });
+  assert.deepStrictEqual(tempo.map(s => s.type), ["warmup", "interval", "repeat", "cooldown"]);
+  assert.deepStrictEqual(tempo[2].count, 2);
+  assert.deepStrictEqual(tempo[2].steps.map(s => [s.type, s.duration_min, s.target.zone]), [["interval", 10, 3], ["recovery", 2, undefined]]);
+  const vo2 = defaults({ sport: "Rad", duration_min: 45, intensity: "hart" });
+  assert.deepStrictEqual(vo2.map(s => s.type), ["warmup", "repeat", "cooldown"]);
+  assert.deepStrictEqual([vo2[1].count, vo2[1].steps[0].duration_min, vo2[1].steps[0].target], [5, 3, { kind: "hr_zone", zone: 5 }]);
+  const thr = defaults({ sport: "Rad", duration_min: 90, intensity: "hart" });
+  assert.deepStrictEqual([thr[2].count, thr[2].steps[0].duration_min, thr[2].steps[0].target.zone], [5, 8, 4]);
 });
 
-test("Standard: Schwimmen und Einheiten ohne Intensität bekommen kein Ziel", () => {
-  assert.ok(defaults({ sport: "Schwimmen", duration_min: 45, intensity: "hart" }).every(s => s.target.kind === "none"));
-  assert.ok(defaults({ sport: "Laufen", duration_min: 45, intensity: null }).every(s => s.target.kind === "none"));
+test("Standard: Laufen/Rad ergeben zusammen genau die geplante Dauer", () => {
+  ["Laufen", "Rad"].forEach(sport => ["leicht", "mittel", "hart"].forEach(intensity => [20, 30, 45, 59, 60, 75, 90, 180].forEach(d => {
+    const st = defaults({ sport, duration_min: d, intensity });
+    assert.ok(near(minutes(st), d), `${sport} ${intensity} ${d} min -> ${minutes(st)}`);
+    assert.ok(app.validateWorkoutSteps(st).steps, `${sport} ${intensity} ${d} gültig`);
+  })));
+});
+
+test("Standard: Ziele aus dem Profil - Pace (Schwellenpace), Watt (FTP), sonst Puls", () => {
+  app.athleteProfile.runThresholdPace = "5:00";
+  app.athleteProfile.ftpWatts = 250;
+  assert.deepStrictEqual(defaults({ sport: "Laufen", duration_min: 45, intensity: "hart" })[1].steps[0].target, { kind: "pace_zone", zone: 5 });
+  assert.deepStrictEqual(defaults({ sport: "Rad", duration_min: 60, intensity: "mittel" })[2].steps[0].target, { kind: "power_zone", zone: 3 });
+  app.athleteProfile.runThresholdPace = null;
+  app.athleteProfile.ftpWatts = null;
+  assert.deepStrictEqual(defaults({ sport: "Laufen", duration_min: 45, intensity: "hart" })[1].steps[0].target, { kind: "hr_zone", zone: 5 });
+});
+
+test("Standard: Schwimmen = Einschwimmen / Technik 50 m / Hauptsatz mit Pausen / Ausschwimmen, in Metern mit Stil", () => {
+  const st = defaults({ sport: "Schwimmen", duration_min: 45, intensity: "mittel" });
+  assert.deepStrictEqual(st.map(s => s.type), ["warmup", "repeat", "repeat", "cooldown"]);
+  assert.deepStrictEqual([st[0].distance_km, st[0].stroke], [0.25, "free"]);
+  assert.deepStrictEqual(st[1].steps.map(s => [s.type, s.distance_km || s.duration_min * 60, s.stroke]), [["interval", 50, "drill"], ["rest", 15, undefined]].map(([t, v, k]) => [t, t === "interval" ? 0.05 : v, k]));
+  assert.deepStrictEqual([st[2].count, st[2].steps[0].distance_km, st[2].steps[0].stroke, st[2].steps[1].type, st[2].steps[1].duration_min * 60], [10, 0.1, "free", "rest", 15]);
+  assert.deepStrictEqual([st[3].distance_km, st[3].stroke], [0.2, "any"]);
+  // ohne CSS kein Pace-Ziel, mit CSS Pace-Zone im Hauptsatz
+  assert.strictEqual(st[2].steps[0].target.kind, "none");
+  app.athleteProfile.swimCss = "1:50";
+  assert.deepStrictEqual(defaults({ sport: "Schwimmen", duration_min: 45, intensity: "hart" })[2].steps[0].target, { kind: "pace_zone", zone: 4 });
+  app.athleteProfile.swimCss = null;
+});
+
+test("Standard: Schwimm-Distanzen sind Bahnlängen und die geschätzte Zeit passt ungefähr", () => {
+  ["leicht", "mittel", "hart"].forEach(intensity => [30, 45, 60, 90].forEach(d => {
+    const st = defaults({ sport: "Schwimmen", duration_min: d, intensity });
+    const f = { warmup: 1.25, cooldown: 1.3 };
+    const sec = flat(st).reduce((a, s) => a + (s.duration_min ? s.duration_min * 60 : s.distance_km * 1000 / 100 * 120 * (f[s.type] || (s.stroke === "drill" ? 1.4 : 1.05))), 0);
+    assert.ok(Math.abs(sec / 60 - d) <= d * 0.15, `${intensity} ${d} min -> ${(sec / 60).toFixed(1)}`);
+    assert.ok(flat(st).every(s => !s.distance_km || Math.round(s.distance_km * 1000) % 25 === 0), "Vielfache von 25 m");
+  }));
+});
+
+test("Standard: ein Satz im Titel (\"6×800 m\", \"5 x 4 min\") wird der Hauptsatz", () => {
+  const run = defaults({ sport: "Laufen", duration_min: 60, intensity: "hart", title: "6×800 m mit 2 min Trabpause" });
+  const set = run.find(s => s.type === "repeat");
+  assert.deepStrictEqual([set.count, set.steps[0].distance_km, set.steps[0].target.zone, set.steps[1].duration_min], [6, 0.8, 4, 2]);
+  const bike = defaults({ sport: "Rad", duration_min: 60, intensity: "hart", description: "Intervalle 5 x 4 min" });
+  assert.deepStrictEqual([bike.find(s => s.type === "repeat").count, bike.find(s => s.type === "repeat").steps[0].duration_min], [5, 4]);
+  const swim = defaults({ sport: "Schwimmen", duration_min: 45, intensity: "mittel", title: "10x100m P 20 s" });
+  assert.deepStrictEqual([swim[2].count, swim[2].steps[0].distance_km, swim[2].steps[1].duration_min * 60], [10, 0.1, 20]);
+  assert.deepStrictEqual(plain(app.parseMainSet({ title: "Locker 45 min" })), null);
 });
 
 test("Standard: kurze Einheit, Kraft/Mobility und Einheit ohne Dauer = ein einziger Schritt", () => {
-  assert.deepStrictEqual(defaults({ sport: "Laufen", duration_min: 20, intensity: "leicht" }), [{ type: "interval", duration_min: 20, target: { kind: "hr_zone", zone: 2 } }]);
+  assert.deepStrictEqual(defaults({ sport: "Laufen", duration_min: 15, intensity: "leicht" }), [{ type: "interval", duration_min: 15, target: { kind: "hr_zone", zone: 2 }, note: "Locker und gleichmäßig" }]);
   assert.deepStrictEqual(defaults({ sport: "Kraft", duration_min: 45, intensity: "hart" }), [{ type: "interval", duration_min: 45, target: NONE }]);
   assert.deepStrictEqual(defaults({ sport: "Rad", duration_min: null, intensity: "leicht" }), [{ type: "interval", target: { kind: "hr_zone", zone: 2 } }]);
+});
+
+test("Hinweis und Schwimmstil bleiben beim Prüfen erhalten, unbekannter Stil fällt weg", () => {
+  const out = validate([{ type: "interval", distance_km: 0.1, stroke: "breast", note: "  Brust locker  " }, { type: "rest", duration_min: 0.25, stroke: "kraulen" }]);
+  assert.deepStrictEqual(out.steps, [{ type: "interval", distance_km: 0.1, target: NONE, stroke: "breast", note: "Brust locker" }, { type: "rest", duration_min: 0.25, target: NONE }]);
 });
 
 /* ---------- Prüfen eigener Schritte ---------- */
@@ -150,7 +210,7 @@ test(".fit: HF-/Leistungszone als Zonennummer, Pace-Zone als Tempobereich aus de
 });
 
 test(".fit: eine Einheit ohne eigene Schritte heißt wie bisher nach ihrem Titel, Datei-CRC stimmt", () => {
-  const pw = { sport: "Rad", title: "Locker rollen", duration_min: 20, intensity: "leicht" };
+  const pw = { sport: "Rad", title: "Locker rollen", duration_min: 15, intensity: "leicht" };
   assert.deepStrictEqual(plain(app.fitWorkoutStepRecords(pw)).map(r => r.name), ["Locker rollen"]);
   const bytes = app.buildFitWorkoutFile({ ...pw, duration_min: 60 });
   const dataSize = bytes[4] | (bytes[5] << 8) | (bytes[6] << 16) | (bytes[7] << 24);

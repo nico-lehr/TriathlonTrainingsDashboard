@@ -424,7 +424,8 @@ class OffiziellTest(PushTestBase):
             self.assertEqual((r["created"], r["stopped"]), (1, None))
             upload = next(c for c in calls if c[0] == "POST" and c[1].endswith("/workout/v2"))
             self.assertEqual((upload[2]["sport"], upload[4]), ("RUNNING", "acc"))
-            main = upload[2]["segments"][0]["steps"][1]
+            repeat = next(st for st in upload[2]["segments"][0]["steps"] if st["type"] == "WorkoutRepeatStep")
+            main = repeat["steps"][0]
             self.assertEqual((main["intensity"], main["durationType"], main["targetType"], main["targetValue"]),
                              ("INTERVAL", "TIME", "HEART_RATE", 3))
             sched = next(c for c in calls if c[1].endswith("/training-api/schedule"))
