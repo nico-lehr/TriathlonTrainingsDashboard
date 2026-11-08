@@ -117,7 +117,7 @@ function renderStats(data) {
     label: "VO2max Rad",
     target: vo2.rad ? vo2.rad.value : 0,
     fmt: v => vo2.rad ? fmtNum(v, 1) + " ml/kg/min" : "–",
-    sub: vo2.rad ? (vo2.rad.trendLabel || vo2.rad.methodLabel) : "Braucht Leistungsmesser-Daten & Körpergewicht im Profil",
+    sub: vo2.rad ? (vo2.rad.trendLabel || vo2.rad.methodLabel) : "Braucht Leistungsmesser-Daten, Körpergewicht, max. Puls & Ruhepuls",
     title: vo2.rad ? vo2.rad.methodLabel : "",
   });
   document.getElementById("stat-row").innerHTML = tiles.map((t, i) => `

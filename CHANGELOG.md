@@ -4,6 +4,14 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.42
+
+**Rad-VO2max: genauere Schätzung**
+
+- **Neue Rechnung:** Die VO2max fürs Rad wird jetzt ähnlich wie bei Garmin berechnet. Das Dashboard sucht in deinen Radeinheiten gleichmäßige 5-Minuten-Abschnitte (nach dem Aufwärmen, ohne Intervalle). Dort vergleicht es deine Watt mit deinem Puls: Wie viel Prozent deines Pulsspielraums (zwischen Ruhepuls und Maximalpuls) brauchst du für diese Leistung? Daraus ergibt sich die VO2max.
+- **Warum die alte Zahl zu tief war:** Bisher wurde eine Linie durch die Durchschnittswerte ganzer Einheiten gelegt und bis zum Maximalpuls verlängert. Weil die meisten Radfahrten im ähnlichen Pulsbereich liegen, reichten schon ein paar Schläge Tagesform (Hitze, Müdigkeit), um das Ergebnis deutlich nach unten zu ziehen – im Test um bis zu 15 Punkte.
+- **Ruhepuls von Garmin:** Ist im Profil kein Ruhepuls eingetragen, wird der Mittelwert deiner Garmin-Ruhepulswerte der letzten 30 Tage genutzt. Als Gewicht zählt dein zuletzt eingetragenes Gewicht.
+
 ## 2.4.41
 
 **Wettkämpfe mit mehr Details**
