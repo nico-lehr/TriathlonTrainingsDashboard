@@ -2723,3 +2723,22 @@ body.m-graphit .settings-page-head, body.m-graphit .sh-back { display: none; }
   border-top: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent); cursor: pointer; }
 #view-settings .push-row span { display: flex; flex-direction: column; gap: 3px; }
 #view-settings .push-row small { font-size: 12.5px; line-height: 1.45; color: var(--text-secondary); }
+
+/* Wochenplan (Einstellungen → Training & Planung, js/components/training-profile.js) */
+#training-profile-body .tp-label small.tp-hint { display: block; font-size: 12.5px; margin-top: 2px; }
+#training-profile-body .tp-section + .tp-section { margin-top: 14px; }
+#training-profile-body .tp-section .tp-row + .tp-row,
+#training-profile-body .tp-section .tp-row + div,
+#training-profile-body .tp-section div + .tp-row { margin-top: 10px; }
+.wp-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.wp-days .mob-chip { min-width: 0; padding-left: 0; padding-right: 0; justify-content: center; text-align: center; }
+#training-profile-body .mob-segmented button { white-space: nowrap; }
+#training-profile-body .wp-col { flex-direction: column; align-items: stretch; gap: 8px; }
+#training-profile-body .wp-col .mob-segmented-lg button { padding-left: 4px; padding-right: 4px; }
+#wp-session-min { width: 84px; }
+.wp-days .mob-chip[disabled] { opacity: 0.35; cursor: default; }
+.wp-off { opacity: 0.45; }
+.wp-off .mob-segmented { pointer-events: none; }
+.wp-warn { color: var(--c-warn, #ff9f0a); }
+.wp-actions { margin-top: 14px; }
+#training-profile-body > .pf-group:first-child { margin-top: 26px; }

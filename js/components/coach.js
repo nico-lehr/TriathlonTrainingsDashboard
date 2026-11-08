@@ -845,6 +845,7 @@ function finishOnboarding() {
   try { syncProfileInputsFromState(); } catch (e) { console.error("syncProfileInputsFromState fehlgeschlagen", e); }
   try { renderGoals(); } catch (e) { console.error("renderGoals fehlgeschlagen", e); }
   try { renderTrainingPlanCard(); } catch (e) { console.error("renderTrainingPlanCard fehlgeschlagen", e); }
+  try { if (typeof window.renderTrainingProfile === "function") window.renderTrainingProfile(); } catch (e) { console.error("renderTrainingProfile fehlgeschlagen", e); }
 }
 
 // Baut eine Chip-Reihe (wie beim Onboarding) für ein Feld des Erholungs-

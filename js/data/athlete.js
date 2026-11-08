@@ -9,6 +9,10 @@ let athleteProfile = {
   maxHr: null, restingHr: null, // für TRIMP/Herzfrequenzreserve in der Trainings-Detailansicht (js/analytics/workout-profile.js)
   weightKg: null, // nur für die Rad-VO2max-Schätzung aus Watt (js/analytics/performance.js) - ohne Wert gibt's keine Rad-Schätzung statt einer geratenen
   includeStrength: false, includeMobility: false, // für den automatisch erstellten Trainingsplan (js/analytics/training-plan.js)
+  // Wochenplan (Einstellungen → Training & Planung), fest geprüft in js/analytics/plan-structure.js:
+  mainPerDay: 1,         // Haupttrainings (Schwimmen/Rad/Laufen) pro Tag: 1 oder 2
+  extrasMode: "same",    // Kraft/Mobility: "same" = zusätzlich am Trainingstag (max. 1), "own" = an eigenen Tagen
+  strengthPerWeek: 2,    // Kraft-Einheiten pro Woche (1-3), nur mit includeStrength
   customPlanWishes: "", // freie Zusatzwünsche für die KI-Trainingsplan-Erstellung (z.B. "1x Zugseiltraining pro Woche") - "Erweiterte Einstellungen" in der Trainingsplan-Kachel, siehe CHANGE_REQUESTS.md
   onboardingDone: false, // EIN Onboarding-Wizard (7 Schritte: Persönliches, Über dich, Verfügbarkeit,
   // Leistungswerte, Trainingsplan, Ziel, Fertig) - siehe coach.js. Deckt seit

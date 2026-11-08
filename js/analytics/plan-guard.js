@@ -32,8 +32,11 @@ const planGuardCopy = list => (list || []).map(p => ({ ...p }));
 // trainingOnly: geplante Mobility zählt nicht - 15 min Dehnen sind kein
 // Training, der Tag gilt dann noch als leerer Trainingstag. Für "komplett
 // freier Tag" (Regelwerk) zählt dagegen alles.
+// trainingOnly "main": auch Kraft zählt nicht (Wochenplan "Kraft/Mobility
+// zusätzlich am Trainingstag" - ein Kraft-Tag bekommt trotzdem ein Haupttraining).
 function planGuardBusyDays(list, history, trainingOnly = false) {
-  const busy = new Set((list || []).filter(p => !trainingOnly || p.sport !== "Mobility").map(p => p.date));
+  const skip = trainingOnly === "main" ? ["Mobility", "Kraft"] : trainingOnly ? ["Mobility"] : [];
+  const busy = new Set((list || []).filter(p => !skip.includes(p.sport)).map(p => p.date));
   (history || []).forEach(w => {
     const d = w._date || (w.date ? new Date(w.date) : null);
     if (d && !isNaN(d)) busy.add(localDateStr(d));
@@ -47,7 +50,9 @@ function planGuardBusyDays(list, history, trainingOnly = false) {
 function planGuardGaps(list, history, o) {
   const days = (o.profile && o.profile.trainingDays) || [];
   if (!days.length) return [];
-  const busy = planGuardBusyDays(list, history, true);
+  // Kraft/Mobility "an eigenen Tagen": ein Tag mit Kraft oder Mobility ist belegt.
+  const mode = o.profile.extrasMode === "own" ? false : o.profile.extrasMode === "same" ? "main" : true;
+  const busy = planGuardBusyDays(list, history, mode);
   const free = o.freeDays || {};
   const out = [];
   for (let k = o.from; k <= o.to; k = planShiftDay(k, 1)) {

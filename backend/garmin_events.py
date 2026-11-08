@@ -128,14 +128,54 @@ def normalize_event(item, detail=None):
     }
 
 
+class CalendarMissing(Exception):
+    """Der Zugang kennt den Garmin-Kalender nicht (z. B. Personal API: 404).
+    Frueher wurde das still als "keine Events" gewertet - dann kam nie etwas an."""
+    user_message = "Garmin gibt den Kalender über diesen Zugang nicht heraus."
+
+
 def month_items(client, year, month):
     """Rohe Kalender-Eintraege eines Monats (month 1-12)."""
     if isinstance(client, personal_api.PersonalApiClient):
         data = client._get(f"/calendar-service/year/{year}/month/{month - 1}", missing_ok=True)
+        if not isinstance(data, dict) or not isinstance(data.get("calendarItems"), list):
+            raise CalendarMissing()
     else:
         data = client.get_scheduled_workouts(year, month)
     items = _dict(data).get("calendarItems")
     return items if isinstance(items, list) else []
+
+
+EVENTS_LIST_LIMIT = 100
+
+
+def list_items(client, today):
+    """Garmins Event-Liste ("Meine Events", /calendar-service/events) als
+    Ersatz, falls der Monatskalender keine Events zeigt. Felder dort heissen
+    teils anders (eventName/eventDate) - auf die Kalender-Form gebracht.
+    Fehler -> leere Liste (der Monatskalender bleibt die Hauptquelle)."""
+    path = "/calendar-service/events"
+    params = {"startDate": today.isoformat(), "pageIndex": 1, "limit": EVENTS_LIST_LIMIT, "sortOrder": "eventDate_asc"}
+    try:
+        if isinstance(client, personal_api.PersonalApiClient):
+            data = client._get(path, params=params, missing_ok=True)
+        else:
+            query = "&".join(f"{k}={v}" for k, v in params.items())
+            data = client.connectapi(f"{path}?{query}")
+    except Exception:
+        return []
+    rows = data if isinstance(data, list) else _dict(data).get("events") or _dict(data).get("calendarItems") or []
+    out = []
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict):
+            continue
+        item = dict(row)
+        item["itemType"] = "event"
+        item.setdefault("title", row.get("eventName") or row.get("name"))
+        day = row.get("date") or row.get("eventDate")
+        item["date"] = day[:10] if isinstance(day, str) else None
+        out.append(item)
+    return out
 
 
 def event_detail(client, item):
@@ -156,21 +196,25 @@ def fetch_events(client, today=None, months=MONTHS_AHEAD):
     today = today or date.today()
     year, month = today.year, today.month
     seen, events, details = set(), [], 0
+    rows = []
     for _ in range(months + 1):
-        for item in month_items(client, year, month):
-            if not isinstance(item, dict) or item.get("itemType") != "event":
-                continue
-            day = item.get("date")
-            if not _valid_date(day) or day < today.isoformat():
-                continue
-            key = (item.get("id"), item.get("shareableEventUuid"), day)
-            if key in seen:  # Monatsraender koennen Eintraege doppelt liefern
-                continue
-            seen.add(key)
-            detail = event_detail(client, item) if details < MAX_DETAILS else {}
-            details += 1
-            events.append(normalize_event(item, detail))
+        rows.extend(month_items(client, year, month))
         year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+    if not any(isinstance(i, dict) and i.get("itemType") == "event" for i in rows):
+        rows.extend(list_items(client, today))
+    for item in rows:
+        if not isinstance(item, dict) or item.get("itemType") != "event":
+            continue
+        day = item.get("date")
+        if not _valid_date(day) or day < today.isoformat():
+            continue
+        key = (item.get("id"), item.get("shareableEventUuid"), day)
+        if key in seen:  # Monatsraender koennen Eintraege doppelt liefern
+            continue
+        seen.add(key)
+        detail = event_detail(client, item) if details < MAX_DETAILS else {}
+        details += 1
+        events.append(normalize_event(item, detail))
     events.sort(key=lambda e: (e["date"], e["name"]))
     return events
 
@@ -196,7 +240,7 @@ def load_events(athlete_id, force=False, now=None):
     clients = _clients(athlete_id)
     if not clients:
         return None, ("Garmin ist noch nicht verbunden.", 409)
-    last_error = None
+    last_error, empty = None, None
     for via, factory in clients:
         try:
             events = fetch_events(factory())
@@ -206,9 +250,17 @@ def load_events(athlete_id, force=False, now=None):
             last_error = getattr(e, "user_message", None) or garmin_sync.describe_error(e, athlete_id)
             continue
         result = {"events": events, "via": via, "at": datetime.now().isoformat(timespec="seconds")}
+        if not events and via != clients[-1][0]:
+            # Leer ueber den einen Zugang? Der andere sieht evtl. mehr.
+            empty = empty or result
+            continue
         with _lock:
             _cache[athlete_id] = (now, result)
         return result, None
+    if empty:
+        with _lock:
+            _cache[athlete_id] = (now, empty)
+        return empty, None
     if [c[0] for c in clients] == ["personal"]:
         return None, ("Garmin gibt die Events über den Schlüssel nicht heraus. Melde dich einmal unter "
                       "Einstellungen → Garmin → „Trainings auf die Uhr“ an, dann klappt es.", 409)

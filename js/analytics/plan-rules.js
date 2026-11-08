@@ -194,6 +194,8 @@ function planMoveTarget(ctx, byDay, s) {
     .filter(k => k >= ctx.todayKey && k !== s.date && !(ctx.gateDay && k <= ctx.gateDay))
     .filter(k => !hardOn(k) && !hardOn(planShiftDay(k, -1)) && !hardOn(planShiftDay(k, 1)))
     .filter(k => others(k).length || freeDays > PLAN_MIN_FREE_DAYS)
+    // Wochenplan (Trainingstage, Schwimmtage, Einheiten pro Tag) - js/analytics/plan-structure.js
+    .filter(k => !ctx.structure || typeof planStructDayAccepts !== "function" || planStructDayAccepts(ctx.structure, k, s, others(k)))
     .sort((a, b) => dist(a) - dist(b))[0] || null;
 }
 
@@ -529,7 +531,8 @@ function checkPlanRecoveryWeek(ctx) {
 // recovery: recoveryCheck (js/data/health.js), optional.
 // options: { goal (Hauptevent, für Regel 6 und die Periodisierung), today (Date, Standard jetzt),
 //   acwr (vorberechnet, sonst computePerformanceState()), planUntil
-//   ("YYYY-MM-DD", bis wohin der Plan reicht, Standard: letzte Einheit) }
+//   ("YYYY-MM-DD", bis wohin der Plan reicht, Standard: letzte Einheit),
+//   structure (Wochenplan aus planStructureSettings - Verschiebungen nur auf passende Tage) }
 function validatePlan(plannedWorkouts, history, wellness, recovery, options = {}) {
   const todayKey = localDateStr(new Date(options.today || Date.now()));
   const sessions = planSessions(plannedWorkouts, history, todayKey);
@@ -550,6 +553,7 @@ function validatePlan(plannedWorkouts, history, wellness, recovery, options = {}
     planUntil: options.planUntil || open[open.length - 1].date,
     goalSports: (goal && PLAN_GOAL_SPORTS[goal.sport]) || [],
     gateDay: gate.reasons.length ? open[0].date : null, // nur locker erlaubt (Regel 5)
+    structure: options.structure || null, // Wochenplan-Vorgaben für Verschiebungen (planStructureSettings)
   };
 
   const severityOrder = { block: 0, warn: 1 };

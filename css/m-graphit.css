@@ -721,3 +721,16 @@ body.m-graphit #modal-overlay .modal-stats .st { background: var(--m-surface); b
 .m-mr-tile.bad span { color: var(--m-bad); }
 .m-mr-wait { color: var(--m-muted); animation: m-mr-pulse 1.4s ease-in-out infinite; }
 @keyframes m-mr-pulse { 50% { opacity: 0.45; } }
+
+/* Wettkämpfe (Coach-Seite) und Markierung im Kalender */
+.m-races { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; }
+.m-races li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 0.5px solid var(--m-line, rgba(127,127,127,.2)); }
+.m-races li:first-child { border-top: none; }
+.m-goal + .m-races { border-top: 0.5px solid var(--m-line, rgba(127,127,127,.2)); margin-top: 14px; }
+.m-race-date { display: flex; flex-direction: column; align-items: center; min-width: 44px; padding: 5px 0; border-radius: 10px; background: var(--m-surface-2); line-height: 1.1; }
+.m-race-date b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.m-race-date small { font-size: 11px; color: var(--m-muted); text-transform: uppercase; letter-spacing: .04em; }
+.m-mc.race > i { display: none; }
+.m-mc.race::after { content: "🏁"; font-size: 10px; line-height: 5px; height: 5px; }
+.m-mc-evs em.race { font-weight: 600; }
+.m-race-flag { font-size: 18px; width: 28px; text-align: center; }

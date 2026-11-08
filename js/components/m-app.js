@@ -351,6 +351,38 @@ function mRenderHeute() {
     + `<button type="button" class="m-more" data-m-classic="overview">Insights – alle Diagramme und Auswertungen</button>`);
 }
 
+// Kommende Ziele/Wettkämpfe (auch die aus dem Garmin-Kalender), nach Datum.
+function mUpcomingGoals() {
+  const today = todayStr();
+  return (typeof goals !== "undefined" ? goals : []).filter(g => g.date && g.date >= today).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function mGoalsOn(k) {
+  return mUpcomingGoals().filter(g => g.date === k);
+}
+
+// Coach-Seite: Hauptevent mit Readiness + alle weiteren Wettkämpfe.
+function mRaceListCard() {
+  const list = mUpcomingGoals();
+  if (!list.length) return "";
+  const today = mDay(new Date());
+  const days = g => Math.round((mDay(g.date + "T00:00:00") - today) / 86400000);
+  const when = g => { const n = days(g); return n === 0 ? "heute" : n === 1 ? "morgen" : `in ${n} Tagen`; };
+  const goal = typeof getPrimaryGoal === "function" ? getPrimaryGoal() : null;
+  const main = goal && goal.date && goal.date >= todayStr() ? goal : null;
+  const ready = main && typeof computeRaceReadiness === "function" ? computeRaceReadiness(main) : null;
+  const head = main ? `<div class="m-goal">${mRing(ready ? ready.score / 100 : 0, "var(--m-r2)", ready ? ready.score : "–", "Readiness", "sm")}
+      <div class="m-grow"><b>${mEsc(main.name)}</b><small>${days(main)} Tage · ${main.targetTime ? `Ziel ${mEsc(main.targetTime)}` : "keine Zielzeit"}</small>
+      ${ready && ready.level ? `<small>${mEsc(ready.level.label)}</small>` : ""}</div></div>` : "";
+  const others = list.filter(g => g !== main).slice(0, 8);
+  const rows = others.map(g => `<li><span class="m-race-date"><b>${new Date(g.date + "T12:00:00").getDate()}.</b><small>${mEsc(new Date(g.date + "T12:00:00").toLocaleDateString("de-DE", { month: "short" }))}</small></span>
+      <span class="m-grow"><span class="m-row-title">${mEsc(g.name)}</span><span class="m-row-meta">${mEsc(g.sport || "")}${g.distanceKm ? ` · ${mNum(g.distanceKm, g.distanceKm < 10 ? 1 : 0)} km` : ""} · ${when(g)}</span></span>
+      ${g.garminEventId ? `<span class="m-tag plan">Garmin</span>` : ""}</li>`).join("");
+  return `<section class="m-card"><div class="m-head"><h2>Deine Wettkämpfe</h2><button type="button" class="m-link" data-m-classic="coach" data-m-scroll="goals">Bearbeiten</button></div>
+      ${head}${rows ? `<ul class="m-races">${rows}</ul>` : ""}
+      ${!main ? `<p class="m-say small">Noch kein Hauptevent gewählt – tippe auf „Bearbeiten“ und markiere dein wichtigstes Rennen mit dem Stern.</p>` : ""}</section>`;
+}
+
 function mRenderKalender() {
   const today = mDay(new Date());
   if (!mState.calMonth) mState.calMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -369,10 +401,11 @@ function mRenderKalender() {
     const date = new Date(m.getFullYear(), m.getMonth(), d);
     const k = localDateStr(date);
     const sport = done.get(k) || plan.get(k);
-    const cls = ["m-mc", k === localDateStr(today) ? "today" : "", date < today ? "past" : "", k >= weekKey && k <= weekEnd ? "inweek" : ""].join(" ");
+    const cls = ["m-mc", k === localDateStr(today) ? "today" : "", date < today ? "past" : "", k >= weekKey && k <= weekEnd ? "inweek" : "", mGoalsOn(k).length ? "race" : ""].join(" ");
     const evs = mWorkoutsOn(date).map(w => ({ t: w.title || w.name || w.sport, s: sportGroup(w.sport) === "Sonstiges" ? w.sport : sportGroup(w.sport), done: true }))
       .concat(mPlannedOn(k).filter(p => p.status === "geplant").map(p => ({ t: p.title || p.sport, s: p.sport, done: false })));
-    const evHtml = evs.length ? `<span class="m-mc-evs">${evs.slice(0, 3).map(e => `<em class="${e.done ? "done" : "plan"}" style="--c:${mSport(e.s).color}">${mEsc(e.t)}</em>`).join("")}${evs.length > 3 ? `<em class="more">+${evs.length - 3}</em>` : ""}</span>` : "";
+    mGoalsOn(k).forEach(g => evs.unshift({ t: `🏁 ${g.name}`, s: g.sport, race: true }));
+    const evHtml = evs.length ? `<span class="m-mc-evs">${evs.slice(0, 3).map(e => `<em class="${e.race ? "race" : e.done ? "done" : "plan"}" style="--c:${mSport(e.s).color}">${mEsc(e.t)}</em>`).join("")}${evs.length > 3 ? `<em class="more">+${evs.length - 3}</em>` : ""}</span>` : "";
     cells += `<button type="button" class="${cls}" data-m-act="cal-day" data-date="${k}"><b>${d}</b>${evHtml}<i style="${sport ? `background:${mSport(sportGroup(sport) === "Sonstiges" ? sport : sportGroup(sport)).color}` : ""}${sport && !done.has(k) ? ";opacity:.5" : ""}"></i></button>`;
   }
   const agenda = [0, 1, 2, 3, 4, 5, 6].map(i => {
@@ -380,6 +413,7 @@ function mRenderKalender() {
     const wd = mWeekdays[(d.getDay() + 6) % 7];
     const k = localDateStr(d);
     const items = [];
+    mGoalsOn(k).forEach(g => items.push(`<button type="button" class="m-ev m-ev-race" data-m-classic="coach" data-m-scroll="goals"><span class="m-ev-stripe" style="background:var(--m-accent)"></span><span class="m-race-flag" aria-hidden="true">🏁</span><span class="m-grow"><span class="m-row-title">${mEsc(g.name)}</span><span class="m-row-meta">Wettkampf${g.distanceKm ? ` · ${mNum(g.distanceKm, g.distanceKm < 10 ? 1 : 0)} km` : ""}${g.targetTime ? ` · Ziel ${mEsc(g.targetTime)}` : ""}</span></span>${g.isPrimary ? `<span class="m-tag plan">Hauptevent</span>` : ""}</button>`));
     mWorkoutsOn(d).forEach(w => items.push(`<button type="button" class="m-ev" data-m-act="workout" data-file="${mEsc(w.file || w.id || "")}"><span class="m-ev-stripe" style="background:${mSport(sportGroup(w.sport)).color}"></span>${mIcon(sportGroup(w.sport) === "Sonstiges" ? w.sport : sportGroup(w.sport), "sm")}<span class="m-grow"><span class="m-row-title">${mEsc(w.title || w.name || w.sport)}</span><span class="m-row-meta">${mDur(w.duration_min || 0)}${w.distance_km ? ` · ${mNum(w.distance_km, 1)} km` : ""}</span></span><span class="m-tag done">✓</span></button>`));
     mPlannedOn(k).filter(p => p.status !== "erledigt" || !mWorkoutsOn(d).length).forEach(p => items.push(`<button type="button" class="m-ev" data-m-act="plan" data-id="${mEsc(p.id)}"><span class="m-ev-stripe" style="background:${mSport(p.sport).color}"></span>${mIcon(p.sport, "sm")}<span class="m-grow"><span class="m-row-title">${mEsc(p.title || p.sport)}</span><span class="m-row-meta">${p.duration_min ? mDur(p.duration_min) : ""}${p.intensity ? ` · ${mEsc(p.intensity)}` : ""}</span></span><span class="m-tag ${p.status === "erledigt" ? "done" : p.status === "uebersprungen" ? "bad" : "plan"}">${p.status === "erledigt" ? "✓" : p.status === "uebersprungen" ? "übersprungen" : "geplant"}</span></button>`));
     return `<div class="m-ag-day${k === localDateStr(today) ? " today" : ""}"><div class="m-ag-date"><b>${k === localDateStr(today) ? "Heute" : wd}</b><span>${d.getDate()}.</span></div>
@@ -477,12 +511,6 @@ function mRenderCoach() {
   } else if (typeof outlook !== "undefined" && outlook.error) say = `<p class="m-say bad">${mEsc(outlook.error)}</p>`;
   else say = `<p class="m-say muted">Tippe auf „Neu“, dann sagt dir der Coach, was heute und diese Woche passt.</p>`;
 
-  const goal = typeof getPrimaryGoal === "function" ? getPrimaryGoal() : null;
-  const ready = goal && typeof computeRaceReadiness === "function" ? computeRaceReadiness(goal) : null;
-  const goalCard = goal && goal.date ? `<section class="m-card"><div class="m-goal">${mRing(ready ? ready.score / 100 : 0, "var(--m-r2)", ready ? ready.score : "–", "Readiness", "sm")}
-      <div class="m-grow"><b>${mEsc(goal.name)}</b><small>${Math.round((mDay(goal.date + "T00:00:00") - mDay(new Date())) / 86400000)} Tage · ${goal.targetTime ? `Ziel ${mEsc(goal.targetTime)}` : "keine Zielzeit"}</small>
-      ${ready && ready.level ? `<small>${mEsc(ready.level.label)}</small>` : ""}</div></div></section>` : "";
-
   const today = todayStr();
   const next = (typeof plannedWorkouts !== "undefined" ? plannedWorkouts : []).filter(p => p.date >= today && p.status === "geplant").sort((a, b) => a.date.localeCompare(b.date)).slice(0, 10);
   // Nach Tagen gruppiert: jeder Tag ein eigener Block mit Überschrift
@@ -512,7 +540,7 @@ function mRenderCoach() {
         <div class="m-check"><span>Energie</span>${mSeg("energy", energy, en)}</div>
         <div class="m-check"><span>Verletzung</span>${mSeg("injury", inj, rc.injury || "no")}</div></section>`
     + `<section class="m-card"><div class="m-head"><h2>Empfehlung</h2><button type="button" class="m-link" data-m-act="outlook">${typeof outlook !== "undefined" && outlook.loading ? "…" : "Neu"}</button></div>${say}</section>`,
-    noteCard + goalCard,
+    noteCard + mRaceListCard(),
     `<section class="m-card"><div class="m-head"><h2>Nächste Einheiten</h2><button type="button" class="m-link" data-m-classic="coach" data-m-scroll="trainingplan">Plan bearbeiten</button></div>${mPlanCheckStatus()}<div class="m-cdays">${nextHtml}</div></section>`
     + `<button type="button" class="m-more" data-m-classic="coach">Ganzer Coach-Bereich</button>`);
 }

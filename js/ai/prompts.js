@@ -40,6 +40,7 @@ Regeln:
 - Plane NUR Trainingstage aus dem Profil ("Trainingstage" oben) - an anderen Tagen keine Einheit vorschlagen (Ruhetag).
 ${buildPlanTrainingDaysRule(windowDates)}
 - Sportarten ausschließlich aus: ${sports.join(", ")}. Schwimmen nur am angegebenen Schwimmtag, falls einer gesetzt ist. Lange Einheiten (Laufen/Rad) bevorzugt an den angegebenen "lange Einheit"-Tagen.
+${typeof planStructureRuleText === "function" ? planStructureRuleText(planStructureSettings(athleteProfile, trainingProfile()), windowDates) : ""}
 - Intensitätsverteilung passend zur Trainingsphase: in Grundlagenausdauer/Aufbau überwiegend "leicht" (polarisiert, ca. 80/20), in der Taper-Phase Umfang deutlich reduzieren, Intensität nur noch kurz und moderat halten.
 - Bei "Erholung heute"/Erholungs-Logbuch mit Muskelkater, wenig Energie oder Verletzung: entsprechend leichter planen oder einen zusätzlichen Ruhetag einschieben.
 - Bei "Zuletzt von dir vorgeschlagene Einheiten + Status": wiederholt übersprungene Einheiten nicht identisch wiederholen, sondern Umfang/Art anpassen.
@@ -225,7 +226,7 @@ ${lines.join("\n")}
 Nachricht des Athleten an dich: "${String(note).replace(/"/g, "'")}"
 
 Setze diese Nachricht um und gib den kompletten Plan für ALLE ${windowDates.length} Tage im Zeitfenster zurück:
-- Die Nachricht hat Vorrang vor den Trainingstagen im Profil (z.B. "heute spontan 45 min schwimmen" -> heute Schwimmen, 45 min, auch wenn heute kein Trainings- oder Schwimmtag ist).
+- Die Nachricht hat Vorrang vor den Trainingstagen, Schwimmtagen und dem Tagesraster im Profil (z.B. "heute spontan 45 min schwimmen" -> heute Schwimmen, 45 min, auch wenn heute kein Trainings- oder Schwimmtag ist).
 - Ändere nur, was dafür nötig ist: übrige Einheiten möglichst unverändert übernehmen (gleiche Sportart, Dauer, Beschreibung), nur verschieben oder anpassen, wenn sonst die Belastung zu hoch wird (z.B. zwei harte Einheiten direkt hintereinander) oder die Nachricht es verlangt.
 - Was nicht mehr im Plan stehen soll, einfach weglassen.
 - Zusätzlich das Feld "antwort": 1-2 kurze Sätze an den Athleten (du-Form, Klartext), was du geändert hast und warum.

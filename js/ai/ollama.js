@@ -322,8 +322,20 @@ async function generateTrainingPlan(goalId, { replace = false } = {}) {
         // Basis erst nach der (langen) KI-Anfrage lesen - Änderungen, die in
         // der Zwischenzeit gemacht wurden, bleiben so erhalten.
         const base = plannedWorkouts;
-        const withAi = [...base, ...entries.map(entry => buildPlannedWorkout({ ...entry, ...defaults }))];
-        return { base, list: addOpenWishesToPlan(withAi, planUntil, { ...defaults, source: "manual" }) };
+        const built = entries.map(entry => buildPlannedWorkout({ ...entry, ...defaults }));
+        let withAi = addOpenWishesToPlan([...base, ...built], planUntil, { ...defaults, source: "manual" });
+        // Wochenplan fest durchsetzen (js/analytics/plan-structure.js):
+        // Schwimmtage, Trainingstage, Einheiten pro Tag, Kraft/Mobility pro Woche.
+        report.structure = [];
+        if (typeof planStructureApply === "function") {
+          const st = planStructureApply(withAi, {
+            settings: planStructureSettings(athleteProfile, trainingProfile()), mutableIds: built.map(p => p.id),
+            from: windowDates[0], to: planUntil, todayKey: todayStr(), goal, defaults,
+          });
+          withAi = st.list;
+          report.structure = st.changes;
+        }
+        return { base, list: withAi };
       },
       validate: list => planRuleViolations(list, { planUntil }),
       fix: (list, suggestion) => applyPlanSuggestion(list, suggestion, defaults),
@@ -342,7 +354,7 @@ async function generateTrainingPlan(goalId, { replace = false } = {}) {
       goal._planError = null;
       planCheckNotes = {
         goalId: goal.id, corrected: result.corrected, hints: result.violations.map(v => v.text),
-        aiCount: report.aiCount || 0, dropped: report.dropped || [],
+        aiCount: report.aiCount || 0, dropped: report.dropped || [], structure: report.structure || [],
         filled: filled.added.map(p => ({ date: p.date, sport: p.sport, title: p.title, duration_min: p.duration_min })),
         skipped: filled.skipped,
       };

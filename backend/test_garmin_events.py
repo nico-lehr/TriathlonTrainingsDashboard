@@ -66,6 +66,14 @@ class EventsTest(unittest.TestCase):
         self.assertEqual(garmin_events.event_sport({}, "Berlin Marathon"), "Laufen")
         self.assertEqual(garmin_events.event_sport({}, "Firmenfeier"), "Sonstiges")
 
+    def test_event_liste_als_ersatz(self):
+        cal = FakeCalendar({}, details={
+            "/calendar-service/events?startDate=2026-11-09&pageIndex=1&limit=100&sortOrder=eventDate_asc":
+                [{"id": 11, "eventName": "Silvesterlauf Trier", "eventDate": "2026-12-31", "isRace": True}],
+        })
+        events = garmin_events.fetch_events(cal, today=TODAY)
+        self.assertEqual([(e["name"], e["date"], e["sport"]) for e in events], [("Silvesterlauf Trier", "2026-12-31", "Laufen")])
+
     def test_personal_api_nutzt_0_basierten_monat(self):
         client = personal_api.PersonalApiClient.__new__(personal_api.PersonalApiClient)
         seen = []
@@ -116,6 +124,38 @@ class EndpunktTest(unittest.TestCase):
             r = self.client.get("/api/v1/garmin/events", headers=self.h)
         self.assertEqual(r.status_code, 409)
         self.assertIn("Trainings auf die Uhr", r.get_json()["error"])
+
+    def test_schluessel_404_weicht_auf_anmeldung_aus(self):
+        """Personal API kennt den Kalender nicht (404 -> None): nicht still
+        "0 Events" melden, sondern die Garmin-Anmeldung fragen."""
+        os.makedirs(tools.garmin_sync.token_path(self.aid))
+        today = date.today()
+        cal = FakeCalendar({(today.year, today.month): [ev(8, today.isoformat(), "Silvesterlauf")]})
+        with mock.patch.object(personal_api, "has_key", return_value=True), \
+             mock.patch.object(personal_api.PersonalApiClient, "__init__", return_value=None), \
+             mock.patch.object(personal_api.PersonalApiClient, "_get", return_value=None), \
+             mock.patch.object(tools.garmin_sync, "connect", return_value=cal):
+            data = self.client.get("/api/v1/garmin/events", headers=self.h).get_json()["data"]
+        self.assertEqual((data["via"], [e["name"] for e in data["events"]]), ("connect", ["Silvesterlauf"]))
+
+    def test_schluessel_404_ohne_anmeldung_sagt_was_fehlt(self):
+        with mock.patch.object(personal_api, "has_key", return_value=True), \
+             mock.patch.object(personal_api.PersonalApiClient, "__init__", return_value=None), \
+             mock.patch.object(personal_api.PersonalApiClient, "_get", return_value=None):
+            r = self.client.get("/api/v1/garmin/events", headers=self.h)
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("Trainings auf die Uhr", r.get_json()["error"])
+
+    def test_schluessel_leer_dann_anmeldung_fragen(self):
+        os.makedirs(tools.garmin_sync.token_path(self.aid))
+        today = date.today()
+        cal = FakeCalendar({(today.year, today.month): [ev(9, today.isoformat(), "Crosslauf")]})
+        with mock.patch.object(personal_api, "has_key", return_value=True), \
+             mock.patch.object(personal_api.PersonalApiClient, "__init__", return_value=None), \
+             mock.patch.object(personal_api.PersonalApiClient, "_get", return_value={"calendarItems": []}), \
+             mock.patch.object(tools.garmin_sync, "connect", return_value=cal):
+            data = self.client.get("/api/v1/garmin/events", headers=self.h).get_json()["data"]
+        self.assertEqual([e["name"] for e in data["events"]], ["Crosslauf"])
 
 
 if __name__ == "__main__":

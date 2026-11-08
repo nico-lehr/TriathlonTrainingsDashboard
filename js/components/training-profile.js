@@ -34,9 +34,120 @@ function initTrainingProfile() {
     return n ? `${n} ${n === 1 ? "Angabe" : "Angaben"} – Körperstellen, Beschwerden, Ausstattung` : "Körperstellen, Beschwerden, Ausstattung";
   };
 
+  // Wochenplan: was früher nur im Onboarding ging - jetzt jederzeit änderbar.
+  // Wird bei jedem neuen KI-Plan fest geprüft (js/analytics/plan-structure.js).
+  const dayChips = (field, selected, allowed) => `
+      <div class="mob-chips wp-days" data-wp-days="${field}">
+        ${WEEKDAYS.map(([id, text]) => {
+          const on = selected.includes(id), ok = !allowed || allowed.includes(id);
+          return `<button type="button" class="mob-chip${on ? " is-on" : ""}" data-id="${id}" aria-pressed="${on}"${ok ? "" : " disabled"}>${text}</button>`;
+        }).join("")}
+      </div>`;
+  const choice = (field, options, current, label, hint = "", wide = false) => `
+    <div class="tp-row${wide ? " wp-col" : ""}">
+      <span class="tp-label" id="wp-${field}-label">${label}${hint ? `<small class="tp-hint">${hint}</small>` : ""}</span>
+      <div class="mob-segmented${wide ? " mob-segmented-lg" : ""}" data-wp="${field}" role="radiogroup" aria-labelledby="wp-${field}-label">
+        ${options.map(([v, t]) => `<button type="button" role="radio" aria-checked="${v === current}" class="${v === current ? "is-on" : ""}" data-value="${v}">${t}</button>`).join("")}
+      </div>
+    </div>`;
+  const DISCIPLINES = [["Schwimmen", "Schwimmen"], ["Rad", "Rad"], ["Laufen", "Laufen"]];
+
+  function weekPlanHtml() {
+    const p = athleteProfile;
+    const days = p.trainingDays || [];
+    const hint = !days.length ? `<p class="tp-intro wp-warn">Wähle deine Trainingstage – sonst plant der Coach an beliebigen Tagen.</p>` : "";
+    return `
+      <h3 class="pf-group">Wochenplan</h3>
+      <p class="tp-intro">So baut der Coach deine Woche. Jeder neue Plan wird danach geprüft und angepasst.</p>
+      ${hint}
+      <div class="tp-section">
+        <span class="tp-label">Trainingstage</span>
+        ${dayChips("trainingDays", days, null)}
+      </div>
+      <div class="tp-section">
+        <span class="tp-label">Schwimmtage<small class="tp-hint">Schwimmen nur an diesen Tagen</small></span>
+        ${dayChips("swimDays", p.swimDays || [], days.length ? days : null)}
+      </div>
+      <div class="tp-section">
+        <span class="tp-label">Lange Einheit<small class="tp-hint">Langer Lauf oder lange Radfahrt</small></span>
+        ${dayChips("longDays", p.longDays || [], days.length ? days : null)}
+      </div>
+      <div class="tp-section">
+        ${choice("mainPerDay", [[1, "1"], [2, "2"]], Number(p.mainPerDay) === 2 ? 2 : 1, "Haupttrainings pro Tag", "Schwimmen, Rad oder Laufen")}
+        ${choice("extrasMode", [["same", "Zusätzlich"], ["own", "Eigener Tag"]], p.extrasMode === "own" ? "own" : "same", "Kraft & Mobility", p.extrasMode === "own" ? "Nur an Tagen ohne Haupttraining" : "Höchstens eine zusätzlich am Tag", true)}
+        <div class="${p.includeStrength ? "" : "wp-off"}">${choice("strengthPerWeek", [[1, "1×"], [2, "2×"], [3, "3×"]], [1, 2, 3].includes(Number(p.strengthPerWeek)) ? Number(p.strengthPerWeek) : 2, "Kraft pro Woche", p.includeStrength ? "" : "Erst oben „Krafttraining einplanen“ einschalten")}</div>
+        <div class="tp-row">
+          <label class="tp-label" for="wp-session-min">Übliche Dauer<small class="tp-hint">Eine normale Einheit</small></label>
+          <span class="pf-input-wrap"><input type="number" id="wp-session-min" class="pf-input" min="15" max="240" step="5" placeholder="45" value="${p.typicalSessionMin || ""}"><span class="pf-unit">min</span></span>
+        </div>
+      </div>
+      <h3 class="pf-group">Über dich</h3>
+      <div class="tp-section">
+        ${choice("experienceLevel", [["<1", "unter 1 Jahr"], ["1-3", "1–3 Jahre"], [">3", "über 3 Jahre"]], p.experienceLevel, "Erfahrung im Ausdauersport", "", true)}
+        ${choice("raceExperience", [["none", "Keine"], ["few", "1–3"], ["some", "4–10"], ["many", "10+"]], p.raceExperience, "Wettkämpfe bisher", "", true)}
+        ${choice("strongDiscipline", DISCIPLINES, p.strongDiscipline, "Stärkste Disziplin", "", true)}
+        ${choice("weakDiscipline", DISCIPLINES, p.weakDiscipline, "Schwächste Disziplin", "", true)}
+      </div>
+      <div class="sh-actions wp-actions"><button type="button" class="reset-link" id="wp-onboarding-btn">Einrichtung noch einmal durchgehen</button></div>`;
+  }
+
+  function bindWeekPlan() {
+    body.querySelectorAll("[data-wp-days]").forEach(group => {
+      group.addEventListener("click", e => {
+        const chip = e.target.closest(".mob-chip");
+        if (!chip || chip.disabled) return;
+        const field = group.dataset.wpDays;
+        const set = new Set(athleteProfile[field] || []);
+        if (set.has(chip.dataset.id)) set.delete(chip.dataset.id); else set.add(chip.dataset.id);
+        const order = WEEKDAYS.map(([id]) => id);
+        athleteProfile[field] = order.filter(d => set.has(d));
+        if (field === "trainingDays") {
+          // Tag rausgenommen -> Schwimmtag/lange Einheit dort auch raus
+          const days = athleteProfile.trainingDays;
+          athleteProfile.trainingDaysPerWeek = days.length || null;
+          athleteProfile.swimDays = (athleteProfile.swimDays || []).filter(d => days.includes(d));
+          athleteProfile.longDays = (athleteProfile.longDays || []).filter(d => days.includes(d));
+        }
+        saveAthleteProfile();
+        render();
+        saved();
+      });
+    });
+    body.querySelectorAll(".mob-segmented[data-wp]").forEach(seg => {
+      seg.addEventListener("click", e => {
+        const btn = e.target.closest("button[data-value]");
+        if (!btn) return;
+        const field = seg.dataset.wp;
+        const numeric = ["mainPerDay", "strengthPerWeek"].includes(field);
+        let value = numeric ? Number(btn.dataset.value) : btn.dataset.value;
+        // Erfahrung/Disziplin: nochmal tippen = Auswahl aufheben
+        if (!numeric && field !== "extrasMode" && athleteProfile[field] === value) value = null;
+        athleteProfile[field] = value;
+        if (field === "strongDiscipline" && value && athleteProfile.weakDiscipline === value) athleteProfile.weakDiscipline = null;
+        if (field === "weakDiscipline" && value && athleteProfile.strongDiscipline === value) athleteProfile.strongDiscipline = null;
+        saveAthleteProfile();
+        render();
+        saved();
+      });
+    });
+    const min = document.getElementById("wp-session-min");
+    let timer = null;
+    const commit = () => {
+      const v = Number(min.value);
+      athleteProfile.typicalSessionMin = v > 0 ? Math.min(240, Math.max(15, Math.round(v))) : null;
+      saveAthleteProfile();
+      saved();
+    };
+    min.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(commit, 700); });
+    min.addEventListener("change", () => { clearTimeout(timer); commit(); });
+    document.getElementById("wp-onboarding-btn").addEventListener("click", () => { if (typeof openOnboarding === "function") openOnboarding(); });
+  }
+
   function render() {
     const tp = trainingProfile();
     body.innerHTML = `
+      ${weekPlanHtml()}
+      <h3 class="pf-group">Mobility</h3>
       <div class="tp-section tp-mobility${athleteProfile.includeMobility ? "" : " is-off"}">
         <div class="tp-row tp-switch-row">
           <label class="tp-label" for="tp-include-mobility">Mobility einplanen</label>
@@ -81,6 +192,7 @@ function initTrainingProfile() {
   }
 
   function bind() {
+    bindWeekPlan();
     const more = body.querySelector(".tp-more");
     if (more) more.addEventListener("toggle", () => { tpMoreOpen = more.open; });
     body.querySelectorAll(".mob-chips[data-group]").forEach(group => {
@@ -126,6 +238,9 @@ function initTrainingProfile() {
   // Die alte Checkbox ("Planung"-Karte) bleibt synchron.
   const old = document.getElementById("profile-include-mobility");
   if (old) old.addEventListener("change", () => { const sw = document.getElementById("tp-include-mobility"); if (sw) sw.checked = old.checked; });
+  // Kraft an/aus oben -> "Kraft pro Woche" frei-/ausgrauen
+  const strength = document.getElementById("profile-include-strength");
+  if (strength) strength.addEventListener("change", () => setTimeout(render, 0));
   render();
   window.renderTrainingProfile = render; // nach Onboarding/Server-Abgleich neu zeichnen
 }

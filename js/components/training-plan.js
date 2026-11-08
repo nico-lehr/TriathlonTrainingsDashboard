@@ -209,6 +209,7 @@ function planReportLines(n) {
   const out = [];
   if (n.aiCount != null) out.push(`Der KI-Coach hat ${n.aiCount} ${n.aiCount === 1 ? "Einheit" : "Einheiten"} geplant.`);
   (n.dropped || []).forEach(d => out.push(`Verworfen${d.date ? ` (${day(d.date)})` : ""}: ${d.sport || "Einheit"} – ${d.reason}.`));
+  if ((n.structure || []).length) out.push(`An deinen Wochenplan angepasst: ${n.structure.join(" ")}`);
   if ((n.filled || []).length) out.push(`Leere Trainingstage ergänzt: ${n.filled.map(f => `${day(f.date)} ${f.title} ${f.duration_min} min`).join(", ")}.`);
   const why = { rest: "bleibt als freier Tag der Woche zur Erholung", volume: "frei, weil der Wochenumfang schon erreicht ist (langsamer Aufbau schützt vor Verletzungen)", rules: "frei, weil eine Einheit dort eine Trainingsregel verletzen würde" };
   (n.skipped || []).forEach(s => out.push(`${day(s.date)} ${why[s.reason] || "bleibt frei"}.`));

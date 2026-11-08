@@ -173,7 +173,9 @@ function futurePlannedDatesForGoal(goalId) {
 function planRuleViolations(list, options = {}) {
   const wellness = typeof planWellnessInput === "function" ? planWellnessInput()
     : { hrv_ms: wellnessDeviation("hrv_ms"), resting_hr: wellnessDeviation("resting_hr") };
-  return validatePlan(list, DATA, wellness, recoveryCheck, { goal: getPrimaryGoal(), ...options });
+  const structure = typeof planStructureSettings === "function" && typeof trainingProfile === "function"
+    ? planStructureSettings(athleteProfile, trainingProfile()) : null;
+  return validatePlan(list, DATA, wellness, recoveryCheck, { goal: getPrimaryGoal(), structure, ...options });
 }
 
 // Kopie der Liste mit geänderter Einheit - die Vorschau, die erst geprüft
