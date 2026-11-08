@@ -286,5 +286,6 @@ function strengthPlanRule() {
   const goalRule = tp.strengthGoal === "athletic"
     ? ` Ziel: athletischer Körper / Muskelaufbau - 3-4 Sätze à 8-12 Wiederholungen, die letzten Wiederholungen schwer; Dauer ca. 40-50 min.`
     : "";
-  return `- Bei "Kraft": "exercises"-Array AUSSCHLIESSLICH aus dieser Liste, je Eintrag {"id": exakt die id, "name": Name, "sets": 2-4, "reps": z.B. "10" oder "8 je Seite", "note": kurzer Tipp}.${focusRule}${goalRule} Erlaubt: ${list}.`;
+  const wishRule = tp.strengthWish && tp.strengthWish.trim() ? ` Wunsch der Person zum Krafttraining (in ihren Worten): "${tp.strengthWish.trim().slice(0, 300)}" - die Übungsauswahl daran ausrichten.` : "";
+  return `- Bei "Kraft": "exercises"-Array AUSSCHLIESSLICH aus dieser Liste, je Eintrag {"id": exakt die id, "name": Name, "sets": 2-4, "reps": z.B. "10" oder "8 je Seite", "note": kurzer Tipp}.${focusRule}${goalRule}${wishRule} Erlaubt: ${list}.`;
 }

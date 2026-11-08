@@ -224,3 +224,29 @@ test("Rechnung: Plan-Rezept für eine ergänzte Kraft-Einheit", () => {
   assert.strictEqual(e.sport, "Kraft");
   assert.ok(e.duration_min >= 20 && e.exercises.length >= 5 && e.exercises.every(x => x.id && x.name));
 });
+
+test("Kraft-Wunsch als Text: Schwerpunkte und Muskelaufbau werden erkannt, Verneinungen nicht", () => {
+  const parse = t => plain(run(`strengthWishParse(${JSON.stringify(t)})`));
+  assert.deepStrictEqual(parse("Ich möchte einen athletischen körper, fokus auf schulter und Brust Muskeln"), { goal: "athletic", focus: ["shoulder", "chest"] });
+  assert.deepStrictEqual(parse("Stabiler Rumpf für den Triathlon. Keine Beinübungen, die Beine sind vom Laufen müde"), { goal: "triathlon", focus: ["core"] });
+  assert.deepStrictEqual(parse("Muskelaufbau an Armen und Beinen, Rücken nicht so wichtig"), { goal: "athletic", focus: ["chest", "legs"] });
+  assert.deepStrictEqual(parse("Als Triathlet verletzungsfrei bleiben"), { goal: "triathlon", focus: [] });
+  assert.deepStrictEqual(parse(""), { goal: "triathlon", focus: [] });
+});
+
+test("Kraft-Wunsch: alte Auswahl wird zu Text, gespeichert wird nur der Text", () => {
+  app.athleteProfile = { trainingProfile: { strengthGoal: "athletic", strengthFocus: ["shoulder", "chest"] } };
+  let tp = plain(run("trainingProfile()"));
+  assert.strictEqual(tp.strengthWish, "Athletischer Körper, Muskelaufbau, Schwerpunkt Schultern und Brust & Arme");
+  assert.strictEqual(tp.strengthGoal, "athletic");
+  assert.deepStrictEqual(tp.strengthFocus, ["shoulder", "chest"]);
+  run(`saveTrainingProfile({ strengthWish: "Starker Rücken" })`);
+  const saved = plain(run("athleteProfile.trainingProfile"));
+  assert.strictEqual(saved.strengthWish, "Starker Rücken");
+  assert.ok(!("strengthGoal" in saved) && !("strengthFocus" in saved));
+  tp = plain(run("trainingProfile()"));
+  assert.deepStrictEqual([tp.strengthGoal, tp.strengthFocus], ["triathlon", ["back"]]);
+  const rule = run(`strengthPlanRule(trainingProfile(), "dumbbells")`) || "";
+  assert.match(rule, /Starker Rücken/);
+  app.athleteProfile = {};
+});

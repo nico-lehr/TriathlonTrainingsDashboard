@@ -52,10 +52,20 @@ function initTrainingProfile() {
     </div>`;
   const DISCIPLINES = [["Schwimmen", "Schwimmen"], ["Rad", "Rad"], ["Laufen", "Laufen"]];
 
+  // Was die App aus dem Kraft-Wunsch herausliest - damit man sieht, dass es ankommt.
+  function strengthWishSummary(text) {
+    const w = strengthWishParse(text);
+    const focus = typeof STRENGTH_AREAS !== "undefined" ? w.focus.map(id => STRENGTH_AREAS[id]).filter(Boolean) : [];
+    const bits = [];
+    if (focus.length) bits.push(`Schwerpunkt ${focus.join(", ")} – je 2 Übungen in jeder Kraft-Einheit`);
+    if (w.goal === "athletic") bits.push("mehr Sätze für Muskelaufbau");
+    return bits.length ? `Erkannt: ${bits.join(" · ")}` : "Der ganze Text geht an den Coach.";
+  }
+
   function weekPlanHtml() {
     const p = athleteProfile;
     const tp = trainingProfile();
-    const strengthWish = /kraft|muskel|hantel|athletisch|bankdr|liegestütz/i.test(`${p.customPlanWishes || ""} ${tp.goals || ""} ${(typeof goals !== "undefined" ? goals : []).map(g => g.notes || "").join(" ")}`);
+    const strengthWish = /kraft|muskel|hantel|athletisch|bankdr|liegestütz/i.test(`${p.customPlanWishes || ""} ${tp.goals || ""} ${tp.strengthWish || ""} ${(typeof goals !== "undefined" ? goals : []).map(g => g.notes || "").join(" ")}`);
     const days = p.trainingDays || [];
     const hint = !days.length ? `<p class="tp-intro wp-warn">Wähle deine Trainingstage – sonst plant der Coach an beliebigen Tagen.</p>` : "";
     return `
@@ -80,8 +90,6 @@ function initTrainingProfile() {
         ${strengthWish && !p.includeStrength ? `<div class="wp-note"><span>Du wünschst dir Krafttraining, aber „Krafttraining einplanen“ ist aus – dann plant der Coach keins.</span><button type="button" class="cal-today-btn" id="wp-strength-on">Einschalten</button></div>` : ""}
         <div class="${p.includeStrength ? "" : "wp-off"}">
           ${choice("strengthPerWeek", [[1, "1×"], [2, "2×"], [3, "3×"]], [1, 2, 3].includes(Number(p.strengthPerWeek)) ? Number(p.strengthPerWeek) : 2, "Kraft pro Woche", p.includeStrength ? "" : "Erst oben „Krafttraining einplanen“ einschalten")}
-          ${choice("strengthGoal", Object.entries(STRENGTH_GOALS), tp.strengthGoal, "Ziel beim Krafttraining", tp.strengthGoal === "athletic" ? "Mehr Sätze, Muskelaufbau" : "Stabil und verletzungsfrei", true)}
-          ${typeof STRENGTH_AREAS !== "undefined" ? chipGroup("strengthFocus", STRENGTH_AREAS, tp.strengthFocus, "Schwerpunkt <span class=\"tp-hint\">Dafür kommen in jeder Kraft-Einheit zwei Übungen mehr.</span>") : ""}
         </div>
         <div class="tp-row">
           <label class="tp-label" for="wp-session-min">Übliche Dauer<small class="tp-hint">Eine normale Einheit</small></label>
@@ -125,12 +133,6 @@ function initTrainingProfile() {
         const btn = e.target.closest("button[data-value]");
         if (!btn) return;
         const field = seg.dataset.wp;
-        if (field === "strengthGoal") {
-          saveTrainingProfile({ strengthGoal: btn.dataset.value });
-          render();
-          saved();
-          return;
-        }
         const numeric = ["mainPerDay", "strengthPerWeek"].includes(field);
         let value = numeric ? Number(btn.dataset.value) : btn.dataset.value;
         // Erfahrung/Disziplin: nochmal tippen = Auswahl aufheben
@@ -183,6 +185,11 @@ function initTrainingProfile() {
       <div class="tp-section">
         <label class="tp-label" for="tp-goals">Was möchtest du erreichen?</label>
         <textarea id="tp-goals" class="coach-input tp-textarea" rows="2" placeholder="z. B. Hüfte lockerer für die Aero-Position, nach dem Laufen weniger steife Waden">${escapeHtml(tp.goals)}</textarea>
+      </div>
+      <div class="tp-section">
+        <label class="tp-label" for="tp-strength-wish">Was möchtest du mit dem Krafttraining erreichen?</label>
+        <textarea id="tp-strength-wish" class="coach-input tp-textarea" rows="2" placeholder="z. B. athletischer Körper, Fokus auf Schultern und Brust">${escapeHtml(tp.strengthWish)}</textarea>
+        <p class="tp-hint tp-strength-parsed" id="tp-strength-parsed">${strengthWishSummary(tp.strengthWish)}</p>
       </div>
       <div class="tp-section">
         <label class="tp-label" for="tp-limitations">Verletzungen oder Einschränkungen</label>
@@ -245,6 +252,9 @@ function initTrainingProfile() {
       el.addEventListener("change", () => { clearTimeout(timer); apply(el.value.trim()); saved(); });
     };
     text("tp-goals", v => saveTrainingProfile({ goals: v.slice(0, 500) }));
+    text("tp-strength-wish", v => saveTrainingProfile({ strengthWish: v.slice(0, 500) }));
+    const sw = document.getElementById("tp-strength-wish"), swOut = document.getElementById("tp-strength-parsed");
+    sw.addEventListener("input", () => { swOut.textContent = strengthWishSummary(sw.value); });
     text("tp-limitations", v => { athleteProfile.limitations = v || null; saveAthleteProfile(); });
     text("tp-wishes", v => { athleteProfile.customPlanWishes = v; saveAthleteProfile(); });
     document.getElementById("tp-include-mobility").addEventListener("change", e => {

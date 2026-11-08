@@ -4,6 +4,13 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.38
+
+- **Krafttraining-Wunsch jetzt als Text:** In „Training & Planung“ gibt es keine Auswahl mehr für „Ziel beim Krafttraining“ und „Schwerpunkt“. Stattdessen steht unter „Deine Wünsche“ ein neues Feld: „Was möchtest du mit dem Krafttraining erreichen?“ – dort schreibst du in eigenen Worten, z. B. „athletischer Körper, Fokus auf Schultern und Brust“.
+- Die App liest aus dem Text heraus, welche Körperteile dir wichtig sind (z. B. Brust, Schultern, Rücken, Beine) und ob du Muskeln aufbauen möchtest. Darunter steht direkt, was erkannt wurde. Diese Körperteile bekommen weiterhin in jeder Kraft-Einheit zwei Übungen. „Keine Beinübungen“ wird richtig als „nicht gewünscht“ verstanden.
+- Der ganze Text geht zusätzlich an die KI, damit sie den Plan danach ausrichtet.
+- Wer vorher schon etwas ausgewählt hatte, findet das automatisch als Text im neuen Feld wieder.
+
 ## 2.4.37
 
 - **KI-Kosten je Modell:** Jede Anfrage an den KI-Coach wird jetzt mit dem Modell gespeichert, das wirklich geantwortet hat – samt Tokens und Kosten. Die Kosten werden mit dem Listenpreis zum Zeitpunkt der Anfrage berechnet (Opus 5.5: 4 $ / 20 $, Sonnet 5.5: 2 $ / 10 $, Haiku 5.5: 0,10 $ / 0,50 $ je Million gelesener / geschriebener Tokens). Auch abgebrochene Antworten zählen mit, denn sie kosten ebenfalls.

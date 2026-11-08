@@ -16,15 +16,61 @@ const TRAINING_PROFILE_DEFAULT = {
   equipment: ["wall"],  // vorhandene Hilfsmittel (MOBILITY_EQUIPMENT)
   mobilityPerWeek: 2,
   mobilityMinutes: 15,
-  strengthGoal: "triathlon", // Krafttraining: "triathlon" (stabil & verletzungsfrei) | "athletic" (athletischer Körper, Muskelaufbau)
-  strengthFocus: [],         // Schwerpunkte beim Krafttraining (STRENGTH_AREAS, z. B. chest, shoulder)
+  strengthWish: "",     // "Was möchtest du mit dem Krafttraining erreichen?" (Freitext)
 };
 
-const STRENGTH_GOALS = { triathlon: "Fit für Triathlon", athletic: "Athletischer Körper" };
+// Aus dem Freitext zum Krafttraining abgeleitet (strengthWishParse):
+// strengthFocus = Muskelgruppen (STRENGTH_AREAS), strengthGoal = "athletic"
+// bei Muskelaufbau-Wünschen, sonst "triathlon". So landet z. B. "Fokus auf
+// Schultern und Brust" sicher in jeder Kraft-Einheit - der ganze Text geht
+// zusätzlich an die KI.
+const STRENGTH_WISH_WORDS = [
+  ["chest", /brust|bankdr|liegestütz|\barm(e|en|s)?\b|oberarm|bizeps|trizeps/],
+  ["shoulder", /schulter|deltamuskel/],
+  ["back", /rücken|\blat\b|latissimus|klimmz/],
+  ["core", /rumpf|bauch|\bcore\b|six-?pack/],
+  ["legs", /\bbein(?!ahe)|oberschenkel|quadrizeps|kniebeug/],
+  ["glute", /\bpo\b|gesäß|\bglute|hintern/],
+  ["calf", /\bwade/],
+];
+const STRENGTH_ATHLETIC_RE = /\bathlet|muskelaufbau|muskelmasse|masse aufbauen|hypertroph|definiert|bodybuilding|\bfigur\b|breitere|muskulöse/;
+
+function strengthWishParse(text) {
+  const focus = [], unwanted = [];
+  let athletic = false;
+  // Satzteile mit "kein/nicht/ohne" zählen nicht - und was dort steht
+  // ("keine Beinübungen") wird auch sonst nicht als Schwerpunkt genommen.
+  String(text || "").toLowerCase().split(/[,.;!?\n]|\baber\b|\bsondern\b/).forEach(part => {
+    if (/\b(kein|keine|keinen|nicht|ohne)\b/.test(part)) {
+      STRENGTH_WISH_WORDS.forEach(([id, re]) => { if (re.test(part)) unwanted.push(id); });
+      return;
+    }
+    if (STRENGTH_ATHLETIC_RE.test(part)) athletic = true;
+    STRENGTH_WISH_WORDS
+      .map(([id, re]) => [id, part.search(re)])
+      .filter(([id, at]) => at >= 0 && !focus.includes(id))
+      .sort((a, b) => a[1] - b[1])
+      .forEach(([id]) => focus.push(id));
+  });
+  return { goal: athletic ? "athletic" : "triathlon", focus: focus.filter(id => !unwanted.includes(id)) };
+}
+
+// Bis 2.4.37 gab es Ziel und Schwerpunkt als Auswahl - daraus einmalig einen
+// Text machen, damit niemandes Einstellung verloren geht.
+function legacyStrengthWish(saved) {
+  const parts = [];
+  if (saved.strengthGoal === "athletic") parts.push("Athletischer Körper, Muskelaufbau");
+  const focus = (Array.isArray(saved.strengthFocus) ? saved.strengthFocus : [])
+    .map(id => (typeof STRENGTH_AREAS !== "undefined" ? STRENGTH_AREAS[id] : null)).filter(Boolean);
+  if (focus.length) parts.push(`Schwerpunkt ${focus.join(" und ")}`);
+  return parts.join(", ");
+}
 
 function trainingProfile() {
   const saved = athleteProfile.trainingProfile && typeof athleteProfile.trainingProfile === "object" ? athleteProfile.trainingProfile : {};
   const list = (v, allowed) => (Array.isArray(v) ? v : []).filter(x => allowed[x]);
+  const strengthWish = typeof saved.strengthWish === "string" ? saved.strengthWish : legacyStrengthWish(saved);
+  const wish = strengthWishParse(strengthWish);
   return {
     goals: typeof saved.goals === "string" ? saved.goals : "",
     focusAreas: list(saved.focusAreas, MOBILITY_AREAS),
@@ -33,13 +79,16 @@ function trainingProfile() {
     equipment: Array.isArray(saved.equipment) ? list(saved.equipment, MOBILITY_EQUIPMENT) : [...TRAINING_PROFILE_DEFAULT.equipment],
     mobilityPerWeek: [1, 2, 3, 4, 5].includes(saved.mobilityPerWeek) ? saved.mobilityPerWeek : TRAINING_PROFILE_DEFAULT.mobilityPerWeek,
     mobilityMinutes: [10, 15, 20, 30].includes(saved.mobilityMinutes) ? saved.mobilityMinutes : TRAINING_PROFILE_DEFAULT.mobilityMinutes,
-    strengthGoal: STRENGTH_GOALS[saved.strengthGoal] ? saved.strengthGoal : TRAINING_PROFILE_DEFAULT.strengthGoal,
-    strengthFocus: typeof STRENGTH_AREAS !== "undefined" ? list(saved.strengthFocus, STRENGTH_AREAS) : [],
+    strengthWish,
+    strengthGoal: wish.goal,
+    strengthFocus: typeof STRENGTH_AREAS !== "undefined" ? wish.focus.filter(id => STRENGTH_AREAS[id]) : [],
   };
 }
 
 function saveTrainingProfile(patch) {
-  athleteProfile.trainingProfile = { ...trainingProfile(), ...patch };
+  // Ziel und Schwerpunkt werden immer aus dem Text abgeleitet, nie gespeichert.
+  const { strengthGoal, strengthFocus, ...rest } = { ...trainingProfile(), ...patch };
+  athleteProfile.trainingProfile = rest;
   saveAthleteProfile();
 }
 
@@ -57,8 +106,8 @@ function trainingProfileContextLines() {
   if (athleteProfile.includeMobility) lines.push(`Mobility-Wunsch: ${tp.mobilityPerWeek}x pro Woche, je ca. ${tp.mobilityMinutes} Minuten`);
   if (athleteProfile.includeStrength) {
     const per = [1, 2, 3].includes(Number(athleteProfile.strengthPerWeek)) ? Number(athleteProfile.strengthPerWeek) : 2;
-    const goal = tp.strengthGoal === "athletic" ? "athletischer Körper / Muskelaufbau" : "stabil und verletzungsfrei für Triathlon";
-    lines.push(`Krafttraining-Wunsch: ${per}x pro Woche, Ziel: ${goal}${tp.strengthFocus.length ? `, Schwerpunkt: ${labelList(tp.strengthFocus, STRENGTH_AREAS)}` : ""}`);
+    lines.push(`Krafttraining-Wunsch: ${per}x pro Woche${tp.strengthFocus.length ? `, Schwerpunkt: ${labelList(tp.strengthFocus, STRENGTH_AREAS)}` : ""}${tp.strengthGoal === "athletic" ? ", Ziel: athletischer Körper / Muskelaufbau" : ""}`);
+    if (tp.strengthWish.trim()) lines.push(`Was der Athlet mit dem Krafttraining erreichen möchte (eigene Worte, unbedingt berücksichtigen): "${tp.strengthWish.trim()}"`);
   }
   const fb = mobilityFeedbackSummary();
   if (fb) lines.push(`Rückmeldungen zu Mobility-Einheiten: ${fb}`);
