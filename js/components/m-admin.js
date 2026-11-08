@@ -82,6 +82,41 @@ function mAdminRank(counts, names, color) {
     <div class="m-adm-rank-bar"><i style="width:${Math.max(3, Math.round(v / top * 100))}%;background:${color}"></i></div></div>`).join("")}</div>`;
 }
 
+// Kosten in US-Dollar (so rechnet Anthropic ab), deutsch geschrieben.
+function mUsd(v) {
+  if (!v) return "0 $";
+  if (v < 0.01) return "< 0,01 $";
+  return `${mNum(v, 2)} $`;
+}
+
+const M_AI_TASK_NAMES = {
+  plan: "Trainingsplan", dailycheck: "Täglicher Plan-Check", analysis: "Auswertung einer Einheit",
+  lessons: "Lessons Learned", focus: "Belastung einordnen", perfSummary: "Leistungszustand",
+  recommendation: "Coach-Empfehlung", morning: "Morgenbericht", mobility: "Mobility", chat: "Sonstiges",
+};
+
+const mTok = n => (n >= 1e6 ? `${mNum(n / 1e6, 2)} Mio.` : n >= 1000 ? `${mNum(n / 1000, 1)}k` : String(n || 0));
+
+// KI-Nutzung und Kosten je Modell und je Aufgabe (backend/usage.py).
+function mAdminAiCostCard(d) {
+  const models = d.ai_models || [];
+  const legacy = d.ai_tokens_without_model || { in: 0, out: 0 };
+  const total = (d.totals && d.totals.ai_cost_usd) || 0;
+  const rows = models.map(m => `<div class="m-row"><span class="m-grow"><span class="m-row-title">${mEsc(m.label)}</span>
+      <span class="m-row-meta">${m.requests} Anfragen · ${mTok(m.tokens_in)} gelesen / ${mTok(m.tokens_out)} geschrieben</span></span>
+      <b>${m.price_known ? mUsd(m.cost_usd) : "Preis unbekannt"}</b></div>`).join("");
+  const old = legacy.in + legacy.out ? `<div class="m-row"><span class="m-grow"><span class="m-row-title">Ohne Modell</span>
+      <span class="m-row-meta">vor Version 2.4.37 gezählt · ${mTok(legacy.in)} / ${mTok(legacy.out)}</span></span><b>–</b></div>` : "";
+  const tasks = Object.entries(d.ai_cost_tasks || {}).sort((a, b) => b[1] - a[1]);
+  const top = tasks.length ? tasks[0][1] : 0;
+  const taskHtml = tasks.length ? `<div class="m-adm-sub">Kosten je Aufgabe</div><div class="m-adm-rank">${tasks.map(([k, v]) => `<div class="m-adm-rank-row"><span>${mEsc(M_AI_TASK_NAMES[k] || k)}</span><b>${mUsd(v)}</b>
+      <div class="m-adm-rank-bar"><i style="width:${Math.max(3, Math.round(v / top * 100))}%;background:var(--m-r2)"></i></div></div>`).join("")}</div>` : "";
+  return `<section class="m-card"><div class="m-head"><h2>KI-Kosten</h2><span class="m-adm-hint">${d.days} Tage</span></div>
+    <div class="m-adm-cost"><b>${mUsd(total)}</b><span>geschätzt nach Listenpreis, in US-Dollar</span></div>
+    ${rows || old ? `<div class="m-list">${rows}${old}</div>` : `<p class="m-muted-note">Noch keine KI-Anfragen im Zeitraum.</p>`}
+    ${taskHtml}</section>`;
+}
+
 function mAdminYesNo(v) {
   if (v === null || v === undefined) return `<span class="m-adm-flag">?</span>`;
   return v ? `<span class="m-adm-flag on">✓</span>` : `<span class="m-adm-flag">–</span>`;
@@ -95,7 +130,7 @@ function mAdminUserCard(u) {
     <div class="m-stats">
       <div class="m-num"><small>Aktive Tage</small><b>${u.active_days}</b></div>
       <div class="m-num"><small>Geöffnet</small><b>${opens}</b></div>
-      <div class="m-num"><small>KI-Coach</small><b>${u.ai_requests}</b></div>
+      <div class="m-num"><small>KI-Coach</small><b>${u.ai_requests}${u.ai_cost_usd ? `<em> ${mUsd(u.ai_cost_usd)}</em>` : ""}</b></div>
       <div class="m-num"><small>Trainings</small><b>${u.workouts}</b></div>
       <div class="m-num"><small>Stunden</small><b>${mNum(u.hours, 1)}</b></div>
       <div class="m-num"><small>Garmin-Abrufe</small><b class="${u.garmin.fehler ? "warn" : ""}">${u.garmin.ok}${u.garmin.fehler ? `<em class="down"> +${u.garmin.fehler} ✕</em>` : ""}</b></div>
@@ -151,5 +186,5 @@ function mRenderAdmin() {
   const users = d.users.slice().sort((a, b) => (b.last_seen || "").localeCompare(a.last_seen || ""));
   const people = `<h2 class="m-adm-section">Personen</h2><div class="m-adm-users">${users.map(mAdminUserCard).join("")}</div>`;
   const note = `<p class="m-adm-note">Nur Zahlen, keine Inhalte: keine einzelnen Trainings, Gesundheitswerte oder Coach-Nachrichten. Gezählt wird seit Version 2.4.27.</p>`;
-  return head + seg + mCols3(kpis + tech, active, usage, "adm") + people + note;
+  return head + seg + mCols3(kpis + tech, active + mAdminAiCostCard(d), usage, "adm") + people + note;
 }

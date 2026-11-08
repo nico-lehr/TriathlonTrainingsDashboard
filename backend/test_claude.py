@@ -208,6 +208,21 @@ class ClaudeTest(unittest.TestCase):
         self.assertEqual(self.put(self.admin, task_models={"plan": "gpt-4"}).status_code, 400)
         self.assertEqual(self.put(self.admin, task_models={"egal": "claude-haiku-5-5"}).status_code, 400)
 
+    def test_kosten_mit_dem_modell_das_geantwortet_hat(self):
+        self.put(self.admin, key=KEY)
+        FakeClient.reply = types.SimpleNamespace(stop_reason="end_turn", model="claude-opus-5",
+                                                 usage=types.SimpleNamespace(input_tokens=1000, output_tokens=500),
+                                                 content=[types.SimpleNamespace(type="text", text="ok")])
+        calls = []
+        with mock.patch("backend.usage.record_many", lambda aid, items, sf=None: calls.extend(items)):
+            r = self.client.post("/api/v1/ai/claude/chat", headers=self.admin, json={"prompt": "x", "task": "plan"})
+        self.assertEqual(r.status_code, 200)
+        got = {(k, n): v for k, n, v in calls}
+        self.assertEqual(got[("ai_model", "claude-opus-5")], 1)  # Ausweich-Modell, nicht das eingestellte
+        self.assertEqual(got[("ai_cost", "claude-opus-5")], 1000 * 5 + 500 * 25)  # Millionstel Dollar
+        self.assertEqual(got[("ai_cost_task", "plan")], 17_500)
+        self.assertEqual(got[("ai", "plan")], 1)
+
     def test_unbekanntes_modell_400(self):
         self.put(self.admin, key=KEY)
         self.assertEqual(self.put(self.admin, model="gpt-4").status_code, 400)

@@ -41,21 +41,50 @@ def bump(session, athlete_id, kind, name, n=1, day=None):
     if row is None:
         row = UsageDaily(athlete_id=athlete_id, day=day, kind=kind, name=name, count=0)
         session.add(row)
-    row.count = min(MAX_PER_DAY if kind != "ai_tokens" else 10**9, (row.count or 0) + int(n))
+    row.count = min(10**12 if kind in UNCAPPED else MAX_PER_DAY, (row.count or 0) + int(n))
+
+
+# Token- und Kostenzaehler haben keinen Deckel (das sind keine Klicks).
+# ai_model:     Anfragen je Modell          ai_model_in / ai_model_out: Tokens je Modell
+# ai_cost:      Kosten je Modell in Millionstel US-Dollar (Preis zum Zeitpunkt der Anfrage)
+# ai_cost_task: Kosten je Aufgabe (plan, analysis, ...) in Millionstel US-Dollar
+UNCAPPED = {"ai_tokens", "ai_model", "ai_model_in", "ai_model_out", "ai_cost", "ai_cost_task"}
 
 
 def record(athlete_id, kind, name, n=1, session_factory=None):
     """Zaehlen mit eigener Sitzung - nie ein Fehler fuer den eigentlichen Ablauf."""
+    record_many(athlete_id, [(kind, name, n)], session_factory)
+
+
+def record_many(athlete_id, items, session_factory=None):
+    """Mehrere Zaehler (kind, name, n) in einer Sitzung."""
     if session_factory is None:
         from . import Session as session_factory  # noqa: N813
     session = session_factory()
     try:
-        bump(session, athlete_id, kind, name, n)
+        for kind, name, n in items:
+            bump(session, athlete_id, kind, name, n)
         session.commit()
     except Exception:  # Statistik ist Nebensache
         session.rollback()
     finally:
         session.close()
+
+
+def record_ai_call(athlete_id, task, tokens, ok=True, error_code=None):
+    """Eine Claude-Anfrage zaehlen: Aufgabe, Tokens, Modell und Kosten."""
+    from . import claude_api
+    items = [("ai", task or "chat", 1)] if ok else [("ai_error", (error_code or "fehler")[:40], 1)]
+    t_in, t_out = int(tokens.get("in", 0) or 0), int(tokens.get("out", 0) or 0)
+    if tokens:
+        items += [("ai_tokens", "in", t_in), ("ai_tokens", "out", t_out)]
+    model = str(tokens.get("model") or "")[:40]
+    if model:
+        items += [("ai_model", model, 1), ("ai_model_in", model, t_in), ("ai_model_out", model, t_out)]
+        cost = claude_api.cost_micro_usd(model, t_in, t_out)
+        if cost:
+            items += [("ai_cost", model, cost), ("ai_cost_task", (task or "chat")[:40], cost)]
+    record_many(athlete_id, items)
 
 
 @api_bp.route("/usage", methods=["POST"])
@@ -80,6 +109,24 @@ def post_usage():
     finally:
         session.close()
     return response_success({"saved": sum(counts.values())})
+
+
+def _model_rows(by):
+    """Anfragen, Tokens und Kosten je Modell, teuerstes zuerst."""
+    from . import claude_api
+    names = set(by.get("ai_model", {})) | set(by.get("ai_model_in", {})) | set(by.get("ai_cost", {}))
+    out = []
+    for m in names:
+        out.append({
+            "model": m,
+            "label": claude_api.MODEL_SHORT.get(m, m),
+            "requests": by.get("ai_model", {}).get(m, 0),
+            "tokens_in": by.get("ai_model_in", {}).get(m, 0),
+            "tokens_out": by.get("ai_model_out", {}).get(m, 0),
+            "cost_usd": round(by.get("ai_cost", {}).get(m, 0) / 1e6, 6),
+            "price_known": m in claude_api.PRICES_USD_PER_MTOK,
+        })
+    return sorted(out, key=lambda r: (-r["cost_usd"], -r["requests"], r["model"]))
 
 
 def _store_value(session, athlete_id, key):
@@ -145,6 +192,8 @@ def admin_stats():
                 "ai_tasks": by.get("ai", {}),
                 "ai_errors": sum(by.get("ai_error", {}).values()),
                 "ai_tokens": by.get("ai_tokens", {}),
+                "ai_cost_usd": round(sum(by.get("ai_cost", {}).values()) / 1e6, 6),
+                "ai_models": _model_rows(by),
                 "garmin": {"connected": garmin, "ok": by.get("garmin", {}).get("ok", 0), "fehler": by.get("garmin", {}).get("fehler", 0)},
                 "js_errors": by.get("error", {}).get("js", 0),
                 "workouts": len(workouts),
@@ -187,6 +236,18 @@ def admin_stats():
             "workouts": sum(u["workouts"] for u in users),
             "hours": round(sum(u["hours"] for u in users), 1),
         }
+        # KI-Nutzung und Kosten je Modell und je Aufgabe (alle Personen)
+        all_by = {}
+        for r in rows:
+            if r.kind.startswith("ai_"):
+                all_by.setdefault(r.kind, {})
+                all_by[r.kind][r.name] = all_by[r.kind].get(r.name, 0) + r.count
+        ai_models = _model_rows(all_by)
+        totals["ai_cost_usd"] = round(sum(all_by.get("ai_cost", {}).values()) / 1e6, 6)
+        # Tokens von vor der Zaehlung je Modell (vor 2.4.37): ohne Modell und ohne Kosten
+        legacy_in = totals["ai_tokens_in"] - sum(m["tokens_in"] for m in ai_models)
+        legacy_out = totals["ai_tokens_out"] - sum(m["tokens_out"] for m in ai_models)
+        ai_cost_tasks = {k: round(v / 1e6, 6) for k, v in all_by.get("ai_cost_task", {}).items()}
         pages, features = {}, {}
         for u in users:
             for k, v in u["pages"].items():
@@ -194,6 +255,8 @@ def admin_stats():
             for k, v in u["features"].items():
                 features[k] = features.get(k, 0) + v
         return response_success({"days": days, "since": since.isoformat(), "totals": totals, "pages": pages, "features": features,
+                                 "ai_models": ai_models, "ai_cost_tasks": ai_cost_tasks,
+                                 "ai_tokens_without_model": {"in": max(0, legacy_in), "out": max(0, legacy_out)},
                                  "daily_active": daily_active, "weekly_active": weekly_active, "users": users})
     finally:
         session.close()

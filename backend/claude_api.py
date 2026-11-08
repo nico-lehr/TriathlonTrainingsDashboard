@@ -30,6 +30,43 @@ DEFAULT_MODEL = "claude-opus-5-5"
 FALLBACK_MODELS = {"claude-opus-5-5", "claude-sonnet-5-5"}
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
+# Preise in US-Dollar je 1 Million Tokens (Eingabe, Ausgabe), Stand Oktober 2026,
+# fuer die Kostenstatistik (Mehr -> Statistik). Die Kosten werden beim Aufruf
+# mit dem dann gueltigen Preis gespeichert - eine spaetere Preisaenderung
+# veraendert alte Werte nicht. Auch Modelle, auf die die API bei einer
+# Ablehnung selbst ausweicht, stehen hier.
+PRICES_USD_PER_MTOK = {
+    "claude-opus-5-5": (4.0, 20.0),
+    "claude-sonnet-5-5": (2.0, 10.0),
+    "claude-haiku-5-5": (0.10, 0.50),
+    "claude-fable-5-1": (10.0, 50.0),
+    "claude-fable-5": (10.0, 50.0),
+    "claude-opus-5": (5.0, 25.0),
+    "claude-opus-4-8": (5.0, 25.0),
+    "claude-sonnet-5": (2.0, 10.0),
+}
+# Haiku 5.5 kostet bei sehr langen Anfragen (ueber 100.000 Tokens) mehr.
+PRICES_LONG = {"claude-haiku-5-5": (100_000, 0.50, 2.50)}
+MODEL_SHORT = {
+    "claude-opus-5-5": "Opus 5.5", "claude-sonnet-5-5": "Sonnet 5.5", "claude-haiku-5-5": "Haiku 5.5",
+    "claude-fable-5-1": "Fable 5.1", "claude-fable-5": "Fable 5", "claude-opus-5": "Opus 5",
+    "claude-opus-4-8": "Opus 4.8", "claude-sonnet-5": "Sonnet 5",
+}
+
+
+def cost_micro_usd(model, tokens_in, tokens_out):
+    """Kosten eines Aufrufs in Millionstel US-Dollar (ganze Zahl), None wenn der Preis unbekannt ist."""
+    price = PRICES_USD_PER_MTOK.get(model)
+    if price is None:
+        return None
+    p_in, p_out = price
+    long = PRICES_LONG.get(model)
+    if long and tokens_in > long[0]:
+        p_in, p_out = long[1], long[2]
+    # Tokens x Dollar je Million = Millionstel Dollar
+    return int(round(tokens_in * p_in + tokens_out * p_out))
+
+
 # Modell je Aufgabe: Der Betreiber kann z. B. Plaene mit Opus und Analysen
 # mit Sonnet erstellen lassen. Gilt fuer alle, die den Schluessel nutzen.
 # Ohne eigene Wahl gilt das Standard-Modell ("model").
@@ -249,6 +286,10 @@ def chat(prompt, task="", schema=None, usage_out=None):
         u = getattr(response, "usage", None)
         usage_out["in"] = int(getattr(u, "input_tokens", 0) or 0)
         usage_out["out"] = int(getattr(u, "output_tokens", 0) or 0)
+        # Das Modell, das wirklich geantwortet hat (bei einer Ablehnung kann
+        # die API auf ein anderes ausweichen).
+        served = getattr(response, "model", None)
+        usage_out["model"] = served if isinstance(served, str) and served else model
     if response.stop_reason == "refusal":
         raise ClaudeError("Der KI-Coach hat diese Anfrage abgelehnt. Bitte anders formulieren.", "claude_refusal", 422)
     if response.stop_reason == "max_tokens":

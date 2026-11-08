@@ -4,6 +4,11 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.37
+
+- **KI-Kosten je Modell:** Jede Anfrage an den KI-Coach wird jetzt mit dem Modell gespeichert, das wirklich geantwortet hat – samt Tokens und Kosten. Die Kosten werden mit dem Listenpreis zum Zeitpunkt der Anfrage berechnet (Opus 5.5: 4 $ / 20 $, Sonnet 5.5: 2 $ / 10 $, Haiku 5.5: 0,10 $ / 0,50 $ je Million gelesener / geschriebener Tokens). Auch abgebrochene Antworten zählen mit, denn sie kosten ebenfalls.
+- **Neue Karte „KI-Kosten“ in der Statistik (Mehr → Statistik):** Gesamtkosten im gewählten Zeitraum, je Modell Anfragen, Tokens und Kosten, dazu die Kosten je Aufgabe (Trainingsplan, Auswertung, Morgenbericht …). Bei jeder Person stehen die KI-Kosten neben der Anzahl der Anfragen. Tokens von vor diesem Update stehen als „Ohne Modell“ dabei.
+
 ## 2.4.36
 
 - **KI-Modell je Aufgabe:** Unter Einstellungen → KI-Coach kann der Betreiber jetzt neben dem Standard-Modell für jede Aufgabe ein eigenes Modell wählen: Trainingsplan (inkl. täglichem Plan-Check), Analysen (Auswertung von Einheiten, Lessons Learned, Belastung, Leistungszustand), Coach & Morgenbericht sowie Mobility. Beispiel: Pläne mit Opus, Analysen mit Sonnet. Die Wahl liegt auf dem Server und gilt für alle, die den Schlüssel des Betreibers nutzen. „Wie Standard“ übernimmt automatisch das Standard-Modell.

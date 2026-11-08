@@ -114,6 +114,37 @@ class UsageTest(unittest.TestCase):
         self.assertNotIn("Geheimer Titel", text)
         self.assertNotIn("Ironman", text)
 
+    def test_ki_kosten_je_modell_und_aufgabe(self):
+        # Opus: 10.000 Tokens rein, 2.000 raus = 0,04 + 0,04 = 0,08 $
+        usage.record_ai_call(self.friend_id, "plan", {"in": 10_000, "out": 2_000, "model": "claude-opus-5-5"})
+        # Sonnet: 5.000 rein, 1.000 raus = 0,01 + 0,01 = 0,02 $ (zweimal)
+        usage.record_ai_call(self.friend_id, "analysis", {"in": 5_000, "out": 1_000, "model": "claude-sonnet-5-5"})
+        usage.record_ai_call(self.admin_id, "analysis", {"in": 5_000, "out": 1_000, "model": "claude-sonnet-5-5"})
+        # Abgeschnittene Antwort: kostet trotzdem, zählt als Fehler
+        usage.record_ai_call(self.admin_id, "morning", {"in": 1_000_000, "out": 0, "model": "claude-haiku-5-5"}, ok=False, error_code="claude_too_long")
+        # Unbekanntes Modell: Tokens ja, Kosten nein
+        usage.record_ai_call(self.admin_id, "plan", {"in": 100, "out": 100, "model": "claude-zukunft-9"})
+        # Alte Zählung ohne Modell (vor 2.4.37)
+        usage.record(self.admin_id, "ai_tokens", "in", 7)
+
+        data = self.client.get("/api/v1/admin/stats?days=30", headers=self.admin).get_json()["data"]
+        models = {m["model"]: m for m in data["ai_models"]}
+        self.assertEqual(models["claude-opus-5-5"]["cost_usd"], 0.08)
+        self.assertEqual(models["claude-opus-5-5"]["label"], "Opus 5.5")
+        self.assertEqual((models["claude-sonnet-5-5"]["requests"], models["claude-sonnet-5-5"]["tokens_in"], models["claude-sonnet-5-5"]["cost_usd"]), (2, 10_000, 0.04))
+        # Haiku über 100.000 Tokens: höherer Preis 0,50 $ je Million
+        self.assertEqual(models["claude-haiku-5-5"]["cost_usd"], 0.5)
+        self.assertFalse(models["claude-zukunft-9"]["price_known"])
+        self.assertEqual(models["claude-zukunft-9"]["cost_usd"], 0)
+        self.assertEqual(data["ai_models"][0]["model"], "claude-haiku-5-5")  # teuerstes zuerst
+        self.assertEqual(data["totals"]["ai_cost_usd"], 0.62)
+        self.assertEqual(data["ai_cost_tasks"], {"plan": 0.08, "analysis": 0.04, "morning": 0.5})
+        self.assertEqual(data["ai_tokens_without_model"], {"in": 7, "out": 0})
+        self.assertEqual(data["totals"]["ai_errors"], 1)
+        friend = next(u for u in data["users"] if u["username"] == "freundin")
+        self.assertEqual(friend["ai_cost_usd"], 0.1)
+        self.assertEqual(friend["ai_requests"], 2)
+
     def test_zaehler_hat_deckel(self):
         session = routes.get_session()
         usage.bump(session, self.friend_id, "page", "heute", 10**6)

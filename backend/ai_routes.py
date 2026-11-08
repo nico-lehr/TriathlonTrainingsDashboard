@@ -138,18 +138,14 @@ def claude_chat():
         return response_error("Für den KI-Coach ist noch kein Schlüssel hinterlegt.", "claude_not_configured", 409)
     if not st["available"] and st["sdk"]:
         return response_error("Der Betreiber hat den KI-Coach für andere Personen nicht freigegeben.", "claude_not_shared", 403)
-    from .usage import record
+    from .usage import record_ai_call
     athlete_id = get_current_athlete_id()
     tokens = {}
     try:
         text = claude_api.chat(prompt, task=task, schema=schema, usage_out=tokens)
     except claude_api.ClaudeError as e:
-        record(athlete_id, "ai_error", (e.code or "fehler")[:40])
-        if tokens:
-            record(athlete_id, "ai_tokens", "in", tokens.get("in", 0))
-            record(athlete_id, "ai_tokens", "out", tokens.get("out", 0))
+        # Auch abgelehnte/abgeschnittene Antworten kosten Tokens - mitzaehlen.
+        record_ai_call(athlete_id, task, tokens, ok=False, error_code=e.code)
         return _claude_error(e)
-    record(athlete_id, "ai", task or "chat")
-    record(athlete_id, "ai_tokens", "in", tokens.get("in", 0))
-    record(athlete_id, "ai_tokens", "out", tokens.get("out", 0))
+    record_ai_call(athlete_id, task, tokens)
     return response_success({"response": text})
