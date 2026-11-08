@@ -87,7 +87,8 @@ test("Standard: Schwimmen = Einschwimmen / Technik 50 m / Hauptsatz mit Pausen /
   // ohne CSS kein Pace-Ziel, mit CSS Pace-Zone im Hauptsatz
   assert.strictEqual(st[2].steps[0].target.kind, "none");
   app.athleteProfile.swimCss = "1:50";
-  assert.deepStrictEqual(defaults({ sport: "Schwimmen", duration_min: 45, intensity: "hart" })[2].steps[0].target, { kind: "pace_zone", zone: 4 });
+  // Schwimmen ohne Tempo-Vorgabe: die Einheit steht in Metern
+  assert.deepStrictEqual(defaults({ sport: "Schwimmen", duration_min: 45, intensity: "hart" })[2].steps[0].target, { kind: "none" });
   app.athleteProfile.swimCss = null;
 });
 

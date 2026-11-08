@@ -224,7 +224,7 @@ function mRenderHeute() {
   let todayCard;
   if (main) {
     const desc = mStepSummary(main) || (main.description || "").split(/[.,\n]/)[0];
-    todayCard = `<div class="m-today">${mIcon(main.sport, "lg")}<div class="m-grow"><div class="m-row-title lg">${mEsc(main.title || main.sport)}${main.duration_min ? ` · ${mDur(main.duration_min)}` : ""}</div>
+    todayCard = `<div class="m-today">${mIcon(main.sport, "lg")}<div class="m-grow"><div class="m-row-title lg">${mEsc(main.title || main.sport)}${main.duration_min ? ` · ${mDur(main.duration_min)}` : ""}${mSwimBit(main)}</div>
         <div class="m-row-meta">${main.intensity ? `<span class="m-tag ${main.intensity}">${mEsc(main.intensity)}</span>` : ""}${mEsc(desc).slice(0, 90)}</div></div></div>
       <div class="m-actions">${main.status === "erledigt" ? `<span class="m-done-note">Erledigt ✓</span>` : ""}
         ${main.sport === "Kraft" && typeof plannedToStrengthSession === "function" && plannedToStrengthSession(main) ? `<button type="button" class="m-btn primary" data-m-act="start-strength" data-id="${mEsc(main.id)}">Mitmachen</button>` : ""}
@@ -324,7 +324,7 @@ function mRenderHeute() {
   const todayKey = localDateStr(mDay(now));
   const upcoming = (typeof plannedWorkouts !== "undefined" ? plannedWorkouts : [])
     .filter(p => p.status === "geplant" && p.date > todayKey).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 4);
-  const nextCard = upcoming.length ? `<section class="m-card m-desk-only"><div class="m-head"><h2>Als Nächstes</h2><button type="button" class="m-link" data-m-page="kalender">Kalender</button></div><div class="m-list">${upcoming.map(p => `<button type="button" class="m-row" data-m-act="plan" data-id="${mEsc(p.id)}">${mIcon(p.sport)}<span class="m-grow"><span class="m-row-title">${mEsc(p.title || p.sport)}</span><span class="m-row-meta">${new Date(p.date + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" })}${p.duration_min ? ` · ${mDur(p.duration_min)}` : ""}</span></span>${p.intensity ? `<span class="m-tag plan">${mEsc(p.intensity)}</span>` : ""}</button>`).join("")}</div></section>` : "";
+  const nextCard = upcoming.length ? `<section class="m-card m-desk-only"><div class="m-head"><h2>Als Nächstes</h2><button type="button" class="m-link" data-m-page="kalender">Kalender</button></div><div class="m-list">${upcoming.map(p => `<button type="button" class="m-row" data-m-act="plan" data-id="${mEsc(p.id)}">${mIcon(p.sport)}<span class="m-grow"><span class="m-row-title">${mEsc(p.title || p.sport)}</span><span class="m-row-meta">${new Date(p.date + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" })}${p.duration_min ? ` · ${mDur(p.duration_min)}` : ""}${mSwimBit(p)}</span></span>${p.intensity ? `<span class="m-tag plan">${mEsc(p.intensity)}</span>` : ""}</button>`).join("")}</div></section>` : "";
 
   return mHeaderHtml(now.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" }), "Heute", mSyncPill())
     + mCols3((typeof morningCardHtml === "function" ? morningCardHtml(mEsc) : "")
@@ -349,6 +349,12 @@ function mRenderHeute() {
         </div></section>`
     + `<section class="m-card"><div class="m-head"><h2>Letzte Einheiten</h2><button type="button" class="m-link" data-m-classic="overview" data-m-scroll="workouts">Alle</button></div><div class="m-list">${recentHtml}</div></section>`
     + `<button type="button" class="m-more" data-m-classic="overview">Insights – alle Diagramme und Auswertungen</button>`);
+}
+
+// Schwimmeinheiten: Meter statt Tempo (" · 1.800 m").
+function mSwimBit(p) {
+  const m = p && p.sport === "Schwimmen" && typeof plannedSwimMeters === "function" ? plannedSwimMeters(p) : null;
+  return m ? ` · ${fmtSwimMeters(m)}` : "";
 }
 
 // Kommende Ziele/Wettkämpfe (auch die aus dem Garmin-Kalender), nach Datum.
@@ -415,7 +421,7 @@ function mRenderKalender() {
     const items = [];
     mGoalsOn(k).forEach(g => items.push(`<button type="button" class="m-ev m-ev-race" data-m-classic="coach" data-m-scroll="goals"><span class="m-ev-stripe" style="background:var(--m-accent)"></span><span class="m-race-flag" aria-hidden="true">🏁</span><span class="m-grow"><span class="m-row-title">${mEsc(g.name)}</span><span class="m-row-meta">Wettkampf${g.distanceKm ? ` · ${mNum(g.distanceKm, g.distanceKm < 10 ? 1 : 0)} km` : ""}${g.targetTime ? ` · Ziel ${mEsc(g.targetTime)}` : ""}</span></span>${g.isPrimary ? `<span class="m-tag plan">Hauptevent</span>` : ""}</button>`));
     mWorkoutsOn(d).forEach(w => items.push(`<button type="button" class="m-ev" data-m-act="workout" data-file="${mEsc(w.file || w.id || "")}"><span class="m-ev-stripe" style="background:${mSport(sportGroup(w.sport)).color}"></span>${mIcon(sportGroup(w.sport) === "Sonstiges" ? w.sport : sportGroup(w.sport), "sm")}<span class="m-grow"><span class="m-row-title">${mEsc(w.title || w.name || w.sport)}</span><span class="m-row-meta">${mDur(w.duration_min || 0)}${w.distance_km ? ` · ${mNum(w.distance_km, 1)} km` : ""}</span></span><span class="m-tag done">✓</span></button>`));
-    mPlannedOn(k).filter(p => p.status !== "erledigt" || !mWorkoutsOn(d).length).forEach(p => items.push(`<button type="button" class="m-ev" data-m-act="plan" data-id="${mEsc(p.id)}"><span class="m-ev-stripe" style="background:${mSport(p.sport).color}"></span>${mIcon(p.sport, "sm")}<span class="m-grow"><span class="m-row-title">${mEsc(p.title || p.sport)}</span><span class="m-row-meta">${p.duration_min ? mDur(p.duration_min) : ""}${p.intensity ? ` · ${mEsc(p.intensity)}` : ""}</span></span><span class="m-tag ${p.status === "erledigt" ? "done" : p.status === "uebersprungen" ? "bad" : "plan"}">${p.status === "erledigt" ? "✓" : p.status === "uebersprungen" ? "übersprungen" : "geplant"}</span></button>`));
+    mPlannedOn(k).filter(p => p.status !== "erledigt" || !mWorkoutsOn(d).length).forEach(p => items.push(`<button type="button" class="m-ev" data-m-act="plan" data-id="${mEsc(p.id)}"><span class="m-ev-stripe" style="background:${mSport(p.sport).color}"></span>${mIcon(p.sport, "sm")}<span class="m-grow"><span class="m-row-title">${mEsc(p.title || p.sport)}</span><span class="m-row-meta">${p.duration_min ? mDur(p.duration_min) : ""}${mSwimBit(p)}${p.intensity ? ` · ${mEsc(p.intensity)}` : ""}</span></span><span class="m-tag ${p.status === "erledigt" ? "done" : p.status === "uebersprungen" ? "bad" : "plan"}">${p.status === "erledigt" ? "✓" : p.status === "uebersprungen" ? "übersprungen" : "geplant"}</span></button>`));
     return `<div class="m-ag-day${k === localDateStr(today) ? " today" : ""}"><div class="m-ag-date"><b>${k === localDateStr(today) ? "Heute" : wd}</b><span>${d.getDate()}.</span></div>
       <div class="m-ag-items">${items.join("") || `<button type="button" class="m-ag-add" data-m-act="plan-new" data-date="${k}">${k < localDateStr(today) ? "–" : "+ Einheit"}</button>`}</div></div>`;
   }).join("");
@@ -521,7 +527,7 @@ function mRenderCoach() {
   const dayName = d => d === today ? "Heute" : d === tomorrow ? "Morgen" : new Date(d + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long" });
   const nextHtml = byDay.length ? byDay.map(g => {
     const total = g.items.reduce((a, p) => a + (p.duration_min || 0), 0);
-    const rows = g.items.map(p => `<button type="button" class="m-row" data-m-act="plan" data-id="${mEsc(p.id)}">${mIcon(p.sport)}<span class="m-grow"><span class="m-row-title">${mEsc(p.title || p.sport)}</span><span class="m-row-meta">${p.duration_min ? mDur(p.duration_min) : ""}${p.description ? ` · ${mEsc(p.description.split(/[.\n]/)[0]).slice(0, 50)}` : ""}</span></span>${p.intensity ? `<span class="m-tag ${p.intensity}">${mEsc(p.intensity)}</span>` : ""}</button>`).join("");
+    const rows = g.items.map(p => `<button type="button" class="m-row" data-m-act="plan" data-id="${mEsc(p.id)}">${mIcon(p.sport)}<span class="m-grow"><span class="m-row-title">${mEsc(p.title || p.sport)}</span><span class="m-row-meta">${p.duration_min ? mDur(p.duration_min) : ""}${mSwimBit(p)}${p.description ? ` · ${mEsc(p.description.split(/[.\n]/)[0]).slice(0, 50)}` : ""}</span></span>${p.intensity ? `<span class="m-tag ${p.intensity}">${mEsc(p.intensity)}</span>` : ""}</button>`).join("");
     return `<div class="m-cday${g.date === today ? " today" : ""}"><div class="m-cday-head"><b>${dayName(g.date)}</b><span>${new Date(g.date + "T12:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "short" })}${total ? " · " + mDur(total) : ""}</span></div><div class="m-list">${rows}</div></div>`;
   }).join("") : `<p class="m-empty">Noch nichts geplant.</p>`;
 
@@ -1020,6 +1026,7 @@ function mPlanSheetHtml(p) {
       <h2 class="m-sh-title">${mEsc(p.title || p.sport)}</h2></div></div>
     <div class="m-sh-facts">
       ${p.duration_min ? `<div class="m-num"><small>Dauer</small><b>${mDur(p.duration_min)}</b></div>` : ""}
+      ${mSwimBit(p) ? `<div class="m-num"><small>Strecke</small><b>${fmtSwimMeters(plannedSwimMeters(p))}</b></div>` : ""}
       ${p.intensity ? `<div class="m-num"><small>Intensität</small><b class="m-int ${mEsc(p.intensity)}">${mEsc(p.intensity[0].toUpperCase() + p.intensity.slice(1))}</b></div>` : ""}
       <div class="m-num"><small>Status</small><b class="${p.status === "erledigt" ? "good" : p.status === "uebersprungen" ? "bad" : ""}">${p.status === "erledigt" ? "Erledigt" : p.status === "uebersprungen" ? "Übersprungen" : "Geplant"}</b></div>
     </div>`;

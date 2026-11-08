@@ -4,6 +4,13 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.34
+
+- **Schwimmen in Metern:** Bei Schwimm-Einheiten steht jetzt, wie viele Meter du schwimmst (z. B. „45 min · 1.600 m“) – statt einer Geschwindigkeits-Vorgabe. Auch auf der Uhr gibt es beim Schwimmen keine Tempo-Vorgabe mehr, nur noch die Meter je Abschnitt.
+- **Krafttraining nach deinem Wunsch:** Unter Einstellungen → Training & Planung → Wochenplan gibt es neu „Ziel beim Krafttraining“ (Fit für Triathlon oder Athletischer Körper) und „Schwerpunkt“ (z. B. Brust & Arme, Schultern). Mit „Athletischer Körper“ gibt es mehr Sätze für Muskelaufbau, und jede Kraft-Einheit enthält mindestens zwei Übungen pro Schwerpunkt.
+- **Kraft-Einheiten fehlen nicht mehr:** Plant die KI weniger Kraft-Einheiten als eingestellt („Kraft pro Woche“), ergänzt die App die fehlenden – an Tagen mit Platz und nicht direkt hintereinander.
+- **Hinweis, wenn Kraft ausgeschaltet ist:** Steht in deinen Wünschen etwas zu Kraft oder Muskeln, aber „Krafttraining einplanen“ ist aus, zeigt der Wochenplan einen Hinweis mit Knopf „Einschalten“.
+
 ## 2.4.33
 
 Dein Trainingsplan hält sich jetzt an deine Woche – und morgens weißt du sofort, wie erholt du bist.

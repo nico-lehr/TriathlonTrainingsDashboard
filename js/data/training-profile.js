@@ -16,7 +16,11 @@ const TRAINING_PROFILE_DEFAULT = {
   equipment: ["wall"],  // vorhandene Hilfsmittel (MOBILITY_EQUIPMENT)
   mobilityPerWeek: 2,
   mobilityMinutes: 15,
+  strengthGoal: "triathlon", // Krafttraining: "triathlon" (stabil & verletzungsfrei) | "athletic" (athletischer Körper, Muskelaufbau)
+  strengthFocus: [],         // Schwerpunkte beim Krafttraining (STRENGTH_AREAS, z. B. chest, shoulder)
 };
+
+const STRENGTH_GOALS = { triathlon: "Fit für Triathlon", athletic: "Athletischer Körper" };
 
 function trainingProfile() {
   const saved = athleteProfile.trainingProfile && typeof athleteProfile.trainingProfile === "object" ? athleteProfile.trainingProfile : {};
@@ -29,6 +33,8 @@ function trainingProfile() {
     equipment: Array.isArray(saved.equipment) ? list(saved.equipment, MOBILITY_EQUIPMENT) : [...TRAINING_PROFILE_DEFAULT.equipment],
     mobilityPerWeek: [1, 2, 3, 4, 5].includes(saved.mobilityPerWeek) ? saved.mobilityPerWeek : TRAINING_PROFILE_DEFAULT.mobilityPerWeek,
     mobilityMinutes: [10, 15, 20, 30].includes(saved.mobilityMinutes) ? saved.mobilityMinutes : TRAINING_PROFILE_DEFAULT.mobilityMinutes,
+    strengthGoal: STRENGTH_GOALS[saved.strengthGoal] ? saved.strengthGoal : TRAINING_PROFILE_DEFAULT.strengthGoal,
+    strengthFocus: typeof STRENGTH_AREAS !== "undefined" ? list(saved.strengthFocus, STRENGTH_AREAS) : [],
   };
 }
 
@@ -49,6 +55,11 @@ function trainingProfileContextLines() {
   if (tp.avoid.length) lines.push(`Bitte vermeiden: ${labelList(tp.avoid, MOBILITY_AVOID)}`);
   lines.push(`Vorhandene Hilfsmittel für Mobility: ${tp.equipment.length ? labelList(tp.equipment, MOBILITY_EQUIPMENT) : "keine (nur Matte/Boden)"}`);
   if (athleteProfile.includeMobility) lines.push(`Mobility-Wunsch: ${tp.mobilityPerWeek}x pro Woche, je ca. ${tp.mobilityMinutes} Minuten`);
+  if (athleteProfile.includeStrength) {
+    const per = [1, 2, 3].includes(Number(athleteProfile.strengthPerWeek)) ? Number(athleteProfile.strengthPerWeek) : 2;
+    const goal = tp.strengthGoal === "athletic" ? "athletischer Körper / Muskelaufbau" : "stabil und verletzungsfrei für Triathlon";
+    lines.push(`Krafttraining-Wunsch: ${per}x pro Woche, Ziel: ${goal}${tp.strengthFocus.length ? `, Schwerpunkt: ${labelList(tp.strengthFocus, STRENGTH_AREAS)}` : ""}`);
+  }
   const fb = mobilityFeedbackSummary();
   if (fb) lines.push(`Rückmeldungen zu Mobility-Einheiten: ${fb}`);
   return lines;

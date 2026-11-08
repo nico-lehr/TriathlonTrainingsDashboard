@@ -77,6 +77,7 @@ function buildPlannedWorkout(entry) {
     duration_min: entry.duration_min != null ? Number(entry.duration_min) : null,
     intensity: entry.intensity || null, // "leicht" | "mittel" | "hart"
     description: entry.description || null,
+    distance_m: entry.sport === "Schwimmen" && Number(entry.distance_m) >= 100 && Number(entry.distance_m) <= 10000 ? Math.round(Number(entry.distance_m)) : null, // nur Schwimmen: Gesamtmeter
     exercises: Array.isArray(entry.exercises) && entry.exercises.length ? entry.exercises : null, // nur Kraft/Mobility: [{name, sets, reps, note}]
     steps: entry.steps ? validateWorkoutSteps(entry.steps).steps : null, // optional, siehe validateWorkoutSteps unten
     status: "geplant", // "geplant" | "erledigt" | "uebersprungen"
@@ -98,6 +99,8 @@ function plannedWorkoutPhase(entry) {
 // Aufrufer setzt sie selbst).
 function withPlannedPatch(pw, patch) {
   const next = { ...pw, ...patch };
+  // Dauer oder Sportart geändert: KI-Meterangabe passt nicht mehr -> aus den Schritten rechnen
+  if (pw.distance_m && !("distance_m" in patch) && ((patch.duration_min != null && patch.duration_min !== pw.duration_min) || (patch.sport && patch.sport !== pw.sport))) next.distance_m = null;
   if (patch.date && patch.date !== pw.date && !("phase" in patch)) next.phase = plannedWorkoutPhase(next);
   return next;
 }
@@ -312,7 +315,24 @@ function stepTarget(sport, zone) {
   const prof = stepProfile();
   if (sport === "Laufen") return { kind: prof.runThresholdPace ? "pace_zone" : "hr_zone", zone };
   if (sport === "Rad") return { kind: prof.ftpWatts ? "power_zone" : "hr_zone", zone };
-  return prof.swimCss ? { kind: "pace_zone", zone } : { kind: "none" };
+  // Schwimmen: bewusst ohne Tempo-Vorgabe - die Einheit steht in Metern,
+  // die Intensität im Hinweis ("Gleichmäßig locker", "Zügig" ...).
+  return { kind: "none" };
+}
+
+// Meter einer Schwimmeinheit: Angabe der KI (distance_m) oder - wie auf der
+// Uhr - aus den Schritten (Einschwimmen, Technik, Hauptsatz, Ausschwimmen).
+function plannedSwimMeters(pw) {
+  if (!pw || pw.sport !== "Schwimmen") return null;
+  if (Number(pw.distance_m) > 0) return Math.round(Number(pw.distance_m));
+  if (!(Number(pw.duration_min) > 0)) return null;
+  const sum = steps => steps.reduce((a, st) => a + (st.type === "repeat" ? (st.count || 1) * sum(st.steps || []) : (Number(st.distance_km) || 0) * 1000), 0);
+  const m = Math.round(sum(plannedWorkoutSteps(pw)) / 50) * 50;
+  return m > 0 ? m : null;
+}
+
+function fmtSwimMeters(m) {
+  return m ? `${Number(m).toLocaleString("de-DE")} m` : "";
 }
 
 // "6×800 m", "5 x 4 min", "10x100m", "3 × 1,5 km" aus Titel/Beschreibung -> Satz.

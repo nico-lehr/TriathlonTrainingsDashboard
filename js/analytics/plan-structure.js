@@ -207,9 +207,40 @@ function planStructureApply(list, o) {
         description: "Ruhig und technisch sauber schwimmen, du kannst gleichmäßig atmen (Zone 2). Ergänzt, weil das dein Schwimmtag ist.",
       };
       const pw = typeof buildPlannedWorkout === "function" ? buildPlannedWorkout(entry) : { id: `ps-${k}`, status: "geplant", ...entry };
+      if (typeof planGuardSwimDescription === "function") pw.description = `${planGuardSwimDescription(pw)} Ergänzt, weil das dein Schwimmtag ist.`;
       mutable.add(pw.id);
       cur.push(pw);
     }
+  }
+
+  // 6. Zu wenig Kraft? Fehlende Einheiten ergänzen (o.makeStrength baut sie
+  // aus der Kraft-Sammlung, mit deinen Schwerpunkten). Bevorzugt an Tagen mit
+  // lockerem Haupttraining, nicht direkt neben einer anderen Kraft-Einheit.
+  if (s.strengthPerWeek && typeof o.makeStrength === "function") {
+    const weeks = [];
+    for (let k = start; k <= o.to; k = planShiftDay(k, 1)) if (!weeks.includes(planWeekKey(k))) weeks.push(planWeekKey(k));
+    weeks.forEach(wk => {
+      const kraftDays = () => cur.filter(p => p.sport === "Kraft" && active(p) && planWeekKey(p.date) === wk).map(p => p.date);
+      // Woche nur teilweise im Plan (Ende des Zeitfensters): anteilig
+      const covered = planWeekDays(wk).filter(d => d <= o.to).length;
+      let need = Math.round(s.strengthPerWeek * covered / 7) - kraftDays().length;
+      while (need > 0) {
+        const near = d => kraftDays().some(x => Math.abs(Date.parse(x) - Date.parse(d)) <= 86400000);
+        const score = d => (near(d) ? 4 : 0) + (onDay(d).some(planIsHard) ? 2 : 0) + (s.longDays.includes(planStructWeekday(d)) ? 1 : 0);
+        const day = planWeekDays(wk)
+          .filter(d => inWindow(d) && !(raceDay && d === planShiftDay(raceDay, -1)) && planStructDayAccepts(s, d, { sport: "Kraft" }, onDay(d)))
+          .filter(d => s.trainingDays.length || onDay(d).length)
+          .sort((a, b) => score(a) - score(b) || a.localeCompare(b))[0];
+        if (!day) break;
+        const made = o.makeStrength(day);
+        if (!made) break;
+        const pw = typeof buildPlannedWorkout === "function" ? buildPlannedWorkout({ ...(o.defaults || {}), ...made, date: day }) : { id: `pk-${day}`, status: "geplant", ...made, date: day };
+        cur.push(pw);
+        mutable.add(pw.id);
+        changes.push(`${label(day)}: Kraft ergänzt – du möchtest ${s.strengthPerWeek}× pro Woche Krafttraining.`);
+        need--;
+      }
+    });
   }
 
   return { list: cur, changes };

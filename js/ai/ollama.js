@@ -208,6 +208,7 @@ function parsePlanResponse(rawText, windowDates, report) {
       duration_min: dur,
       intensity,
       description: entry.description ? String(entry.description).slice(0, 500) : null,
+      distance_m: entry.sport === "Schwimmen" && Number(entry.distance_m) > 0 ? Math.round(Number(entry.distance_m)) : null,
       exercises,
     });
   });
@@ -323,14 +324,25 @@ async function generateTrainingPlan(goalId, { replace = false } = {}) {
         // der Zwischenzeit gemacht wurden, bleiben so erhalten.
         const base = plannedWorkouts;
         const built = entries.map(entry => buildPlannedWorkout({ ...entry, ...defaults }));
+        const tp = trainingProfile();
+        const mode = typeof strengthMode === "function" ? strengthMode(tp) : null;
+        // Kraft-Schwerpunkte (z. B. Brust/Schultern) auch in KI-Einheiten sicherstellen
+        if (typeof strengthEnsureFocus === "function") {
+          built.forEach(p => {
+            if (p.sport !== "Kraft") return;
+            const ex = strengthEnsureFocus(p.exercises, tp, mode, p.date);
+            if (ex) p.exercises = ex;
+          });
+        }
         let withAi = addOpenWishesToPlan([...base, ...built], planUntil, { ...defaults, source: "manual" });
         // Wochenplan fest durchsetzen (js/analytics/plan-structure.js):
         // Schwimmtage, Trainingstage, Einheiten pro Tag, Kraft/Mobility pro Woche.
         report.structure = [];
         if (typeof planStructureApply === "function") {
           const st = planStructureApply(withAi, {
-            settings: planStructureSettings(athleteProfile, trainingProfile()), mutableIds: built.map(p => p.id),
+            settings: planStructureSettings(athleteProfile, tp), mutableIds: built.map(p => p.id),
             from: windowDates[0], to: planUntil, todayKey: todayStr(), goal, defaults,
+            makeStrength: typeof plannedStrengthEntry === "function" ? date => plannedStrengthEntry(date, tp, mode) : null,
           });
           withAi = st.list;
           report.structure = st.changes;

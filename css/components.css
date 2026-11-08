@@ -2742,3 +2742,6 @@ body.m-graphit .settings-page-head, body.m-graphit .sh-back { display: none; }
 .wp-warn { color: var(--c-warn, #ff9f0a); }
 .wp-actions { margin-top: 14px; }
 #training-profile-body > .pf-group:first-child { margin-top: 26px; }
+.wp-note { display: flex; align-items: center; gap: 12px; margin: 10px 0; padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--c-warn, #ff9f0a) 14%, transparent); font-size: 14px; line-height: 1.4; }
+.wp-note span { flex: 1; }
+#training-profile-body .wp-off + .tp-row, #training-profile-body div > .tp-group { margin-top: 12px; }

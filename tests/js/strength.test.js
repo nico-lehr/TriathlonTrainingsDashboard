@@ -194,3 +194,33 @@ test("Trainingsart wechseln: geplante Übungen werden gruppengleich getauscht", 
   // Nichts zu tun -> null
   assert.strictEqual(run(`adaptStrengthExercises(${JSON.stringify([list[1]])}, ${tp}, "body", "2026-11-07")`), null);
 });
+
+test("Schwerpunkt Brust + Schultern: je Bereich mindestens zwei Übungen, Muskelaufbau mit mehr Sätzen", () => {
+  const tp = profile({ equipment: ["dumbbells", "wall", "bench"], strengthFocus: ["chest", "shoulder"], strengthGoal: "athletic" });
+  app.__tp = tp;
+  const s = plain(run(`buildStrengthSession({ tp: __tp, today: "2026-11-10", mode: "dumbbells" })`));
+  const areasOf = id => EXERCISES.find(e => e.id === id).areas;
+  assert.ok(s.exercises.filter(x => areasOf(x.id)[0] === "chest").length >= 2, JSON.stringify(s.exercises));
+  assert.ok(s.exercises.filter(x => areasOf(x.id).includes("shoulder")).length >= 2);
+  assert.ok(s.exercises.length <= 8);
+  assert.ok(s.exercises.some(x => ["knee", "hinge"].includes(EXERCISES.find(e => e.id === x.id).group)), "Beine bleiben drin");
+  assert.match(s.intro, /Brust/);
+  const base = plain(run(`buildStrengthSession({ tp: { ...__tp, strengthFocus: [], strengthGoal: "triathlon" }, today: "2026-11-10", mode: "dumbbells" })`));
+  const x = base.exercises.find(e => !EXERCISES.find(ex => ex.id === e.id).hold);
+  assert.ok(x);
+});
+
+test("KI-Kraft-Einheit ohne Brust-Übung wird um den Schwerpunkt ergänzt", () => {
+  app.__tp = profile({ equipment: ["dumbbells"], strengthFocus: ["chest"] });
+  const out = plain(run(`strengthEnsureFocus([{ id: "kniebeuge", name: "Kniebeuge", sets: 3, reps: "10" }], __tp, "dumbbells", "2026-11-10")`));
+  assert.ok(out.length >= 3);
+  assert.ok(out.slice(1).every(x => EXERCISES.find(e => e.id === x.id).areas.includes("chest")));
+  assert.strictEqual(run(`strengthEnsureFocus([], { ...__tp, strengthFocus: [] }, "dumbbells", "x")`), null);
+});
+
+test("Rechnung: Plan-Rezept für eine ergänzte Kraft-Einheit", () => {
+  app.__tp = profile({ equipment: ["dumbbells"], strengthFocus: ["shoulder"] });
+  const e = plain(run(`plannedStrengthEntry("2026-11-11", __tp, "dumbbells")`));
+  assert.strictEqual(e.sport, "Kraft");
+  assert.ok(e.duration_min >= 20 && e.exercises.length >= 5 && e.exercises.every(x => x.id && x.name));
+});

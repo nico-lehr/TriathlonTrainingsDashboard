@@ -54,6 +54,8 @@ function initTrainingProfile() {
 
   function weekPlanHtml() {
     const p = athleteProfile;
+    const tp = trainingProfile();
+    const strengthWish = /kraft|muskel|hantel|athletisch|bankdr|liegestütz/i.test(`${p.customPlanWishes || ""} ${tp.goals || ""} ${(typeof goals !== "undefined" ? goals : []).map(g => g.notes || "").join(" ")}`);
     const days = p.trainingDays || [];
     const hint = !days.length ? `<p class="tp-intro wp-warn">Wähle deine Trainingstage – sonst plant der Coach an beliebigen Tagen.</p>` : "";
     return `
@@ -75,7 +77,12 @@ function initTrainingProfile() {
       <div class="tp-section">
         ${choice("mainPerDay", [[1, "1"], [2, "2"]], Number(p.mainPerDay) === 2 ? 2 : 1, "Haupttrainings pro Tag", "Schwimmen, Rad oder Laufen")}
         ${choice("extrasMode", [["same", "Zusätzlich"], ["own", "Eigener Tag"]], p.extrasMode === "own" ? "own" : "same", "Kraft & Mobility", p.extrasMode === "own" ? "Nur an Tagen ohne Haupttraining" : "Höchstens eine zusätzlich am Tag", true)}
-        <div class="${p.includeStrength ? "" : "wp-off"}">${choice("strengthPerWeek", [[1, "1×"], [2, "2×"], [3, "3×"]], [1, 2, 3].includes(Number(p.strengthPerWeek)) ? Number(p.strengthPerWeek) : 2, "Kraft pro Woche", p.includeStrength ? "" : "Erst oben „Krafttraining einplanen“ einschalten")}</div>
+        ${strengthWish && !p.includeStrength ? `<div class="wp-note"><span>Du wünschst dir Krafttraining, aber „Krafttraining einplanen“ ist aus – dann plant der Coach keins.</span><button type="button" class="cal-today-btn" id="wp-strength-on">Einschalten</button></div>` : ""}
+        <div class="${p.includeStrength ? "" : "wp-off"}">
+          ${choice("strengthPerWeek", [[1, "1×"], [2, "2×"], [3, "3×"]], [1, 2, 3].includes(Number(p.strengthPerWeek)) ? Number(p.strengthPerWeek) : 2, "Kraft pro Woche", p.includeStrength ? "" : "Erst oben „Krafttraining einplanen“ einschalten")}
+          ${choice("strengthGoal", Object.entries(STRENGTH_GOALS), tp.strengthGoal, "Ziel beim Krafttraining", tp.strengthGoal === "athletic" ? "Mehr Sätze, Muskelaufbau" : "Stabil und verletzungsfrei", true)}
+          ${typeof STRENGTH_AREAS !== "undefined" ? chipGroup("strengthFocus", STRENGTH_AREAS, tp.strengthFocus, "Schwerpunkt <span class=\"tp-hint\">Dafür kommen in jeder Kraft-Einheit zwei Übungen mehr.</span>") : ""}
+        </div>
         <div class="tp-row">
           <label class="tp-label" for="wp-session-min">Übliche Dauer<small class="tp-hint">Eine normale Einheit</small></label>
           <span class="pf-input-wrap"><input type="number" id="wp-session-min" class="pf-input" min="15" max="240" step="5" placeholder="45" value="${p.typicalSessionMin || ""}"><span class="pf-unit">min</span></span>
@@ -118,6 +125,12 @@ function initTrainingProfile() {
         const btn = e.target.closest("button[data-value]");
         if (!btn) return;
         const field = seg.dataset.wp;
+        if (field === "strengthGoal") {
+          saveTrainingProfile({ strengthGoal: btn.dataset.value });
+          render();
+          saved();
+          return;
+        }
         const numeric = ["mainPerDay", "strengthPerWeek"].includes(field);
         let value = numeric ? Number(btn.dataset.value) : btn.dataset.value;
         // Erfahrung/Disziplin: nochmal tippen = Auswahl aufheben
@@ -140,6 +153,15 @@ function initTrainingProfile() {
     };
     min.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(commit, 700); });
     min.addEventListener("change", () => { clearTimeout(timer); commit(); });
+    const on = document.getElementById("wp-strength-on");
+    if (on) on.addEventListener("click", () => {
+      athleteProfile.includeStrength = true;
+      saveAthleteProfile();
+      const sw = document.getElementById("profile-include-strength");
+      if (sw) sw.checked = true;
+      render();
+      saved();
+    });
     document.getElementById("wp-onboarding-btn").addEventListener("click", () => { if (typeof openOnboarding === "function") openOnboarding(); });
   }
 

@@ -138,3 +138,15 @@ test("Harte Einheit am Schwimmtag ersetzt lieber einen lockeren Lauf an einem an
   assert.ok(hard && hard.sport === "Laufen" && hard.date !== D.do, JSON.stringify(res.changes));
   assert.ok(res.changes.some(t => /dafür entfällt/.test(t)));
 });
+
+test("Fehlende Kraft-Einheiten werden ergänzt – an Tagen mit Platz, nicht direkt hintereinander", () => {
+  const list = [pw(D.mo, "Schwimmen"), pw(D.di, "Laufen", 50, "hart"), pw(D.mi, "Rad"), pw(D.do, "Schwimmen"), pw(D.fr, "Laufen"), pw(D.sa, "Rad", 120)];
+  app.__.list = list; app.__.s = settings({ strengthPerWeek: 2 });
+  const res = plain(run(`planStructureApply(__.list, { settings: __.s, mutableIds: __.list.map(p => p.id), from: "${D.mo}", to: "${D.so}", todayKey: "${D.mo}", goal: goals[0],
+    defaults: { goalId: "g1" }, makeStrength: d => ({ sport: "Kraft", title: "Kraft", duration_min: 30, intensity: "mittel", exercises: [{ id: "liegestuetz", name: "Liegestütz" }] }) })`));
+  const kraft = res.list.filter(p => p.sport === "Kraft").map(p => p.date).sort();
+  assert.strictEqual(kraft.length, 2, JSON.stringify(res.changes));
+  assert.ok(!kraft.includes(D.di), "nicht am harten Tag");
+  assert.ok(Math.abs(Date.parse(kraft[1]) - Date.parse(kraft[0])) > 86400000, "mit Abstand");
+  assert.ok(res.changes.some(t => /Kraft ergänzt/.test(t)));
+});

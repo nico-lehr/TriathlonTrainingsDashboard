@@ -48,7 +48,8 @@ ${typeof planStructureRuleText === "function" ? planStructureRuleText(planStruct
 - Nie einen exakten Trainingsload/TSS-Wert erfinden - nur "intensity": "leicht"|"mittel"|"hart" angeben, keine Zahl.
 ${typeof strengthPlanRule === "function" ? strengthPlanRule() : "- Bei \"Kraft\": \"exercises\"-Array mit 3-6 konkreten Übungen (Name, Sätze, Wiederholungen, kurzer Hinweis)."}
 ${mobilityPlanRule()}
-- Bei Schwimmen/Rad/Laufen: "description" MUSS enthalten (a) eine kurze konkrete Struktur mit Einrollen/Hauptteil/Auslaufen (z.B. "10min Einrollen, 6x400m zügig mit 90s Pause, 10min Auslaufen") UND (b) den passenden Ziel-Bereich aus den oben angegebenen Zonen (Herzfrequenz-Zonen/Pace-Zonen/Leistungszonen) für die gewählte Intensität - z.B. "Hauptteil im Bereich Z2 Grundlage (128-142 bpm bzw. 5:20-5:45/km)". Nutze dafür AUSSCHLIESSLICH die im Kontext oben schon berechneten Zonenwerte, erfinde selbst keine Zahlen. Sind für eine Sportart keine Zonen im Kontext angegeben (kein Schwellenwert im Profil hinterlegt), einfach nur "leicht/mittel/hart" ohne Zahlen nennen.
+${swimPlanRule()}
+- Bei Rad/Laufen: "description" MUSS enthalten (a) eine kurze konkrete Struktur mit Einrollen/Hauptteil/Auslaufen (z.B. "10min Einrollen, 6x400m zügig mit 90s Pause, 10min Auslaufen") UND (b) den passenden Ziel-Bereich aus den oben angegebenen Zonen (Herzfrequenz-Zonen/Pace-Zonen/Leistungszonen) für die gewählte Intensität - z.B. "Hauptteil im Bereich Z2 Grundlage (128-142 bpm bzw. 5:20-5:45/km)". Nutze dafür AUSSCHLIESSLICH die im Kontext oben schon berechneten Zonenwerte, erfinde selbst keine Zahlen. Sind für eine Sportart keine Zonen im Kontext angegeben (kein Schwellenwert im Profil hinterlegt), einfach nur "leicht/mittel/hart" ohne Zahlen nennen.
 - Bei Schwimmen/Rad/Laufen zusätzlich: falls unter "Zuletzt tatsächlich absolviert" oder in einer früheren Analyse erkennbar ist, dass ähnliche Einheiten dieser Sportart zuletzt zu hart/zu leicht gelaufen sind oder häufig übersprungen wurden, das kurz in der "description" berücksichtigen (z.B. "diesmal bewusst 5min kürzer, da die letzten beiden Tempoläufe übersprungen wurden").
 - Kein "exercises"-Feld bei Schwimmen/Rad/Laufen (nur bei Kraft/Mobility, s.o.).
 - Alle Textfelder ("description", "title", Übungs-"note") als reiner Klartext ohne Markdown (kein **, kein #, keine Aufzählungszeichen) - werden teilweise in einfachen Textfeldern angezeigt, in denen Markdown-Zeichen nur störend wären.
@@ -58,9 +59,21 @@ ${mobilityPlanRule()}
 - WICHTIG - Sicherheit: falls oben "Verletzungen/Einschränkungen des Athleten" angegeben sind, DIESE UNBEDINGT beachten - keine Übungen/Belastungen vorschlagen, die die genannte Einschränkung verschlimmern könnten (z.B. bei Knieproblemen keine tiefen Kniebeugen/Sprünge, bei Schulterproblemen kein Bankdrücken/Zugseiltraining über Kopf), stattdessen alternative Übungen wählen oder die Belastung entsprechend anpassen.
 
 Antworte AUSSCHLIESSLICH mit einem JSON-Objekt in genau dieser Form, keinerlei Text davor/danach, keine Code-Block-Markierung:
-{"workouts":[{"date":"YYYY-MM-DD","sport":"Schwimmen|Rad|Laufen|Kraft|Mobility","title":"kurzer Titel","duration_min":60,"intensity":"leicht|mittel|hart","description":"...","exercises":[{"name":"...","sets":3,"reps":"12","note":"..."}]}]}
+{"workouts":[{"date":"YYYY-MM-DD","sport":"Schwimmen|Rad|Laufen|Kraft|Mobility","title":"kurzer Titel","duration_min":60,"intensity":"leicht|mittel|hart","description":"...","distance_m":1800,"exercises":[{"name":"...","sets":3,"reps":"12","note":"..."}]}]}
 
-"exercises" nur bei sport="Kraft"/"Mobility" angeben, sonst weglassen. Jedes "date" muss exakt eines der oben genannten ${windowDates.length} Zeitfenster-Daten sein. Kein Datum außerhalb, keine Duplikate am selben Tag+Sportart.`;
+"distance_m" nur bei sport="Schwimmen", "exercises" nur bei sport="Kraft"/"Mobility" angeben, sonst weglassen. Jedes "date" muss exakt eines der oben genannten ${windowDates.length} Zeitfenster-Daten sein. Kein Datum außerhalb, keine Duplikate am selben Tag+Sportart.`;
+}
+
+// Schwimmen in Metern statt mit Tempo-Vorgabe (Wunsch aus der Praxis: am
+// Beckenrand zählt man Bahnen, nicht Sekunden pro 100 m). Richtwert aus der
+// CSS (Schwellentempo) inkl. Pausen, ohne CSS 2:00 /100 m.
+function swimMetersPer10Min() {
+  const css = (typeof paceToSeconds === "function" && paceToSeconds(athleteProfile.swimCss)) || 120;
+  return Math.max(200, Math.round(600 / (css * 1.3) * 100 / 50) * 50);
+}
+
+function swimPlanRule() {
+  return `- Bei "Schwimmen": "description" in METERN statt Minuten und OHNE Tempo-Vorgabe (keine Zeiten pro 100 m, keine Pace-Zonen), z.B. "400 m einschwimmen locker, 6 × 50 m Technik, 8 × 100 m zügig mit 20 s Pause, 200 m ausschwimmen – zusammen 1.900 m". Die Intensität nur in Worten (locker, zügig, hart, Atemgefühl). Zusätzlich "distance_m" = Gesamtmeter als Zahl (Vielfaches von 50). Richtwert für diese Person: etwa ${swimMetersPer10Min()} m pro 10 Minuten inklusive Pausen - die Meter müssen zu "duration_min" passen.`;
 }
 
 // Die Trainingstage im Zeitfenster ausdrücklich nennen: Ohne diese Liste
@@ -141,7 +154,8 @@ ${modeInstruction}
 
 Regeln:
 - Sportart ausschließlich aus: ${sports.join(", ")}.
-- Nutze für den Zielbereich (Herzfrequenz/Pace/Leistung) AUSSCHLIESSLICH die oben angegebenen Zonenwerte, erfinde selbst keine Zahlen. Sind keine Zonen angegeben, nur "leicht/mittel/hart" ohne Zahlen nennen.
+- Rad/Laufen: Nutze für den Zielbereich (Herzfrequenz/Pace/Leistung) AUSSCHLIESSLICH die oben angegebenen Zonenwerte, erfinde selbst keine Zahlen. Sind keine Zonen angegeben, nur "leicht/mittel/hart" ohne Zahlen nennen.
+${swimPlanRule()}
 ${typeof strengthPlanRule === "function" ? strengthPlanRule() : "- Bei Kraft: \"exercises\"-Array mit 3-6 konkreten Übungen."} Sonst (Schwimmen/Rad/Laufen) kein "exercises"-Feld.
 ${mobilityPlanRule()}
 - Alle Textfelder als reiner Klartext ohne Markdown (kein **, kein #, keine Aufzählungszeichen).
@@ -149,9 +163,9 @@ ${mobilityPlanRule()}
 - WICHTIG - Konsistenz: "sport" muss exakt zur tatsächlichen Aktivität in "title"/"description" passen (z.B. Zugseiltraining/Klimmzüge/Kniebeugen -> sport MUSS "Kraft" sein), und "duration_min" muss der in "description" genannten Gesamtdauer entsprechen, falls dort eine genannt wird.
 
 Antworte AUSSCHLIESSLICH mit einem JSON-Objekt in genau dieser Form, keinerlei Text davor/danach, keine Code-Block-Markierung:
-{"workouts":[{"date":"${pw.date}","sport":"...","title":"kurzer Titel","duration_min":45,"intensity":"leicht|mittel|hart","description":"...","exercises":[{"name":"...","sets":3,"reps":"12","note":"..."}]}]}
+{"workouts":[{"date":"${pw.date}","sport":"...","title":"kurzer Titel","duration_min":45,"intensity":"leicht|mittel|hart","description":"...","distance_m":1800,"exercises":[{"name":"...","sets":3,"reps":"12","note":"..."}]}]}
 
-"exercises" nur bei sport="Kraft"/"Mobility" angeben, sonst weglassen. Genau EIN Eintrag im Array, mit date="${pw.date}".`;
+"distance_m" nur bei sport="Schwimmen", "exercises" nur bei sport="Kraft"/"Mobility" angeben, sonst weglassen. Genau EIN Eintrag im Array, mit date="${pw.date}".`;
 }
 
 // Prompt fuer die kurze KI-Einordnung im "Trainingsbelastungsfokus"-Chart

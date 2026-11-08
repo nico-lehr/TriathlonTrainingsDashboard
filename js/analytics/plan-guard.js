@@ -101,6 +101,13 @@ function planGuardSport(list, history, date, o) {
   return cands.slice().sort((a, b) => minutes(a) - minutes(b) || (yesterday.has(a) ? 1 : 0) - (yesterday.has(b) ? 1 : 0) || goalSports.indexOf(a) - goalSports.indexOf(b))[0];
 }
 
+// Schwimmen in Metern (wie die Schritte auf der Uhr), ohne Tempo-Vorgabe.
+function planGuardSwimDescription(pw) {
+  const m = typeof plannedSwimMeters === "function" ? plannedSwimMeters(pw) : null;
+  const total = m ? `Zusammen etwa ${fmtSwimMeters(m)}: ` : "";
+  return `${total}locker einschwimmen, ein paar Bahnen Technik, dann ruhig in längeren Stücken und zum Schluss ausschwimmen. So locker, dass du gleichmäßig atmen kannst.`;
+}
+
 function planGuardFillDescription(sport, long) {
   const what = long ? "Längere, ruhige Grundlage" : "Ruhige Grundlage";
   return `${what}: gleichmäßig locker, du kannst dich dabei noch unterhalten (Zone 2). Vom Plan-Check ergänzt, weil an diesem Trainingstag nichts geplant war.`;
@@ -148,6 +155,7 @@ function planGuardFill(list, history, o) {
         ...(o.defaults || {}), date, sport, title: PLAN_GUARD_SPORT_TITLE[sport] || `${sport} locker`,
         duration_min: dur, intensity: "leicht", description: planGuardFillDescription(sport, long), source: "guard",
       });
+      if (sport === "Schwimmen") entry.description = planGuardSwimDescription(entry);
       const next = [...cur, entry];
       if (o.validate) {
         const fresh = newPlanViolations(o.validate(cur), o.validate(next)).filter(v => v.severity === "block");

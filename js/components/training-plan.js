@@ -51,7 +51,7 @@ function renderTrainingPlanCard() {
             <span class="plan-item-title">${escapeHtml(p.title)}</span>
             ${p.intensity ? `<span class="plan-intensity plan-intensity-${p.intensity}">${PLAN_INTENSITY_LABELS[p.intensity]}</span>` : ""}
           </div>
-          <div class="plan-item-meta">${p.duration_min != null ? Math.round(p.duration_min) + " min" : ""}${p.status !== "geplant" ? " · " + PLAN_STATUS_LABELS[p.status] : ""}</div>
+          <div class="plan-item-meta">${p.duration_min != null ? Math.round(p.duration_min) + " min" : ""}${p.sport === "Schwimmen" && plannedSwimMeters(p) ? " · " + fmtSwimMeters(plannedSwimMeters(p)) : ""}${p.status !== "geplant" ? " · " + PLAN_STATUS_LABELS[p.status] : ""}</div>
         </div>
         ${planItemGarminHtml(p)}
         <button type="button" class="plan-item-export" data-id="${p.id}" title="Als .fit für Garmin exportieren">⬇</button>

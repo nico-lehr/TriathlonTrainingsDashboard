@@ -138,6 +138,67 @@ function strengthPick(list, key, lastIds) {
   return pool[Math.floor(mobilityDayHash(key) * pool.length) % pool.length];
 }
 
+const STRENGTH_MAX_EXERCISES = 8;
+const STRENGTH_FOCUS_PER_AREA = 2;
+
+// Sätze: für einen athletischen Körper (Muskelaufbau) einer mehr, höchstens 4.
+function strengthSets(ex, tp) {
+  return tp && tp.strengthGoal === "athletic" && !ex.hold ? Math.min(4, ex.sets + 1) : ex.sets;
+}
+
+// Zusätzliche Übungen für die Schwerpunkte: je Bereich bis zu zwei, die noch
+// nicht in der Einheit sind - bevorzugt mit den Geräten der Trainingsart.
+function strengthFocusPicks(allowed, focus, mode, usedIds, key) {
+  const used = new Set(usedIds);
+  const out = [];
+  const prefer = mode && STRENGTH_MODES[mode] ? STRENGTH_MODES[mode].prefer : [];
+  focus.forEach(area => {
+    // Übungen, die schon für diesen Bereich in der Einheit sind, zählen mit.
+    let have = [...used].filter(id => STRENGTH_BY_ID[id] && STRENGTH_BY_ID[id].areas[0] === area).length;
+    // Hauptbereich zuerst (Bankdrücken für Brust, nicht Rudern), dann Übungen
+    // mit den Geräten der Trainingsart.
+    const rank = ex => (ex.areas[0] === area ? 0 : 2) + (ex.equipment.some(e => prefer.includes(e)) ? 0 : 1);
+    let pool = allowed.filter(ex => ex.areas.includes(area) && !used.has(ex.id)).sort((a, b) => rank(a) - rank(b));
+    while (have < STRENGTH_FOCUS_PER_AREA && pool.length) {
+      const top = pool.filter(ex => rank(ex) === rank(pool[0]));
+      const ex = top[Math.floor(mobilityDayHash(key + area + have) * top.length) % top.length];
+      out.push(ex); used.add(ex.id); have++;
+      pool = pool.filter(x => x !== ex);
+    }
+  });
+  return out;
+}
+
+// Eine KI-Kraft-Einheit (Plan-Format {id, name, sets, reps}) um die
+// Schwerpunkte ergänzen, wenn sie dafür zu wenig enthält. null = passt schon.
+function strengthEnsureFocus(exercises, tp, mode, key) {
+  const focus = (tp.strengthFocus || []).filter(a => STRENGTH_AREAS[a]);
+  if (!focus.length) return null;
+  const list = Array.isArray(exercises) ? exercises.slice() : [];
+  const ids = list.map(x => x && x.id).filter(Boolean);
+  const room = STRENGTH_MAX_EXERCISES - list.length;
+  if (room <= 0) return null;
+  const add = strengthFocusPicks(allowedStrengthExercises(tp, mode), focus, mode, ids, key).slice(0, room);
+  if (!add.length) return null;
+  return [...list, ...add.map(ex => ({ id: ex.id, name: ex.name, sets: strengthSets(ex, tp), reps: ex.hold ? `${ex.hold} s` : ex.reps, note: `Schwerpunkt ${STRENGTH_AREAS[focus.find(a => ex.areas.includes(a))] || ""}`.trim() }))];
+}
+
+// Fertige Kraft-Einheit für den Trainingsplan (wenn die KI zu wenige
+// Kraft-Einheiten plant): Übungen nach den Regeln oben, im Plan-Format.
+function plannedStrengthEntry(date, tp, mode) {
+  const session = buildStrengthSession({ tp, today: date, mode, lastIds: [] });
+  if (!session) return null;
+  return {
+    sport: "Kraft", title: session.title, intensity: "mittel",
+    duration_min: Math.max(20, Math.round(session.minutes / 5) * 5),
+    description: session.intro,
+    exercises: session.exercises.map(x => {
+      const ex = STRENGTH_BY_ID[x.id];
+      return { id: x.id, name: ex.name, sets: x.sets, reps: ex.hold ? `${ex.hold} s` : ex.reps };
+    }),
+  };
+}
+
 // options: { tp, today, lastIds, mode }
 function buildStrengthSession(options) {
   const { tp, today = todayStr(), lastIds = [], mode } = options;
@@ -148,15 +209,22 @@ function buildStrengthSession(options) {
     const list = strengthGroupPool(allowed, group, mode);
     if (list.length) picked.push(strengthPick(list, today + group, lastIds));
   });
-  const exercises = picked.map(ex => ({
-    id: ex.id, sets: ex.sets, reps: ex.reps || null, hold: ex.hold || null, rest: ex.rest,
+  // Schwerpunkte (z. B. Brust und Schultern): je Bereich zwei Übungen mehr.
+  const focus = (tp.strengthFocus || []).filter(a => STRENGTH_AREAS[a]);
+  strengthFocusPicks(allowed, focus, mode, picked.map(ex => ex.id), today).forEach(ex => picked.push(ex));
+  const athletic = tp.strengthGoal === "athletic";
+  const exercises = picked.slice(0, STRENGTH_MAX_EXERCISES).map(ex => ({
+    id: ex.id, sets: strengthSets(ex, tp), reps: ex.reps || null, hold: ex.hold || null, rest: ex.rest,
     kg: mode ? strengthModeKg(ex, mode) : (ex.weight ? strengthWeight(ex.id) : null),
   }));
   const label = mode && STRENGTH_MODES[mode] ? STRENGTH_MODES[mode].label : "";
+  const focusText = focus.length ? `Schwerpunkt ${focus.map(a => STRENGTH_AREAS[a]).join(" und ")}` : "";
   const session = {
     kind: "strength",
-    title: label ? `Kraft · ${label}` : "Kraft für Triathlon",
-    intro: "Beine, Hüfte, Rumpf, Rücken und Schultern – eine ausgewogene Einheit mit deinen Hilfsmitteln.",
+    title: athletic ? `Kraft · ${focus.length ? STRENGTH_AREAS[focus[0]] : "Athletik"}` : label ? `Kraft · ${label}` : "Kraft für Triathlon",
+    intro: focus.length
+      ? `${focusText} – dazu Beine, Hüfte und Rumpf, damit der Körper im Gleichgewicht bleibt.${athletic ? " Für Muskelaufbau: die letzten Wiederholungen dürfen schwer sein." : ""}`
+      : "Beine, Hüfte, Rumpf, Rücken und Schultern – eine ausgewogene Einheit mit deinen Hilfsmitteln.",
     source: "rules",
     createdAt: new Date().toISOString(),
     exercises,
@@ -211,5 +279,12 @@ function strengthPlanRule() {
   const allowed = allowedStrengthExercises(tp, strengthMode(tp));
   if (!allowed.length) return "- Bei \"Kraft\": \"exercises\"-Array mit 4-6 Übungen (Name, Sätze, Wiederholungen, kurzer Hinweis).";
   const list = allowed.map(ex => `${ex.id} (${ex.name})`).join(", ");
-  return `- Bei "Kraft": "exercises"-Array mit 4-6 Übungen AUSSCHLIESSLICH aus dieser Liste, je Eintrag {"id": exakt die id, "name": Name, "sets": 2-4, "reps": z.B. "10" oder "8 je Seite", "note": kurzer Tipp}. Möglichst je eine Übung für Beine, Hüfte, Drücken, Ziehen und Rumpf. Erlaubt: ${list}.`;
+  const focus = (tp.strengthFocus || []).filter(a => STRENGTH_AREAS[a]);
+  const focusRule = focus.length
+    ? ` WICHTIG - Schwerpunkt dieser Person: ${focus.map(a => STRENGTH_AREAS[a]).join(", ")}. In JEDER Kraft-Einheit mindestens 2 Übungen je Schwerpunkt (passend: ${focus.map(a => allowed.filter(ex => ex.areas[0] === a || ex.areas.includes(a)).slice(0, 6).map(ex => ex.id).join("/")).join("; ")}), dazu Beine, Hüfte und Rumpf als Ausgleich; 5-8 Übungen.`
+    : " Möglichst je eine Übung für Beine, Hüfte, Drücken, Ziehen und Rumpf.";
+  const goalRule = tp.strengthGoal === "athletic"
+    ? ` Ziel: athletischer Körper / Muskelaufbau - 3-4 Sätze à 8-12 Wiederholungen, die letzten Wiederholungen schwer; Dauer ca. 40-50 min.`
+    : "";
+  return `- Bei "Kraft": "exercises"-Array AUSSCHLIESSLICH aus dieser Liste, je Eintrag {"id": exakt die id, "name": Name, "sets": 2-4, "reps": z.B. "10" oder "8 je Seite", "note": kurzer Tipp}.${focusRule}${goalRule} Erlaubt: ${list}.`;
 }
