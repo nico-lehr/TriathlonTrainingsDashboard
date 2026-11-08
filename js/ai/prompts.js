@@ -101,7 +101,8 @@ ${ctx}
 Gib eine kurze Auswertung auf Deutsch:
 1. Auffälligkeiten im Vergleich zur Vergleichsgruppe (z.B. ungewöhnliche Pace/HF-Kombination, überdurchschnittliche Anstrengung, deutliche Verbesserung/Verschlechterung, auffällige Kadenz). Falls angegeben: auch die Trainingsbelastung (TRIMP/Herzfrequenzreserve/Stress-Score) und der negative Split einordnen, aber nicht selbst nachrechnen - sind bereits fertig berechnet. Wenn nichts auffällt, das kurz so bestätigen statt etwas zu erfinden.
 2. Falls eine eigene Notiz und/oder Bewertung des Athleten zu dieser oder ähnlichen früheren Einheiten angegeben ist: das subjektive Gefühl mit den objektiven Werten (Pace/HF/Load) in Bezug setzen (z.B. "fühlte sich hart an" bei unauffälligen Werten, oder eine niedrige Bewertung trotz guter Pace) - ist keine Notiz/Bewertung vorhanden, diesen Punkt einfach auslassen statt etwas zu vermuten.
-3. 2-4 konkrete, sofort umsetzbare Tipps für die nächsten ähnlichen Einheiten.
+3. Falls eine "Einordnung der Messwerte" angegeben ist: die 1-3 aussagekräftigsten Werte bewerten (gut/mittel/verbesserungswürdig und ob besser oder schlechter als sonst) und kurz in einfachen Worten erklären, was das bedeutet. Wenn der Athlet laut Notiz gezielt an etwas arbeitet (z. B. höhere Schrittfrequenz), genau dazu Rückmeldung geben, ob es wirkt. Die Richtwerte sind allgemeine Orientierung - der Vergleich mit den eigenen früheren Werten bei ähnlichem Tempo ist wichtiger.
+4. 2-4 konkrete, sofort umsetzbare Tipps für die nächsten ähnlichen Einheiten.
 
 Zeitlinie beachten (sehr wichtig):
 - Die Vergleichsgruppe enthält nur Einheiten VOR dieser Einheit. Was unter "SEIT dieser Einheit schon absolviert" steht, geschah DANACH. Beschreibe spätere Einheiten nie als "damals" oder "früher".
@@ -109,7 +110,7 @@ Zeitlinie beachten (sehr wichtig):
 - Deine Tipps müssen zum heutigen Stand passen: Empfiehl nichts, was seitdem schon erledigt wurde (z. B. keinen neuen Test, wenn danach schon einer gemacht wurde), und nutze die aktuellen Schwellenwerte im Profil bzw. die Ergebnisse späterer Tests.
 - Ziehe die Körperwerte am Tag der Einheit (Schlaf, HRV, Ruhepuls) und die Belastung der Tage davor heran, wenn sie die Leistung erklären. Was nicht angegeben ist, nicht vermuten.
 
-Nur normaler Fließtext in kurzen Absätzen - KEIN Markdown (keine **, keine #-Überschriften, keine Aufzählungszeichen/nummerierten Listen), keine Tabellen/Code-Blöcke, max. ca. 180 Wörter.`;
+Nur normaler Fließtext in kurzen Absätzen - KEIN Markdown (keine **, keine #-Überschriften, keine Aufzählungszeichen/nummerierten Listen), keine Tabellen/Code-Blöcke, max. ca. 220 Wörter.`;
 }
 
 // Baut den Prompt fuer "Lessons Learned" EINER geplanten (noch nicht

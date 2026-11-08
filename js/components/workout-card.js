@@ -245,6 +245,12 @@ function buildWorkoutDetailHtml(w) {
     if (kg && w.avg_power_w != null) extraStats.push(["Ø Leistung pro kg", fmtNum(w.avg_power_w / kg, 2) + " W/kg"]);
   }
 
+  // Einordnung der Werte (js/analytics/metric-insights.js): unter dem
+  // passenden Diagramm; was kein Diagramm hat, steht danach gesammelt.
+  const insights = typeof workoutMetricInsights === "function" ? workoutMetricInsights(w) : [];
+  const shownCharts = new Set();
+  const mi = chart => { shownCharts.add(chart); return metricInsightsHtml(insights.filter(x => x.chart === chart)); };
+
   const extraStatsHtml = extraStats.map(([l, v]) => `<div class="st"><div class="l">${l}</div><div class="v">${v}</div></div>`).join("");
 
   // Welche Detail-Charts (über HF/Pace hinaus) tatsächlich Sekundendaten
@@ -282,25 +288,50 @@ function buildWorkoutDetailHtml(w) {
     <div class="modal-charts">
       <div>
         <h4>Herzfrequenz-Verlauf</h4>
-        <div class="chart-wrap wd-hr-chart"></div>
+        <div class="chart-wrap wd-hr-chart"></div>${mi("hr")}
       </div>
       ${noRoute ? "" : `<div>
         <h4>Pace- / Geschwindigkeitsverlauf</h4>
-        <div class="chart-wrap wd-pace-chart"></div>
+        <div class="chart-wrap wd-pace-chart"></div>${mi("pace")}
       </div>`}
       ${hasAlt ? `<div><h4>Höhenprofil</h4><div class="chart-wrap wd-alt-chart"></div></div>` : ""}
-      ${hasCad ? `<div><h4>Schrittfrequenz-Verlauf</h4><div class="chart-wrap wd-cad-chart"></div></div>` : ""}
-      ${hasPower ? `<div><h4>Leistungsverlauf</h4><div class="chart-wrap wd-power-chart"></div></div>` : ""}
-      ${hasGct ? `<div><h4>Bodenkontaktzeit-Verlauf</h4><div class="chart-wrap wd-gct-chart"></div></div>` : ""}
-      ${hasVr ? `<div><h4>Vertikales Verhältnis-Verlauf</h4><div class="chart-wrap wd-vr-chart"></div></div>` : ""}
+      ${hasCad ? `<div><h4>Schrittfrequenz-Verlauf</h4><div class="chart-wrap wd-cad-chart"></div>${mi("cad")}</div>` : ""}
+      ${hasPower ? `<div><h4>Leistungsverlauf</h4><div class="chart-wrap wd-power-chart"></div>${mi("power")}</div>` : ""}
+      ${hasGct ? `<div><h4>Bodenkontaktzeit-Verlauf</h4><div class="chart-wrap wd-gct-chart"></div>${mi("gct")}</div>` : ""}
+      ${hasVr ? `<div><h4>Vertikales Verhältnis-Verlauf</h4><div class="chart-wrap wd-vr-chart"></div>${mi("vr")}</div>` : ""}
       ${missingRunDynamics ? `<p class="empty-note" style="padding:4px 0 0;">Leistung, Bodenkontaktzeit und vertikales Verhältnis sind in dieser Aufzeichnung nicht enthalten — dafür braucht die Uhr einen kompatiblen Brustgurt (z.B. HRM-Pro Plus) oder einen Running-Dynamics-Pod bzw. eine Laufleistungs-Quelle.</p>` : ""}
-      <div><h4>Herzfrequenzprofil</h4><div class="chart-wrap wd-hrprofile-chart"></div></div>
+      <div><h4>Herzfrequenzprofil</h4><div class="chart-wrap wd-hrprofile-chart"></div>${mi("hrprofile")}</div>
       <div><h4>Belastungsprofil</h4><div class="chart-wrap wd-radar-chart"></div></div>
+      ${(() => { const rest = insights.filter(x => !shownCharts.has(x.chart)); return rest.length ? `<div><h4>Weitere Werte eingeordnet</h4>${metricInsightsHtml(rest)}</div>` : ""; })()}
     </div>
     ${buildWorkoutLoadStatsHtml(w)}
     ${buildWorkoutEquipmentHtml(w)}
     ${buildWorkoutRatingHtml(w)}
     ${buildWorkoutAnalysisHtml(w)}`;
+}
+
+// Einordnung eines Werts: Bereich (Balken mit Farbbereichen + Markierung),
+// Vergleich mit früheren Einheiten und aufklappbar Erklärung + Tipp.
+function metricInsightsHtml(list) {
+  if (!list || !list.length) return "";
+  const esc = escapeHtml;
+  const bar = sc => {
+    if (!sc) return "";
+    const span = sc.max - sc.min;
+    const segs = sc.bands.map(b => `<i class="mi-seg mi-${b.level}" style="flex:${(b.to - b.from) / span}"></i>`).join("");
+    const pos = Math.max(0, Math.min(100, (sc.value - sc.min) / span * 100));
+    return `<div class="mi-bar" aria-hidden="true">${segs}<b class="mi-mark" style="left:${pos.toFixed(1)}%"></b></div>`;
+  };
+  const arrow = c => (c.dir === "same" ? "=" : c.delta > 0 ? "↑" : "↓");
+  return `<div class="mi-list">${list.map(x => `
+    <div class="mi">
+      <div class="mi-head"><span class="mi-label">${esc(x.label)}</span><span class="mi-val">${esc(x.valueText)}</span>${x.verdict ? `<span class="mi-chip mi-${x.level}">${esc(x.verdict)}</span>` : ""}</div>
+      ${bar(x.scale)}
+      ${x.rangeText ? `<div class="mi-meta">${esc(x.rangeText)}</div>` : ""}
+      ${x.plan ? `<div class="mi-plan mi-t-${x.plan.level}">${esc(x.plan.text)}</div>` : ""}
+      ${x.compare ? `<div class="mi-cmp mi-cmp-${x.compare.dir}"><span class="mi-cmp-dir">${arrow(x.compare)} ${esc(x.compare.text)}</span> · ${esc(x.compare.baseText)}</div>` : ""}
+      <details class="mi-more"><summary>Was heißt das?</summary><p>${esc(x.explain)}</p>${x.tip ? `<p><b>Tipp:</b> ${esc(x.tip)}</p>` : ""}</details>
+    </div>`).join("")}</div>`;
 }
 
 // Eigene Bewertung (1-5 Sterne, Klick toggelt an/aus) + Notiz zu dieser
@@ -431,7 +462,7 @@ function buildWorkoutAnalysisHtml(w) {
         </div>
       </div>
       ${state.error ? `<p class="goal-error">${escapeHtml(state.error)}</p>` : ""}
-      ${state.analysis && !state.loading && !(state.ctx >= (typeof WORKOUT_ANALYSIS_CTX !== "undefined" ? WORKOUT_ANALYSIS_CTX : 0)) ? `<p class="wd-analysis-old">Diese Auswertung ist von vor dem Update und kannte noch nicht die Reihenfolge deiner Einheiten. Tippe auf „Neu auswerten“ für eine genauere Einordnung.</p>` : ""}
+      ${state.analysis && !state.loading && !(state.ctx >= (typeof WORKOUT_ANALYSIS_CTX !== "undefined" ? WORKOUT_ANALYSIS_CTX : 0)) ? `<p class="wd-analysis-old">Diese Auswertung stammt von vor einem Update und kennt noch nicht alles, was der Coach heute sieht (z. B. die Einordnung deiner Messwerte). Tippe auf „Neu auswerten“ für eine genauere Rückmeldung.</p>` : ""}
       ${state.analysis ? `<div class="goal-recommendation">${formatRecommendation(state.analysis)}</div>` : ""}
     </div>`;
 }

@@ -9,10 +9,17 @@ const vm = require("node:vm");
 
 const ROOT = path.join(__dirname, "..", "..");
 
+// Uhr fest auf Montag 9.11. 7:00 - der Bericht zeigt sich nur morgens, sonst
+// hinge der Test von der Uhrzeit ab, zu der er läuft.
+class MorningDate extends Date {
+  constructor(...a) { super(...(a.length ? a : [2026, 10, 9, 7, 0])); }
+  static now() { return new MorningDate().getTime(); }
+}
+
 function makeApp({ night, base = {}, plan = [], store = {}, ai = null } = {}) {
   const saved = { ...store };
   const ctx = vm.createContext({
-    console, setTimeout: () => 0, Date, Math, JSON, String, Number, Array, Object, Set,
+    console, setTimeout: () => 0, Date: MorningDate, Math, JSON, String, Number, Array, Object, Set,
     storeGet: k => (saved[k] ? JSON.parse(JSON.stringify(saved[k])) : null),
     storeSet: (k, v) => { saved[k] = v; },
     todayStr: () => "2026-11-09",

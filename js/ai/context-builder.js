@@ -656,6 +656,14 @@ function buildWorkoutAnalysisContext(w, comparable) {
     lines.push(`Negativer Split: ${negSplit >= 0 ? "+" : ""}${fmtNum(negSplit, 1)}% (zweite Hälfte ${negSplit >= 0 ? "schneller" : "langsamer"} als erste)`);
   }
 
+  // Einordnung der Messwerte (js/analytics/metric-insights.js): dieselben
+  // Richtwerte und Vergleiche, die der Athlet in der Detailansicht sieht.
+  const insightLines = typeof workoutMetricInsightLines === "function" ? workoutMetricInsightLines(w) : [];
+  if (insightLines.length) {
+    lines.push("Einordnung der Messwerte (allgemeine Richtwerte + Vergleich mit früheren Einheiten desselben Athleten VOR dieser Einheit; Lauf-Dynamik hängt vom Tempo ab):");
+    lines.push(...insightLines);
+  }
+
   lines.push(...workoutFeedbackContextLines(comparable));
 
   return lines.join("\n");

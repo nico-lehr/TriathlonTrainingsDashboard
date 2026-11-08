@@ -4,6 +4,18 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.40
+
+- **Ist mein Wert gut? – Einordnung direkt unter den Diagrammen:** In der Detailansicht einer Einheit steht jetzt unter Schrittfrequenz, Bodenkontaktzeit, vertikalem Verhältnis, Leistung, Puls und Tempo eine kurze Einordnung:
+  - ein Farbbalken mit dem Bereich, in dem dein Wert liegt (von „sehr gut“ bis „verbesserungswürdig“) und was als gut gilt,
+  - **besser oder schlechter als sonst** – verglichen mit deinen früheren Einheiten, beim Laufen möglichst nur mit Läufen in ähnlichem Tempo (Schrittfrequenz & Co. hängen stark vom Tempo ab),
+  - aufklappbar „Was heißt das?“ mit einer einfachen Erklärung und einem Tipp.
+- **Laufen:** Schrittfrequenz, Bodenkontaktzeit, vertikales Verhältnis, vertikale Oszillation (Bereiche wie die Farben bei Garmin) und „Puls bei ähnlichem Tempo“ – sinkt er, wirst du fitter.
+- **Rad:** Trittfrequenz, Intensität in % deiner FTP (mit W/kg), Gleichmäßigkeit (wichtig für den Lauf danach) und Puls bei ähnlicher Leistung.
+- **Schwimmen:** Tempo im Verhältnis zu deiner CSS, SWOLF und Zugfrequenz.
+- **Für alle Sportarten:** Pulszone der Einheit mit Abgleich zum Plan (z. B. „härter als geplant“, wenn eine lockere Einheit zu schnell war), Garmin-Trainingseffekt und bei gleichmäßigen Einheiten ab 40 Minuten die Puls-Drift (steigt der Puls bei gleichem Tempo?).
+- **Der Coach bewertet die Werte mit:** Die KI-Auswertung bekommt dieselbe Einordnung und gibt jetzt Rückmeldung, ob z. B. deine höhere Schrittfrequenz das vertikale Verhältnis wirklich senkt. Ältere Auswertungen zeigen einen Hinweis – mit „Neu auswerten“ bekommst du die neue Rückmeldung.
+
 ## 2.4.39
 
 - **Garmin-Daten kommen jetzt von selbst:** Sobald du das Dashboard öffnest oder die App wieder nach vorne holst, werden die neuesten Garmin-Daten leise im Hintergrund geholt. Oben steht so lange „Holt Garmin-Daten …“, danach erscheinen neue Trainings und Schlafwerte ohne Neuladen.

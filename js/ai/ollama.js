@@ -448,7 +448,7 @@ async function replanFromCoachNote(note) {
 
 // Version des Auswertungs-Kontexts: ältere Auswertungen (ohne Zeitlinie,
 // Körperwerte, "seitdem absolviert") bekommen in der Ansicht einen Hinweis.
-const WORKOUT_ANALYSIS_CTX = 2;
+const WORKOUT_ANALYSIS_CTX = 3; // 3: mit Einordnung der Messwerte (2.4.40)
 
 function workoutsBefore(w, all) {
   return w && w._date ? all.filter(o => !o._date || o._date < w._date) : all;
