@@ -4,6 +4,19 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.33
+
+Dein Trainingsplan hält sich jetzt an deine Woche – und morgens weißt du sofort, wie erholt du bist.
+
+Neu in 2.4.33:
+- Wochenplan in den Einstellungen: Unter Training & Planung stellst du jetzt jederzeit Trainingstage, Schwimmtage und den Tag für die lange Einheit ein – dazu, wie viele Haupttrainings du pro Tag machst und ob Kraft und Mobility zusätzlich am Trainingstag oder an eigenen Tagen kommen
+- Neu: Kraft pro Woche (1×, 2× oder 3×) und deine übliche Trainingsdauer. Auch Erfahrung, Wettkämpfe und stärkste/schwächste Disziplin aus der Einrichtung kannst du dort ändern
+- Der Plan hält sich daran: Jeder neue Plan wird danach geprüft. Schwimmen kommt nur an deine Schwimmtage, pro Tag gibt es nur so viele Einheiten wie eingestellt, und Kraft kommt nicht öfter als gewünscht. Was angepasst wurde, steht unter „So ist dein Plan entstanden“
+- Garmin-Events: Wenn Garmin den Kalender über den Schlüssel nicht herausgibt, nutzt das Dashboard jetzt die Garmin-Anmeldung. Früher kamen dann still keine Events an
+- Deine Wettkämpfe stehen jetzt auf der Coach-Seite, und im Kalender markiert eine Zielflagge den Wettkampftag
+- Morgenbericht: Auf „Heute“ siehst du morgens Schlaf, HRV und Ruhepuls im Vergleich zu deinem Normalwert, dazu einen kurzen Satz vom Coach zum heutigen Training
+- Mitteilung aufs Handy: Sobald die Daten deiner Nacht da sind, kommt der Morgenbericht als Mitteilung. Einschalten unter Einstellungen → Mitteilungen. Auf dem iPhone geht das nur, wenn du das Dashboard über Safari → Teilen → „Zum Home-Bildschirm“ abgelegt hast und von dort öffnest
+
 ## 2.4.32
 
 Dein Plan passt jetzt besser auf dich auf – und deine Garmin-Events sind automatisch da.
