@@ -424,13 +424,14 @@ function buildWorkoutAnalysisHtml(w) {
   return `
     <div class="wd-analysis" data-file="${encodeURIComponent(w.file)}">
       <div class="wd-analysis-head">
-        <h4>KI-Auswertung <span class="wd-analysis-hint">vergleicht mit ähnlichen früheren Einheiten (gleiche Sportart, Distanz/Dauer ±20%)</span></h4>
+        <h4>KI-Auswertung <span class="wd-analysis-hint">vergleicht mit ähnlichen früheren Einheiten (gleiche Sportart, Distanz/Dauer ±20%) und kennt, was du seitdem trainiert hast</span></h4>
         <div class="wd-analysis-actions">
           <button type="button" class="chip wd-analysis-btn" ${state.loading ? "disabled" : ""}>${btnLabel}</button>
           ${state.analysisAt ? `<span class="goal-rec-date">Stand: ${fmtDateFull(new Date(state.analysisAt))}</span>` : ""}
         </div>
       </div>
       ${state.error ? `<p class="goal-error">${escapeHtml(state.error)}</p>` : ""}
+      ${state.analysis && !state.loading && !(state.ctx >= (typeof WORKOUT_ANALYSIS_CTX !== "undefined" ? WORKOUT_ANALYSIS_CTX : 0)) ? `<p class="wd-analysis-old">Diese Auswertung ist von vor dem Update und kannte noch nicht die Reihenfolge deiner Einheiten. Tippe auf „Neu auswerten“ für eine genauere Einordnung.</p>` : ""}
       ${state.analysis ? `<div class="goal-recommendation">${formatRecommendation(state.analysis)}</div>` : ""}
     </div>`;
 }

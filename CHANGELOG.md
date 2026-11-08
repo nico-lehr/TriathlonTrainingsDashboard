@@ -4,6 +4,13 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.35
+
+- **KI-Auswertung einer Einheit kennt jetzt die Reihenfolge:** Verglichen wird nur noch mit Einheiten, die VOR der ausgewerteten Einheit lagen. Was du danach trainiert hast (z. B. ein CSS-Test am Tag darauf), bekommt die KI getrennt als „seitdem gemacht“ – inklusive deiner Notizen. So empfiehlt sie keinen Test mehr, den du schon gemacht hast.
+- **Notizen werden nicht mehr verwechselt:** Notizen anderer Einheiten stehen jetzt mit Datum und Namen im Kontext und dürfen nicht mehr als Notiz der ausgewerteten Einheit ausgegeben werden.
+- **Mehr Hintergrund für die Auswertung:** Die KI kennt jetzt das heutige Datum, wann die Einheit war, was an dem Tag geplant war, deine Körperwerte an dem Morgen (HRV, Ruhepuls, Schlaf) im Vergleich zu deinem Mittel, die Belastung der 7 Tage davor und deine aktuellen Schwellenwerte (CSS mit Testdatum, FTP, Lauf-Schwelle). Beim Schwimmen wird die Strecke in Metern übergeben.
+- **Hinweis bei alten Auswertungen:** Auswertungen von vor diesem Update zeigen einen Hinweis – mit „Neu auswerten“ bekommst du die genauere Einordnung.
+
 ## 2.4.34
 
 - **Schwimmen in Metern:** Bei Schwimm-Einheiten steht jetzt, wie viele Meter du schwimmst (z. B. „45 min · 1.600 m“) – statt einer Geschwindigkeits-Vorgabe. Auch auf der Uhr gibt es beim Schwimmen keine Tempo-Vorgabe mehr, nur noch die Meter je Abschnitt.

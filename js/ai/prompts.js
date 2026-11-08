@@ -103,6 +103,12 @@ Gib eine kurze Auswertung auf Deutsch:
 2. Falls eine eigene Notiz und/oder Bewertung des Athleten zu dieser oder ähnlichen früheren Einheiten angegeben ist: das subjektive Gefühl mit den objektiven Werten (Pace/HF/Load) in Bezug setzen (z.B. "fühlte sich hart an" bei unauffälligen Werten, oder eine niedrige Bewertung trotz guter Pace) - ist keine Notiz/Bewertung vorhanden, diesen Punkt einfach auslassen statt etwas zu vermuten.
 3. 2-4 konkrete, sofort umsetzbare Tipps für die nächsten ähnlichen Einheiten.
 
+Zeitlinie beachten (sehr wichtig):
+- Die Vergleichsgruppe enthält nur Einheiten VOR dieser Einheit. Was unter "SEIT dieser Einheit schon absolviert" steht, geschah DANACH. Beschreibe spätere Einheiten nie als "damals" oder "früher".
+- "Deine Notiz" ist ausschließlich die eigene Notiz zu DIESER Einheit. Notizen und Bewertungen anderer Einheiten immer mit ihrem Datum nennen und nie dieser Einheit zuschreiben.
+- Deine Tipps müssen zum heutigen Stand passen: Empfiehl nichts, was seitdem schon erledigt wurde (z. B. keinen neuen Test, wenn danach schon einer gemacht wurde), und nutze die aktuellen Schwellenwerte im Profil bzw. die Ergebnisse späterer Tests.
+- Ziehe die Körperwerte am Tag der Einheit (Schlaf, HRV, Ruhepuls) und die Belastung der Tage davor heran, wenn sie die Leistung erklären. Was nicht angegeben ist, nicht vermuten.
+
 Nur normaler Fließtext in kurzen Absätzen - KEIN Markdown (keine **, keine #-Überschriften, keine Aufzählungszeichen/nummerierten Listen), keine Tabellen/Code-Blöcke, max. ca. 180 Wörter.`;
 }
 

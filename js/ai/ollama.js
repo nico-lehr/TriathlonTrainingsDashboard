@@ -446,16 +446,26 @@ async function replanFromCoachNote(note) {
 // (renderWorkoutAnalysisBlock, workout-card.js) statt der ganzen Detailansicht
 // - die dort ebenfalls angezeigten Diagramme müssen dafür nicht neu gezeichnet werden.
 
+// Version des Auswertungs-Kontexts: ältere Auswertungen (ohne Zeitlinie,
+// Körperwerte, "seitdem absolviert") bekommen in der Ansicht einen Hinweis.
+const WORKOUT_ANALYSIS_CTX = 2;
+
+function workoutsBefore(w, all) {
+  return w && w._date ? all.filter(o => !o._date || o._date < w._date) : all;
+}
+
 async function generateWorkoutAnalysis(file) {
   const w = ALL.find(x => x.file === file);
   if (!w) return;
-  const comparable = findComparableWorkouts(w, ALL);
+  // Nur Einheiten VOR dieser vergleichen - spätere (z. B. ein CSS-Test am
+  // Tag danach) stehen getrennt als "seitdem absolviert" im Kontext.
+  const comparable = findComparableWorkouts(w, workoutsBefore(w, ALL));
   if (comparable.length < 3) {
     workoutAnalysisCache[file] = {
       analysis: null, analysisAt: null, loading: false,
       // Nennt die konkrete Vergleichsgruppe, damit nachvollziehbar ist, warum
       // z.B. Outdoor-Fahrten bei einer Indoor-Einheit absichtlich nicht zählen.
-      error: `Noch nicht genug ähnliche Einheiten für einen Vergleich (aktuell ${comparable.length}, mindestens 3 nötig — ${comparisonGroupLabel(w)}, ${isIndoorRide(w) ? "Dauer" : "Distanz/Dauer"} ±20%).`,
+      error: `Noch nicht genug ähnliche frühere Einheiten für einen Vergleich (aktuell ${comparable.length}, mindestens 3 nötig — ${comparisonGroupLabel(w)}, ${isIndoorRide(w) ? "Dauer" : "Distanz/Dauer"} ±20%).`,
     };
     saveWorkoutAnalysisCache();
     renderWorkoutAnalysisBlock(file);
@@ -466,7 +476,7 @@ async function generateWorkoutAnalysis(file) {
   try {
     const prompt = buildWorkoutAnalysisPrompt(w, comparable);
     const text = await callAiText(prompt, { task: "analysis" });
-    workoutAnalysisCache[file] = { analysis: text, analysisAt: new Date().toISOString(), loading: false, error: null };
+    workoutAnalysisCache[file] = { analysis: text, analysisAt: new Date().toISOString(), loading: false, error: null, ctx: WORKOUT_ANALYSIS_CTX };
   } catch (e) {
     workoutAnalysisCache[file] = { ...(workoutAnalysisCache[file] || {}), loading: false, error: describeAiError(e, "analysis") };
   } finally {

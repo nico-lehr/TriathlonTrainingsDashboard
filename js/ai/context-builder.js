@@ -446,9 +446,114 @@ function workoutFeedbackContextLines(comparable) {
     const avg = ratings.reduce((a, b) => a + b, 0) / ratings.length;
     lines.push(`Ø Nutzer-Bewertung ähnlicher früherer Einheiten: ${fmtNum(avg, 1)}/5 Sterne (${ratings.length} bewertet)`);
   }
-  const notes = rated.filter(x => x.entry.note).slice(0, 3).map(x => `"${x.entry.note}"`);
-  if (notes.length) lines.push(`Notizen aus ähnlichen früheren Einheiten: ${notes.join(" | ")}`);
+  // Mit Datum und Namen: ohne Datum hält die KI eine fremde Notiz (z. B.
+  // "CSS-Test") leicht für eine Notiz zu der gerade ausgewerteten Einheit.
+  const notes = rated.filter(x => x.entry.note).slice(0, 3)
+    .map(x => `${x.o._date ? fmtDateFull(x.o._date) : "ohne Datum"}${workoutDisplayName(x.o) ? ` („${workoutDisplayName(x.o)}“)` : ""}: "${x.entry.note}"`);
+  if (notes.length) lines.push(`Notizen des Athleten zu ANDEREN Einheiten der Vergleichsgruppe (nicht zu dieser Einheit): ${notes.join(" | ")}`);
 
+  return lines;
+}
+
+// Name einer absolvierten Einheit (Garmin-Titel), falls vorhanden.
+function workoutDisplayName(w) {
+  const n = String((w && (w.title || w.name)) || "").trim();
+  return n && n !== w.sport ? n.slice(0, 60) : "";
+}
+
+const WEEKDAY_FULL_DE = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+
+// Mittelwert eines Garmin-Messwerts in den `days` Tagen VOR `key` - die
+// Basislinie für "wie war der Körper an genau diesem Tag".
+function wellnessBaselineBefore(field, key, days = 30) {
+  const daily = typeof wellnessDaily === "function" ? wellnessDaily() : {};
+  const end = new Date(key + "T00:00:00"), start = new Date(end - days * 86400000);
+  const vals = Object.keys(daily)
+    .filter(k => { const d = new Date(k + "T00:00:00"); return d < end && d >= start; })
+    .map(k => daily[k] && daily[k][field]).filter(v => v != null);
+  return vals.length >= 3 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+}
+
+// Zeitlinie für die Auswertung EINER Einheit: wann sie war (und wann heute
+// ist), was an dem Tag geplant war, wie der Körper an dem Tag drauf war,
+// was in den Tagen davor los war, was SEITDEM schon absolviert wurde und
+// welche Schwellenwerte heute gelten. Ohne das empfiehlt die KI z. B. einen
+// CSS-Test, obwohl der schon am Tag danach gemacht wurde.
+function workoutTimelineContextLines(w, now = new Date()) {
+  const lines = [];
+  if (!w || !w._date) return lines;
+  const key = localDateStr(w._date);
+  const today = new Date(now); today.setHours(0, 0, 0, 0);
+  const day = new Date(w._date); day.setHours(0, 0, 0, 0);
+  const ago = Math.round((today - day) / 86400000);
+  const agoText = ago <= 0 ? "heute" : ago === 1 ? "gestern" : `vor ${ago} Tagen`;
+  lines.push(`Heute ist ${WEEKDAY_FULL_DE[today.getDay()]}, ${fmtDateFull(today)}. Diese Einheit war am ${WEEKDAY_FULL_DE[day.getDay()]}, ${fmtDateFull(day)} (${agoText}).`);
+
+  // Was an dem Tag geplant war (gleiche Sportart)
+  const planned = (typeof plannedWorkouts !== "undefined" ? plannedWorkouts : [])
+    .filter(p => p.date === key && p.sport === w.sport).slice(0, 2);
+  planned.forEach(p => {
+    const desc = p.description ? `: ${String(p.description).replace(/\s+/g, " ").slice(0, 220)}` : "";
+    lines.push(`Geplant war an diesem Tag: „${p.title || p.sport}“ (${p.duration_min ? p.duration_min + " min, " : ""}${p.intensity || "ohne Angabe"})${desc}`);
+  });
+
+  // Körper an diesem Tag (Garmin-Nachtwerte vom Morgen der Einheit)
+  const wd = typeof wellnessForDate === "function" ? wellnessForDate(day) : null;
+  if (wd) {
+    const body = [];
+    const cmp = (field, label, unit, digits = 0) => {
+      if (wd[field] == null) return;
+      const base = wellnessBaselineBefore(field, key);
+      const d = base != null ? wd[field] - base : null;
+      body.push(`${label} ${fmtNum(wd[field], digits)}${unit}${d != null ? ` (Mittel davor ${fmtNum(base, digits)}${unit})` : ""}`);
+    };
+    cmp("hrv_ms", "HRV", " ms");
+    cmp("resting_hr", "Ruhepuls", " bpm");
+    if (wd.sleep_min != null) body.push(`Schlaf ${Math.floor(wd.sleep_min / 60)}:${String(Math.round(wd.sleep_min % 60)).padStart(2, "0")} h`);
+    if (wd.sleep_score != null) body.push(`Schlafscore ${Math.round(wd.sleep_score)}/100`);
+    if (wd.body_battery_high != null) body.push(`Body Battery max ${Math.round(wd.body_battery_high)}`);
+    if (wd.readiness_score != null) body.push(`Trainingsbereitschaft ${Math.round(wd.readiness_score)}/100`);
+    if (wd.hrv_status) body.push(`HRV-Status ${wd.hrv_status}`);
+    if (body.length) lines.push(`Körperwerte am Tag der Einheit (Garmin): ${body.join(" | ")}`);
+  }
+
+  // Belastung in den 7 Tagen davor
+  const all = (typeof DATA !== "undefined" ? DATA : []).filter(o => o._date && o.file !== w.file && !o.is_summary);
+  const before = all.filter(o => o._date < w._date && o._date >= new Date(w._date - 7 * 86400000));
+  if (before.length) {
+    const min = before.reduce((a, o) => a + (o.duration_min || 0), 0);
+    const load = before.reduce((a, o) => a + (o.training_load || 0), 0);
+    const prev = before.filter(o => o._date >= new Date(w._date - 2 * 86400000)).sort((a, b) => a._date - b._date)
+      .map(o => `${fmtDate(o._date)} ${o.sport}${o.duration_min ? " " + Math.round(o.duration_min) + " min" : ""}`);
+    lines.push(`Die 7 Tage davor: ${before.length} Einheiten, ${Math.round(min)} min${load ? `, Load ${Math.round(load)}` : ""}${prev.length ? `; in den 2 Tagen davor: ${prev.join(", ")}` : ""}`);
+  } else {
+    lines.push("Die 7 Tage davor: keine Einheit erfasst.");
+  }
+
+  // Was SEITDEM passiert ist (inkl. Name und eigener Notiz)
+  const after = all.filter(o => o._date > w._date).sort((a, b) => a._date - b._date).slice(0, 10);
+  if (after.length) {
+    const bits = after.map(o => {
+      const note = typeof getWorkoutNote === "function" ? getWorkoutNote(o.file) : null;
+      const pace = o.pace_min_per_100m ? ` ${o.pace_min_per_100m} min/100m` : o.pace_min_per_km ? ` ${o.pace_min_per_km} min/km` : "";
+      const dist = o.distance_km != null ? (o.sport === "Schwimmen" ? ` ${Math.round(o.distance_km * 1000)} m` : ` ${fmtNum(o.distance_km, 1)} km`) : "";
+      return `${WEEKDAY_FULL_DE[o._date.getDay()].slice(0, 2)} ${fmtDate(o._date)} ${o.sport}${workoutDisplayName(o) ? ` „${workoutDisplayName(o)}“` : ""}${dist}${o.duration_min ? ` ${Math.round(o.duration_min)} min` : ""}${pace}${note && note.note ? ` – Notiz: "${note.note}"` : ""}`;
+    });
+    lines.push(`SEIT dieser Einheit schon absolviert (danach, nicht davor): ${bits.join(" | ")}`);
+  } else {
+    lines.push("Seit dieser Einheit wurde nichts weiter absolviert.");
+  }
+
+  // Schwellenwerte, die HEUTE gelten
+  const p = typeof athleteProfile !== "undefined" && athleteProfile ? athleteProfile : {};
+  const thr = [];
+  if (p.swimCss) {
+    const t = p.swimCssTest;
+    thr.push(`CSS ${p.swimCss} min/100m${t && t.date ? ` (aus CSS-Test vom ${fmtDateFull(new Date(t.date + "T12:00:00"))}${t.t400 && t.t200 ? `: 400 m in ${t.t400}, 200 m in ${t.t200}` : ""})` : ""}`);
+  }
+  if (p.ftpWatts) thr.push(`FTP ${p.ftpWatts} W`);
+  if (p.runThresholdPace) thr.push(`Lauf-Schwelle ${p.runThresholdPace} min/km`);
+  if (thr.length) lines.push(`Aktuelle Schwellenwerte im Profil (Stand heute): ${thr.join(" | ")}`);
   return lines;
 }
 
@@ -474,7 +579,7 @@ function buildWorkoutAnalysisContext(w, comparable) {
     const np = w.normalized_power_w ?? w.avg_power_w;
     if (ftp && np != null) bits.push(`IF ${fmtNum(np / ftp, 2)} (${Math.round((np / ftp) * 100)}% FTP)`);
   }
-  if (w.distance_km != null) bits.push(`${fmtNum(w.distance_km, 2)} km${indoor ? " (virtuell)" : ""}`);
+  if (w.distance_km != null) bits.push(w.sport === "Schwimmen" ? `${Math.round(w.distance_km * 1000)} m` : `${fmtNum(w.distance_km, 2)} km${indoor ? " (virtuell)" : ""}`);
   if (w.duration_min != null) bits.push(`${fmtNum(w.duration_min, 0)} min`);
   if (paceOrSpeed) bits.push(paceOrSpeed);
   if (w.avg_hr != null) bits.push(`Ø HF ${w.avg_hr}`);
@@ -484,7 +589,9 @@ function buildWorkoutAnalysisContext(w, comparable) {
   if (effElev != null && !indoor) bits.push(`${Math.round(effElev)} Hm${w.elevation_gain_m == null ? " (nachgetragen)" : ""}`);
   if (ownEntry && ownEntry.rating != null) bits.push(`eigene Bewertung ${ownEntry.rating}/5`);
   lines.push(`Diese Einheit: ${bits.filter(Boolean).join(" | ")}`);
-  if (ownEntry && ownEntry.note) lines.push(`Eigene Notiz des Athleten zu dieser Einheit: "${ownEntry.note}"`);
+  if (workoutDisplayName(w)) lines.push(`Name der Einheit: „${workoutDisplayName(w)}“`);
+  lines.push(ownEntry && ownEntry.note ? `Eigene Notiz des Athleten zu dieser Einheit: "${ownEntry.note}"` : "Zu dieser Einheit gibt es keine eigene Notiz des Athleten.");
+  lines.push(...workoutTimelineContextLines(w));
 
   // Der Hinweis steht VOR der Vergleichsgruppe und den Kennzahlen, damit das
   // Modell die folgenden Zahlen von Anfang an richtig einordnet: sonst liest es
@@ -498,7 +605,7 @@ function buildWorkoutAnalysisContext(w, comparable) {
   const groupNote = indoor
     ? " - die Gruppe enthält ausschließlich Indoor-Einheiten, die Ähnlichkeit wurde über die DAUER (±20%) bestimmt, nicht über die Distanz"
     : "";
-  lines.push(`Vergleichsgruppe: ${comparable.length} ähnliche ${comparisonGroupLabel(w)}-Einheiten${spanBits.length ? " (" + spanBits.join("") + ")" : ""}${groupNote}`);
+  lines.push(`Vergleichsgruppe: ${comparable.length} ähnliche ${comparisonGroupLabel(w)}-Einheiten VOR dieser Einheit${spanBits.length ? " (" + spanBits.join("") + ")" : ""}${groupNote}`);
 
   const avgPaceSec = averageComparisonStat(comparable.map(o => ({ v: paceOrSpeedSeconds(o) })), "v");
   const thisPaceSec = paceOrSpeedSeconds(w);
