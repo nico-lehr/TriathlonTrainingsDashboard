@@ -373,7 +373,7 @@
 
       <div class="card" data-card-id="new-goal" id="new-goal-card" hidden>
         <span class="card-drag-handle" title="Karte verschieben">⠿</span>
-        <h2>Neues Ziel</h2>
+        <h2 id="goal-form-title">Neues Ziel</h2>
         <form class="goal-form" id="goal-form">
           <div class="goal-form-row">
             <label for="goal-name">Event / Ziel</label>
@@ -393,36 +393,64 @@
             <input type="date" id="goal-date" class="coach-input" required>
           </div>
           <div class="goal-form-row">
-            <label for="goal-target-time">Zielzeit (optional)</label>
-            <input type="text" id="goal-target-time" class="coach-input" placeholder="z.B. 5:30">
+            <label for="goal-format">Distanz</label>
+            <select id="goal-format" class="coach-input"></select>
           </div>
           <div class="goal-form-row">
-            <label for="goal-distance">Distanz in km (optional)</label>
-            <input type="number" id="goal-distance" class="coach-input" step="0.1" min="0" placeholder="z.B. 113">
+            <label for="goal-terrain">Streckenart (optional)</label>
+            <select id="goal-terrain" class="coach-input"></select>
+          </div>
+          <div class="goal-form-row" id="goal-relay-row">
+            <span class="goal-form-label">Teilnahme</span>
+            <div class="goal-seg" role="radiogroup" aria-label="Teilnahme">
+              <label><input type="radio" name="goal-relay" value="solo" checked><span>Allein</span></label>
+              <label><input type="radio" name="goal-relay" value="relay"><span>Staffel</span></label>
+            </div>
+          </div>
+          <div class="goal-form-row goal-form-row-wide" id="goal-relay-legs-row" hidden>
+            <span class="goal-form-label">Welche Teilstrecke machst du selbst?</span>
+            <div class="goal-relay-legs" id="goal-relay-legs">
+              <label class="goal-leg-chip"><input type="checkbox" value="swim"><span class="sport-dot" style="background:var(--c-schwimmen)"></span>Schwimmen</label>
+              <label class="goal-leg-chip"><input type="checkbox" value="bike"><span class="sport-dot" style="background:var(--c-rad)"></span>Rad</label>
+              <label class="goal-leg-chip"><input type="checkbox" value="run"><span class="sport-dot" style="background:var(--c-laufen)"></span>Laufen</label>
+            </div>
+            <p class="goal-form-hint">Der Trainingsplan und der Coach richten sich dann nur nach deinem Teil.</p>
+          </div>
+          <div class="goal-form-row" id="goal-distance-row">
+            <label for="goal-distance">Distanz in km</label>
+            <input type="number" id="goal-distance" class="coach-input" step="0.1" min="0" placeholder="z.B. 21,1">
+          </div>
+          <div class="goal-form-row">
+            <label for="goal-target-time" id="goal-target-time-label">Zielzeit (optional)</label>
+            <input type="text" id="goal-target-time" class="coach-input" placeholder="z.B. 1:45:00">
           </div>
           <div class="goal-form-row-wide goal-subdisciplines" id="goal-subdisciplines" style="display:none;">
-            <label>Unterdisziplinen (optional)</label>
-            <div class="goal-subdiscipline-row">
-              <span class="goal-subdiscipline-label"><span class="sport-dot" style="background:var(--c-schwimmen)"></span>Schwimmen</span>
-              <input type="number" id="goal-sub-swim-distance" class="coach-input" step="0.1" min="0" placeholder="Distanz km">
-              <input type="text" id="goal-sub-swim-time" class="coach-input" placeholder="Zielzeit z.B. 0:40:00">
+            <label>Teilstrecken <span class="goal-form-hint-inline">– Distanz anpassbar, Zielzeit optional</span></label>
+            <div class="goal-subdiscipline-row" data-leg="swim">
+              <span class="goal-subdiscipline-label"><span class="sport-dot" style="background:var(--c-schwimmen)"></span>Schwimmen<em class="goal-leg-team">Team</em></span>
+              <input type="number" id="goal-sub-swim-distance" class="coach-input" step="0.05" min="0" placeholder="Distanz km" aria-label="Schwimmen Distanz in km">
+              <input type="text" id="goal-sub-swim-time" class="coach-input" placeholder="Ziel 0:40:00" aria-label="Schwimmen Zielzeit">
             </div>
-            <div class="goal-subdiscipline-row">
-              <span class="goal-subdiscipline-label"><span class="sport-dot" style="background:var(--c-rad)"></span>Rad</span>
-              <input type="number" id="goal-sub-bike-distance" class="coach-input" step="0.1" min="0" placeholder="Distanz km">
-              <input type="text" id="goal-sub-bike-time" class="coach-input" placeholder="Zielzeit z.B. 2:30:00">
+            <div class="goal-subdiscipline-row" data-leg="bike">
+              <span class="goal-subdiscipline-label"><span class="sport-dot" style="background:var(--c-rad)"></span>Rad<em class="goal-leg-team">Team</em></span>
+              <input type="number" id="goal-sub-bike-distance" class="coach-input" step="0.1" min="0" placeholder="Distanz km" aria-label="Rad Distanz in km">
+              <input type="text" id="goal-sub-bike-time" class="coach-input" placeholder="Ziel 2:30:00" aria-label="Rad Zielzeit">
             </div>
-            <div class="goal-subdiscipline-row">
-              <span class="goal-subdiscipline-label"><span class="sport-dot" style="background:var(--c-laufen)"></span>Laufen</span>
-              <input type="number" id="goal-sub-run-distance" class="coach-input" step="0.1" min="0" placeholder="Distanz km">
-              <input type="text" id="goal-sub-run-time" class="coach-input" placeholder="Zielzeit z.B. 1:40:00">
+            <div class="goal-subdiscipline-row" data-leg="run">
+              <span class="goal-subdiscipline-label"><span class="sport-dot" style="background:var(--c-laufen)"></span>Laufen<em class="goal-leg-team">Team</em></span>
+              <input type="number" id="goal-sub-run-distance" class="coach-input" step="0.1" min="0" placeholder="Distanz km" aria-label="Laufen Distanz in km">
+              <input type="text" id="goal-sub-run-time" class="coach-input" placeholder="Ziel 1:40:00" aria-label="Laufen Zielzeit">
             </div>
           </div>
           <div class="goal-form-row goal-form-row-wide">
             <label for="goal-notes">Notizen (optional)</label>
             <input type="text" id="goal-notes" class="coach-input" placeholder="z.B. erste Langdistanz, Laufen ist meine Schwäche">
           </div>
-          <button type="submit" class="update-btn goal-submit-btn">Ziel hinzufügen</button>
+          <p class="goal-error goal-form-row-wide" id="goal-form-error" hidden></p>
+          <div class="goal-form-actions">
+            <button type="submit" class="update-btn goal-submit-btn" id="goal-submit-btn">Ziel hinzufügen</button>
+            <button type="button" class="chip" id="goal-edit-cancel-btn" hidden>Abbrechen</button>
+          </div>
         </form>
       </div>
 
@@ -1180,6 +1208,7 @@
 <script src="js/data/fit-parser.js"></script>
 <script src="js/data/workouts.js"></script>
 <script src="js/data/workout-notes.js"></script>
+<script src="js/data/race-formats.js"></script>
 <script src="js/data/goals.js"></script>
 <script src="js/data/garmin-events.js"></script>
 <script src="js/data/web-push.js"></script>
@@ -1234,6 +1263,7 @@
 <script src="js/components/records.js"></script>
 <script src="js/components/equipment.js"></script>
 <script src="js/components/health-status.js"></script>
+<script src="js/components/goal-form.js"></script>
 <script src="js/components/coach.js"></script>
 <script src="js/components/training-plan.js"></script>
 <script src="js/components/race-countdown.js"></script>

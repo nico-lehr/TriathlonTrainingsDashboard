@@ -271,9 +271,14 @@ function buildCompactContext(goal) {
   if (goal) {
     const zielBits = [`${goal.name}`, goal.sport, goal.date];
     if (daysUntil != null) zielBits.push(`in ${daysUntil} Tagen`);
-    if (goal.targetTime) zielBits.push(`Zielzeit ${goal.targetTime}`);
+    if (goal.targetTime) zielBits.push(`${goalIsRelay(goal) ? "Team-Zielzeit" : "Zielzeit"} ${goal.targetTime}`);
     if (goal.distanceKm) zielBits.push(`${fmtNum(goal.distanceKm, 1)}km`);
     lines.push(`Ziel: ${zielBits.join(" | ")}`);
+    // Vorlage, Staffel, Streckenart (js/data/race-formats.js) - bei einer
+    // Staffel ausdrücklich: nur die eigene Teilstrecke trainieren.
+    const raceBits = goalRaceBits(goal);
+    if (raceBits.length) lines.push(`Wettkampf: ${raceBits.join(" | ")}`);
+    if (goalIsRelay(goal)) lines.push(`Staffel: Der Athlet macht nur ${raceLegNames(goalOwnLegKeys(goal))} - Training und Rennplanung auf diese Teilstrecke(n) ausrichten, die anderen übernimmt das Team.`);
 
     // Periodisierung: Phase heute mit Erklärung und der Zielumfang dieser
     // Woche - fertig berechnet, die KI soll darauf aufbauen statt eigene
@@ -287,13 +292,14 @@ function buildCompactContext(goal) {
       if (targets.baselineMin != null) lines.push(`Aktueller Wochenumfang: ${targets.baselineMin} min (${targets.returnAfterWeeks ? `Wiedereinstieg nach ${targets.returnAfterWeeks} leichteren Wochen in Folge` : `letzte normale Woche ab ${targets.baselineWeek}`})`);
     }
     if (goal.subDisciplines && goal.subDisciplines.length) {
-      const subBits = goal.subDisciplines.map(s => {
+      const relay = goalIsRelay(goal);
+      const subBits = goalLegs(goal).filter(l => l.distanceKm || l.targetTime).map(l => {
         const parts = [];
-        if (s.distanceKm) parts.push(`${fmtNum(s.distanceKm, 1)}km`);
-        if (s.targetTime) parts.push(`Ziel ${s.targetTime}`);
-        return `${s.label}${parts.length ? " " + parts.join(", ") : ""}`;
+        if (l.distanceKm) parts.push(`${fmtNum(l.distanceKm, 2)}km`);
+        if (l.targetTime) parts.push(`Ziel ${l.targetTime}`);
+        return `${l.label}${parts.length ? " " + parts.join(", ") : ""}${relay ? (l.mine ? " (selbst)" : " (Team)") : ""}`;
       });
-      lines.push(`Unterdisziplinen: ${subBits.join(" | ")}`);
+      if (subBits.length) lines.push(`Teilstrecken: ${subBits.join(" | ")}`);
     }
     if (goal.notes) lines.push(`Notiz: ${goal.notes}`);
 

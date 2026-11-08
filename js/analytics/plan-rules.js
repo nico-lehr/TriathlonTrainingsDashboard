@@ -90,8 +90,8 @@ const PLAN_SKIN_TEMP_RISE_C = 0.8;
 const PLAN_RESP_RISE = 1.5;
 const PLAN_READINESS_LOW = 25;
 
-// Sportarten eines Ziels - je mind. 1 lockere Grundlageneinheit pro Woche.
-const PLAN_GOAL_SPORTS = { Triathlon: ["Schwimmen", "Rad", "Laufen"], Schwimmen: ["Schwimmen"], Rad: ["Rad"], Laufen: ["Laufen"] };
+// Sportarten eines Ziels (goalRaceSports, js/data/race-formats.js - bei einer
+// Staffel nur die eigenen Teilstrecken) - je mind. 1 lockere Grundlageneinheit pro Woche.
 const PLAN_EASY_SESSION_DEFAULT_MIN = 45; // vorgeschlagene Dauer einer fehlenden lockeren Einheit
 
 const PLAN_SPORT_TEXT = { Rad: "Radfahren" }; // für Sätze wie "beim Radfahren"
@@ -551,7 +551,7 @@ function validatePlan(plannedWorkouts, history, wellness, recovery, options = {}
     periodWeeks: new Map(period ? period.weeks.map(w => [w.weekStart, w]) : []), // Zielumfang je Woche
     weeks: [...new Set(open.map(s => planWeekKey(s.date)))],
     planUntil: options.planUntil || open[open.length - 1].date,
-    goalSports: (goal && PLAN_GOAL_SPORTS[goal.sport]) || [],
+    goalSports: goal ? goalRaceSports(goal) : [], // Staffel: nur die eigenen Teilstrecken (js/data/race-formats.js)
     gateDay: gate.reasons.length ? open[0].date : null, // nur locker erlaubt (Regel 5)
     structure: options.structure || null, // Wochenplan-Vorgaben für Verschiebungen (planStructureSettings)
   };
@@ -575,7 +575,7 @@ function validatePlan(plannedWorkouts, history, wellness, recovery, options = {}
 // Zieldatum auch Taper/Erholung aus der Periodisierung.
 function planRulesText(goal) {
   const pct = x => Math.round(x * 100);
-  const sports = (goal && PLAN_GOAL_SPORTS[goal.sport]) || [];
+  const sports = goal ? goalRaceSports(goal) : [];
   return [
     `Nie zwei harte Tage hintereinander. Hart ist eine Einheit mit Intensität "hart" oder mit mehr als ${PLAN_HARD_MIN_DURATION} Minuten (auch wenn sie locker ist).`,
     `Höchstens ${PLAN_MAX_HARD_PER_WEEK} harte Einheiten pro Woche (Montag bis Sonntag).`,

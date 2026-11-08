@@ -261,13 +261,17 @@ function renderGoals() {
     const eventDate = goal.date ? new Date(goal.date + "T00:00:00") : null;
     const days = eventDate ? Math.round((eventDate - todayMid) / 86400000) : null;
     const daysLabel = days == null ? "" : days > 0 ? `in ${days} Tagen` : days === 0 ? "heute" : `vor ${Math.abs(days)} Tagen`;
-    const metaBits = [];
-    if (goal.distanceKm) metaBits.push(`${fmtNum(goal.distanceKm, 1)} km`);
-    if (goal.targetTime) metaBits.push(`Zielzeit ${escapeHtml(goal.targetTime)}`);
+    // Vorlage, Staffel, Streckenart (js/data/race-formats.js), dann Distanz/Zielzeit
+    const metaBits = goalRaceBits(goal).map(escapeHtml);
+    if (goal.distanceKm && !(goal.sport === "Triathlon" && raceFormatOf(goal))) metaBits.push(`${fmtNum(goal.distanceKm, 1)} km`);
+    if (goal.targetTime) metaBits.push(`${goalIsRelay(goal) ? "Team-Zielzeit" : "Zielzeit"} ${escapeHtml(goal.targetTime)}`);
     const btnLabel = goal._loading ? "Generiere …" : (goal.recommendation ? "Neu generieren" : "Empfehlung generieren");
-    const subDisciplinesHtml = (goal.subDisciplines && goal.subDisciplines.length) ? `
+    // Teilstrecken: bei der Staffel die eigenen hervorgehoben, die des Teams blass.
+    const relay = goalIsRelay(goal);
+    const legTags = goal.sport === "Triathlon" ? goalLegs(goal).filter(l => l.distanceKm || l.targetTime || (relay && l.mine)) : [];
+    const subDisciplinesHtml = legTags.length ? `
         <div class="goal-subdiscipline-list">
-          ${goal.subDisciplines.map(s => `<span class="goal-subdiscipline-tag">${escapeHtml(s.label)}${s.distanceKm ? " " + fmtNum(s.distanceKm, 1) + " km" : ""}${s.targetTime ? " · " + escapeHtml(s.targetTime) : ""}</span>`).join("")}
+          ${legTags.map(l => `<span class="goal-subdiscipline-tag${relay ? (l.mine ? " is-mine" : " is-team") : ""}"><span class="sport-dot" style="background:${sportColor(l.sport)}"></span>${escapeHtml(l.label)}${l.distanceKm ? " " + fmtNum(l.distanceKm, l.distanceKm < 10 ? 2 : 1) + " km" : ""}${l.targetTime ? " · " + escapeHtml(l.targetTime) : ""}${relay ? (l.mine ? " · du" : " · Team") : ""}</span>`).join("")}
         </div>` : "";
     const readiness = computeRaceReadiness(goal);
     const readinessBadgeHtml = readiness ? `
@@ -294,6 +298,7 @@ function renderGoals() {
           </div>
           <div class="goal-head-right">
             ${readinessBadgeHtml}
+            <button class="goal-edit-btn" title="Wettkampf bearbeiten" aria-label="Wettkampf bearbeiten" data-id="${goal.id}" type="button">✎</button>
             <button class="goal-expand-btn${isOpen ? " open" : ""}" title="${isOpen ? "Details ausblenden" : "Details anzeigen"}" data-id="${goal.id}" type="button">⌄</button>
             <button class="goal-delete" title="Ziel löschen" data-id="${goal.id}">✕</button>
           </div>
@@ -324,6 +329,7 @@ function renderGoals() {
       : window.confirm(`${label} wirklich löschen?`);
     if (ok) deleteGoal(btn.dataset.id);
   }));
+  el.querySelectorAll(".goal-edit-btn").forEach(btn => btn.addEventListener("click", () => openGoalEditor(btn.dataset.id)));
   el.querySelectorAll(".goal-generate-btn").forEach(btn => btn.addEventListener("click", () => generateRecommendation(btn.dataset.id)));
   el.querySelectorAll(".goal-primary-star").forEach(btn => btn.addEventListener("click", () => setGoalPrimary(btn.dataset.id)));
   el.querySelectorAll(".goal-expand-btn").forEach(btn => btn.addEventListener("click", () => {
@@ -958,16 +964,8 @@ function initCoach() {
 
   document.getElementById("goal-form").addEventListener("submit", addGoal);
 
-  // Unterdisziplinen (Distanz + Zielzeit je Disziplin) nur beim Ziel-Sportart
-  // "Triathlon" anzeigen - bei einer einzelnen Sportart reichen die
-  // normalen Distanz-/Zielzeit-Felder oben.
-  const goalSportSelect = document.getElementById("goal-sport");
-  const goalSubdisciplinesEl = document.getElementById("goal-subdisciplines");
-  function toggleGoalSubdisciplines() {
-    goalSubdisciplinesEl.style.display = goalSportSelect.value === "Triathlon" ? "flex" : "none";
-  }
-  goalSportSelect.addEventListener("change", toggleGoalSubdisciplines);
-  toggleGoalSubdisciplines();
+  // Vorlagen, Staffel, Teilstrecken und Bearbeiten: js/components/goal-form.js
+  initGoalForm();
 
   document.getElementById("onboarding-start-btn").addEventListener("click", openOnboarding);
   const gateBtn = document.getElementById("onboarding-gate-btn");
@@ -1092,15 +1090,10 @@ const newGoalToggleBtn = document.getElementById("new-goal-toggle-btn");
 const newGoalCard = document.getElementById("new-goal-card");
 if (newGoalToggleBtn && newGoalCard) {
   newGoalToggleBtn.addEventListener("click", () => {
-    const nowHidden = !newGoalCard.hidden;
-    newGoalCard.hidden = nowHidden;
-    newGoalToggleBtn.classList.toggle("active", !nowHidden);
-    newGoalToggleBtn.textContent = nowHidden ? "+ Neues Ziel/Event" : "✕ Abbrechen";
-    if (!nowHidden) {
-      newGoalCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      const firstField = newGoalCard.querySelector("input, select, textarea");
-      if (firstField) firstField.focus();
-    }
+    const show = newGoalCard.hidden;
+    // Öffnen = immer ein neues Ziel; Schließen bricht auch ein Bearbeiten ab.
+    resetGoalForm();
+    showGoalFormCard(show);
   });
 }
 

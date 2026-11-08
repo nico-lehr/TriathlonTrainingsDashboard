@@ -85,7 +85,8 @@ function planGuardWeekMinutes(list, history, todayKey, wk) {
 // Ziel-Sportart mit den wenigsten Minuten in dieser Woche - möglichst nicht
 // dieselbe wie am Vortag.
 function planGuardSport(list, history, date, o) {
-  const goalSports = (o.goal && PLAN_GOAL_SPORTS[o.goal.sport]) || ["Laufen", "Rad", "Schwimmen"];
+  const ownSports = o.goal ? goalRaceSports(o.goal) : [];
+  const goalSports = ownSports.length ? ownSports : ["Laufen", "Rad", "Schwimmen"];
   const wd = planGuardWeekday(date);
   const swimDays = (o.profile && o.profile.swimDays) || [];
   const longDays = (o.profile && o.profile.longDays) || [];

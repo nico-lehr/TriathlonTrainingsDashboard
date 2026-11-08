@@ -261,8 +261,10 @@ function computeRaceFuelingPlan() {
 
   const disciplines = [];
   if (goal.sport === "Triathlon" && Array.isArray(goal.subDisciplines)) {
+    // Staffel: nur die eigenen Teilstrecken (goalOwnLegKeys, js/data/race-formats.js)
+    const own = goalOwnLegKeys(goal);
     const order = { swim: 0, bike: 1, run: 2 };
-    goal.subDisciplines.slice().sort((a, b) => order[a.key] - order[b.key]).forEach(sd => {
+    goal.subDisciplines.filter(sd => sd && own.includes(sd.key)).sort((a, b) => order[a.key] - order[b.key]).forEach(sd => {
       disciplines.push({ key: sd.key, label: NUTRITION_SPORT_LABEL[sd.key] || sd.label, hours: hmsToHours(sd.targetTime), targetTime: sd.targetTime });
     });
   } else if (goal.targetTime) {

@@ -4,6 +4,16 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.41
+
+**Wettkämpfe mit mehr Details**
+
+- **Distanz-Vorlagen:** Beim Anlegen eines Wettkampfs kannst du jetzt eine Distanz auswählen – zum Beispiel Sprint, Olympisch, Mitteldistanz oder Langdistanz beim Triathlon, 5 km, 10 km, Halbmarathon oder Marathon beim Laufen. Die Kilometer werden automatisch eingetragen und lassen sich danach noch ändern. Passt nichts, wählst du „Eigene Distanz“.
+- **Staffel:** Beim Triathlon gibt es jetzt „Allein“ oder „Staffel“. Bei einer Staffel wählst du aus, welche Teilstrecke du selbst machst (z. B. nur Laufen). Die Distanzen jeder Teilstrecke kannst du frei eintragen.
+- **Nur dein Teil zählt:** Bei einer Staffel richten sich Trainingsplan, KI-Coach, Renntempo und Rennverpflegung nur nach deiner eigenen Teilstrecke. Der Rennplan zeigt eine passende Checkliste für die Übergabe ans Team.
+- **Streckenart:** Optional kannst du angeben, ob es z. B. ein Straßenlauf, Trail, Bahn- oder Crosslauf ist. Auch das bekommt der Coach mit.
+- **Bearbeiten:** Wettkämpfe lassen sich jetzt nachträglich ändern – über den Stift (✎) auf der Wettkampfkarte.
+
 ## 2.4.40
 
 - **Ist mein Wert gut? – Einordnung direkt unter den Diagrammen:** In der Detailansicht einer Einheit steht jetzt unter Schrittfrequenz, Bodenkontaktzeit, vertikalem Verhältnis, Leistung, Puls und Tempo eine kurze Einordnung:

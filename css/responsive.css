@@ -67,7 +67,8 @@
     .goal-form { grid-template-columns: 1fr; }
     .goal-form-row-wide { grid-column: span 1; }
     .goal-submit-btn { grid-column: span 1; }
-    .goal-subdiscipline-row { grid-template-columns: 1fr; gap: 6px; }
+    .goal-subdiscipline-row { grid-template-columns: 1fr 1fr; gap: 6px; }
+    .goal-subdiscipline-label { grid-column: 1 / -1; }
     .coach-settings { flex-direction: column; align-items: stretch; }
     .coach-settings-row { flex-direction: column; align-items: stretch; }
     .onb-row { grid-template-columns: 1fr; }

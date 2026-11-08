@@ -16,64 +16,47 @@ function saveGoals() {
   storeSet(GOALS_KEY, clean);
 }
 
-// Liest die drei Unterdisziplin-Felder (Schwimmen/Rad/Laufen) aus dem
-// Ziel-Formular. Nur Disziplinen mit mindestens Distanz oder Zielzeit
-// werden übernommen; ist keine einzige ausgefüllt, gibt es null zurück
-// (kein leeres Array im gespeicherten Ziel).
-function readGoalSubdisciplines() {
-  const defs = [
-    { key: "swim", label: "Schwimmen", distId: "goal-sub-swim-distance", timeId: "goal-sub-swim-time" },
-    { key: "bike", label: "Rad", distId: "goal-sub-bike-distance", timeId: "goal-sub-bike-time" },
-    { key: "run", label: "Laufen", distId: "goal-sub-run-distance", timeId: "goal-sub-run-time" },
-  ];
-  const list = defs.map(d => {
-    const distanceRaw = document.getElementById(d.distId).value;
-    const targetTime = document.getElementById(d.timeId).value.trim();
-    if (!distanceRaw && !targetTime) return null;
-    return { key: d.key, label: d.label, distanceKm: distanceRaw ? Number(distanceRaw) : null, targetTime: targetTime || null };
-  }).filter(Boolean);
-  return list.length ? list : null;
-}
-
+// Neues Ziel anlegen oder - wenn gerade eines bearbeitet wird (goalEditingId,
+// js/components/goal-form.js) - dessen Wettkampf-Angaben ändern. Was aus dem
+// Formular gelesen wird, steht in readGoalForm(); Staffel, Vorlage und
+// Streckenart rechnet goalRaceFields() (js/data/race-formats.js).
 function addGoal(e) {
   e.preventDefault();
-  const name = document.getElementById("goal-name").value.trim();
-  const date = document.getElementById("goal-date").value;
-  if (!name || !date) return;
-  const distanceRaw = document.getElementById("goal-distance").value;
-  const sport = document.getElementById("goal-sport").value;
-  goals.push({
-    id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ("g" + Date.now() + Math.random().toString(16).slice(2)),
-    name,
-    sport,
-    date,
-    targetTime: document.getElementById("goal-target-time").value.trim() || null,
-    distanceKm: distanceRaw ? Number(distanceRaw) : null,
-    subDisciplines: sport === "Triathlon" ? readGoalSubdisciplines() : null,
-    notes: document.getElementById("goal-notes").value.trim() || null,
-    isPrimary: goals.length === 0, // erstes Ziel wird automatisch Hauptevent, sonst per Stern markierbar
-    recommendation: null,
-    recommendationAt: null,
-    // "Erweiterte Einstellungen" (js/components/coach.js, buildGoalAdvancedHtml)
-    // - alle optional, nichts davon blockiert das Anlegen eines Ziels.
-    priority: null, // "A"|"B"|"C" (Ausdauersport-Konvention: A = Hauptrennen, B/C = Nebenziele)
-    strategyNote: null, // Freitext, z.B. Pacing-/Verpflegungsstrategie
-    courseElevationM: null, // Höhenmeter der Strecke, manuell ODER aus GPX
-    courseProfileSource: null, // "manual"|"gpx" - nur zur Anzeige, welche Quelle
-    courseProfileLabel: null, // z.B. "1240 Hm über 92 km (13 Hm/km, hügelig)" - nur bei GPX-Quelle gesetzt (gpxProfileLabel())
-    racePlan: null, // Rennplan-Checklisten (js/analytics/race-plan.js) - null = Standard-Listen, bis etwas geändert wird
-  });
-  saveGoals();
-  e.target.reset();
-  // Formular-Kachel nach dem Anlegen wieder einklappen (siehe coach.js:
-  // "+ Neues Ziel/Event"-Toggle).
-  const card = document.getElementById("new-goal-card");
-  const toggleBtn = document.getElementById("new-goal-toggle-btn");
-  if (card) card.hidden = true;
-  if (toggleBtn) {
-    toggleBtn.classList.remove("active");
-    toggleBtn.textContent = "+ Neues Ziel/Event";
+  const form = readGoalForm();
+  const errEl = document.getElementById("goal-form-error");
+  if (form.error) {
+    if (errEl) { errEl.textContent = form.error; errEl.hidden = false; }
+    return;
   }
+  if (errEl) errEl.hidden = true;
+  if (!form.name || !form.date) return;
+  const editing = goalEditingId ? goals.find(g => g.id === goalEditingId) : null;
+  if (editing) {
+    // Nur die Wettkampf-Angaben - Priorität, Streckenprofil, Rennplan und
+    // KI-Empfehlung bleiben, wie sie sind.
+    Object.assign(editing, form);
+  } else {
+    goals.push({
+      id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ("g" + Date.now() + Math.random().toString(16).slice(2)),
+      ...form, // name, sport, date, notes, format, relay, relayLegs, terrain, distanceKm, targetTime, subDisciplines
+      isPrimary: goals.length === 0, // erstes Ziel wird automatisch Hauptevent, sonst per Stern markierbar
+      recommendation: null,
+      recommendationAt: null,
+      // "Erweiterte Einstellungen" (js/components/coach.js, buildGoalAdvancedHtml)
+      // - alle optional, nichts davon blockiert das Anlegen eines Ziels.
+      priority: null, // "A"|"B"|"C" (Ausdauersport-Konvention: A = Hauptrennen, B/C = Nebenziele)
+      strategyNote: null, // Freitext, z.B. Pacing-/Verpflegungsstrategie
+      courseElevationM: null, // Höhenmeter der Strecke, manuell ODER aus GPX
+      courseProfileSource: null, // "manual"|"gpx" - nur zur Anzeige, welche Quelle
+      courseProfileLabel: null, // z.B. "1240 Hm über 92 km (13 Hm/km, hügelig)" - nur bei GPX-Quelle gesetzt (gpxProfileLabel())
+      racePlan: null, // Rennplan-Checklisten (js/analytics/race-plan.js) - null = Standard-Listen, bis etwas geändert wird
+    });
+  }
+  saveGoals();
+  // Formular zurücksetzen und die Kachel wieder einklappen (siehe coach.js:
+  // "+ Neues Ziel/Event"-Toggle).
+  resetGoalForm();
+  showGoalFormCard(false);
   renderGoals();
   // Das neu angelegte Ziel kann automatisch zum Hauptevent werden (erstes
   // Ziel überhaupt, s.o.) - Trainingsplan-Kachel (inkl. Zeitleiste) und
@@ -82,7 +65,6 @@ function addGoal(e) {
   renderTrainingPlanCard();
   if (typeof renderNutrition === "function") renderNutrition();
 }
-
 
 function deleteGoal(id) {
   const gone = goals.find(g => g.id === id);

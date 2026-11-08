@@ -59,7 +59,8 @@ function planStructureApply(list, o) {
   const mutable = new Set(o.mutableIds || []);
   const start = o.from > o.todayKey ? o.from : o.todayKey;
   const raceDay = o.goal && o.goal.date ? o.goal.date : null;
-  const goalSports = (o.goal && PLAN_GOAL_SPORTS[o.goal.sport]) || ["Schwimmen", "Rad", "Laufen"];
+  const ownSports = o.goal ? goalRaceSports(o.goal) : [];
+  const goalSports = ownSports.length ? ownSports : ["Schwimmen", "Rad", "Laufen"];
   let cur = (list || []).map(p => ({ ...p }));
   const changes = [];
 

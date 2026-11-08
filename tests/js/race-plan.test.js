@@ -15,7 +15,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const ROOT = path.join(__dirname, "..", "..");
-const SCRIPTS = ["js/utils/dates.js", "js/utils/formatting.js", "js/analytics/nutrition.js", "js/analytics/race-plan.js"];
+const SCRIPTS = ["js/data/race-formats.js", "js/utils/dates.js", "js/utils/formatting.js", "js/analytics/nutrition.js", "js/analytics/race-plan.js"];
 
 const app = vm.createContext({});
 SCRIPTS.forEach(f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), "utf8"), app, { filename: f }));

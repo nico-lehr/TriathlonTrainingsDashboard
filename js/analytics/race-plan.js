@@ -24,7 +24,19 @@ const RACE_PACING_LEGS = {
   bike: { label: "Rad", sport: "Rad" },
   run: { label: "Laufen", sport: "Laufen" },
 };
-const RACE_PACING_KEY_BY_SPORT = { Schwimmen: "swim", Rad: "bike", Laufen: "run" };
+
+// Staffel: Übergabe statt kompletter Wechselzone, Ausrüstung nur für die
+// eigenen Teilstrecken (goalOwnLegKeys, js/data/race-formats.js).
+const RACE_RELAY_TRANSITION = {
+  common: [
+    "Übergabe mit dem Team absprechen (Zeitmess-Chip bzw. Band)",
+    "Treffpunkt in der Wechselzone vereinbaren",
+    "Ungefähr ausrechnen, wann du dran bist",
+  ],
+  swim: ["Neoprenanzug, Schwimmbrille, Badekappe"],
+  bike: ["Rad: Reifendruck prüfen, leichten Gang für den Start einlegen", "Helm, Radschuhe und Sonnenbrille am Platz"],
+  run: ["Laufschuhe, Startnummernband und Kappe am Platz"],
+};
 
 const RACE_PLAN_DEFAULTS = {
   transitionTriathlon: [
@@ -50,7 +62,7 @@ const RACE_PLAN_DEFAULTS = {
     [-3, "Ausrüstung komplett durchchecken"],
     [-2, "Anreise und Startzeit prüfen"],
     [-1, "Startunterlagen abholen"],
-    [-1, "Rad und Wechselbeutel einchecken", "Triathlon"],
+    [-1, "Rad und Wechselbeutel einchecken", "Triathlon", "bike"], // nur wer selbst Rad fährt (Staffel)
     [-1, "Wettkampfbesprechung", "Triathlon"],
     [0, "Rechtzeitig am Start sein (Zeitplan prüfen)"],
   ],
@@ -58,16 +70,21 @@ const RACE_PLAN_DEFAULTS = {
 
 // Überschrift der ersten Checkliste: beim Triathlon die Wechselzone, sonst die Ausrüstung.
 function raceTransitionTitle(goal) {
+  if (goalIsRelay(goal)) return "Staffel-Übergabe";
   return goal && goal.sport === "Triathlon" ? "Wechselzone" : "Ausrüstung";
 }
 
 function defaultRacePlan(goal) {
   const tri = !!goal && goal.sport === "Triathlon";
   const item = text => ({ text, done: false });
+  const transition = goalIsRelay(goal)
+    ? [...RACE_RELAY_TRANSITION.common, ...goalOwnLegKeys(goal).flatMap(k => RACE_RELAY_TRANSITION[k])]
+    : (tri ? RACE_PLAN_DEFAULTS.transitionTriathlon : RACE_PLAN_DEFAULTS.transitionOther);
   return {
-    transition: (tri ? RACE_PLAN_DEFAULTS.transitionTriathlon : RACE_PLAN_DEFAULTS.transitionOther).map(item),
+    transition: transition.map(item),
     nutrition: RACE_PLAN_DEFAULTS.nutrition.map(item),
-    raceWeek: RACE_PLAN_DEFAULTS.raceWeek.filter(([, , onlyFor]) => !onlyFor || (goal && goal.sport === onlyFor))
+    raceWeek: RACE_PLAN_DEFAULTS.raceWeek
+      .filter(([, , onlyFor, leg]) => (!onlyFor || (goal && goal.sport === onlyFor)) && (!leg || goalOwnLegKeys(goal).includes(leg)))
       .map(([dayOffset, text]) => ({ text, done: false, dayOffset })),
   };
 }
@@ -79,19 +96,14 @@ function racePlanOf(goal) {
 }
 
 // Gleichmäßiges Tempo je Disziplin. Triathlon: Schwimmen/Rad/Laufen aus den
-// Unterdisziplinen, sonst eine Zeile aus Distanz + Zielzeit des Ziels.
+// Unterdisziplinen (bei der Staffel nur die eigenen), sonst eine Zeile aus
+// Distanz + Zielzeit des Ziels.
 // Je Disziplin: { key, label, sport, distanceKm, seconds, value, text, missing }
 //   value: Schwimmen s je 100 m, Rad km/h, Laufen s je km (null, wenn etwas fehlt)
 //   missing: was fehlt, z.B. ["Distanz fehlt", "Zielzeit fehlt"]
 function computeRacePacing(goal) {
   if (!goal) return [];
-  const legs = goal.sport === "Triathlon"
-    ? Object.keys(RACE_PACING_LEGS).map(key => {
-      const sub = (Array.isArray(goal.subDisciplines) ? goal.subDisciplines : []).find(s => s && s.key === key) || {};
-      return { key, distanceKm: sub.distanceKm, targetTime: sub.targetTime };
-    })
-    : RACE_PACING_KEY_BY_SPORT[goal.sport] ? [{ key: RACE_PACING_KEY_BY_SPORT[goal.sport], distanceKm: goal.distanceKm, targetTime: goal.targetTime }] : [];
-  return legs.map(racePacingLeg);
+  return goalLegs(goal).filter(l => l.mine).map(racePacingLeg);
 }
 
 function racePacingLeg({ key, distanceKm, targetTime }) {

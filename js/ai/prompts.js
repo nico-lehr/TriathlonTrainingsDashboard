@@ -328,7 +328,8 @@ function buildDailyCheckContext(goal, candidates, signals, guardEntry) {
   if (goal) {
     const days = goal.date ? Math.round((new Date(goal.date + "T00:00:00") - new Date(todayKey + "T00:00:00")) / 86400000) : null;
     const phase = goal.date && typeof getPhase === "function" ? getPhase(now, goal) : null;
-    lines.push(`Ziel: ${goal.name}${goal.sport ? ` (${goal.sport})` : ""}${goal.date ? `, am ${goal.date}, in ${days} Tagen` : ""}${phase && PERIOD_PHASES[phase] ? `, Phase ${PERIOD_PHASES[phase].label}` : ""}`);
+    const raceBits = typeof goalRaceBits === "function" ? goalRaceBits(goal) : [];
+    lines.push(`Ziel: ${goal.name}${goal.sport ? ` (${[goal.sport, ...raceBits].join(", ")})` : ""}${goal.date ? `, am ${goal.date}, in ${days} Tagen` : ""}${phase && PERIOD_PHASES[phase] ? `, Phase ${PERIOD_PHASES[phase].label}` : ""}`);
     const targets = goal.date ? getWeeklyTargets(goal, plannedWorkouts, DATA) : null;
     const wk = targets && targets.weeks[0];
     if (wk) lines.push(`Diese Woche (Mo-So): ${PERIOD_WEEK_LABELS[wk.type] || wk.type}${wk.targetMin != null ? `, Zielumfang ${wk.targetMin} min` : ""}, absolviert ${wk.doneMin} min, noch geplant ${wk.plannedMin} min`);
