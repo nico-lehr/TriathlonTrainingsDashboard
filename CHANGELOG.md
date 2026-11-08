@@ -4,6 +4,10 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.36
+
+- **KI-Modell je Aufgabe:** Unter Einstellungen → KI-Coach kann der Betreiber jetzt neben dem Standard-Modell für jede Aufgabe ein eigenes Modell wählen: Trainingsplan (inkl. täglichem Plan-Check), Analysen (Auswertung von Einheiten, Lessons Learned, Belastung, Leistungszustand), Coach & Morgenbericht sowie Mobility. Beispiel: Pläne mit Opus, Analysen mit Sonnet. Die Wahl liegt auf dem Server und gilt für alle, die den Schlüssel des Betreibers nutzen. „Wie Standard“ übernimmt automatisch das Standard-Modell.
+
 ## 2.4.35
 
 - **KI-Auswertung einer Einheit kennt jetzt die Reihenfolge:** Verglichen wird nur noch mit Einheiten, die VOR der ausgewerteten Einheit lagen. Was du danach trainiert hast (z. B. ein CSS-Test am Tag darauf), bekommt die KI getrennt als „seitdem gemacht“ – inklusive deiner Notizen. So empfiehlt sie keinen Test mehr, den du schon gemacht hast.

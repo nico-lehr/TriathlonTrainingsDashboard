@@ -30,6 +30,18 @@ DEFAULT_MODEL = "claude-opus-5-5"
 FALLBACK_MODELS = {"claude-opus-5-5", "claude-sonnet-5-5"}
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
+# Modell je Aufgabe: Der Betreiber kann z. B. Plaene mit Opus und Analysen
+# mit Sonnet erstellen lassen. Gilt fuer alle, die den Schluessel nutzen.
+# Ohne eigene Wahl gilt das Standard-Modell ("model").
+TASK_GROUPS = [
+    ("plan", "Trainingsplan", "Plan erstellen und ändern, täglicher Plan-Check", {"plan", "dailycheck"}),
+    ("analysis", "Analysen", "Auswertung einzelner Einheiten, Lessons Learned, Belastung, Leistungszustand",
+     {"analysis", "lessons", "focus", "perfSummary"}),
+    ("coach", "Coach & Morgenbericht", "Empfehlungen zum Ziel und der Satz im Morgenbericht", {"recommendation", "morning", ""}),
+    ("mobility", "Mobility", "Mobility-Einheiten zusammenstellen", {"mobility"}),
+]
+TASK_GROUP_OF = {task: gid for gid, _, _, tasks in TASK_GROUPS for task in tasks}
+
 KEY_MIN_LEN, KEY_MAX_LEN = 20, 300
 PROMPT_MAX_CHARS = 120_000
 # Obergrenze der Antwort je Aufgabe. Denken zaehlt bei den aktuellen Modellen
@@ -92,10 +104,24 @@ def sdk_available():
         return False
 
 
+def _task_models(data):
+    raw = data.get("task_models") if isinstance(data.get("task_models"), dict) else {}
+    return {g: m for g, m in raw.items() if g in TASK_GROUP_OF.values() and m in MODELS}
+
+
+def model_for(data, task):
+    """Modell fuer eine Aufgabe: eigene Wahl der Gruppe, sonst Standard."""
+    own = _task_models(data).get(TASK_GROUP_OF.get(task or ""))
+    if own:
+        return own
+    return data.get("model") if data.get("model") in MODELS else DEFAULT_MODEL
+
+
 def settings():
     data = _read()
     model = data.get("model") if data.get("model") in MODELS else DEFAULT_MODEL
-    return {"configured": bool(data.get("key")), "model": model, "shared": bool(data.get("shared"))}
+    return {"configured": bool(data.get("key")), "model": model, "shared": bool(data.get("shared")),
+            "task_models": _task_models(data)}
 
 
 def status(admin):
@@ -106,17 +132,32 @@ def status(admin):
         "available": st["configured"] and (admin or st["shared"]) and sdk_available(),
         "sdk": sdk_available(),
         "models": [{"id": k, "label": v} for k, v in MODELS.items()],
+        "task_groups": [{"id": gid, "label": label, "hint": hint} for gid, label, hint, _ in TASK_GROUPS],
     }
 
 
-def save(key=None, model=None, shared=None):
-    """Aenderungen uebernehmen. Ein neuer Schluessel wird vorher geprueft."""
+def save(key=None, model=None, shared=None, task_models=None):
+    """Aenderungen uebernehmen. Ein neuer Schluessel wird vorher geprueft.
+    task_models: {gruppe: modell} - "" setzt die Gruppe auf das Standard-Modell zurueck."""
     with _lock:
         data = _read()
         if model is not None:
             if model not in MODELS:
                 raise ValueError("Unbekanntes Modell.")
             data["model"] = model
+        if task_models is not None:
+            groups = set(TASK_GROUP_OF.values())
+            current = _task_models(data)
+            for gid, m in task_models.items():
+                if gid not in groups:
+                    raise ValueError("Unbekannte Aufgabe.")
+                if m in (None, ""):
+                    current.pop(gid, None)
+                elif m in MODELS:
+                    current[gid] = m
+                else:
+                    raise ValueError("Unbekanntes Modell.")
+            data["task_models"] = current
         if shared is not None:
             data["shared"] = bool(shared)
         if key is not None:
@@ -185,7 +226,7 @@ def chat(prompt, task="", schema=None, usage_out=None):
     key = data.get("key")
     if not key:
         raise ClaudeError("Für den KI-Coach ist noch kein Schlüssel hinterlegt.", "claude_not_configured", 409)
-    model = data.get("model") if data.get("model") in MODELS else DEFAULT_MODEL
+    model = model_for(data, task)
     anthropic, client = _client(key)
     output_config = {"effort": EFFORT.get(task, EFFORT_DEFAULT)}
     if schema:

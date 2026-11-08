@@ -62,7 +62,7 @@ def ai_models():
 
 # ------------------------------------------------------------ Claude API
 # GET    /api/v1/ai/claude        Stand (Schluessel da? Modell? freigegeben? darf ich?)
-# PUT    /api/v1/ai/claude        {key?, model?, shared?} - nur Betreiber; neuer Schluessel wird geprueft
+# PUT    /api/v1/ai/claude        {key?, model?, shared?, task_models?} - nur Betreiber; neuer Schluessel wird geprueft
 # DELETE /api/v1/ai/claude        Schluessel entfernen - nur Betreiber
 # POST   /api/v1/ai/claude/chat   {prompt, task?, schema?} -> {response}
 # Logik und Ablage in claude_api.py; der Schluessel verlaesst den Server nie.
@@ -101,10 +101,11 @@ def put_claude():
     key = data.get("key") if data.get("key") not in (None, "") else None
     model = data.get("model") if data.get("model") not in (None, "") else None
     shared = data.get("shared") if isinstance(data.get("shared"), bool) else None
-    if key is None and model is None and shared is None:
+    task_models = data.get("task_models") if isinstance(data.get("task_models"), dict) else None
+    if key is None and model is None and shared is None and task_models is None:
         return response_error("Nichts zu speichern.", "VALIDATION_ERROR", 400)
     try:
-        claude_api.save(key=key, model=model, shared=shared)
+        claude_api.save(key=key, model=model, shared=shared, task_models=task_models)
     except ValueError as e:
         return response_error(str(e), "VALIDATION_ERROR", 400)
     except claude_api.ClaudeError as e:

@@ -18,6 +18,8 @@ function initAiSettings() {
   const manage = document.getElementById("claude-manage");
   const changeBtn = document.getElementById("claude-change-btn");
   const cancelBtn = document.getElementById("claude-cancel-btn");
+  const taskBox = document.getElementById("claude-task-box");
+  const taskList = document.getElementById("claude-task-models");
   let changing = false; // Schlüssel-Feld nur ohne Schlüssel oder nach "Schlüssel ändern"
   let last = null;
   if (!keyRow || !keyActions || !keyHint || !manage || !changeBtn || !cancelBtn) return;
@@ -44,7 +46,8 @@ function initAiSettings() {
       return;
     }
     if (st.available) {
-      text.textContent = `Claude ist verbunden · ${modelLabel(st)}`;
+      const perTask = Object.keys(st.task_models || {}).length;
+      text.textContent = `Claude ist verbunden · ${modelLabel(st)}${perTask ? ` · für ${perTask === 1 ? "eine Aufgabe" : perTask + " Aufgaben"} ein eigenes Modell` : ""}`;
       dot.classList.add("on");
     } else if (!st.sdk) {
       text.textContent = "Auf dem Server fehlt das Claude-Paket – bitte „pip install -r backend/requirements.txt“ ausführen.";
@@ -73,6 +76,32 @@ function initAiSettings() {
     manage.hidden = edit;
     cancelBtn.hidden = !st.configured;
     modelSelect.disabled = sharedInput.disabled = !st.configured;
+    renderTaskModels(st);
+  }
+
+  // Modell je Aufgabe (Plan, Analysen, ...): "Wie Standard" oder ein eigenes.
+  function renderTaskModels(st) {
+    if (!taskBox || !taskList) return;
+    const groups = st.task_groups || [];
+    taskBox.hidden = !st.configured || !groups.length;
+    if (taskBox.hidden) return;
+    const short = id => { const m = (st.models || []).find(x => x.id === id); return m ? m.label.split(" – ")[0].replace(/^Claude /, "") : id; };
+    const std = short(st.model);
+    const own = st.task_models || {};
+    taskList.innerHTML = groups.map(g => `
+      <div class="settings-list-row claude-task-row">
+        <label for="claude-task-${g.id}"><span>${escapeHtml(g.label)}</span><small>${escapeHtml(g.hint)}</small></label>
+        <select id="claude-task-${g.id}" class="coach-input" data-task-group="${g.id}">
+          <option value="">Wie Standard (${escapeHtml(std)})</option>
+          ${(st.models || []).map(m => `<option value="${m.id}"${own[g.id] === m.id ? " selected" : ""}>${escapeHtml(short(m.id))}</option>`).join("")}
+        </select>
+      </div>`).join("");
+    taskList.querySelectorAll("select[data-task-group]").forEach(sel => sel.addEventListener("change", async () => {
+      const g = groups.find(x => x.id === sel.dataset.taskGroup);
+      if (await put({ task_models: { [sel.dataset.taskGroup]: sel.value } }, "Speichere …")) {
+        setStatus(`${g ? g.label : "Aufgabe"}: ${sel.value ? "eigenes Modell gespeichert" : "wieder wie Standard"}.`, "ok");
+      }
+    }));
   }
 
   async function put(body, busyText) {

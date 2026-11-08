@@ -184,6 +184,30 @@ class ClaudeTest(unittest.TestCase):
         self.assertEqual(kw["model"], "claude-haiku-5-5")
         self.assertEqual(kw["output_config"], {"effort": "low"})
 
+    def test_modell_je_aufgabe_gilt_fuer_alle(self):
+        self.put(self.admin, key=KEY, shared=True)
+        r = self.put(self.admin, task_models={"analysis": "claude-sonnet-5-5", "coach": "claude-haiku-5-5"})
+        self.assertEqual(r.status_code, 200, r.get_json())
+        self.assertEqual(r.get_json()["data"]["task_models"], {"analysis": "claude-sonnet-5-5", "coach": "claude-haiku-5-5"})
+        self.assertEqual([g["id"] for g in r.get_json()["data"]["task_groups"]], ["plan", "analysis", "coach", "mobility"])
+
+        def model(headers, task):
+            self.client.post("/api/v1/ai/claude/chat", headers=headers, json={"prompt": "x", "task": task})
+            return FakeClient.calls[-1][1]["model"]
+        self.assertEqual(model(self.friend, "plan"), "claude-opus-5-5")  # ohne eigene Wahl: Standard
+        self.assertEqual(model(self.friend, "analysis"), "claude-sonnet-5-5")
+        self.assertEqual(model(self.friend, "lessons"), "claude-sonnet-5-5")
+        self.assertEqual(model(self.admin, "morning"), "claude-haiku-5-5")
+        self.assertEqual(model(self.admin, ""), "claude-haiku-5-5")
+        # "" setzt auf den Standard zurück, der Standard selbst bleibt wählbar
+        self.put(self.admin, task_models={"analysis": ""}, model="claude-sonnet-5-5")
+        self.assertEqual(model(self.admin, "analysis"), "claude-sonnet-5-5")
+        self.assertEqual(model(self.admin, "plan"), "claude-sonnet-5-5")
+        # nur der Betreiber, nur bekannte Gruppen und Modelle
+        self.assertEqual(self.put(self.friend, task_models={"plan": "claude-haiku-5-5"}).status_code, 403)
+        self.assertEqual(self.put(self.admin, task_models={"plan": "gpt-4"}).status_code, 400)
+        self.assertEqual(self.put(self.admin, task_models={"egal": "claude-haiku-5-5"}).status_code, 400)
+
     def test_unbekanntes_modell_400(self):
         self.put(self.admin, key=KEY)
         self.assertEqual(self.put(self.admin, model="gpt-4").status_code, 400)

@@ -835,7 +835,7 @@
               <input type="password" id="claude-api-key" class="coach-input" autocomplete="off" spellcheck="false" placeholder="sk-ant-…">
             </div>
             <div class="settings-list-row">
-              <label for="claude-model">Modell</label>
+              <label for="claude-model">Standard-Modell</label>
               <select id="claude-model" class="coach-input"></select>
             </div>
             <div class="settings-list-row">
@@ -844,6 +844,11 @@
             </div>
           </div>
           <p class="card-sub settings-list-foot">Freigegeben zahlen Anfragen deiner Freunde über dein Guthaben.</p>
+          <div id="claude-task-box" hidden>
+            <h4 class="claude-task-head">Modell je Aufgabe</h4>
+            <p class="card-sub claude-task-sub">Gilt für alle, die deinen Schlüssel nutzen. Größere Modelle denken gründlicher, kosten aber mehr.</p>
+            <div class="settings-list" id="claude-task-models"></div>
+          </div>
           <div class="coach-settings-row" id="claude-key-actions">
             <button type="button" class="update-btn" id="claude-save-btn">Speichern</button>
             <button type="button" class="reset-link" id="claude-cancel-btn" hidden>Abbrechen</button>
