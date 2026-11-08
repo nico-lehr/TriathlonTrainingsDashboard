@@ -4,3 +4,4 @@ SQLAlchemy>=2.0.36,<2.1  # 2.0.21 startet unter Python 3.13+ nicht
 python-dotenv==1.0.0
 waitress==3.0.2
 anthropic>=2.6,<3  # Claude API (Einstellungen -> KI); optional - ohne Paket bleibt nur Ollama
+cryptography>=41  # Mitteilungen aufs Handy (Web Push, backend/web_push.py); optional

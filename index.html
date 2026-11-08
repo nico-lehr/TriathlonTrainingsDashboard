@@ -803,6 +803,24 @@
         <div id="gp-body"><p class="card-sub">Lade …</p></div>
       </div>
 
+      <div class="card full" id="push-card" data-sp="mitteilungen">
+        <h2>Mitteilungen</h2>
+        <h3 class="sh-sec">Morgenbericht aufs Handy</h3>
+        <p class="card-sub">Morgens eine kurze Mitteilung, sobald die Daten deiner Nacht von Garmin da sind: Schlaf, HRV, Ruhepuls und dein Training für heute. Tippst du darauf, öffnet sich der Bericht mit der Einschätzung deines Coaches.</p>
+        <p class="coach-test-status" id="push-status"></p>
+        <ol class="push-ios-hint" id="push-ios-hint" hidden>
+          <li>Öffne das Dashboard in <b>Safari</b>.</li>
+          <li>Tippe unten auf <b>Teilen</b> (Quadrat mit Pfeil) → <b>„Zum Home-Bildschirm“</b>.</li>
+          <li>Öffne das Dashboard über das neue Symbol und komm hierher zurück.</li>
+        </ol>
+        <div class="sh-actions">
+          <button type="button" class="update-btn" id="push-enable-btn" hidden>Mitteilungen erlauben</button>
+          <button type="button" class="cal-today-btn" id="push-test-btn" hidden>Probe senden</button>
+          <button type="button" class="reset-link" id="push-disable-btn" hidden>Auf diesem Gerät ausschalten</button>
+        </div>
+        <label class="push-row" id="push-morning-row" hidden><span><b>Morgenbericht</b><small>Kommt nach dem Garmin-Abruf um 5:45 Uhr – fehlt die Nacht da noch, um 8 Uhr. Höchstens einmal am Tag, nicht, wenn du ihn schon im Dashboard gesehen hast.</small></span><input type="checkbox" class="switch" id="push-morning-enabled"></label>
+      </div>
+
       <div class="card full" id="ai-settings-card" data-sp="ki">
         <h2>KI-Coach</h2>
         <p class="card-sub">Claude erstellt Trainingspläne, Mobility-Einheiten und Auswertungen – abgestimmt auf dein Trainingsprofil.</p>
@@ -1159,6 +1177,7 @@
 <script src="js/data/workout-notes.js"></script>
 <script src="js/data/goals.js"></script>
 <script src="js/data/garmin-events.js"></script>
+<script src="js/data/web-push.js"></script>
 <script src="js/data/gpx-parser.js"></script>
 <script src="js/data/athlete.js"></script>
 <script src="js/data/weather.js"></script>
@@ -1214,6 +1233,7 @@
 <script src="js/components/race-plan.js"></script>
 <script src="js/components/risk-adjust.js"></script>
 <script src="js/components/plan-check.js"></script>
+<script src="js/components/morning-report.js"></script>
 <script src="js/components/ollama-setup.js"></script>
 <script src="js/components/nutrition.js"></script>
 <script src="js/components/achievements.js"></script>

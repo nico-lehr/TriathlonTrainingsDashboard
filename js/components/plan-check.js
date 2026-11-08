@@ -290,6 +290,8 @@ async function runPlanCheck({ force = false } = {}) {
     return null;
   } finally {
     planCheckRunning = false;
+    // Morgenbericht erst nach dem Plan-Check schreiben: er soll den fertigen Plan kennen
+    if (typeof ensureMorningText === "function") ensureMorningText();
   }
 }
 

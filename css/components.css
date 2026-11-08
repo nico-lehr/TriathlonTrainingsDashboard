@@ -2716,3 +2716,10 @@ body.m-graphit .settings-page-head, body.m-graphit .sh-back { display: none; }
 
 /* Ziel aus dem Garmin-Kalender (js/data/garmin-events.js) */
 .goal-garmin-badge { font-size: 10.5px; font-weight: 600; letter-spacing: .02em; padding: 1px 6px; border-radius: 6px; color: var(--text-secondary); border: 1px solid var(--border, rgba(127,127,127,.35)); }
+
+/* Einstellungen → Mitteilungen (js/data/web-push.js) */
+#view-settings .push-ios-hint { margin: 8px 0 4px; padding-left: 20px; font-size: 14px; line-height: 1.6; color: var(--text-secondary); }
+#view-settings .push-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 16px; padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent); cursor: pointer; }
+#view-settings .push-row span { display: flex; flex-direction: column; gap: 3px; }
+#view-settings .push-row small { font-size: 12.5px; line-height: 1.45; color: var(--text-secondary); }

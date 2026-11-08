@@ -705,3 +705,19 @@ body.m-graphit #modal-overlay .modal-stats .st { background: var(--m-surface); b
 @media (prefers-reduced-motion: reduce) { .m-pc-status i.run { animation: none; } }
 .m-pc-new { font-style: normal; font-size: 11px; font-weight: 600; letter-spacing: .02em; padding: 1px 6px; margin-right: 6px; border-radius: 6px; vertical-align: 1px;
   color: var(--m-accent); background: color-mix(in srgb, var(--m-accent) 15%, transparent); }
+
+/* Morgenbericht (js/components/morning-report.js) */
+.m-morning .m-head { align-items: baseline; }
+.m-mr-date { font-size: 13px; color: var(--m-muted); }
+.m-mr-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 8px; margin: 4px 0 12px; }
+.m-mr-tile { display: flex; flex-direction: column; gap: 1px; padding: 10px 10px 9px; border-radius: 14px;
+  background: color-mix(in srgb, var(--m-text) 5%, transparent); }
+.m-mr-tile small { font-size: 12px; color: var(--m-muted); }
+.m-mr-tile b { font-size: 19px; font-weight: 650; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.m-mr-tile b i { font-style: normal; font-size: 13px; font-weight: 550; margin-left: 3px; color: var(--m-muted); }
+.m-mr-tile span { font-size: 12px; color: var(--m-muted); }
+.m-mr-tile.good span { color: var(--m-good); }
+.m-mr-tile.bad { background: color-mix(in srgb, var(--m-bad) 12%, transparent); }
+.m-mr-tile.bad span { color: var(--m-bad); }
+.m-mr-wait { color: var(--m-muted); animation: m-mr-pulse 1.4s ease-in-out infinite; }
+@keyframes m-mr-pulse { 50% { opacity: 0.45; } }

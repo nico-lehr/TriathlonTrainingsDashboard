@@ -12,7 +12,7 @@ from .config import config
 frontend_bp = Blueprint("frontend", __name__)
 
 # Einzelne Dateien im Projektordner, die der Browser laden darf.
-PUBLIC_FILES = {"index.html", "login.html", "manifest.json"}
+PUBLIC_FILES = {"index.html", "login.html", "manifest.json", "sw.js"}  # sw.js: Mitteilungen (Web Push)
 # Ordner, deren Inhalt komplett oeffentlich ist (reiner Programmcode/Design).
 PUBLIC_DIRS = {"css", "js", "icons"}
 

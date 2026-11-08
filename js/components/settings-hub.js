@@ -14,6 +14,7 @@ const SH_ICONS = {
   kalender: ["#f08a5d", '<rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/>'],
   wetter: ["#f2c14e", '<circle cx="12" cy="12" r="3.8"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M5.6 18.4l1.6-1.6M16.8 7.2l1.6-1.6"/>'],
   equipment: ["#c9a0ff", '<path d="M4 15.5c3 0 4-1.5 5.5-4l1.5 1.5c1.5-.5 3-.5 4.5.5L20 16v2.5H4z"/>'],
+  mitteilungen: ["#f2705e", '<path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 2h-14z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>'],
   updates: ["#6f9cf0", '<path d="M12 4v10M7.5 10 12 14.5 16.5 10M5 19.5h14"/>'],
   einladen: ["#f2705e", '<circle cx="9.5" cy="9" r="3"/><path d="M4 18.5c.9-2.7 3-4 5.5-4s4.6 1.3 5.5 4M17.5 8v6M14.5 11h6"/>'],
   statistik: ["#4fd18b", '<path d="M5 19.5V12M10 19.5V7M15 19.5v-5M20 19.5V4.5"/>'],
@@ -26,6 +27,7 @@ const SH_PANELS = {
   ki: ["KI-Coach", "Claude erstellt Pläne, Mobility und Auswertungen."],
   kalender: ["Kalender & Wetter", ""],
   equipment: ["Equipment", "Kilometer von Schuhen und Rad, automatisch gezählt."],
+  mitteilungen: ["Mitteilungen", ""],
   updates: ["Programm-Updates", ""],
   einladen: ["Freunde einladen", ""],
 };
@@ -63,6 +65,11 @@ function shStatus(id) {
     case "equipment": {
       const n = typeof equipmentItems !== "undefined" ? equipmentItems.filter(e => !e.retired).length : 0;
       return n ? `${n} ${n === 1 ? "Teil" : "Teile"}` : "Keins";
+    }
+    case "mitteilungen": {
+      if (typeof webPush === "undefined" || !webPush.loaded) return "…";
+      if (webPush.thisDevice) return { text: webPush.morning.enabled ? "Morgenbericht an" : "An", ok: true };
+      return webPush.devices ? "Anderes Gerät" : "Aus";
     }
     case "updates": {
       const v = document.getElementById("app-update-version");
@@ -109,6 +116,7 @@ function renderSettingsHub() {
       ${shRow("kalender", "Kalender & Wetter")}
     </div></div>
     <div class="sh-group"><h3>App</h3><div class="sh-list">
+      ${shRow("mitteilungen", "Mitteilungen")}
       ${shRow("updates", "Programm-Updates")}
       ${invite && !invite.hidden ? shRow("einladen", "Freunde einladen") : ""}
       ${isAdmin && typeof mShow === "function" ? shRow("statistik", "Admin · Statistik") : ""}

@@ -451,3 +451,37 @@ class GarminPushState(Base):
     last_run_at = Column(DateTime)
     last_result = Column(JSON)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class PushSubscription(Base):
+    """Ein Geraet, das Mitteilungen bekommen darf (Web Push, z. B. iPhone mit
+    dem Dashboard auf dem Home-Bildschirm). endpoint/p256dh/auth liefert der
+    Browser beim Erlauben; sie sind kein Passwort, aber nur fuer dieses Geraet.
+    Wird ein Abo bei Apple/Google ungueltig (404/410), entfaellt die Zeile.
+    """
+    __tablename__ = "push_subscriptions"
+
+    id = Column(Integer, primary_key=True)
+    athlete_id = Column(Integer, nullable=False, index=True)
+    endpoint = Column(Text, nullable=False, unique=True)
+    p256dh = Column(String(200), nullable=False)
+    auth = Column(String(64), nullable=False)
+    label = Column(String(80))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_ok_at = Column(DateTime)
+    fail_count = Column(Integer, nullable=False, default=0)
+
+
+class MorningState(Base):
+    """Morgenbericht je Person (backend/morning.py): an/aus und was heute
+    schon passiert ist - damit die Mitteilung hoechstens einmal am Tag kommt.
+    Tage als "YYYY-MM-DD"."""
+    __tablename__ = "morning_state"
+
+    athlete_id = Column(Integer, primary_key=True)
+    enabled = Column(Boolean, nullable=False, default=True)
+    sent_day = Column(String(10))        # Mitteilung verschickt
+    seen_day = Column(String(10))        # Bericht im Dashboard schon angesehen
+    late_sync_day = Column(String(10))   # zweiter Garmin-Abruf (8 Uhr) gestartet
+    last_result = Column(JSON)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

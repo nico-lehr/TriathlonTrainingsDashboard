@@ -70,6 +70,9 @@ if __name__ == "__main__":
     from backend import updater
     if os.getenv("UPDATE_CHECK", "1") != "0":
         updater.start_background_check()  # einmal am Tag bei GitHub nach einer neuen Version fragen
+    if os.getenv("MORNING_PUSH", "1") != "0":
+        from backend import morning
+        morning.start_background_loop()  # Morgenbericht aufs Handy, sobald die Nacht da ist
 
     print("\n" + "=" * 60)
     print(f"Triathlon-Dashboard laeuft (Version {updater.current_version()})")

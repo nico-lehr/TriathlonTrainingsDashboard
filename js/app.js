@@ -116,6 +116,8 @@ function checkAutoReplan() {
   if (typeof initGarminEvents === "function") initGarminEvents();
   if (typeof syncGarminEvents === "function") syncGarminEvents().catch(() => {});
   if (typeof initPlanCheck === "function") initPlanCheck();
+  if (typeof initWebPush === "function") initWebPush();
+  if (typeof initMorningReport === "function") initMorningReport();
   else checkTrainingRiskAdjustment();
 })();
 

@@ -327,7 +327,8 @@ function mRenderHeute() {
   const nextCard = upcoming.length ? `<section class="m-card m-desk-only"><div class="m-head"><h2>Als Nächstes</h2><button type="button" class="m-link" data-m-page="kalender">Kalender</button></div><div class="m-list">${upcoming.map(p => `<button type="button" class="m-row" data-m-act="plan" data-id="${mEsc(p.id)}">${mIcon(p.sport)}<span class="m-grow"><span class="m-row-title">${mEsc(p.title || p.sport)}</span><span class="m-row-meta">${new Date(p.date + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" })}${p.duration_min ? ` · ${mDur(p.duration_min)}` : ""}</span></span>${p.intensity ? `<span class="m-tag plan">${mEsc(p.intensity)}</span>` : ""}</button>`).join("")}</div></section>` : "";
 
   return mHeaderHtml(now.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" }), "Heute", mSyncPill())
-    + mCols3(`<section class="m-card m-hero" aria-label="Dein Zustand heute">${rings}</section>`
+    + mCols3((typeof morningCardHtml === "function" ? morningCardHtml(mEsc) : "")
+    + `<section class="m-card m-hero" aria-label="Dein Zustand heute">${rings}</section>`
     + mGarminEventsCard()
     + mPlanCheckCard()
     + `<section class="m-card"><div class="m-head"><h2>Heute geplant</h2><button type="button" class="m-link" data-m-page="coach">Plan</button></div>${todayCard}</section>`
@@ -809,6 +810,9 @@ async function mAction(btn) {
     } catch (e) {
       mState.coachNote = { error: typeof describeAiError === "function" && !/Ziel|Schreib|Trainingsregeln/.test(e.message || "") ? describeAiError(e) : (e.message || String(e)) };
     }
+    renderMApp();
+  } else if (act === "mr-ok") {
+    if (typeof dismissMorningReport === "function") dismissMorningReport();
     renderMApp();
   } else if (act === "ge-ok") {
     if (typeof dismissGarminEventsNotice === "function") dismissGarminEventsNotice();

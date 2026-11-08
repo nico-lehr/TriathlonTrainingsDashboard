@@ -37,7 +37,7 @@ if ! .venv/bin/python -m pip install -q -r backend/requirements.txt; then
   # Claude-Paket (anthropic) braucht Bausteine, die es auf alten 32-Bit-
   # Systemen evtl. nicht gibt - das Dashboard laeuft trotzdem, nur ohne Claude.
   echo "Hinweis: nicht alle Bibliotheken liessen sich installieren - ohne Claude-Paket noch einmal."
-  .venv/bin/python -m pip install -q -r <(grep -v '^anthropic' backend/requirements.txt)
+  .venv/bin/python -m pip install -q -r <(grep -vE '^(anthropic|cryptography)' backend/requirements.txt)
   echo "Hinweis: Claude (KI-Coach) geht so nicht. Abhilfe: Raspberry Pi OS (64-bit) verwenden."
 fi
 if [ "$(getconf LONG_BIT)" != "64" ]; then

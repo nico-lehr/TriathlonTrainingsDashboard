@@ -355,9 +355,10 @@ def pip_install(root):
         proc = subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", str(req)],
                               capture_output=True, text=True, timeout=900)
         if proc.returncode != 0 and req.name == "requirements.txt" and req.parent.name == "backend":
-            # Das Claude-Paket ist optional (auf alten 32-Bit-Systemen nicht
-            # installierbar) - ohne es noch einmal, statt das Update zu blockieren.
-            lines = [l for l in req.read_text(encoding="utf-8").splitlines() if not l.strip().lower().startswith("anthropic")]
+            # Das Claude-Paket und cryptography (Mitteilungen) sind optional (auf
+            # alten 32-Bit-Systemen evtl. nicht installierbar) - ohne sie noch
+            # einmal, statt das Update zu blockieren.
+            lines = [l for l in req.read_text(encoding="utf-8").splitlines() if not l.strip().lower().startswith(("anthropic", "cryptography"))]
             slim = req.parent / "requirements-ohne-claude.txt"
             slim.write_text("\n".join(lines) + "\n", encoding="utf-8")
             proc = subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", str(slim)],
