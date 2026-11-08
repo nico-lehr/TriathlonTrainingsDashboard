@@ -100,6 +100,10 @@ def cache_path(athlete_id):
 # ueberspringt bereits vorhandene Dateien, es geht also nichts verloren:
 #   ./sync-garmin.command --days 1095
 DEFAULT_DAYS = 300
+# Schneller Abruf (beim Oeffnen des Dashboards, Wischen nach unten): nur die
+# letzten Tage - neue Trainings und die frischen Gesundheitswerte. Die
+# gruendliche Pruefung ueber DEFAULT_DAYS macht der naechtliche Lauf.
+QUICK_DAYS = 3
 
 REQUEST_PAUSE_S = 1.0   # Hoeflichkeitspause zwischen Anfragen (Rate-Limit)
 MAX_SECTION_FAILS = 3   # so oft scheitert ein Abschnitt eines Tages, bevor er als "keine Daten" gilt
@@ -130,6 +134,37 @@ def log_user(athlete_id, msg):
             f.write(line + "\n")
     except OSError:
         pass  # Log nicht beschreibbar - die Zeile steht trotzdem auf dem Bildschirm
+
+
+# Letzter Abruf je Benutzer (Zeit, geklappt?, Zusammenfassung) - damit das
+# Dashboard auch den naechtlichen Lauf kennt (eigener Prozess) und automatische
+# Abrufe nicht zu oft kommen. Enthaelt keine Zugangsdaten.
+def last_sync_path(athlete_id):
+    return os.path.join(TOKEN_DIR, f"garmin_last_sync_{int(athlete_id)}.json")
+
+
+def save_last_sync(athlete_id, ok, message, quick=False):
+    entry = {"at": datetime.now().isoformat(timespec="seconds"), "ok": bool(ok),
+             "message": str(message or "")[:300], "quick": bool(quick)}
+    try:
+        os.makedirs(TOKEN_DIR, exist_ok=True)
+        tmp = last_sync_path(athlete_id) + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(entry, f)
+        os.replace(tmp, last_sync_path(athlete_id))
+    except OSError:
+        pass  # nur Komfort - der Abruf selbst hat trotzdem geklappt
+    return entry
+
+
+def load_last_sync(athlete_id):
+    try:
+        with open(last_sync_path(athlete_id), encoding="utf-8") as f:
+            data = json.load(f)
+        datetime.fromisoformat(data["at"])
+        return data
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
 
 
 def is_rate_limited(e):
@@ -771,6 +806,7 @@ def sync_user(athlete_id, session_factory, start, end, args):
     """Kompletter Sync EINES Benutzers. Jeder Schreibzugriff nutzt seine athlete_id."""
     from backend.models import Athlete
     session = session_factory()
+    quick = (end - start).days <= QUICK_DAYS
     try:
         if not session.query(Athlete).filter_by(athlete_id=athlete_id).first():
             raise LookupError(f"Benutzer {athlete_id} gibt es nicht (anlegen mit: python3 backend/create_user.py)")
@@ -793,7 +829,11 @@ def sync_user(athlete_id, session_factory, start, end, args):
             parts.append(f"Gesundheitsdaten {len(daily)} Tage")
         summary = ", ".join(parts)
         log_user(athlete_id, "OK - " + summary)
+        save_last_sync(athlete_id, True, summary, quick)
         return summary
+    except Exception as e:
+        save_last_sync(athlete_id, False, describe_error(e, athlete_id), quick)
+        raise
     finally:
         session.close()
 

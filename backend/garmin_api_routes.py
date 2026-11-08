@@ -5,6 +5,9 @@ Personal-API-Schluessel hinterlegen und Garmin-Daten auf Knopfdruck holen.
     PUT    /api/v1/garmin/personal-api   {key, expires?} - prueft den Schluessel bei Garmin, dann speichern
     DELETE /api/v1/garmin/personal-api   Schluessel entfernen
     POST   /api/v1/garmin/sync           Abruf fuer die angemeldete Person im Hintergrund starten
+                                         {quick: true}: nur die letzten Tage (schnell)
+                                         {auto: true}: schnell, aber hoechstens alle 30 Minuten -
+                                         beim Oeffnen des Dashboards; sonst 200 mit "skipped"
 
 Der Schluessel liegt nur in ~/.triathlon/garmin_api_<id>.json
 (tools/garmin_personal_api.py) und wird nie zurueckgegeben oder geloggt.
@@ -29,13 +32,26 @@ from .routes import api_bp, response_error, response_success
 _sync_lock = threading.Lock()
 _sync_state = {}  # athlete_id -> {"running": bool, "at": iso, "ok": bool, "message": str}
 
+# Automatischer Abruf (Dashboard geoeffnet): hoechstens so oft. Garmin drosselt
+# bei vielen Anfragen, und neue Trainings kommen ohnehin selten haeufiger.
+AUTO_SYNC_MIN_GAP = timedelta(minutes=30)
+
+
+def _last_sync(athlete_id):
+    """Letzter fertiger Abruf - aus diesem Server (Knopf, automatisch) oder dem
+    naechtlichen Lauf (eigener Prozess, steht nur in der Datei); der neuere gilt."""
+    mem = _sync_state.get(athlete_id) or {}
+    disk = garmin_sync.load_last_sync(athlete_id) or {}
+    return mem if (mem.get("at") or "") >= (disk.get("at") or "") else disk
+
 
 def _status(athlete_id):
     state = _sync_state.get(athlete_id) or {}
+    last = _last_sync(athlete_id)
     return {
         **personal_api.key_status(athlete_id),
         "old_login": os.path.isdir(garmin_sync.token_path(athlete_id)),
-        "sync": {k: state.get(k) for k in ("running", "at", "ok", "message")},
+        "sync": {"running": bool(state.get("running")), **{k: last.get(k) for k in ("at", "ok", "message")}},
     }
 
 
@@ -87,14 +103,14 @@ def delete_garmin_personal_api():
     return response_success(_status(athlete_id))
 
 
-def _run_sync(athlete_id):
+def _run_sync(athlete_id, days=None):
     """Laeuft in einem eigenen Thread: derselbe Sync wie tools/garmin_sync.py."""
     from . import Session
     args = argparse.Namespace(login=False, activities_only=False, wellness_only=False)
     end = date.today()
     result = {"ok": False, "message": "Abruf abgebrochen."}
     try:
-        summary = garmin_sync.sync_user(athlete_id, Session, end - timedelta(days=garmin_sync.DEFAULT_DAYS), end, args)
+        summary = garmin_sync.sync_user(athlete_id, Session, end - timedelta(days=days or garmin_sync.DEFAULT_DAYS), end, args)
         result = {"ok": True, "message": summary or "Fertig."}
     except SystemExit as e:  # z. B. fehlende Bibliothek beim alten Weg (garmin_sync.connect)
         result = {"ok": False, "message": " ".join(str(e).split())}
@@ -111,8 +127,9 @@ def _run_sync(athlete_id):
             _sync_state[athlete_id] = {"running": False, "at": datetime.now().isoformat(timespec="seconds"), **result}
 
 
-def _start_sync(athlete_id):
-    """Startet den Abruf im Hintergrund. None = gestartet, sonst (Meldung, Code, Status)."""
+def _start_sync(athlete_id, quick=False):
+    """Startet den Abruf im Hintergrund. None = gestartet, sonst (Meldung, Code, Status).
+    quick: nur die letzten Tage (garmin_sync.QUICK_DAYS) statt des ganzen Zeitraums."""
     if not personal_api.has_key(athlete_id):
         return ("Garmin ist für dich noch nicht verbunden – zuerst den Schlüssel eintragen.", "garmin_not_connected", 409)
     if importlib.util.find_spec("fitdecode") is None:  # liest die .fit-Dateien (parse_fit.py)
@@ -122,15 +139,43 @@ def _start_sync(athlete_id):
         if (_sync_state.get(athlete_id) or {}).get("running"):
             return ("Der Abruf läuft schon.", "sync_running", 409)
         _sync_state[athlete_id] = {**(_sync_state.get(athlete_id) or {}), "running": True}
-    threading.Thread(target=_run_sync, args=(athlete_id,), daemon=True, name=f"garmin-sync-{athlete_id}").start()
+    threading.Thread(target=_run_sync, args=(athlete_id,), kwargs={"days": garmin_sync.QUICK_DAYS if quick else None},
+                     daemon=True, name=f"garmin-sync-{athlete_id}").start()
+    return None
+
+
+def _auto_skip_reason(athlete_id, now=None):
+    """Warum ein automatischer Abruf jetzt NICHT laeuft (None = er darf)."""
+    key = personal_api.key_status(athlete_id)
+    if not key.get("configured"):
+        return "not_connected"
+    if key.get("days_left") is not None and key["days_left"] < 0:
+        return "key_expired"
+    if (_sync_state.get(athlete_id) or {}).get("running"):
+        return "running"
+    at = _last_sync(athlete_id).get("at")
+    try:
+        if at and (now or datetime.now()) - datetime.fromisoformat(at) < AUTO_SYNC_MIN_GAP:
+            return "recent"
+    except ValueError:
+        pass
     return None
 
 
 @api_bp.route("/garmin/sync", methods=["POST"])
 def start_garmin_sync():
     athlete_id = get_current_athlete_id()
-    err = _start_sync(athlete_id)
+    body = request.get_json(silent=True)
+    body = body if isinstance(body, dict) else {}
+    auto = body.get("auto") is True
+    if auto:
+        reason = _auto_skip_reason(athlete_id)
+        if reason:  # kein Fehler: der Aufruf kommt bei jedem Oeffnen des Dashboards
+            return response_success({**_status(athlete_id), "skipped": reason})
+    err = _start_sync(athlete_id, quick=auto or body.get("quick") is True)
     if err:
+        if auto:
+            return response_success({**_status(athlete_id), "skipped": err[1]})
         return response_error(*err)
     return response_success(_status(athlete_id), status=202)
 

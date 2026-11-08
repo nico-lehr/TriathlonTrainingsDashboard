@@ -5,6 +5,7 @@ Schluessel-Dateien liegen in einem Temp-Ordner.
 
 Aufruf im Projektordner:  python -m unittest backend.test_garmin_personal_api -v
 """
+import argparse
 import base64
 import io
 import json
@@ -17,7 +18,7 @@ import unittest
 import urllib.error
 import zipfile
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from unittest import mock
 
 import tools.garmin_sync as garmin_sync
@@ -560,7 +561,69 @@ class EinstellungenTest(TempDirsMixin, unittest.TestCase):
         st = self.client.get("/api/v1/garmin/personal-api", headers=self.h["garmin-anna"]).get_json()["data"]["sync"]
         self.assertEqual((st["running"], st["ok"], st["message"]), (False, True, "Aktivitaeten 2 neu"))
         # Ben ist davon nicht betroffen
-        self.assertIsNone(self.client.get("/api/v1/garmin/personal-api", headers=self.h["garmin-ben"]).get_json()["data"]["sync"]["running"])
+        self.assertFalse(self.client.get("/api/v1/garmin/personal-api", headers=self.h["garmin-ben"]).get_json()["data"]["sync"]["running"])
+
+    def test_automatischer_abruf_schnell_und_hoechstens_alle_30_minuten(self):
+        anna, post = self.ids["garmin-anna"], lambda body: self.client.post("/api/v1/garmin/sync", headers=self.h["garmin-anna"], json=body)
+        # Ohne Schluessel: kein Fehler, nur "uebersprungen" (kommt bei jedem Oeffnen)
+        r = post({"auto": True})
+        self.assertEqual((r.status_code, r.get_json()["data"]["skipped"]), (200, "not_connected"))
+        personal_api.save_key(anna, API_KEY)
+        with mock.patch.object(garmin_sync, "sync_user", return_value="Aktivitaeten 1 neu") as sync_user, \
+                mock.patch("threading.Thread") as thread, mock.patch.object(backend, "Session"):
+            r = post({"auto": True})
+            self.assertEqual(r.status_code, 202)
+            self.assertEqual(thread.call_args.kwargs["kwargs"], {"days": garmin_sync.QUICK_DAYS})
+            self.assertEqual(post({"auto": True}).get_json()["data"]["skipped"], "running")
+            kw = thread.call_args.kwargs
+            kw["target"](*kw["args"], **kw["kwargs"])
+            start, end = sync_user.call_args[0][2:4]
+            self.assertEqual((end - start).days, garmin_sync.QUICK_DAYS)  # nur die letzten Tage
+            # Gerade erst geholt -> der naechste automatische Abruf wartet
+            self.assertEqual(post({"auto": True}).get_json()["data"]["skipped"], "recent")
+            self.assertEqual(thread.call_count, 1)
+            # Von Hand geht es trotzdem jederzeit - schnell (Wischen) oder komplett (Knopf)
+            self.assertEqual(post({"quick": True}).status_code, 202)
+            self.assertEqual(thread.call_args.kwargs["kwargs"], {"days": garmin_sync.QUICK_DAYS})
+            garmin_api_routes._sync_state.clear()
+            self.assertEqual(post({}).status_code, 202)
+            self.assertEqual(thread.call_args.kwargs["kwargs"], {"days": None})
+            garmin_api_routes._sync_state.clear()
+            # Nach 31 Minuten darf der automatische wieder
+            later = datetime.now() + timedelta(minutes=31)
+            self.assertIsNone(garmin_api_routes._auto_skip_reason(anna, now=later))
+        # Abgelaufener Schluessel: nicht automatisch bei Garmin anklopfen
+        personal_api.save_key(anna, API_KEY, (date.today() - timedelta(days=1)).isoformat())
+        self.assertEqual(garmin_api_routes._auto_skip_reason(anna), "key_expired")
+        personal_api.delete_key(anna)
+
+    def test_naechtlicher_abruf_zaehlt_fuer_status_und_pause(self):
+        anna = self.ids["garmin-anna"]
+        personal_api.save_key(anna, API_KEY)
+        # Der naechtliche Lauf (eigener Prozess) hinterlaesst nur die Datei
+        garmin_sync.save_last_sync(anna, True, "Aktivitaeten 3 neu")
+        st = self.client.get("/api/v1/garmin/personal-api", headers=self.h["garmin-anna"]).get_json()["data"]["sync"]
+        self.assertEqual((st["running"], st["ok"], st["message"]), (False, True, "Aktivitaeten 3 neu"))
+        self.assertEqual(garmin_api_routes._auto_skip_reason(anna), "recent")
+        # Fehlschlag wird ebenso gemerkt
+        garmin_sync.save_last_sync(anna, False, "Garmin nicht erreichbar")
+        st = self.client.get("/api/v1/garmin/personal-api", headers=self.h["garmin-anna"]).get_json()["data"]["sync"]
+        self.assertEqual((st["ok"], st["message"]), (False, "Garmin nicht erreichbar"))
+        personal_api.delete_key(anna)
+
+    def test_sync_user_merkt_ergebnis(self):
+        anna = self.ids["garmin-anna"]
+        args = argparse.Namespace(login=False, activities_only=True, wellness_only=False)
+        with mock.patch.object(garmin_sync, "client_for", return_value=object()), \
+                mock.patch.object(garmin_sync, "sync_activities", return_value={"neu": 1, "vorhanden": 0, "fehler": 0}):
+            garmin_sync.sync_user(anna, backend.Session, date.today() - timedelta(days=3), date.today(), args)
+        last = garmin_sync.load_last_sync(anna)
+        self.assertEqual((last["ok"], last["quick"]), (True, True))
+        with mock.patch.object(garmin_sync, "client_for", side_effect=RuntimeError("kaputt")):
+            with self.assertRaises(RuntimeError):
+                garmin_sync.sync_user(anna, backend.Session, date.today() - timedelta(days=300), date.today(), args)
+        last = garmin_sync.load_last_sync(anna)
+        self.assertEqual((last["ok"], last["quick"]), (False, False))
 
     def test_fehlende_bibliothek_klare_meldung(self):
         personal_api.save_key(self.ids["garmin-anna"], API_KEY)

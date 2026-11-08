@@ -113,6 +113,8 @@ function checkAutoReplan() {
   // machen. Nicht awaited: die App wartet nicht auf eine evtl. KI-Anfrage.
   // Events aus dem Garmin-Kalender als Ziele übernehmen (höchstens einmal am Tag,
   // js/data/garmin-events.js) - vor dem Plan-Check, der das Hauptevent braucht.
+  // Garmin-Daten beim Öffnen leise im Hintergrund holen (js/components/garmin-settings.js)
+  if (typeof initGarminAutoSync === "function") initGarminAutoSync();
   if (typeof initGarminEvents === "function") initGarminEvents();
   if (typeof syncGarminEvents === "function") syncGarminEvents().catch(() => {});
   if (typeof initPlanCheck === "function") initPlanCheck();

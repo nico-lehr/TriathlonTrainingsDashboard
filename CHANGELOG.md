@@ -4,6 +4,15 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.39
+
+- **Garmin-Daten kommen jetzt von selbst:** Sobald du das Dashboard öffnest oder die App wieder nach vorne holst, werden die neuesten Garmin-Daten leise im Hintergrund geholt. Oben steht so lange „Holt Garmin-Daten …“, danach erscheinen neue Trainings und Schlafwerte ohne Neuladen.
+- **Schnell und schonend:** Dieser automatische Abruf holt nur die letzten 3 Tage und dauert deshalb nur Sekunden. Er läuft höchstens alle 30 Minuten, damit Garmin nicht zu oft gefragt wird. Die gründliche Prüfung über die letzten Monate macht weiterhin der nächtliche Abruf um 5:45 Uhr.
+- **Wann zuletzt geholt:** Der Garmin-Knopf oben zeigt jetzt z. B. „Garmin · vor 12 Min.“ – auch nach dem nächtlichen Abruf. Antippen holt sofort neue Daten.
+- **Am Handy nach unten ziehen** (ganz oben auf einer Seite) holt ebenfalls sofort neue Daten – wie in Mail oder Fotos.
+- **Warnung vor dem Ablauf des Garmin-Schlüssels:** Eine Woche bevor dein Schlüssel abläuft, erscheint auf „Heute“ ein Hinweis mit „Jetzt erneuern“. Ist er abgelaufen, steht das auch oben im Garmin-Knopf.
+- Tippst du gerade etwas ein, wartet die App mit dem Neuzeichnen, bis du fertig bist.
+
 ## 2.4.38
 
 - **Krafttraining-Wunsch jetzt als Text:** In „Training & Planung“ gibt es keine Auswahl mehr für „Ziel beim Krafttraining“ und „Schwerpunkt“. Stattdessen steht unter „Deine Wünsche“ ein neues Feld: „Was möchtest du mit dem Krafttraining erreichen?“ – dort schreibst du in eigenen Worten, z. B. „athletischer Körper, Fokus auf Schultern und Brust“.

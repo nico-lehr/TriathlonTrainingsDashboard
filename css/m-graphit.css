@@ -739,3 +739,17 @@ body.m-graphit #modal-overlay .modal-stats .st { background: var(--m-surface); b
 .m-mc.race::after { content: "🏁"; font-size: 10px; line-height: 5px; height: 5px; }
 .m-mc-evs em.race { font-weight: 600; }
 .m-race-flag { font-size: 18px; width: 28px; text-align: center; }
+
+/* Garmin: nach unten ziehen zum Aktualisieren (m-app.js, mInitPullToRefresh) */
+.m-ptr {
+  position: fixed; top: calc(env(safe-area-inset-top, 0px) + 8px); left: 50%; z-index: 60;
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px;
+  background: var(--m-surface); color: var(--m-text); font-size: 13px; font-weight: 500;
+  max-width: calc(100vw - 32px); box-shadow: 0 6px 20px rgba(0, 0, 0, .25); transform: translate(-50%, -60px); opacity: 0; pointer-events: none;
+}
+.m-ptr.settle { transition: transform .25s ease, opacity .25s ease; }
+.m-ptr-ic { display: inline-block; transition: transform .2s ease; color: var(--m-muted); }
+.m-ptr.ready .m-ptr-ic { transform: rotate(180deg); color: var(--m-accent); }
+.m-ptr.err { color: var(--m-bad); }
+@media (prefers-reduced-motion: reduce) { .m-ptr, .m-ptr-ic { transition: none; } }
+.m-keywarn h2 { color: var(--m-warn); }

@@ -172,20 +172,66 @@ function mHeaderHtml(kicker, title, right = "") {
   return `<header class="m-top"><div><div class="m-kicker">${mEsc(kicker)}</div><h1 class="m-title">${mEsc(title)}</h1></div><div class="m-top-right">${right}</div></header>`;
 }
 
+// Wann zuletzt Garmin-Daten kamen: der letzte gelungene Abruf (Server, auch
+// der nächtliche) oder - falls neuer - der Stand der Gesundheitsdaten.
+function mGarminLastAt() {
+  const gs = typeof garminState !== "undefined" ? garminState : { sync: {} };
+  const w = typeof lastGarminSync === "function" ? lastGarminSync() : null;
+  const a = gs.sync && gs.sync.ok && gs.sync.at ? new Date(gs.sync.at) : null;
+  const b = w && w.at ? new Date(w.at) : null;
+  const ok = d => d && !isNaN(d);
+  if (ok(a) && ok(b)) return a > b ? a : b;
+  return ok(a) ? a : ok(b) ? b : null;
+}
+
+function mAgoLabel(d, now = new Date()) {
+  const min = Math.floor((now - d) / 60000);
+  if (min < 1) return "gerade eben";
+  if (min < 60) return `vor ${min} Min.`;
+  const time = d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  if (localDateStr(d) === localDateStr(now)) return `${time} Uhr`;
+  if (localDateStr(d) === localDateStr(mAddDays(now, -1))) return `gestern ${time}`;
+  return d.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
+}
+
 function mSyncPill() {
   const gs = typeof garminState !== "undefined" ? garminState : { loaded: false, sync: {} };
-  const sync = typeof lastGarminSync === "function" ? lastGarminSync() : null;
   if (gs.sync && gs.sync.running) return `<span class="m-pill busy" role="status"><i></i>Holt Garmin-Daten …</span>`;
   if (gs.loaded && !gs.configured) return `<button type="button" class="m-pill" data-m-act="garmin"><i class="off"></i>Garmin verbinden</button>`;
+  if (gs.loaded && gs.days_left != null && gs.days_left < 0) return `<button type="button" class="m-pill" data-m-act="garmin"><i class="bad"></i>Garmin-Schlüssel abgelaufen</button>`;
   if (gs.loaded && gs.sync && gs.sync.at && gs.sync.ok === false) return `<button type="button" class="m-pill" data-m-act="garmin"><i class="bad"></i>Garmin: Abruf fehlgeschlagen</button>`;
-  if (!sync || !sync.at) {
+  const at = mGarminLastAt();
+  if (!at) {
     return gs.loaded ? `<button type="button" class="m-pill" data-m-act="garmin-sync"><i class="old"></i>Jetzt von Garmin holen</button>`
       : `<button type="button" class="m-pill" data-m-act="garmin"><i class="off"></i>Garmin</button>`;
   }
-  const d = new Date(sync.at);
-  const today = localDateStr(d) === todayStr();
-  const label = today ? d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
-  return `<button type="button" class="m-pill" data-m-act="garmin-sync" aria-label="Jetzt von Garmin holen (zuletzt ${mEsc(label)})"><i class="${today ? "" : "old"}"></i>Garmin · ${mEsc(label)} ↻</button>`;
+  const fresh = Date.now() - at < 6 * 3600 * 1000;
+  const label = mAgoLabel(at);
+  return `<button type="button" class="m-pill" data-m-act="garmin-sync" data-m-sync-at="${at.getTime()}" aria-label="Garmin-Daten zuletzt ${mEsc(label)} – jetzt abrufen"><i class="${fresh ? "" : "old"}"></i><span class="m-pill-t">Garmin · ${mEsc(label)}</span> ↻</button>`;
+}
+
+// Der Garmin-Schlüssel gilt nur bis zu einem Datum - danach kämen still keine
+// Daten mehr. Eine Woche vorher (und danach) steht das deshalb auf "Heute".
+function mGarminKeyCard() {
+  const gs = typeof garminState !== "undefined" ? garminState : null;
+  if (!gs || !gs.loaded || !gs.configured || gs.days_left == null || gs.days_left > 7) return "";
+  const until = new Date(gs.expires + "T12:00:00").toLocaleDateString("de-DE", { day: "numeric", month: "long" });
+  const text = gs.days_left < 0 ? `Dein Garmin-Schlüssel ist seit ${until} abgelaufen. Bis du einen neuen einträgst, kommen keine neuen Trainings und Schlafwerte mehr.`
+    : gs.days_left === 0 ? "Dein Garmin-Schlüssel läuft heute ab. Danach kommen keine neuen Trainings und Schlafwerte mehr."
+    : `Dein Garmin-Schlüssel läuft ${gs.days_left === 1 ? "morgen" : `in ${gs.days_left} Tagen`} ab (${until}). Danach kommen keine neuen Trainings und Schlafwerte mehr.`;
+  return `<section class="m-card m-pcheck m-keywarn" role="status"><div class="m-head"><h2>Garmin-Schlüssel erneuern</h2></div>
+      <p class="m-say">${mEsc(text)}</p>
+      <p class="m-say small">In Garmin Connect einen neuen Schlüssel erstellen und in den Einstellungen unter „Garmin“ eintragen.</p>
+      <div class="m-actions"><button type="button" class="m-btn primary" data-m-act="garmin">Jetzt erneuern</button></div></section>`;
+}
+
+// Die Zeit im Garmin-Knopf ("vor 12 Min.") jede Minute auffrischen, ohne die
+// ganze Seite neu zu zeichnen.
+function mTickSyncLabels() {
+  document.querySelectorAll("[data-m-sync-at] .m-pill-t").forEach(el => {
+    const at = new Date(Number(el.parentElement.dataset.mSyncAt));
+    if (!isNaN(at)) el.textContent = `Garmin · ${mAgoLabel(at)}`;
+  });
 }
 
 function mRenderHeute() {
@@ -327,7 +373,7 @@ function mRenderHeute() {
   const nextCard = upcoming.length ? `<section class="m-card m-desk-only"><div class="m-head"><h2>Als Nächstes</h2><button type="button" class="m-link" data-m-page="kalender">Kalender</button></div><div class="m-list">${upcoming.map(p => `<button type="button" class="m-row" data-m-act="plan" data-id="${mEsc(p.id)}">${mIcon(p.sport)}<span class="m-grow"><span class="m-row-title">${mEsc(p.title || p.sport)}</span><span class="m-row-meta">${new Date(p.date + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" })}${p.duration_min ? ` · ${mDur(p.duration_min)}` : ""}${mSwimBit(p)}</span></span>${p.intensity ? `<span class="m-tag plan">${mEsc(p.intensity)}</span>` : ""}</button>`).join("")}</div></section>` : "";
 
   return mHeaderHtml(now.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" }), "Heute", mSyncPill())
-    + mCols3((typeof morningCardHtml === "function" ? morningCardHtml(mEsc) : "")
+    + mCols3(mGarminKeyCard() + (typeof morningCardHtml === "function" ? morningCardHtml(mEsc) : "")
     + `<section class="m-card m-hero" aria-label="Dein Zustand heute">${rings}</section>`
     + mGarminEventsCard()
     + mPlanCheckCard()
@@ -896,7 +942,7 @@ async function mAction(btn) {
   else if (act === "profile") { mState.classic = "settings"; openSettingsView(); renderMApp(); openTrainingProfile(); }
   else if (act === "garmin") { mState.classic = "settings"; openSettingsView(); renderMApp(); openSettingsPanel("garmin"); }
   else if (act === "garmin-sync") {
-    try { await startGarminSync(); } catch (e) {
+    try { await startGarminSync({ quick: true }); } catch (e) {
       mState.classic = "settings"; openSettingsView(); renderMApp(); openSettingsPanel("garmin");
     }
     renderMApp();
@@ -1135,6 +1181,68 @@ function mPlanSheet(id) {
   });
 }
 
+// Am Handy: oben nach unten ziehen holt die neuesten Garmin-Daten (wie in
+// Mail oder Fotos). Nur ganz oben auf einer Graphit-Seite und ohne offenes
+// Fenster - sonst ist Ziehen normales Scrollen.
+const M_PTR_TRIGGER = 64;
+// Manche Fenster liegen immer im Dokument und sind nur unsichtbar (visibility).
+const mDialogVisible = () => [...document.querySelectorAll('[aria-modal="true"], [role="dialog"]')]
+  .some(el => el.getClientRects().length && getComputedStyle(el).visibility !== "hidden");
+function mInitPullToRefresh() {
+  if (!("ontouchstart" in window)) return;
+  const ind = document.createElement("div");
+  ind.className = "m-ptr";
+  ind.setAttribute("aria-live", "polite");
+  ind.innerHTML = `<span class="m-ptr-ic" aria-hidden="true">↓</span><span class="m-ptr-t"></span>`;
+  document.body.appendChild(ind);
+  const text = ind.querySelector(".m-ptr-t"), ic = ind.querySelector(".m-ptr-ic");
+  let startY = null, pull = 0, busy = false;
+  const show = (px, label, cls = "") => {
+    // unter der Leiste mit den Bereichen, wenn sie oben steht
+    const tabs = document.getElementById("m-tabs"), r = tabs && tabs.getBoundingClientRect();
+    ind.style.top = r && r.height && r.top < 120 && r.width > window.innerWidth / 2 ? `${Math.round(r.bottom + 8)}px` : "";
+    ind.style.transform = `translate(-50%, ${Math.round(px)}px)`;
+    ind.style.opacity = px > 8 ? "1" : "0";
+    ind.className = `m-ptr ${cls}`;
+    ic.textContent = /err/.test(cls) ? "!" : "↓";
+    text.textContent = label;
+  };
+  const hide = () => show(-60, text.textContent, "settle");
+  const allowed = target => mActive() && !mState.classic && !busy && window.scrollY <= 0
+    && target.closest && target.closest("#m-body") && !target.closest("input, textarea, select, .m-cal, .table-scroll")
+    && !document.body.classList.contains("m-sheet-open") && !mDialogVisible();
+  document.addEventListener("touchstart", e => {
+    startY = e.touches.length === 1 && allowed(e.target) ? e.touches[0].clientY : null;
+    pull = 0;
+  }, { passive: true });
+  document.addEventListener("touchmove", e => {
+    if (startY == null) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy <= 0 || window.scrollY > 0) { if (pull) hide(); startY = null; pull = 0; return; }
+    pull = Math.min(dy * 0.5, 96);
+    show(pull - 44, pull >= M_PTR_TRIGGER ? "Loslassen zum Aktualisieren" : "Zum Aktualisieren ziehen", pull >= M_PTR_TRIGGER ? "ready" : "");
+  }, { passive: true });
+  document.addEventListener("touchend", async () => {
+    if (startY == null) return;
+    startY = null;
+    if (pull < M_PTR_TRIGGER) { if (pull) hide(); pull = 0; return; }
+    pull = 0;
+    busy = true;
+    // Ab hier zeigt der Garmin-Knopf oben den Fortschritt ("Holt Garmin-Daten …")
+    hide();
+    let error = null;
+    try {
+      const sync = await startGarminSync({ quick: true });
+      if (!sync || sync.ok === false) error = (sync && sync.message) || "Abruf fehlgeschlagen";
+    } catch (e) {
+      error = e.message || "Abruf fehlgeschlagen";
+    }
+    if (!error) { busy = false; return; }
+    show(14, error, "err settle");
+    setTimeout(() => { hide(); busy = false; }, 4000);
+  });
+}
+
 function initMApp() {
   const host = document.createElement("div");
   host.id = "m-app";
@@ -1196,6 +1304,8 @@ function initMApp() {
   };
   ["savePlannedWorkouts", "saveMobilityState", "saveStrengthState", "renderAll", "renderOutlook"].forEach(wrap);
   if (typeof onGarminState === "function") onGarminState(() => mScheduleRender());
+  setInterval(mTickSyncLabels, 60000);
+  mInitPullToRefresh();
   if (window.matchMedia) window.matchMedia(M_QUERY).addEventListener("change", () => renderMApp());
   window.addEventListener("resize", () => mMoveTabIndicator());
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => mMoveTabIndicator());

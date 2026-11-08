@@ -29,6 +29,9 @@ async function refreshGarminState() {
 // Nach einem Abruf die neuen Trainings und Gesundheitsdaten zeigen - ohne
 // die Seite neu zu laden.
 async function reloadGarminData() {
+  // Nicht mitten in eine Eingabe hinein neu zeichnen (z. B. eine Notiz) -
+  // höchstens zwei Minuten warten, bis das Feld verlassen wurde.
+  for (let i = 0; i < 120 && garminUserIsTyping(); i++) await new Promise(r => setTimeout(r, 1000));
   await Promise.all([loadPersistedWorkouts(), loadWellness()]);
   if (typeof syncGarminWeightIntoLog === "function") syncGarminWeightIntoLog();
   // Neue/geänderte Events aus dem Garmin-Kalender gleich mit übernehmen
@@ -61,16 +64,44 @@ function watchGarminSync() {
   return garminWatch;
 }
 
+function garminUserIsTyping() {
+  const el = document.activeElement;
+  return !!el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
+}
+
 // Abruf starten (oder an einen laufenden anhängen) und auf das Ende warten.
 // Fehler beim Starten (z. B. kein Schlüssel) kommen als Error.
-async function startGarminSync() {
+// quick: nur die letzten Tage (Wischen nach unten) - sonst der ganze Zeitraum.
+async function startGarminSync({ quick = false } = {}) {
   try {
-    setGarminState((await apiCall("garmin/sync", "POST")).data);
+    setGarminState((await apiCall("garmin/sync", "POST", quick ? { quick: true } : {})).data);
   } catch (e) {
     if (!/läuft schon/.test(e.message)) throw e;
     setGarminState({ ...garminState, sync: { ...garminState.sync, running: true } });
   }
   return watchGarminSync();
+}
+
+// Automatischer Abruf: beim Öffnen des Dashboards und wenn die App wieder
+// nach vorne kommt. Der Server holt dann nur die letzten Tage und höchstens
+// alle 30 Minuten (backend/garmin_api_routes.py) - hier zusätzlich nicht öfter
+// als alle 5 Minuten fragen, damit nicht jeder Fensterwechsel eine Anfrage ist.
+const GARMIN_AUTO_ASK_GAP_MS = 5 * 60 * 1000;
+let garminAutoAskedAt = 0;
+
+async function autoGarminSync() {
+  if (document.visibilityState === "hidden" || garminWatch) return null;
+  if (Date.now() - garminAutoAskedAt < GARMIN_AUTO_ASK_GAP_MS) return null;
+  garminAutoAskedAt = Date.now();
+  let data;
+  try { data = (await apiCall("garmin/sync", "POST", { auto: true }, { redirectOn401: false })).data; } catch (e) { return null; }
+  setGarminState(data); // läuft er, wartet watchGarminSync und lädt danach neu
+  return data;
+}
+
+function initGarminAutoSync() {
+  autoGarminSync();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") autoGarminSync(); });
 }
 
 function initGarminSettings() {
