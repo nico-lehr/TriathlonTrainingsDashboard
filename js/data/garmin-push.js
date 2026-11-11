@@ -1,17 +1,24 @@
-// Trainings auf die Uhr: geplante Einheiten der nächsten 7 Tage automatisch
-// in Garmin Connect (backend/garmin_push.py). Der Browser rechnet die Schritte
+// Trainings auf die Uhr: geplante Einheiten automatisch in Garmin Connect
+// (backend/garmin_push.py) - je nach Einstellung nur die von heute (Standard),
+// die nächsten 7 Tage oder nur per Knopf "An Garmin senden". Der Browser rechnet die Schritte
 // (Pace-Bereiche aus den eigenen Zonen) und Übungen aus und schickt sie mit;
 // der Server gleicht ab - neu, geändert, verschoben, gelöscht.
 //
 // Ausgelöst: beim Öffnen des Dashboards und kurz nach jeder Plan-Änderung
-// (savePlannedWorkouts -> scheduleGarminPush), nur wenn verbunden und die
-// Automatik an ist. Zusätzlich gleicht der Garmin-Timer morgens ab.
+// (savePlannedWorkouts -> scheduleGarminPush), wenn verbunden - auch bei
+// "nur per Knopf": dann werden nur von Hand gesendete Einheiten aktualisiert
+// und Liegengebliebenes aufgeräumt. Zusätzlich gleicht der Garmin-Timer morgens ab.
 
-const GARMIN_PUSH_DAYS = 7;
 const GARMIN_PUSH_DELAY_MS = 4000;
+// Auswahl in Einstellungen → Garmin: wie weit automatisch vorausgeschickt wird.
+const GARMIN_PUSH_MODES = [
+  { key: "today", label: "Nur heute", sub: "Am Trainingstag kommt die Einheit automatisch auf die Uhr." },
+  { key: "week", label: "Nächste 7 Tage", sub: "Die ganze Woche liegt schon in Garmin Connect." },
+  { key: "manual", label: "Nur per Knopf", sub: "Nichts automatisch – du sendest jede Einheit selbst." },
+];
 const GARMIN_EXERCISE_SPORTS = ["Kraft", "Mobility"];
 
-let garminPush = { loaded: false, connected: false, auto: true, links: {}, last_result: null, last_run_at: null,
+let garminPush = { loaded: false, connected: false, auto: true, mode: "today", window_days: 1, links: {}, last_result: null, last_run_at: null,
   mfa_pending: false, official: { available: false, connected: false }, busy: false, error: null };
 const garminPushListeners = [];
 let garminPushTimer = null;
@@ -72,16 +79,18 @@ function garminPushDetails(pw) {
     : { id: pw.id, steps: resolvedWorkoutSteps(pw) };
 }
 
-// Die Einheiten, die gerade in Garmin gehören: nächste 7 Tage + von Hand gesendete.
+// Die Einheiten, die gerade in Garmin gehören: das eingestellte Fenster
+// (heute bzw. 7 Tage, bei "nur per Knopf" keins) + von Hand gesendete.
 function garminPushCandidates(today = todayStr()) {
-  const end = localDateStr(new Date(new Date(today + "T00:00:00").getTime() + (GARMIN_PUSH_DAYS - 1) * 86400000));
+  const days = garminPush.auto ? (garminPush.window_days || 1) : 0;
+  const end = days > 0 ? localDateStr(new Date(new Date(today + "T00:00:00").getTime() + (days - 1) * 86400000)) : null;
   return plannedWorkouts.filter(p => p.date >= today && (p.status || "geplant") === "geplant" && garminSupported(p)
-    && (p.date <= end || (garminPush.links[p.id] && garminPush.links[p.id].pinned)));
+    && ((end && p.date <= end) || (garminPush.links[p.id] && garminPush.links[p.id].pinned)));
 }
 
-// Schritte/Übungen ALLER kommenden Einheiten (nicht nur der nächsten 7 Tage):
+// Schritte/Übungen ALLER kommenden Einheiten (nicht nur die im Fenster):
 // Der Server merkt sie sich und legt damit später auch dann das detaillierte
-// Workout an, wenn eine Einheit ins 7-Tage-Fenster rückt, während das
+// Workout an, wenn eine Einheit ins Fenster rückt (z. B. morgens), während das
 // Dashboard zu ist. Höchstens 120 (MAX_DETAILS in backend/garmin_push.py),
 // die nächsten zuerst.
 function garminPushDetailItems(today = todayStr()) {
@@ -90,7 +99,7 @@ function garminPushDetailItems(today = todayStr()) {
 }
 
 async function runGarminPush() {
-  if (!garminPush.connected || !garminPush.auto || garminPush.busy) return null;
+  if (!garminPush.connected || garminPush.busy) return null;
   garminPush.busy = true;
   setGarminPush({});
   try {
@@ -107,7 +116,7 @@ async function runGarminPush() {
 }
 
 function scheduleGarminPush() {
-  if (!garminPush.connected || !garminPush.auto) return;
+  if (!garminPush.connected) return;
   clearTimeout(garminPushTimer);
   garminPushTimer = setTimeout(runGarminPush, GARMIN_PUSH_DELAY_MS);
 }

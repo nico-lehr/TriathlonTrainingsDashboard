@@ -2737,6 +2737,10 @@ body.m-graphit .settings-page-head, body.m-graphit .sh-back { display: none; }
 /* --- Trainings auf die Uhr (js/components/garmin-push-settings.js) --- */
 #gp-body .gp-h { margin: 20px 0 0; font-size: 13px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--text-secondary); }
 #gp-body .gp-list { margin-top: 8px; }
+#gp-body .gp-modes { margin-top: 8px; }
+#gp-body .gp-mode { cursor: pointer; gap: 12px; }
+#gp-body .gp-mode .gp-what { flex: 1; }
+#gp-body .gp-mode input { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--accent, #0a84ff); }
 #gp-body .coach-settings-row { margin-top: 16px; }
 #gp-body .gp-foot { margin-top: 12px; }
 #gp-body .gp-logout { display: block; margin-top: 14px; }

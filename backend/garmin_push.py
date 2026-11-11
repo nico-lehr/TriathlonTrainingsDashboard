@@ -1,12 +1,19 @@
 """Trainings auf die Uhr: geplante Einheiten automatisch in Garmin Connect.
 
-Die naechsten 7 Tage des Plans werden mit Garmin abgeglichen:
+Wie weit automatisch vorausgeschickt wird, waehlt jede Person (Einstellungen):
+  - "today"  (Standard): nur die Einheiten von heute
+  - "week":  die naechsten 7 Tage
+  - "manual": gar nichts automatisch - nur, was mit "An Garmin senden" kommt
+Was dabei im Fenster liegt, wird mit Garmin abgeglichen:
   - neue Einheit        -> Workout hochladen und in den Garmin-Kalender legen
   - geaenderte Einheit  -> dasselbe Garmin-Workout aktualisieren (keine Doppelten)
   - verschobene Einheit -> altes Workout weg, am neuen Tag neu
   - geloeschte/uebersprungene Einheit -> Workout in Garmin loeschen
 Erledigte und vergangene Einheiten bleiben in Garmin unangetastet.
-Von Hand gesendete Einheiten ("pinned") bleiben auch ausserhalb der 7 Tage.
+Von Hand gesendete Einheiten ("pinned") bleiben auch ausserhalb des Fensters.
+Automatisch geschickte Einheiten, die nach einer Umstellung nicht mehr ins
+Fenster gehoeren (z. B. von "week" auf "today"), werden in Garmin geloescht -
+nur die von heute bleiben.
 
 Welche Einheit welches Garmin-Workout ist, steht in garmin_workout_links
 (backend/models.py). Ohne Aenderung wird Garmin gar nicht erst gefragt.
@@ -39,10 +46,12 @@ from tools import garmin_sync
 
 from . import garmin_official, get_current_athlete_id
 from .garmin_workouts import EXERCISE_SPORTS, PLANNED_WORKOUTS_KEY, SPORTS, workout_variants
-from .models import AthleteStore, GarminPushState, GarminWorkoutLink
+from .models import AthleteStore, GarminPushPrefs, GarminPushState, GarminWorkoutLink
 from .routes import api_bp, get_session, response_error, response_success
 
-WINDOW_DAYS = 7
+WINDOW_DAYS = 7         # "Naechste 7 Tage"
+DEFAULT_WINDOW_DAYS = 1  # Standard: nur heute - sonst ist Garmins Startseite voller Workouts
+MODES = {"today": 1, "week": 7, "manual": 0}  # Modus -> Tage, die automatisch auf die Uhr kommen
 MAX_OPS = 30          # hoechstens so viele Garmin-Aenderungen je Lauf (Garmin drosselt)
 MAX_DETAILS = 120     # so viele Einheiten merkt sich der Server mit Schritten
 MFA_TTL_S = 300
@@ -165,6 +174,19 @@ def get_state(session, athlete_id):
     return state
 
 
+def push_window(session, athlete_id):
+    """Wie viele Tage ab heute automatisch auf die Uhr kommen (0 = nur per Knopf)."""
+    state = session.get(GarminPushState, athlete_id)
+    if state is not None and not state.auto:
+        return 0
+    prefs = session.get(GarminPushPrefs, athlete_id)
+    return prefs.window_days if prefs is not None and prefs.window_days in (1, 7) else DEFAULT_WINDOW_DAYS
+
+
+def mode_for(window_days):
+    return next((m for m, d in MODES.items() if d == window_days), "today")
+
+
 def clean_details(items):
     """Vom Browser: [{id, steps, exercises}] -> {id: {steps, exercises}} (nur Listen, gekappt)."""
     out = {}
@@ -198,11 +220,12 @@ def link_info(link):
 
 # ------------------------------------------------------------------ Abgleich
 
-def plan_operations(entries, links, details, today, only=None):
+def plan_operations(entries, links, details, today, only=None, window_days=WINDOW_DAYS):
     """Was in Garmin passieren muss - ohne Garmin zu fragen.
+    window_days: so viele Tage ab heute automatisch (0 = nur von Hand gesendete).
     Ergebnis: (ops, failed, unchanged). op = dict(kind, entry, link, variants, hash)."""
     by_id = {p["id"]: p for p in entries}
-    end = (today + timedelta(days=WINDOW_DAYS - 1)).isoformat()
+    end = (today + timedelta(days=window_days - 1)).isoformat() if window_days > 0 else None
     today_s = today.isoformat()
     active = {l.planned_id: l for l in links if l.state == "active"}
     ops, failed, unchanged = [], [], 0
@@ -217,7 +240,7 @@ def plan_operations(entries, links, details, today, only=None):
             if (p.get("status") or "geplant") != "geplant" or p["date"] < today_s:
                 continue
             link = active.get(p["id"])
-            if p["date"] <= end or (link is not None and link.pinned):
+            if (end is not None and p["date"] <= end) or (link is not None and link.pinned):
                 wanted.append(p)
 
     wanted_ids = set()
@@ -256,6 +279,8 @@ def plan_operations(entries, links, details, today, only=None):
                     continue  # gemacht - bleibt in Garmin
                 if (link.date or "") < today_s and (p.get("date") or "") < today_s:
                     continue  # Vergangenheit nicht anfassen
+                if status == "geplant" and link.date == today_s and p.get("date") == today_s:
+                    continue  # heute schon auf der Uhr - bleibt, auch bei "nur per Knopf"
             ops.append({"kind": "remove", "entry": p, "link": link})
     return ops, failed, unchanged
 
@@ -352,9 +377,11 @@ def apply_operation(client, session, athlete_id, op, via, pin):
     return create_on_garmin(client, session, athlete_id, op, via, pin)
 
 
-def run_push(athlete_id, session_factory, items=None, only=None, pin=False, today=None, client_factory=None):
+def run_push(athlete_id, session_factory, items=None, only=None, pin=False, today=None, client_factory=None,
+             window_days=None):
     """Ein Abgleich fuer EINE Person. Ergebnis-dict (siehe unten); wirft nie
-    wegen Garmin - Abbruchgruende stehen in result["stopped"]."""
+    wegen Garmin - Abbruchgruende stehen in result["stopped"].
+    window_days: None = aus den Einstellungen der Person (push_window)."""
     today = today or date.today()
     client_factory = client_factory or open_client
     with push_lock(athlete_id), FileLock(athlete_id):
@@ -365,7 +392,16 @@ def run_push(athlete_id, session_factory, items=None, only=None, pin=False, toda
             if items is not None:
                 merge_details(state, items, entries)
             links = session.query(GarminWorkoutLink).filter_by(athlete_id=athlete_id).all()
-            ops, failed, unchanged = plan_operations(entries, links, state.details or {}, today, only)
+            if window_days is None:
+                window_days = push_window(session, athlete_id)
+            ops, failed, unchanged = plan_operations(entries, links, state.details or {}, today, only, window_days)
+            if pin and only:
+                # Von Hand gesendet, aber schon (automatisch) in Garmin: ab jetzt
+                # gilt sie als von Hand gesendet und bleibt auch ausserhalb des Fensters.
+                for link in links:
+                    if link.state == "active" and link.planned_id in only and not link.pinned:
+                        link.pinned = True
+                session.commit()
             result = {"created": 0, "updated": 0, "moved": 0, "removed": 0, "unchanged": unchanged,
                       "failed": failed, "stopped": None, "pending": 0, "ran_at": datetime.utcnow().isoformat() + "Z"}
             if ops:
@@ -415,8 +451,10 @@ def run_push(athlete_id, session_factory, items=None, only=None, pin=False, toda
 
 
 def run_scheduled_pushes(session_factory, log=print):
-    """Fuer den Garmin-Timer am Morgen: alle Personen mit Anmeldung und
-    eingeschaltetem Automatik-Abgleich. Eine Person stoppt nie die anderen."""
+    """Fuer den Garmin-Timer am Morgen: alle Personen mit Anmeldung. Mit
+    "nur heute" kommt so die Einheit des Tages auf die Uhr; bei "nur per
+    Knopf" wird nur Liegengebliebenes aufgeraeumt (ohne Aenderung fragt der
+    Abgleich Garmin gar nicht). Eine Person stoppt nie die anderen."""
     ids = set()
     if os.path.isdir(garmin_sync.TOKEN_DIR):
         for name in os.listdir(garmin_sync.TOKEN_DIR):
@@ -424,12 +462,7 @@ def run_scheduled_pushes(session_factory, log=print):
             if m:
                 ids.add(int(m.group(1)))
     ids |= set(garmin_official.connected_athletes())
-    session = session_factory()
-    try:
-        off = {s.athlete_id for s in session.query(GarminPushState).filter_by(auto=False).all()}
-    finally:
-        session.close()
-    for athlete_id in sorted(ids - off):
+    for athlete_id in sorted(ids):
         try:
             r = run_push(athlete_id, session_factory)
             stop = r["stopped"]["message"] if r["stopped"] else ""
@@ -447,16 +480,18 @@ def status_payload(athlete_id):
         state = session.get(GarminPushState, athlete_id)
         links = session.query(GarminWorkoutLink).filter_by(athlete_id=athlete_id, state="active").all()
         pending = _pending_mfa.get(athlete_id)
+        window = push_window(session, athlete_id)
         return {
             "connected": connected(athlete_id),
             "via": "official" if garmin_official.connected(athlete_id) else "connect",
             "library": library_available(),
             "mfa_pending": bool(pending and pending[1] > time.time()),
             "auto": True if state is None else bool(state.auto),
+            "mode": mode_for(window),
             "last_run_at": state.last_run_at.isoformat() + "Z" if state and state.last_run_at else None,
             "last_result": state.last_result if state else None,
             "links": {l.planned_id: link_info(l) for l in links},
-            "window_days": WINDOW_DAYS,
+            "window_days": window,
             "official": garmin_official.status(athlete_id),
         }
     finally:
@@ -557,12 +592,21 @@ def garmin_workouts_disconnect():
 def garmin_workouts_settings():
     athlete_id = get_current_athlete_id()
     body = request.get_json(silent=True)
-    auto = body.get("auto") if isinstance(body, dict) else None
-    if not isinstance(auto, bool):
-        return response_error("auto muss true oder false sein.", "VALIDATION_ERROR", 400)
+    body = body if isinstance(body, dict) else {}
+    mode, auto = body.get("mode"), body.get("auto")
+    if mode is None and isinstance(auto, bool):  # aelterer Browser: nur an/aus
+        mode = "on" if auto else "manual"
+    if mode not in MODES and mode != "on":
+        return response_error("mode muss today, week oder manual sein.", "VALIDATION_ERROR", 400)
     session = get_session()
     try:
-        get_state(session, athlete_id).auto = auto
+        get_state(session, athlete_id).auto = mode != "manual"
+        if mode in ("today", "week"):
+            prefs = session.get(GarminPushPrefs, athlete_id)
+            if prefs is None:
+                prefs = GarminPushPrefs(athlete_id=athlete_id)
+                session.add(prefs)
+            prefs.window_days = MODES[mode]
         session.commit()
     finally:
         session.close()
@@ -577,7 +621,8 @@ def session_factory_for_request():
 @api_bp.route("/garmin/workouts/sync", methods=["POST"])
 def garmin_workouts_sync():
     """{items: [{id, steps, exercises}], only?: [id]} -> Ergebnis des Abgleichs.
-    Ohne only: die naechsten 7 Tage (nur bei eingeschalteter Automatik)."""
+    Ohne only: alles im eingestellten Fenster (heute / 7 Tage); bei "nur per
+    Knopf" nur Aufraeumen und Aktualisieren von Hand gesendeter Einheiten."""
     athlete_id = get_current_athlete_id()
     body = request.get_json(silent=True)
     body = body if isinstance(body, dict) else {}
@@ -585,14 +630,6 @@ def garmin_workouts_sync():
     if only is not None and not (isinstance(only, list) and all(isinstance(i, str) for i in only) and len(only) <= 20):
         return response_error("only muss eine Liste von Einheiten sein.", "VALIDATION_ERROR", 400)
     if only is None:
-        session = get_session()
-        try:
-            state = session.get(GarminPushState, athlete_id)
-            auto = True if state is None else bool(state.auto)
-        finally:
-            session.close()
-        if not auto:
-            return response_success({"skipped": "auto_off", **status_payload(athlete_id)})
         if not connected(athlete_id):
             return response_success({"skipped": "not_connected", **status_payload(athlete_id)})
     result = run_push(athlete_id, session_factory_for_request(), items=body.get("items"), only=only, pin=only is not None)

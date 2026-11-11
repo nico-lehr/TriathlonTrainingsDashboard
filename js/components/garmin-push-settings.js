@@ -1,6 +1,6 @@
 // Einstellungen → Garmin → "Trainings auf die Uhr": einmal mit Garmin
-// anmelden (ggf. mit Zwei-Faktor-Code), Automatik an/aus, Stand der nächsten
-// 7 Tage, "Jetzt abgleichen". Das Passwort geht nur einmal an den eigenen
+// anmelden (ggf. mit Zwei-Faktor-Code), wählen, was automatisch kommt (nur
+// heute / 7 Tage / nur per Knopf), Stand der Einheiten, "Jetzt abgleichen". Das Passwort geht nur einmal an den eigenen
 // Dashboard-Server, wird dort gegen eine Anmeldung getauscht und vergessen.
 // Daten und Abgleich: js/data/garmin-push.js, backend/garmin_push.py.
 
@@ -26,15 +26,24 @@ function gpResultText(r) {
   return parts.length ? parts.join(" · ") : "alles aktuell";
 }
 
+function gpUpcomingTitle() {
+  return garminPush.mode === "week" ? "Nächste 7 Tage" : garminPush.mode === "manual" ? "Von dir gesendet" : "Heute";
+}
+
 function gpUpcomingHtml() {
   const list = garminPushCandidates().sort((a, b) => a.date.localeCompare(b.date)).slice(0, 10);
-  if (!list.length) return `<p class="card-sub gp-empty">In den nächsten 7 Tagen ist nichts geplant, das auf die Uhr kann.</p>`;
+  if (!list.length) {
+    const empty = garminPush.mode === "manual" ? "Noch nichts gesendet. Öffne eine Einheit und tippe auf „An Garmin senden“."
+      : garminPush.mode === "week" ? "In den nächsten 7 Tagen ist nichts geplant, das auf die Uhr kann."
+        : "Heute ist nichts geplant, das auf die Uhr kann. Andere Tage kannst du in der Einheit mit „An Garmin senden“ schicken.";
+    return `<p class="card-sub gp-empty">${empty}</p>`;
+  }
   const failed = new Map(((garminPush.last_result || {}).failed || []).map(f => [f.id, f.message]));
   return `<div class="settings-list gp-list">${list.map(p => {
     const link = garminPush.links[p.id];
     const st = link ? `<span class="gp-st ok"><i></i>Auf der Uhr</span>`
       : failed.has(p.id) ? `<span class="gp-st bad" title="${gpEsc(failed.get(p.id))}">Fehler</span>`
-        : `<span class="gp-st wait">${garminPush.auto ? "Kommt gleich" : "Noch nicht gesendet"}</span>`;
+        : `<span class="gp-st wait">Kommt gleich</span>`;
     const day = new Date(p.date + "T00:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "numeric" });
     return `<div class="settings-list-row gp-row"><span class="gp-what"><b>${gpEsc(p.title || p.sport)}</b><small>${gpEsc(day)} · ${gpEsc(p.sport)}</small></span>${st}</div>`;
   }).join("")}</div>`;
@@ -89,15 +98,20 @@ function renderGarminPushCard() {
     <div class="ai-status-row"><span class="ai-status-dot on" aria-hidden="true"></span>
       <span class="ai-status-text">Verbunden${garminPush.last_run_at ? ` · abgeglichen ${gpEsc(gpWhen(garminPush.last_run_at))}` : ""}</span></div>
     ${err ? `<p class="coach-test-status err">${gpEsc(err)}</p>` : ""}
-    <div class="settings-list">
-      <label class="settings-list-row" for="gp-auto"><span>Automatisch senden</span>
-        <input type="checkbox" id="gp-auto" class="switch" role="switch"${garminPush.auto ? " checked" : ""}></label>
+    <h3 class="gp-h">Was kommt automatisch auf die Uhr?</h3>
+    <div class="settings-list gp-modes" role="radiogroup" aria-label="Was kommt automatisch auf die Uhr?">
+      ${GARMIN_PUSH_MODES.map(m => `
+      <label class="settings-list-row gp-mode">
+        <span class="gp-what"><b>${gpEsc(m.label)}</b><small>${gpEsc(m.sub)}</small></span>
+        <input type="radio" name="gp-mode" value="${m.key}"${garminPush.mode === m.key ? " checked" : ""}>
+      </label>`).join("")}
     </div>
-    <h3 class="gp-h">Nächste 7 Tage</h3>
+    <p class="card-sub settings-list-foot">Jede Einheit kannst du außerdem jederzeit selbst schicken: Einheit öffnen → „An Garmin senden“.</p>
+    <h3 class="gp-h">${gpUpcomingTitle()}</h3>
     ${gpUpcomingHtml()}
     ${gpMsgHtml()}
     <div class="sh-actions">
-      <button type="button" class="cal-today-btn" id="gp-sync-now"${garminPush.busy || !garminPush.auto ? " disabled" : ""}>${garminPush.busy ? "Gleiche ab …" : "Jetzt abgleichen"}</button>
+      <button type="button" class="cal-today-btn" id="gp-sync-now"${garminPush.busy ? " disabled" : ""}>${garminPush.busy ? "Gleiche ab …" : "Jetzt abgleichen"}</button>
       <button type="button" class="reset-link" id="gp-logout">Abmelden</button>
     </div>
     ${gpOfficialHtml()}`;
@@ -139,11 +153,14 @@ function initGarminPushSettings() {
   if (!body) return;
   body.addEventListener("submit", e => { if (e.target.id === "gp-login-form") gpSubmitLogin(e); });
   body.addEventListener("change", async e => {
-    if (e.target.id !== "gp-auto") return;
+    if (e.target.name !== "gp-mode") return;
     try {
-      const res = await apiCall("garmin/workouts/settings", "PUT", { auto: e.target.checked });
+      const res = await apiCall("garmin/workouts/settings", "PUT", { mode: e.target.value });
       setGarminPush(res.data);
-      if (garminPush.auto) runGarminPush();
+      // Gleich abgleichen: neue Einheiten schicken bzw. nicht mehr gewünschte aus Garmin entfernen.
+      const r = await runGarminPush();
+      if (r && r.removed) gpSetMsg(`${r.removed} ${r.removed === 1 ? "Workout" : "Workouts"} aus Garmin Connect entfernt.`, "ok");
+      renderGarminPushCard();
     } catch (err) { gpSetMsg(err.message, "err"); renderGarminPushCard(); }
   });
   body.addEventListener("click", async e => {

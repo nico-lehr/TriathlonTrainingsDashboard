@@ -4,6 +4,17 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.43
+
+**Garmin: Du bestimmst, was auf die Uhr kommt**
+- Neu unter Einstellungen → Garmin: „Was kommt automatisch auf die Uhr?“ mit drei Möglichkeiten:
+  - **Nur heute** (neuer Standard): Am Trainingstag kommt die Einheit des Tages automatisch auf die Uhr – sonst nichts.
+  - **Nächste 7 Tage**: wie bisher, die ganze Woche liegt schon in Garmin Connect.
+  - **Nur per Knopf**: Nichts geht automatisch, du schickst jede Einheit selbst.
+- In jeder geplanten Einheit gibt es den Knopf „An Garmin senden“. Damit schickst du eine Einheit sofort auf die Uhr – auch eine von morgen oder nächster Woche. Von Hand gesendete Einheiten bleiben in Garmin, egal welche Einstellung du gewählt hast.
+- Aufräumen: Einheiten für die kommenden Tage, die bisher automatisch geschickt wurden, werden beim nächsten Abgleich wieder aus Garmin Connect entfernt. Die Einheit von heute und alles, was du selbst geschickt hast, bleibt.
+- In einer Einheit für einen späteren Tag steht jetzt: „Kommt am Trainingstag automatisch auf deine Uhr – oder schick sie jetzt schon.“
+
 ## 2.4.42
 
 **Rad-VO2max: genauere Schätzung**

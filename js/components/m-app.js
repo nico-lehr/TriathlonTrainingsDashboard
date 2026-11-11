@@ -1112,7 +1112,9 @@ function mPlanSheetHtml(p) {
   const garminLabel = st.loading ? "Sende an Garmin …" : watch && watch.kind === "ok" || p.garminSentAt ? "Auf Garmin aktualisieren" : "An Garmin senden";
   const garminNote = st.error ? `<p class="m-say bad small">${mEsc(st.error)}</p><button type="button" class="m-btn ghost wide" data-sh="fit">Stattdessen als .fit-Datei laden</button>`
     : watch ? `<p class="m-sh-note m-watch ${watch.kind}"><i aria-hidden="true"></i>${watch.kind === "ok" ? "Auf deiner Uhr – Änderungen hier landen automatisch auch dort." : "Kommt gleich automatisch auf deine Uhr."}</p>`
-      : p.garminSentAt ? `<p class="m-sh-note">✓ Gesendet am ${mEsc(new Date(p.garminSentAt).toLocaleDateString("de-DE", { day: "numeric", month: "short" }))} – nach dem nächsten Sync auf der Uhr.</p>` : "";
+      : p.garminSentAt ? `<p class="m-sh-note">✓ Gesendet am ${mEsc(new Date(p.garminSentAt).toLocaleDateString("de-DE", { day: "numeric", month: "short" }))} – nach dem nächsten Sync auf der Uhr.</p>`
+        : typeof garminPush !== "undefined" && garminPush.connected && garminPush.auto && garminPush.mode === "today" && p.date > todayStr() && (p.status || "geplant") === "geplant"
+          ? `<p class="m-sh-note">Kommt am Trainingstag automatisch auf deine Uhr – oder schick sie jetzt schon.</p>` : "";
   let primary = "";
   if (p.sport === "Kraft" && typeof plannedToStrengthSession === "function" && plannedToStrengthSession(p)) primary = `<button type="button" class="m-btn primary wide" data-sh="strength">Mitmachen</button>`;
   else if (p.sport === "Mobility" && typeof plannedToMobilitySession === "function" && plannedToMobilitySession(p)) primary = `<button type="button" class="m-btn primary wide" data-sh="mobility">Starten</button>`;

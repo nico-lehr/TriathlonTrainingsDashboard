@@ -37,7 +37,7 @@ test("Kraft und Mobility: Übungen mit Namen, Sätzen, Sekunden und Gewicht aus 
   assert.strictEqual(app.garminSupported({ sport: "Ruhetag" }), false);
 });
 
-test("Mit geht nur Geplantes der nächsten 7 Tage (plus von Hand Gesendetes)", () => {
+test("Mit geht nur Geplantes im eingestellten Fenster (heute / 7 Tage / keins) plus von Hand Gesendetes", () => {
   app.replacePlannedWorkouts([
     { id: "a", date: day(0), sport: "Laufen", duration_min: 40, status: "geplant" },
     { id: "b", date: day(6), sport: "Rad", duration_min: 60, status: "geplant" },
@@ -46,24 +46,34 @@ test("Mit geht nur Geplantes der nächsten 7 Tage (plus von Hand Gesendetes)", (
     { id: "e", date: day(-1), sport: "Laufen", duration_min: 40, status: "geplant" },
     { id: "f", date: day(20), sport: "Schwimmen", duration_min: 40, status: "geplant" },
   ]);
-  vm.runInContext("garminPush.links = { f: { pinned: true } }", app);
-  assert.deepStrictEqual(plain(app.garminPushCandidates().map(p => p.id)).sort(), ["a", "b", "f"]);
+  const ids = () => plain(app.garminPushCandidates().map(p => p.id)).sort();
+  vm.runInContext("garminPush.links = { f: { pinned: true } }; garminPush.auto = true; garminPush.mode = 'week'; garminPush.window_days = 7", app);
+  assert.deepStrictEqual(ids(), ["a", "b", "f"]);
+  vm.runInContext("garminPush.mode = 'today'; garminPush.window_days = 1", app); // Standard: nur heute
+  assert.deepStrictEqual(ids(), ["a", "f"]);
+  vm.runInContext("garminPush.mode = 'manual'; garminPush.auto = false; garminPush.window_days = 0", app); // nur per Knopf
+  assert.deepStrictEqual(ids(), ["f"]);
 });
 
 test("Abgleich schickt Schritte mit, Stand je Einheit", async () => {
   calls.length = 0;
-  app.replacePlannedWorkouts([{ id: "a", date: day(1), sport: "Laufen", duration_min: 40, intensity: "leicht", status: "geplant" },
+  app.replacePlannedWorkouts([{ id: "a", date: day(0), sport: "Laufen", duration_min: 40, intensity: "leicht", status: "geplant" },
     { id: "z", date: day(30), sport: "Schwimmen", duration_min: 45, intensity: "mittel", status: "geplant" }]);
-  vm.runInContext("garminPush = { ...garminPush, loaded: true, connected: true, auto: true, links: {}, busy: false }", app);
+  vm.runInContext("garminPush = { ...garminPush, loaded: true, connected: true, auto: true, mode: 'today', window_days: 1, links: {}, busy: false }", app);
   assert.deepStrictEqual(plain(app.garminWatchStatus({ id: "a" })), { text: "Kommt auf die Uhr", kind: "wait" });
   await app.runGarminPush();
   const sync = calls.find(c => c.url === "garmin/workouts/sync");
   assert.strictEqual(sync.body.items[0].id, "a");
   // detaillierter Ablauf: Einlaufen, Grundlage, 4× Steigerung, Auslaufen
   assert.deepStrictEqual(plain(sync.body.items[0].steps.map(s => s.type)), ["warmup", "interval", "repeat", "cooldown"]);
-  // auch Einheiten weit hinter den 7 Tagen schicken ihre Schritte mit (der Server merkt sie sich)
+  // auch Einheiten weit hinter dem Fenster schicken ihre Schritte mit (der Server merkt sie sich)
   assert.deepStrictEqual(plain(sync.body.items.map(i => i.id)), ["a", "z"]);
   assert.deepStrictEqual(plain(app.garminWatchStatus({ id: "a" })), { text: "Auf der Uhr", kind: "ok" });
+  // "nur per Knopf": der Abgleich läuft trotzdem (räumt auf, aktualisiert Gesendetes)
+  calls.length = 0;
+  vm.runInContext("garminPush.auto = false; garminPush.mode = 'manual'; garminPush.window_days = 0", app);
+  await app.runGarminPush();
+  assert.ok(calls.some(c => c.url === "garmin/workouts/sync"));
   vm.runInContext("garminPush.connected = false", app);
   assert.strictEqual(app.garminWatchStatus({ id: "a" }), null);
 });

@@ -18,7 +18,7 @@ from unittest import mock
 import tools.garmin_sync
 from backend import auth, create_app, garmin_official, garmin_push
 from backend.config import config
-from backend.models import AthleteStore, GarminPushState, GarminWorkoutLink
+from backend.models import AthleteStore, GarminPushPrefs, GarminPushState, GarminWorkoutLink
 
 config.SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
 config.SECRET_KEY = "nur-fuer-tests"
@@ -94,6 +94,7 @@ class PushTestBase(unittest.TestCase):
         session = self.Session()
         session.query(GarminWorkoutLink).delete()
         session.query(GarminPushState).delete()
+        session.query(GarminPushPrefs).delete()
         session.query(AthleteStore).delete()
         session.commit()
         session.close()
@@ -116,6 +117,7 @@ class PushTestBase(unittest.TestCase):
 
     def push(self, **kw):
         kw.setdefault("today", TODAY)
+        kw.setdefault("window_days", 7)  # die Abgleich-Tests rechnen mit "naechste 7 Tage"; Modi: ModusTest
         return garmin_push.run_push(self.aid, self.Session, client_factory=self.factory, **kw)
 
     def links(self):
@@ -229,7 +231,7 @@ class AbgleichTest(PushTestBase):
         self.assertEqual((r["created"], r["stopped"]), (2, None))  # der Rest kommt beim naechsten Mal
 
     def test_ohne_anmeldung_nichts_kaputt(self):
-        self.set_plan([entry("a", "2026-11-10")])
+        self.set_plan([entry("a", "2026-11-09")])
         r = garmin_push.run_push(self.aid, self.Session, today=TODAY)  # echter open_client, aber kein Token
         self.assertEqual(r["stopped"]["code"], "garmin_not_connected")
         self.assertEqual(r["pending"], 1)
@@ -267,21 +269,78 @@ class AbgleichTest(PushTestBase):
         self.assertEqual(set(session.get(GarminPushState, self.aid).details), {"a"})  # Fremdes vergessen
         session.close()
 
-    def test_zeitplan_morgens_nur_mit_anmeldung_und_automatik(self):
-        self.set_plan([entry("a", date.today().isoformat())])
-        os.makedirs(tools.garmin_sync.token_path(self.aid))
+    def test_zeitplan_morgens_nur_mit_anmeldung(self):
+        tomorrow = date.fromordinal(date.today().toordinal() + 1).isoformat()
+        self.set_plan([entry("a", date.today().isoformat()), entry("b", tomorrow)])
         lines = []
         with mock.patch.object(garmin_push, "open_client", self.factory):
             garmin_push.run_scheduled_pushes(self.Session, log=lines.append)
-        self.assertEqual(len(self.fake.workouts), 1)
+        self.assertEqual(lines, [])  # ohne Anmeldung niemand
+        os.makedirs(tools.garmin_sync.token_path(self.aid))
+        with mock.patch.object(garmin_push, "open_client", self.factory):
+            garmin_push.run_scheduled_pushes(self.Session, log=lines.append)
+        self.assertEqual(len(self.fake.workouts), 1)  # Standard "nur heute": morgen kommt erst morgen
         self.assertIn("1 neu", lines[0])
         session = self.Session()
         session.get(GarminPushState, self.aid).auto = False
         session.commit()
         session.close()
-        lines.clear()
-        garmin_push.run_scheduled_pushes(self.Session, log=lines.append)
-        self.assertEqual(lines, [])
+        self.factory_calls = 0
+        with mock.patch.object(garmin_push, "open_client", self.factory):
+            garmin_push.run_scheduled_pushes(self.Session, log=lines.append)
+        self.assertEqual((len(self.fake.workouts), self.factory_calls), (1, 0))  # nur per Knopf: nichts Neues
+
+
+class ModusTest(PushTestBase):
+    """Wie weit automatisch vorausgeschickt wird: heute (Standard), 7 Tage, nur per Knopf."""
+
+    def set_mode(self, mode):
+        session = self.Session()
+        garmin_push.get_state(session, self.aid).auto = mode != "manual"
+        if mode != "manual":
+            session.merge(GarminPushPrefs(athlete_id=self.aid, window_days=garmin_push.MODES[mode]))
+        session.commit()
+        session.close()
+
+    def push(self, **kw):
+        kw.setdefault("today", TODAY)
+        return garmin_push.run_push(self.aid, self.Session, client_factory=self.factory, **kw)
+
+    def test_standard_nur_heute(self):
+        self.set_plan([entry("a", "2026-11-09"), entry("b", "2026-11-10"), entry("c", "2026-11-12")])
+        r = self.push()
+        self.assertEqual((r["created"], set(r["links"])), (1, {"a"}))
+        r = self.push(today=date(2026, 11, 10))  # naechster Morgen: die Einheit von dann
+        self.assertEqual((r["created"], r["removed"]), (1, 0))
+        self.assertEqual(set(r["links"]), {"a", "b"})  # gestrige bleibt (Vergangenheit)
+
+    def test_umstellung_von_7_tagen_auf_heute_raeumt_garmin_auf(self):
+        self.set_mode("week")
+        self.set_plan([entry("a", "2026-11-09"), entry("b", "2026-11-10"), entry("c", "2026-11-12"),
+                       entry("d", "2026-11-14")])
+        self.push()
+        self.assertEqual(len(self.fake.workouts), 4)
+        r = self.push(only=["d"], pin=True)  # von Hand gesendet - bleibt
+        self.set_mode("today")
+        r = self.push()
+        self.assertEqual(r["removed"], 2)
+        self.assertEqual(set(r["links"]), {"a", "d"})
+        self.assertEqual(len(self.fake.workouts), 2)
+
+    def test_nur_per_knopf(self):
+        self.set_mode("week")
+        self.set_plan([entry("a", "2026-11-09"), entry("b", "2026-11-10")])
+        self.push()
+        self.set_mode("manual")
+        self.set_plan([entry("a", "2026-11-09"), entry("b", "2026-11-10"), entry("c", "2026-11-11")])
+        r = self.push()
+        self.assertEqual((r["created"], r["removed"]), (0, 1))  # morgen weg, heute bleibt
+        self.assertEqual(set(r["links"]), {"a"})
+        r = self.push(only=["c"], pin=True)
+        self.assertEqual(r["created"], 1)
+        self.set_plan([entry("a", "2026-11-09"), entry("b", "2026-11-10"), entry("c", "2026-11-11", title="Neu")])
+        r = self.push()  # von Hand gesendet: Aenderungen kommen trotzdem automatisch nach
+        self.assertEqual((r["updated"], set(r["links"])), (1, {"a", "c"}))
 
 
 class EndpunkteTest(PushTestBase):
@@ -298,15 +357,25 @@ class EndpunkteTest(PushTestBase):
                             ("PUT", "settings"), ("POST", "sync")):
             self.assertEqual(self.client.open(f"/api/v1/garmin/workouts/{url}", method=method, json={}).status_code, 401)
 
-    def test_status_und_automatik_aus(self):
+    def test_status_und_modus(self):
         r = self.client.get("/api/v1/garmin/workouts/status", headers=self.h).get_json()["data"]
-        self.assertEqual((r["connected"], r["auto"], r["official"]["available"]), (False, True, False))
-        r = self.client.put("/api/v1/garmin/workouts/settings", headers=self.h, json={"auto": False})
-        self.assertFalse(r.get_json()["data"]["auto"])
+        self.assertEqual((r["connected"], r["auto"], r["mode"], r["window_days"], r["official"]["available"]),
+                         (False, True, "today", 1, False))
+        put = lambda body: self.client.put("/api/v1/garmin/workouts/settings", headers=self.h, json=body)
+        d = put({"mode": "week"}).get_json()["data"]
+        self.assertEqual((d["auto"], d["mode"], d["window_days"]), (True, "week", 7))
+        d = put({"mode": "manual"}).get_json()["data"]
+        self.assertEqual((d["auto"], d["mode"], d["window_days"]), (False, "manual", 0))
+        d = put({"auto": True}).get_json()["data"]  # aelterer Browser: wieder an = zuletzt gewaehlt
+        self.assertEqual(d["mode"], "week")
+        d = put({"auto": False}).get_json()["data"]
+        self.assertEqual(d["mode"], "manual")
         os.makedirs(tools.garmin_sync.token_path(self.aid))
         r = self.client.post("/api/v1/garmin/workouts/sync", headers=self.h, json={}).get_json()["data"]
-        self.assertEqual(r["skipped"], "auto_off")
-        self.assertEqual(self.client.put("/api/v1/garmin/workouts/settings", headers=self.h, json={"auto": "ja"}).status_code, 400)
+        self.assertNotIn("skipped", r)  # nur per Knopf: Abgleich raeumt trotzdem auf
+        self.assertEqual(r["created"], 0)
+        self.assertEqual(put({"auto": "ja"}).status_code, 400)
+        self.assertEqual(put({"mode": "monat"}).status_code, 400)
 
     def test_sync_ohne_anmeldung_ueberspringt(self):
         r = self.client.post("/api/v1/garmin/workouts/sync", headers=self.h, json={}).get_json()["data"]
@@ -419,7 +488,7 @@ class OffiziellTest(PushTestBase):
             self.assertEqual(r.status_code, 400)
             self.assertEqual(oct(os.stat(garmin_official.token_file(self.aid)).st_mode & 0o777), "0o600")
 
-            self.set_plan([entry("a", "2026-11-10", intensity="mittel")])
+            self.set_plan([entry("a", "2026-11-09", intensity="mittel")])
             r = garmin_push.run_push(self.aid, self.Session, today=TODAY)
             self.assertEqual((r["created"], r["stopped"]), (1, None))
             upload = next(c for c in calls if c[0] == "POST" and c[1].endswith("/workout/v2"))
@@ -429,7 +498,7 @@ class OffiziellTest(PushTestBase):
             self.assertEqual((main["intensity"], main["durationType"], main["targetType"], main["targetValue"]),
                              ("INTERVAL", "TIME", "HEART_RATE", 3))
             sched = next(c for c in calls if c[1].endswith("/training-api/schedule"))
-            self.assertEqual(sched[2], {"workoutId": 777, "date": "2026-11-10"})
+            self.assertEqual(sched[2], {"workoutId": 777, "date": "2026-11-09"})
             session = self.Session()
             self.assertEqual(session.query(GarminWorkoutLink).filter_by(planned_id="a").one().via, "official")
             session.close()

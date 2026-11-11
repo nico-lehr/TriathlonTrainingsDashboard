@@ -435,10 +435,25 @@ class GarminWorkoutLink(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class GarminPushPrefs(Base):
+    """Wie weit "Trainings auf die Uhr" automatisch vorausschickt (je Person).
+
+    window_days: 1 = nur die Einheiten von heute (Standard), 7 = die naechsten
+    7 Tage. "Nur per Knopf" ist GarminPushState.auto = False. Neue Tabelle
+    statt neuer Spalte (create_all legt sie in einer vorhandenen training.db an).
+    """
+    __tablename__ = "garmin_push_prefs"
+
+    athlete_id = Column(Integer, primary_key=True)
+    window_days = Column(Integer, nullable=False, default=1)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class GarminPushState(Base):
     """Einstellungen und letzter Stand von "Trainings auf die Uhr" je Person.
 
-    auto: die naechsten 7 Tage automatisch abgleichen.
+    auto: automatisch abgleichen (wie weit: GarminPushPrefs.window_days);
+          aus = nur von Hand gesendete Einheiten ("Nur per Knopf").
     details: {planned_id: {steps, exercises}} - die Schritte so, wie der
     Browser sie berechnet (Pace-Bereiche aus den eigenen Zonen), damit auch
     der naechtliche Abgleich sie hat.
