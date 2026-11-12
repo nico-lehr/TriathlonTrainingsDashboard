@@ -4,6 +4,15 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.44
+
+**Neue Projektseite auf GitHub**
+- Das README ist neu: auf Englisch (README.md) und auf Deutsch (README.de.md), mit Bildern aus der App (nur erfundene Beispieldaten), einem Preisvergleich mit bezahlten Trainings-Apps, einer Übersicht aller Funktionen und einem Schnellstart.
+- Die ausführliche Installationsanleitung aus dem alten README steht jetzt in docs/INSTALLATION.md.
+
+**Kleine Korrektur**
+- Einstellungen → Garmin: Steht in der Liste auch eine Einheit, die du selbst an Garmin geschickt hast, heißt die Überschrift jetzt „Heute + von dir gesendet“ statt nur „Heute“.
+
 ## 2.4.43
 
 **Garmin: Du bestimmst, was auf die Uhr kommt**

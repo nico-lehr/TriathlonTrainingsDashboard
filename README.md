@@ -1,365 +1,274 @@
-# Triathlon Trainings-Dashboard
+<div align="center">
 
-Ein Trainings-Tagebuch für Triathleten, das auf deinem eigenen PC (Windows
-oder Mac) läuft. Es liest die Trainingsdateien deiner Garmin-Uhr ein und
-macht daraus übersichtliche Auswertungen — Wochenumfang, Form, Bestzeiten,
-Erholung, Trainingsplan mit Regel-Prüfung, Wettkampf-Countdown.
+# 🏊 🚴 🏃 Triathlon Training Dashboard
 
-**Alles bleibt auf deinem Rechner.** Kein Cloud-Konto, keine monatlichen
-Kosten. Bis zu ein paar Freunde können sich über **Tailscale** (ein privates
-Netz nur für eure Geräte) mit eigenem Benutzernamen anmelden — jede Person
-sieht nur ihre eigenen Daten. Auch am Handy (iPhone: „Zum Home-Bildschirm“).
+**Your own AI triathlon coach, training log and Garmin workout planner, self-hosted and free.**
 
-> **Empfohlen: auf einem Raspberry Pi betreiben.** Dann läuft das
-> Dashboard Tag und Nacht bei dir zu Hause, ist unter einer festen
-> https-Adresse von überall erreichbar, und jede Person hat ihr eigenes
-> Konto. Anleitung für Einsteiger:
-> **[docs/RASPBERRY_PI_ANLEITUNG.md](docs/RASPBERRY_PI_ANLEITUNG.md)**.
-> Die Kurzfassung unten beschreibt den Betrieb auf einem Mac/PC.
+It does what TrainingPeaks, TriDot or Garmin Connect+ do, without a subscription,<br>
+and your health data never leaves your own hardware.
 
-> **Wichtig:** `index.html` lässt sich nicht mehr per Doppelklick öffnen.
-> Das Dashboard läuft jetzt als kleiner Server auf deinem PC: du startest
-> ihn (`start.bat` / `start.sh`) und öffnest dann http://localhost:5000 im
-> Browser. Die Demo-Version (`build-demo.py`) geht weiterhin ohne Server.
+[![Latest release](https://img.shields.io/github/v/release/nico-lehr/TriathlonTrainingsDashboard?label=release&color=0a84ff)](https://github.com/nico-lehr/TriathlonTrainingsDashboard/releases)
+![Self-hosted](https://img.shields.io/badge/self--hosted-Raspberry%20Pi%20%7C%20Mac%20%7C%20Windows-30d158)
+![Cost](https://img.shields.io/badge/subscription-%240%20%2F%20year-30d158)
+![Python](https://img.shields.io/badge/backend-Python%203%20%C2%B7%20Flask%20%C2%B7%20SQLite-3776ab)
+![No build step](https://img.shields.io/badge/frontend-vanilla%20JS%2C%20no%20build-f7df1e)
+[![Stars](https://img.shields.io/github/stars/nico-lehr/TriathlonTrainingsDashboard?style=social)](https://github.com/nico-lehr/TriathlonTrainingsDashboard/stargazers)
 
----
+**English** · [Deutsch](README.de.md)
 
-# Einrichtung — Schritt für Schritt
+<img src="docs/images/hero-phones.png" alt="Today view, a structured workout, the calendar and the coach on a phone" width="100%">
 
-Dauert etwa 10 Minuten. **Vorkenntnisse sind nicht nötig.** Die
-ausführliche Anleitung (Tailscale, Freunde, Backups, iPhone, Probleme) steht
-in **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** — hier nur die Kurzfassung.
+</div>
 
-## Schritt 1 — Python installieren
-
-Von [python.org](https://www.python.org/downloads/) herunterladen und
-installieren (normaler Installer). **Windows:** im Installer unbedingt
-„Add python.exe to PATH“ ankreuzen. Mac: ist es oft schon da.
-
-## Schritt 2 — Die Dateien herunterladen
-
-1. Öffne **https://github.com/nico-lehr/TriathlonTrainingsDashboard**
-2. Klicke auf den grünen Knopf **`< > Code`** → **`Download ZIP`**.
-3. Die ZIP-Datei entpacken (Doppelklick). Den entstandenen Ordner dorthin
-   legen, wo du ihn wiederfindest (z. B. „Dokumente“).
-
-## Schritt 3 — Starten
-
-- **Windows:** im Ordner `start.bat` doppelklicken.
-- **Mac:** Terminal öffnen (`⌘` + Leertaste, „Terminal“, Enter), dort
-  `bash ` tippen (mit Leerzeichen!), die Datei `start.sh` aus dem Ordner in
-  das Fenster ziehen und Enter drücken.
-
-Beim ersten Start werden die nötigen Bibliotheken installiert und die Datei
-`.env` mit einem geheimen Schlüssel angelegt. **Das Fenster muss offen
-bleiben**, solange das Dashboard laufen soll.
-
-## Schritt 4 — Dich selbst als Benutzer anlegen
-
-In einem **zweiten** Fenster (Windows: Eingabeaufforderung im Projektordner,
-Mac: Terminal) eingeben:
-
-```
-python backend/create_user.py
-```
-
-(Mac: `python3`.) Benutzername und Passwort (mindestens 10 Zeichen)
-eingeben. **Lege zuerst dich selbst an, danach deine Freunde** — wer zuerst
-angelegt wird, bekommt alle schon vorhandenen Daten zu sehen. Eine
-Registrierungsseite gibt es bewusst nicht.
-
-## Schritt 5 — Im Browser öffnen
-
-**http://localhost:5000** → anmelden. Fertig. Freunde dazuholen:
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), Abschnitt 2.
+> [!NOTE]
+> The app's interface is currently **in German**. The code, docs and this README are open to everyone, and translations are very welcome.
 
 ---
 
-# Deine Trainingsdaten holen
+## 💸 Why this exists
 
-Nach der Einrichtung ist das Dashboard noch leer. Drei Möglichkeiten.
-(**Mac:** in allen Befehlen hier `python3` statt `python` schreiben.)
+Serious amateur triathletes usually end up paying for **several subscriptions at once**:
 
-## Möglichkeit A — Automatisch von Garmin Connect (offizielle Schnittstelle)
-
-1. Einmalig am PC: `python -m pip install -r requirements.txt`
-2. Jede Person erstellt in Garmin Connect ihren eigenen Schlüssel:
-   Einstellungen → **Personal API**
-   (https://connect.garmin.com/app/settings/personalApiToken).
-3. Im Dashboard: Einstellungen → **Garmin-Verbindung** → Schlüssel
-   einfügen → „Schlüssel prüfen & speichern“ → **„Jetzt von Garmin holen“**.
-
-Kein Garmin-Passwort nötig, der Schlüssel kann nur lesen. Danach holt auch
-`python tools/garmin_sync.py` am PC die Daten **aller** Personen mit
-Schlüssel. Für „An Garmin senden“ (Workouts auf die Uhr) braucht es
-zusätzlich die alte Anmeldung (`python tools/garmin_sync.py --login --athlete 1`).
-Alle Einzelheiten: [docs/GARMIN_SYNC_GUIDE.md](docs/GARMIN_SYNC_GUIDE.md).
-
-## Möglichkeit B — Eigene `.fit`-Dateien ohne Garmin-Konto
-
-Im Dashboard oben rechts auf **Aktualisieren** klicken und den Ordner mit
-den `.fit`-Dateien auswählen (oder einzelne Dateien hineinziehen). Sie
-werden auf dem Server gespeichert; Doppeltes wird ignoriert.
-Dafür brauchst du kein Garmin-Konto.
-
-## Möglichkeit C — Daten vom alten Doppelklick-Dashboard übernehmen
-
-Siehe [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), „Deine bisherigen Daten
-übernehmen“ (einmaliger Export + Import).
-
----
-
-# Der Alltag danach
-
-Auf dem Mac in allen Befehlen `python3` statt `python` schreiben.
-
-| Was du willst | Was du tust |
-|---|---|
-| Dashboard starten | `start.bat` (Windows) / `start.sh` (Mac) |
-| Dashboard ansehen | http://localhost:5000 (Freunde: `http://<PC-Name>:5000`) |
-| Neue Trainings holen | `python tools/garmin_sync.py` |
-| Benutzer anlegen / Passwort vergessen | `python backend/create_user.py` / `… --reset` |
-| Sicherung machen | `backup.bat` / `python backup.py` (läuft auch automatisch bei jedem Start) |
-| Neue Version installieren | Hinweis oben im Dashboard → „Installieren“ (nur für dich als Betreiber; siehe [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), „Updates“) |
-| Dauerhaft auf einem Raspberry Pi | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), Abschnitt 9 (ein Installationsbefehl, startet von selbst) |
-| Auf dem iPhone | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), Abschnitt 6 (Tailscale) oder Abschnitt 8 (VS Code-Port-Weiterleitung, ohne Tailscale) |
-
----
-
-# Wenn etwas nicht klappt
-
-Eine Tabelle mit den häufigsten Problemen (Server nicht erreichbar, Port
-belegt, Firewall, Passwort vergessen, KI antwortet nicht) steht in
-[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), Abschnitt 5. Zwei Klassiker:
-
-- **„Server nicht erreichbar“ beim Anmelden:** Das Start-Fenster ist
-  geschlossen, oder du hast `index.html` per Doppelklick geöffnet. Starte
-  den Server (Schritt 3) und rufe http://localhost:5000 auf.
-- **Die Synchronisierung bricht mit einem Anmeldefehler ab:** Garmin ändert
-  gelegentlich etwas an seiner Schnittstelle. Meistens hilft ein Update:
-  `python -m pip install -U garminconnect curl_cffi`
-
----
-
-# Was mit deinen Daten passiert
-
-- **Alles bleibt auf deinem PC** (Datei `training.db`). Nach außen spricht
-  der Server nur mit: Claude bzw. Ollama (KI), Garmin
-  (Sync und „An Garmin senden“, mit dem Zugangsschlüssel der jeweiligen
-  Person), Open-Meteo (Wetter, nur der Ortsname bzw. die Koordinaten
-  deines Heimatorts, falls du einen einstellst) und GitHub (einmal am Tag
-  „gibt es eine neue Version?“, beim Installieren der Download – dazu
-  Python-Bibliotheken von PyPI). An GitHub und PyPI gehen keine
-  persönlichen Daten.
-- **Jede Person sieht nur ihre eigenen Daten.** Ohne Anmeldung ist nur die
-  Login-Seite erreichbar; Passwörter werden nur als Hash gespeichert.
-- **Garmin-Passwörter werden nie gespeichert.** Garmin-Schlüssel und
-  -Token liegen außerhalb des Projektordners (`~/.triathlon/`) und sind nur
-  für deinen Computer-Benutzer lesbar.
-- `.env`, `training.db`, `backups/` und alle Trainingsdaten sind so
-  eingerichtet, dass sie **nicht versehentlich ins Internet hochgeladen**
-  werden (`.gitignore`) und der Server sie **nie ausliefert**.
-- Nutzt du den KI-Coach mit Claude (optional), gehen zusammengefasste
-  Kennzahlen und dein Trainingsprofil an Anthropic. Der Claude-Schlüssel
-  liegt nur auf dem Dashboard-Server (`~/.triathlon/claude_api.json`, nur
-  für deinen Computer-Benutzer lesbar), nie im Browser. Mit Ollama bleibt
-  auch das komplett lokal.
-
----
-
-# Für Fortgeschrittene
-
-### Voraussetzungen im Überblick
-
-| Wofür | Was nötig ist | Pflicht? |
+| What you need | Typical paid product | List price* |
 |---|---|---|
-| Dashboard betreiben | Python 3 (aktuelle Version; `start.bat`/`start.sh` installieren den Rest) und ein Browser | **ja** |
-| Freunde / Handy | Tailscale (kostenlos) | optional |
-| Automatische Garmin-Synchronisierung, „An Garmin senden“ | Garmin-Konto und einmalig `python -m pip install -r requirements.txt` | optional |
-| KI-Coach | ein Claude-Schlüssel (Anthropic) **oder** Ollama auf dem Dashboard-PC | optional |
+| Training log & analytics (fitness / fatigue / form) | TrainingPeaks Premium | $134.99 / year |
+| Adaptive AI training plan | Athletica · Humango · TriDot | $189 / year · ~$29 / month · tiers from $14.99 |
+| Premium watch insights | Garmin Connect+ | $69.99 / year (€89.99) |
+| Social / segments, optional | Strava | $79.99 / year |
+| **A typical stack** (TrainingPeaks + Athletica + Connect+) | | **≈ $394 every year** |
+| **This project** | **open code, runs on your own hardware** | **$0** |
 
-### KI-Coach einrichten (optional)
+<sub>* US list prices as published by the vendors or their app-store listings, checked November 2026. Prices change, taxes vary by country. All product names are trademarks of their owners; this project is not affiliated with any of them.</sub>
 
-Der Coach-Bereich wertet einzelne Einheiten aus und erstellt Trainingspläne
-und Empfehlungen (heute / diese Woche / nächste Woche). Jeder KI-Plan wird
-zusätzlich vom Regelwerk des Dashboards geprüft (siehe unten).
+**The only optional running costs:**
 
-- **Claude (empfohlen):** Schlüssel auf
-  [console.anthropic.com](https://console.anthropic.com/settings/keys)
-  erstellen und als Betreiber in den Einstellungen → **KI-Coach** eintragen.
-  Er liegt dann nur auf dem Dashboard-Server; alle deine Geräte nutzen ihn.
-  Mit „Für alle Personen freigeben“ dürfen auch deine Freunde Claude nutzen
-  (über dein Guthaben). Modell wählbar: Opus 5.5 (beste Qualität, Standard),
-  Sonnet 5.5 oder Haiku 5.5 (am günstigsten).
-- **Lokal mit Ollama** (kostenlos, nichts verlässt den Rechner), wenn kein
-  Claude eingerichtet ist:
-  [ollama.com](https://ollama.com) auf dem Dashboard-PC installieren, dann
-  `ollama pull llama3.1`. Die Freunde brauchen kein eigenes Ollama — ihr
-  Browser fragt den Dashboard-Server, der fragt Ollama. Anderer Rechner:
-  `OLLAMA_URL=http://…:11434` in `.env` eintragen.
-
-Ohne beides funktioniert alles andere normal — nur der Coach-Bereich bleibt leer.
-
-### Ordnerstruktur
-
-```
-start.bat / start.sh    Server starten (installiert beim ersten Mal alles, startet nach Updates neu)
-VERSION                 Installierte Programmversion (für die Update-Prüfung)
-CHANGELOG.md            Was ist neu – je Version
-backup.py / backup.bat  Datenbank sichern (backups/, die letzten 14)
-
-index.html, login.html  Dashboard und Anmeldung (vom Server ausgeliefert)
-css/  js/               Der Programmcode im Browser
-manifest.json, icons/   „Zum Home-Bildschirm“ (iPhone/Android)
-
-backend/                Server (Flask + SQLite): Login, API, Datenbank
-tools/garmin_sync.py    Holt die Daten von Garmin (alle Benutzer)
-docs/                   Anleitungen und technische Dokumentation
-tests/js/               Tests der Rechenlogik (node --test tests/js/)
-
-training.db             Deine Daten (entsteht beim Start, nie im Repository)
-.env                    Geheimer Schlüssel (entsteht beim Start, nie im Repository)
-```
-
-Weitere Tests: `python -m unittest discover -s backend -t .` (Server, Login,
-Datentrennung). Die Datei-Übersicht steht in `docs/PROJECT_MAP.md`.
+- **AI coach:** you pay per request with your own Claude API key. That is usually a few cents per request, and the app shows the exact cost per model and per task. With [Ollama](https://ollama.com) it runs locally for **free**.
+- **Hardware:** a Raspberry Pi (one-off purchase) if you want it running 24/7. Any Mac or Windows PC works too.
 
 ---
 
-## Funktionen
+## ✨ What you get
 
-- **Übersicht**: Trainingsumfang pro Woche, Verteilung nach Sportart,
-  Fitness & Form (Performance Management Chart mit CTL/ATL/TSB wie bei
-  TrainingsPeaks), Trainingsbelastungsverhältnis (ACWR) als Tacho-Gauge,
-  Trainingsbelastungsfokus (polarisiertes Training nach Seiler,
-  niedrig-/hoch-aerob/anaerob), Herzfrequenz-Zonen, Pace-/Geschwindigkeits-
-  entwicklung je Sportart, filterbare Workout-Tabelle mit Detailansicht.
-- **Detailansicht je Einheit**: Puls- und Pace-/Geschwindigkeitsverlauf,
-  plus — soweit vom Gerät/Zubehör aufgezeichnet — Höhenprofil, Schritt-
-  bzw. Trittfrequenz-Verlauf, Leistungsverlauf, Bodenkontaktzeit- und
-  vertikales-Verhältnis-Verlauf sowie Kennzahlen wie Ø/Max-Kadenz,
-  Ø/Max-/Normalized Power, vertikale Oszillation, Schrittlänge und
-  Gesamtschritte. Lauf-Dynamik (Bodenkontaktzeit, vertikales Verhältnis,
-  vertikale Oszillation) und Leistung brauchen einen kompatiblen Brustgurt
-  (z. B. HRM-Pro Plus) bzw. einen Running-Dynamics-Pod oder eine
-  Leistungsmess-Quelle — ohne passendes Zubehör zeichnet die Uhr diese
-  Werte nicht auf, dann bleibt der jeweilige Chart schlicht weg.
-- **Kalender**: Monatsansicht wie bei TrainingsPeaks — jede Zeile eine
-  Kalenderwoche, jede Spalte ein Wochentag, rechts die Wochenzusammenfassung
-  (Zeit, Trainingsbelastung, Zeit je Sportart). Monatsnavigation und
-  Sportart-Filter.
-- **Rekorde**: Persönliche Bestleistungen je Sportart, angelehnt an die
-  Personal-Records-Ansicht von TrainingsPeaks (schnellste 1/5/10 km beim
-  Laufen, 10/20/40 km beim Rad, beste Pace beim Schwimmen, längste
-  Distanz/Dauer, Höhengewinn, Herzfrequenzwerte, Trainingsbelastung,
-  Kalorien, höchste je erreichte Fitness).
-- **Coach**: modularer, per Drag & Drop frei umsortierbarer Kartenbereich
-  (eigenes Layout, unabhängig von der Übersicht), mit den Ollama-Zugangs-
-  daten dezent hinter einem Zahnradmenü. Vor der ersten Nutzung ist der
-  Bereich hinter einem minimalistischen Onboarding-Gate verborgen (zentraler
-  Button, Hintergrund unscharf) — erst nach Abschluss des kurzen
-  Onboarding-Assistenten (oder bewusstem Überspringen) wird der Coach-Bereich
-  sichtbar. Der Fragenkatalog fragt Erfahrung, Stärken/Schwächen, Alter,
-  anklickbare Trainingstage (inkl. Verfeinerung: welcher Tag ist Schwimmtag,
-  welche Tage sind lange Einheiten), typische Einheitendauer, verfügbare
-  Wochenstunden, optionale Leistungswerte sowie das aktuelle Ziel ab und legt
-  daraus Athletenprofil und Ziel direkt an; alles lässt sich jederzeit auch
-  einzeln nachpflegen. Aus Profil (inkl. Trainingstage-Plan), Ziel-Events
-  (Datum/Zielzeit) und der aktuellen Form lässt sich eine Trainingsempfehlung
-  generieren — der Kontext (Fitness/Ermüdung/ACWR, Trainingsumfang,
-  persönliche Bestzeiten, Profil, Erholungs-Check, Ziel) wird dabei bewusst
-  als kompakter Text statt verschachteltem JSON an das Modell übergeben, um
-  Tokens/Latenz zu sparen, ohne Informationen zu verlieren. Läuft über ein
-  lokales KI-Modell via [Ollama](https://ollama.com) (kein Cloud-Dienst,
-  keine Kosten, keine Daten verlassen den Rechner).
-- **Daten aktualisieren**: Menü mit zwei Wegen, neue `.fit`-Dateien
-  einzulesen — der bisherige Ordner-Scan ("Aktualisieren") oder eine
-  Drag-&-Drop-Fläche für einzelne Dateien (mit Klick-Fallback zur
-  Dateiauswahl). Beide laufen über dieselbe Einlese- und
-  Zusammenführungs-Logik, nichts wird ersetzt.
-- Sticky Menüleiste (bleibt beim Scrollen oben sichtbar), manueller
-  Hell/Dunkel-Schalter (übersteuert bei Bedarf die Betriebssystem-
-  Einstellung), Micro-Animationen, responsives Layout.
-- Workout-Tabelle mit Ausklappen/Einklappen (Vorschau der letzten 10
-  Einheiten, "Alle anzeigen"-Button bei Bedarf).
-- Übersicht- und Coach-Karten (je eigenes Layout) per Drag & Drop frei
-  umsortierbar (Griff oben rechts an jeder Karte), Reihenfolge wird pro
-  Gerät gespeichert, mit "Layout zurücksetzen".
-- Erholungs-Check im Coach-Tab (Muskelkater inkl. Lokalisierung, Energie,
-  Verletzung), fließt automatisch in die nächste Trainingsempfehlung ein
-  und wird täglich zurückgesetzt — die Werte des Vortags landen in einem
-  Logbuch (letzte 90 Tage), das der KI-Coach für spätere Auswertungen zur
-  Verfügung steht.
-- Design: dezenter Parallax-Effekt im Kopfbereich, Gradient-Titel/Logo und
-  3D-Tilt-Effekt auf den Kennzahlen-Kacheln in der Übersicht.
-- **Trainingsplaner mit Regelwerk**: Der Plan (KI oder von Hand) wird gegen
-  7 feste Regeln geprüft — nie zwei harte Tage hintereinander, höchstens 3
-  harte Einheiten pro Woche und ~80 % locker, mindestens ein freier Tag,
-  Wochenumfang höchstens +10 % mit Entlastungswoche, nach Belastungsspitze
-  oder schlechter Erholung nur locker, lockere Grundlage je Ziel-Sportart,
-  nach dem Wettkampf nur locker. Beim Verschieben im Kalender erscheint ein
-  Hinweis („Trotzdem verschieben“ bzw. ein Vorschlag per Klick); KI-Pläne
-  werden korrigiert oder abgelehnt. Terminwünsche („Donnerstag schwimmen“)
-  plant die KI fest ein.
-- **Wettkampf-Countdown & Periodisierung**: Tage bis zum Hauptevent, aktuelle
-  Phase (Grundlage / Aufbau / Spezifisch / Taper / Erholung) mit Erklärung und
-  Zielumfang je Woche.
-- **Analyse-Tab**: Sport-Balance (Schwimmen/Rad/Laufen gegen Ziel), Schwimm-CSS
-  und Trend, Rad-FTP-Schätzung mit Leistungszonen, Koppeltraining.
-- **Rennplan** je Ziel: Tempo je Disziplin aus der Zielzeit, Checklisten
-  (Wechselzone, Verpflegung), Rennwoche.
-- **„An Garmin senden“**: geplante Lauf-/Rad-/Schwimmeinheit mit Schritten
-  direkt in den Garmin-Kalender (Uhr holt sie beim nächsten Sync); `.fit`-Export
-  als Plan B.
-- **Wetter im Kalender** (7-Tage-Vorhersage für deinen Heimatort),
-  **Material** (Schuhe, Rad, Verschleißteile mit Kilometerstand).
-- **Handy**: Layout für iPhone/Android, als App auf den Home-Bildschirm legbar.
+<table>
+<tr>
+<td width="50%" valign="top">
 
-## Funktionsweise
+### 🤖 An AI coach that actually adapts
+- **Generates your whole plan** from your goal race, available days, swim days, long-session day, weekly hours and strength wishes.
+- **Daily plan check:** it looks at today and tomorrow every day, the rest of the week every 3 days, and further ahead once a week. After a bad night (low HRV, high resting HR, elevated skin temperature) it **turns a hard session into an easy one** and tells you why, with a one-tap undo.
+- **"Tell the coach"**: type *"spontaneously swimming 45 min today"* and it re-plans the next 7 days.
+- **7 hard training rules** check every plan, from the AI or your own: no two hard days in a row, ~80 % easy, max +10 % volume per week, deload weeks, a rest day, easy after races, and more.
 
-`start.bat` / `start.sh` startet über `backend/launcher.py` den Server
-`backend/app.py` (waitress; nach einem Update startet der Starter ihn neu). Der Server
-liefert die Webseite (`index.html`, `login.html`, `css/`, `js/`, `icons/`) und
-die API unter derselben Adresse aus — nur diese Erlaubt-Liste, nichts sonst.
-Alle persönlichen Daten liegen in `training.db` (SQLite), jede Zeile mit der
-Nummer der Person; jede Anfrage prüft den Login und filtert danach. Der
-Browser hält nur Login-Token, Hell/Dunkel-Design und Geräte-Einstellungen.
+</td>
+<td width="50%" valign="top" align="center">
+<img src="docs/images/mobile-plan-check.png" alt="Plan check: the coach swapped intervals for an easy run because HRV was low" width="300">
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top" align="center">
+<img src="docs/images/mobile-workout.png" alt="Structured workout with steps and a 'Send to Garmin' button" width="300">
+</td>
+<td width="50%" valign="top">
 
-| Datei | Zweck |
-|---|---|
-| `index.html`, `css/`, `js/` | Der Quelltext des Dashboards (Struktur, Styles, Logik) — reiner Code, keine persönlichen Daten. |
-| `backend/` | Server: Login (`auth.py`), API (`routes.py`, `dashboard_routes.py`, …), Tabellen (`models.py`). |
-| `tools/garmin_sync.py` | Garmin-Sync für alle Benutzer, schreibt in die Datenbank. |
-| `parse_fit.py`, `build_dashboard.py` | Altes Einzelplatz-Werkzeug: `.fit`-Ordner → `workouts.json`; dessen Inhalt übernimmt `backend/import_workouts_json.py` einmalig in die Datenbank. |
-| `verify_parser.py` | Playwright-Test, der den JS-Parser im Browser Feld für Feld gegen die Python-Referenz vergleicht. |
+### ⌚ Workouts straight to your Garmin watch
+- Every planned session becomes a **structured Garmin workout**: warm-up, intervals with repeats and rests, cool-down, and target zones from *your* pace, power and heart-rate values.
+- **Swims in metres**, like Garmin Coach: drills, 10 × 100 m with 20 s rest, stroke type, pool length.
+- **Strength and mobility too**, with exercises, sets, reps and weights.
+- You choose what lands on the watch: **only today's session** (default), **the next 7 days**, or **only when you tap "Send to Garmin"**. Moved, edited or deleted sessions are synced automatically.
 
-Die Datei-Übersicht steht in `docs/PROJECT_MAP.md`, die Datenformen in
-`docs/DATA_MODEL.md`, der Betrieb in `docs/DEPLOYMENT.md`.
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
 
-## Hintergrund der Kennzahlen
+### 📊 "Is my value good?" for every session
+- Cadence, ground contact time, vertical ratio, power, heart rate, pace, SWOLF, CSS and more, each with a **colour scale**, **better or worse than usual** (compared with your runs at a similar pace) and a plain-language **"What does this mean?" + tip**.
+- **Fitness / fatigue / form** (CTL/ATL/TSB), ACWR, polarised-training split, HR zones, personal records, FTP and CSS estimates, run & bike VO2max.
+- **AI analysis** of single sessions that knows what was planned that day and how you slept.
 
-- **PMC (CTL/ATL/TSB)**: Performance-Management-Chart-Methodik, wie sie u. a.
-  TrainingsPeaks verwendet — CTL (Fitness, 42-Tage-EWMA), ATL (Ermüdung,
-  7-Tage-EWMA), TSB = CTL − ATL (Form).
-- **ACWR**: Acute:Chronic Workload Ratio nach Gabbett (2016) — Verhältnis aus
-  kurzfristiger (7 Tage) zu langfristiger (42 Tage) Trainingsbelastung.
-- **Polarisiertes Training**: ~80/10/10-Verteilung nach Seiler zwischen
-  niedrig-aerobem, hoch-aerobem und anaerobem Trainingsanteil.
+</td>
+<td width="50%" valign="top" align="center">
+<img src="docs/images/mobile-insights.png" alt="Cadence rated with a colour scale, compared with similar runs, with explanation and tip" width="300">
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top" align="center">
+<img src="docs/images/mobile-strength.png" alt="Follow-along strength training with stick-figure animation" width="300">
+</td>
+<td width="50%" valign="top">
 
-## Technik
+### 🏋️ Strength & mobility built in
+- **50 strength exercises** and **33 mobility exercises**, each with an animated stick figure, steps, common mistakes and easier or harder variants.
+- **Follow-along mode** for your phone: big timer, side switch, "set done", and the screen stays on.
+- Bodyweight, dumbbells, kettlebell, band or gym: the plan uses what you have, and it remembers your weights.
 
-Im Browser reines Vanilla JavaScript/HTML/CSS ohne Frameworks und ohne
-Build-Step; dahinter ein kleiner Python-Server (Flask + SQLite, waitress).
-Modular aufgeteilt nach Verantwortlichkeit (Struktur/Styling/Logik/Daten/
-Analytics/KI/Komponenten, siehe `docs/PROJECT_MAP.md`). Berechnungen
-(Belastung, Planregeln, Periodisierung) sind reine Funktionen ohne Browser-
-Zugriff und deshalb per `node --test tests/js/` testbar. Der FIT-Binärparser
-(inkl. komprimierter Zeitstempel und Developer-Feldern) ist von Hand
-geschrieben, damit der Browser keine externen Abhängigkeiten braucht.
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
 
-## Lizenz
+### 🏁 Races, recovery & everyday life
+- **Races in detail:** presets from super-sprint to Ironman, 5 km to ultra, **relays** (you do the bike, the team does the rest), terrain, target times per leg, race plan with pacing and checklists.
+- **Garmin events** from your Garmin calendar show up as goals automatically.
+- **Morning report** with sleep, HRV and resting HR compared with *your* baseline, plus a push notification on your phone.
+- Weather on outdoor sessions, a calendar feed for Apple/Google Calendar, and gear tracking (shoe and bike mileage).
 
-Privates Projekt zur eigenen Trainingsauswertung, veröffentlicht als
-Referenz/Inspiration für andere. Keine Garantie auf Korrektheit der
-sportwissenschaftlichen Kennzahlen — für ernsthafte Trainingsentscheidungen
-im Zweifel einen Coach oder eine etablierte Plattform konsultieren.
+</td>
+<td width="50%" valign="top" align="center">
+<img src="docs/images/mobile-garmin.png" alt="Garmin settings: choose what is sent to the watch automatically" width="300">
+</td>
+</tr>
+</table>
+
+<details>
+<summary><b>🖥️ It also works on a big screen</b> (click to expand)</summary>
+<br>
+<img src="docs/images/desktop-today.png" alt="Desktop: today overview" width="100%">
+<img src="docs/images/desktop-calendar.png" alt="Desktop: month calendar with planned and completed sessions" width="100%">
+<img src="docs/images/desktop-analysis.png" alt="Desktop: analysis with sport balance, swim CSS and bike FTP" width="100%">
+</details>
+
+---
+
+## ⚖️ Side by side
+
+|  | Paid cloud apps | **Triathlon Training Dashboard** |
+|---|:---:|:---:|
+| Yearly cost | $70–$400+ | **$0** |
+| Where your health data lives | Vendor's cloud | **Your own Pi / PC** (SQLite file) |
+| Can be shut down, paywalled or have its price raised | Yes | **No.** You own the code |
+| AI coach that re-plans after bad sleep | Some, in higher tiers | ✅ |
+| Structured workouts on your Garmin | Most | ✅ incl. swim, strength & mobility |
+| Explains *why* a value is good or bad | Rarely | ✅ for every key metric |
+| Friends & family on one install | Usually separate subscriptions | ✅ invite codes, each person sees only their own data |
+| Choose your AI (cloud or 100 % local) | No | ✅ Claude or Ollama |
+| Works on phone like an app | Yes | ✅ installable web app (PWA) with push |
+
+---
+
+## 🧭 How it works
+
+```mermaid
+flowchart LR
+    W["⌚ Garmin watch"] -->|sync| GC["Garmin Connect"]
+    GC -->|"your personal API key<br/>(read-only)"| S
+    F["📁 .fit files<br/>(any device)"] -->|upload| S
+    subgraph S ["🏠 Your Raspberry Pi / PC"]
+        DB[("training.db<br/>SQLite")]
+        API["Flask server<br/>+ rules engine"]
+    end
+    S -->|structured workouts| GC
+    S <-->|"optional: plan &<br/>analysis requests"| AI["🤖 Claude API<br/>or local Ollama"]
+    S --> P["📱 Phone · 💻 Browser"]
+```
+
+- **One small server at home** serves the app to all your devices. Use [Tailscale](https://tailscale.com) or a single command for a fixed HTTPS address.
+- **Everything personal stays in one SQLite file** on your machine, with automatic backups before every start and update.
+- **One-click updates** from inside the dashboard, or fully automatic at night.
+
+---
+
+## 🚀 Quick start
+
+**Option 1: just look around (no install).**
+
+```bash
+python3 build-demo.py      # creates dashboard-demo.html with made-up demo data
+```
+Double-click `dashboard-demo.html`. That's it.
+
+**Option 2: on your Mac or PC (about 10 minutes, no coding skills needed).**
+
+```bash
+git clone https://github.com/nico-lehr/TriathlonTrainingsDashboard.git
+cd TriathlonTrainingsDashboard
+bash start.sh                        # Windows: double-click start.bat
+python3 backend/create_user.py       # in a second terminal: create your account
+```
+Open **http://localhost:5000**, log in, and connect Garmin in the onboarding. It takes three steps, and **no Garmin password** is needed.
+
+**Option 3: 24/7 on a Raspberry Pi (recommended).**
+
+```bash
+bash deploy/raspberry-pi/install.sh      # installs and starts the dashboard as a service
+bash deploy/raspberry-pi/oeffentlich.sh  # optional: fixed HTTPS address from anywhere
+```
+
+📖 Detailed step-by-step guides (in German, written for beginners):
+[Installation](docs/INSTALLATION.md) · [Raspberry Pi](docs/RASPBERRY_PI_ANLEITUNG.md) · [Operations & friends](docs/DEPLOYMENT.md) · [Garmin sync](docs/GARMIN_SYNC_GUIDE.md)
+
+---
+
+## 🔒 Privacy & security
+
+- **Self-hosted by design.** No account with us, no tracking, no ads. Your data sits in `training.db` on your own machine.
+- **Your Garmin password is never stored.** Data comes in through Garmin's official *Personal API* key, which is read-only. Tokens live outside the project folder and are readable only by your user.
+- **Multi-user with strict separation.** Every request is authenticated and filtered by person. Accounts are locked after repeated failed logins, and security headers are set.
+- **The server delivers only an allow-list** of app files. Database, secrets, backups and docs are never served.
+- **The AI is your choice.** With Claude, only summarised metrics and your training profile are sent, and the key stays on your server, never in the browser. With Ollama nothing leaves your network.
+
+---
+
+## 🛠️ Under the hood
+
+- **Frontend:** vanilla JavaScript, HTML and CSS with no framework and no build step. It includes a hand-written binary **FIT parser** (compressed timestamps, developer fields).
+- **Backend:** Python 3 with Flask, SQLAlchemy, SQLite and waitress. It runs on a Raspberry Pi.
+- **Sports science as pure, tested functions:** PMC (CTL/ATL/TSB), ACWR (Gabbett 2016), polarised distribution (Seiler), periodisation, plan rules, VO2max and FTP/CSS estimates.
+- **Tests:** about 270 JavaScript tests (`node --test tests/js/`) and about 270 backend tests (`python -m unittest discover -s backend -t .`). The tests never call Garmin for real; they use mocks only.
+- **Docs for contributors:** [Project map](docs/PROJECT_MAP.md) · [Data model](docs/DATA_MODEL.md) · [Changelog](CHANGELOG.md)
+
+---
+
+## ❓ FAQ
+
+<details>
+<summary><b>Do I need a Garmin watch?</b></summary>
+
+No. You can upload `.fit` files from any device that records them. Garmin unlocks the extras: automatic sync, sleep, HRV and wellness data, events, and workouts on the watch.
+</details>
+
+<details>
+<summary><b>Is it really free?</b></summary>
+
+The software costs nothing and has no subscription. The AI coach is optional: either you pay the AI provider directly per request (usually cents, and the app shows the exact cost), or you run it locally with Ollama for free. Everything else works without AI too.
+</details>
+
+<details>
+<summary><b>Do I need to be a programmer?</b></summary>
+
+No. The guides are written for complete beginners, and installing on a Raspberry Pi takes one command. After that, updates are installed from inside the dashboard.
+</details>
+
+<details>
+<summary><b>Can my friends or partner use it too?</b></summary>
+
+Yes. Send an invite link from the settings. Everyone gets their own account, and each person only ever sees their own data.
+</details>
+
+<details>
+<summary><b>How does the Garmin workout upload work?</b></summary>
+
+Reading data uses Garmin's official Personal API. Uploading workouts to your watch uses a one-time Garmin login whose token is stored on your server, and the password itself is never stored. Support for Garmin's official Training API is prepared and will be switched on once access is available.
+</details>
+
+---
+
+## 🤝 Contributing
+
+Ideas, bug reports and pull requests are welcome! Good first contributions:
+
+- 🌍 **Translating the UI** (English first)
+- ⌚ Support for other watch platforms (COROS, Wahoo, Suunto, Polar)
+- 🧪 More tests and real-world FIT files for the parser
+
+Please open an issue before larger changes so we can agree on the approach. If this project saves you a subscription, **leave a ⭐**. It helps other athletes find it.
+
+---
+
+## ⚠️ Disclaimer
+
+This is a hobby project, not a medical product. The sports-science metrics are estimates. Listen to your body, and if in doubt, ask a doctor or a qualified coach. Not affiliated with or endorsed by Garmin, TrainingPeaks, TriDot, Humango, Athletica, Strava or Anthropic.
+
+## 📄 License
+
+No open-source license has been chosen yet, so for now all rights are reserved by the author. Reading the code and running it privately for yourself is what the project is shared for. If you'd like to reuse or redistribute it, please open an issue.

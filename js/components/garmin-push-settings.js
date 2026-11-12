@@ -26,8 +26,14 @@ function gpResultText(r) {
   return parts.length ? parts.join(" · ") : "alles aktuell";
 }
 
-function gpUpcomingTitle() {
-  return garminPush.mode === "week" ? "Nächste 7 Tage" : garminPush.mode === "manual" ? "Von dir gesendet" : "Heute";
+// Überschrift der Liste - mit "+ von dir gesendet", wenn darin auch von Hand
+// geschickte Einheiten außerhalb des Fensters stehen.
+function gpUpcomingTitle(list = garminPushCandidates()) {
+  if (garminPush.mode === "manual") return "Von dir gesendet";
+  const days = garminPush.window_days || 1;
+  const end = localDateStr(new Date(new Date(todayStr() + "T00:00:00").getTime() + (days - 1) * 86400000));
+  const base = garminPush.mode === "week" ? "Nächste 7 Tage" : "Heute";
+  return list.some(p => p.date > end) ? `${base} + von dir gesendet` : base;
 }
 
 function gpUpcomingHtml() {

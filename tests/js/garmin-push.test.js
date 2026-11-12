@@ -77,3 +77,17 @@ test("Abgleich schickt Schritte mit, Stand je Einheit", async () => {
   vm.runInContext("garminPush.connected = false", app);
   assert.strictEqual(app.garminWatchStatus({ id: "a" }), null);
 });
+
+test("Überschrift der Liste in Einstellungen → Garmin nennt auch von Hand Gesendetes", () => {
+  vm.runInContext(fs.readFileSync(path.join(ROOT, "js/components/garmin-push-settings.js"), "utf8"), app, { filename: "garmin-push-settings.js" });
+  app.replacePlannedWorkouts([{ id: "h", date: day(0), sport: "Laufen", duration_min: 40, intensity: "leicht", status: "geplant" },
+    { id: "f", date: day(2), sport: "Laufen", duration_min: 40, intensity: "leicht", status: "geplant" }]);
+  vm.runInContext("garminPush = { ...garminPush, auto: true, mode: 'today', window_days: 1, links: {} }", app);
+  assert.strictEqual(app.gpUpcomingTitle(), "Heute");
+  vm.runInContext("garminPush.links = { f: { pinned: true } }", app);
+  assert.strictEqual(app.gpUpcomingTitle(), "Heute + von dir gesendet");
+  vm.runInContext("garminPush.mode = 'week'; garminPush.window_days = 7", app);
+  assert.strictEqual(app.gpUpcomingTitle(), "Nächste 7 Tage");
+  vm.runInContext("garminPush.mode = 'manual'; garminPush.auto = false; garminPush.window_days = 0", app);
+  assert.strictEqual(app.gpUpcomingTitle(), "Von dir gesendet");
+});

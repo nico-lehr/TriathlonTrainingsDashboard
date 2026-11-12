@@ -196,7 +196,7 @@ DEMO_BANNER = """
   box-shadow:0 2px 12px rgba(0,0,0,.25)">
   Das hier ist eine <strong>Demo mit erfundenen Beispieldaten</strong> &mdash; zum Ausprobieren, ohne etwas zu installieren.
   <br>
-  <a href="https://github.com/nico-lehr/TriathlonTrainingsDashboard#einrichtung--schritt-f%C3%BCr-schritt"
+  <a href="https://github.com/nico-lehr/TriathlonTrainingsDashboard/blob/main/README.de.md#-loslegen"
      style="color:#fff;text-decoration:underline;font-weight:800">Gefällt dir? So installierst du es kostenlos &rarr;</a>
   &nbsp;·&nbsp;
   <a href="index.html" style="color:#fff;text-decoration:underline;font-weight:500">zurück zur Startseite</a>
