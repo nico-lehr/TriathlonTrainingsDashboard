@@ -705,7 +705,7 @@ function mRenderMehr() {
   // Analyse und Insights stehen am Computer direkt in der Seitenleiste - hier nur am Handy/Tablet.
   const rows = [["nutrition", "Ernährung"], ["records", "Rekorde"], ["analysis", "Analyse", true], ["overview", "Insights", true], ["settings", "Einstellungen"]];
   return mHeaderHtml("Weitere Bereiche", "Mehr")
-    + mCols(`<section class="m-card m-navlist">${rows.map(([v, l, side]) => `<button type="button" class="m-nav-row${side ? " m-side-hide" : ""}" data-m-classic="${v}"><span>${l}${v === "nutrition" ? ` <em class="m-soon">Coming soon</em>` : ""}</span><i>›</i></button>`).join("")}</section>`,
+    + mCols(`<section class="m-card m-navlist">${rows.map(([v, l, side]) => `<button type="button" class="m-nav-row${side ? " m-side-hide" : ""}" data-m-classic="${v}"><span>${l}</span><i>›</i></button>`).join("")}</section>`,
       `<section class="m-card m-navlist"><button type="button" class="m-nav-row" data-m-act="profile"><span>Dein Trainingsprofil</span><i>›</i></button></section>`
       + (typeof mAdmin !== "undefined" && mAdmin.isAdmin ? `<section class="m-card m-navlist"><button type="button" class="m-nav-row" data-m-page="admin"><span>Admin · Statistik</span><i>›</i></button></section>` : ""));
 }
@@ -1271,7 +1271,7 @@ function initMApp() {
 
   document.getElementById("m-back").addEventListener("click", mBack);
   // Ernährung vorerst gesperrt: Inhalt unbedienbar (auch per Tastatur), nur der Hinweis bleibt.
-  document.querySelectorAll("#view-nutrition.is-soon > :not(.soon-lock)").forEach(el => { el.inert = true; el.setAttribute("aria-hidden", "true"); });
+  document.querySelectorAll("#view-nutrition .nutri-legacy.is-soon > :not(.soon-lock)").forEach(el => { el.inert = true; el.setAttribute("aria-hidden", "true"); });
   host.addEventListener("click", e => {
     if (e.target.closest("#m-tabs") && typeof closeDetail === "function") closeDetail(); // Training-Seite schließen
     const tab = e.target.closest("[data-m-page]");

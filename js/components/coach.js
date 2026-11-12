@@ -761,7 +761,7 @@ function wireOnbStepInputs() {
 
 
 function syncProfileInputsFromState() {
-  [["profile-name", "name"], ["profile-gender", "gender"], ["profile-birthdate", "birthDate"], ["profile-ftp", "ftpWatts"], ["profile-run-pace", "runThresholdPace"], ["profile-swim-pace", "swimCss"], ["profile-weekly-hours", "weeklyHours"], ["profile-max-hr", "maxHr"], ["profile-resting-hr", "restingHr"], ["profile-weight-kg", "weightKg"]]
+  [["profile-name", "name"], ["profile-gender", "gender"], ["profile-birthdate", "birthDate"], ["profile-ftp", "ftpWatts"], ["profile-run-pace", "runThresholdPace"], ["profile-swim-pace", "swimCss"], ["profile-weekly-hours", "weeklyHours"], ["profile-max-hr", "maxHr"], ["profile-resting-hr", "restingHr"], ["profile-weight-kg", "weightKg"], ["profile-height-cm", "heightCm"]]
     .forEach(([id, key]) => {
       const el = document.getElementById(id);
       if (el && athleteProfile[key] != null) el.value = athleteProfile[key];
@@ -925,6 +925,7 @@ function initCoach() {
     ["profile-max-hr", "maxHr", v => v ? Number(v) : null],
     ["profile-resting-hr", "restingHr", v => v ? Number(v) : null],
     ["profile-weight-kg", "weightKg", v => v ? Number(v) : null],
+    ["profile-height-cm", "heightCm", v => v ? Number(v) : null],
   ];
   profileFields.forEach(([id, key, parse]) => {
     const input = document.getElementById(id);

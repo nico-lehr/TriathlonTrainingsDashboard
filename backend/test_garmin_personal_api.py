@@ -327,6 +327,47 @@ class SyncMitApiTest(TempDirsMixin, unittest.TestCase):
         day = garmin_sync.normalize(cache)["2026-10-03"]
         self.assertEqual((day["body_battery_high"], day["body_battery_low"], day["steps"]), (80, 20, 1000))
 
+    def test_kalorien_aus_der_tageszusammenfassung(self):
+        cache = {"days": {"2026-10-03": {"summary": {"totalKilocalories": 2950.0, "activeKilocalories": 1120,
+                                                       "bmrKilocalories": 1830, "consumedKilocalories": None}},
+                          "2026-10-04": {"summary": {"totalKilocalories": 99999, "bmrKilocalories": 12}}},
+                 "ranges": {"daily_summaries": {"data": [
+                     {"calendarDate": "2026-10-02", "calories": {"totalKilocalories": 2400, "bmrKilocalories": 1800,
+                                                                  "activeKilocalories": 600, "consumedKilocalories": 2300}},
+                     {"calendarDate": "2026-10-03", "totalKilocalories": 1000}]}}}
+        out = garmin_sync.normalize(cache)
+        self.assertEqual((out["2026-10-03"]["kcal_total"], out["2026-10-03"]["kcal_active"], out["2026-10-03"]["kcal_bmr"]), (2950, 1120, 1830))
+        self.assertNotIn("kcal_consumed", out["2026-10-03"])
+        # verschachtelt (offizielle API) und mit Ernaehrungs-App
+        self.assertEqual((out["2026-10-02"]["kcal_total"], out["2026-10-02"]["kcal_consumed"]), (2400, 2300))
+        # Messfehler werden zur Luecke
+        self.assertNotIn("kcal_total", out.get("2026-10-04", {}))
+        self.assertNotIn("kcal_bmr", out.get("2026-10-04", {}))
+
+    def test_zeitraum_antworten_werden_zusammengefuehrt(self):
+        old = {"data": [{"calendarDate": "2026-10-01", "totalKilocalories": 2500},
+                        {"calendarDate": "2026-10-02", "totalKilocalories": 2600}]}
+        new = {"data": [{"calendarDate": "2026-10-02", "totalKilocalories": 2700},
+                        {"calendarDate": "2026-10-03", "totalKilocalories": 2800}]}
+        merged = garmin_sync.merge_range(old, new)
+        self.assertEqual([(i["calendarDate"], i["totalKilocalories"]) for i in merged["data"]],
+                         [("2026-10-01", 2500), ("2026-10-02", 2700), ("2026-10-03", 2800)])
+        # Listen ohne "data" und unbekannte Formen
+        self.assertEqual(len(garmin_sync.merge_range([{"date": "2026-10-01"}], [{"date": "2026-10-02"}])), 2)
+        self.assertEqual(garmin_sync.merge_range(None, new), new)
+        self.assertEqual(garmin_sync.merge_range({"dateWeightList": []}, {"dateWeightList": [1]}), {"dateWeightList": [1]})
+
+    def test_schneller_abruf_loescht_aeltere_tage_nicht(self):
+        client = mock.Mock(spec=["get_daily_summaries"])
+        path = os.path.join(self.key_dir, "cache.json")
+        garmin_sync.save_cache({"days": {}, "ranges": {"daily_summaries": {"data": [
+            {"calendarDate": "2026-09-01", "totalKilocalories": 2500}]}}}, path)
+        client.get_daily_summaries.return_value = {"data": [{"calendarDate": "2026-10-01", "totalKilocalories": 2600}]}
+        with mock.patch.object(garmin_sync, "REQUEST_PAUSE_S", 0):
+            cache = garmin_sync.sync_wellness(client, date(2026, 10, 1), date(2026, 10, 1), path)
+        out = garmin_sync.normalize(cache)
+        self.assertEqual((out["2026-09-01"]["kcal_total"], out["2026-10-01"]["kcal_total"]), (2500, 2600))
+
     def test_gesundheitsdaten_luecken_werden_spaeter_nachgeholt(self):
         # Gescheiterte Abfragen werden nicht als "keine Daten" gespeichert,
         # fehlende Funktionen (z. B. VO2max in der Personal API) schon.

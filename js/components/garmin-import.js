@@ -7,6 +7,7 @@
 
 const GARMIN_IMPORT_FIELDS = [
   ["weightKg", "Körpergewicht", v => `${String(v).replace(".", ",")} kg`],
+  ["heightCm", "Größe", v => `${v} cm`],
   ["maxHr", "Maximale Herzfrequenz", v => `${v} bpm`],
   ["restingHr", "Ruhe-Herzfrequenz", v => `${v} bpm`],
   ["runThresholdPace", "Schwellenpace Laufen", v => `${v} /km`],
@@ -18,7 +19,6 @@ const GARMIN_INFO_FIELDS = [
   ["lthr", "Laktatschwelle (Puls)", v => `${v} bpm`],
   ["vo2maxRun", "VO2max Laufen", v => String(v)],
   ["vo2maxBike", "VO2max Rad", v => String(v)],
-  ["heightCm", "Größe", v => `${v} cm`],
 ];
 
 let garminConnectedCache = null;
@@ -53,7 +53,7 @@ function garminApply(target, picked) {
     return;
   }
   Object.entries(picked).forEach(([k, v]) => {
-    athleteProfile[k] = ["weightKg", "maxHr", "restingHr", "ftpWatts"].includes(k) ? Number(v) : v;
+    athleteProfile[k] = GARMIN_NUMERIC.includes(k) ? Number(v) : v;
   });
   saveAthleteProfile();
   if (typeof syncProfileInputsFromState === "function") syncProfileInputsFromState();
@@ -210,7 +210,7 @@ async function initOnbGarmin(root) {
    athleteProfile.garminOverrides – Felder, die man selbst überschrieben hat
    athleteProfile.garminSyncedAt  – letzter Abgleich (ISO)
    ---------------------------------------------------------------------- */
-const GARMIN_NUMERIC = ["weightKg", "maxHr", "restingHr", "ftpWatts"];
+const GARMIN_NUMERIC = ["weightKg", "heightCm", "maxHr", "restingHr", "ftpWatts"];
 const GARMIN_SYNC_EVERY_MS = 20 * 3600 * 1000;
 
 function profileFromGarmin(key) {

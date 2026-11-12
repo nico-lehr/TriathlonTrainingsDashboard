@@ -4,6 +4,24 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.45
+
+**Ernährung: Neuer Bereich „Energie & Bedarf“**
+- Ganz oben im Ernährungs-Tab siehst du jetzt, wie viele Kalorien du verbrauchst – aufgeteilt in **Grundumsatz** (Verbrauch in Ruhe), **Alltag** (Gehen, Stehen, Verdauen) und **Training**.
+- **Energie heute**: voraussichtlicher Verbrauch für heute, inklusive des Trainings, das im Plan steht. Die Kalorien fürs Training werden aus deinen eigenen bisherigen Einheiten geschätzt. Mit Garmin siehst du zusätzlich, wie viel es bisher war.
+- **Dein Energiebedarf**: Durchschnitt der letzten 7, 30 und 90 Tage, Ruhetag im Vergleich zum Trainingstag, und ob dein Verbrauch gerade steigt oder sinkt.
+- **Verlauf**: Balkendiagramm über 30 Tage, 90 Tage oder 12 Monate, mit Durchschnittslinie.
+- **Gewicht & Energiebilanz**: Aus deinem Gewichtsverlauf wird berechnet, ob du gerade mehr oder weniger isst, als du verbrauchst – ganz ohne Essen zu tracken. Dazu „Du isst ungefähr“ und „Zum Halten“ in kcal pro Tag. Dein Gewicht kannst du direkt hier eintragen.
+- **Kennzahlen**: Grundumsatz, Aktivitätslevel (PAL), Verbrauch pro kg, Kalorien pro Trainingsstunde, Anteil des Trainings, BMI und (mit Garmin-Waage) Magermasse – jeweils mit kurzer Erklärung.
+- Die älteren Kacheln (Makros, Essen vor dem Training, Wettkampf-Verpflegung) stehen weiter unten und sind noch als „Coming soon“ gesperrt.
+
+**Garmin**
+- Aus der Garmin-Tageszusammenfassung kommen jetzt auch die Kalorien (gesamt, aktiv, Grundumsatz). Ohne Garmin-Werte rechnet das Dashboard selbst.
+- Korrektur: Der schnelle Abgleich (letzte 3 Tage) hat bisher ältere Tageswerte wie Body Battery bis zum nächsten nächtlichen Abgleich überschrieben. Jetzt werden sie zusammengeführt und bleiben erhalten.
+
+**Profil**
+- Neues Feld **Größe** (cm) unter Einstellungen → Profil. Damit wird der Grundumsatz genauer und der BMI angezeigt. Wenn Garmin deine Größe kennt, kann sie übernommen werden.
+
 ## 2.4.44
 
 **Neue Projektseite auf GitHub**

@@ -583,12 +583,68 @@
     <p class="mob-disclaimer">Sanft bleiben: Ziehen ist gut, Schmerz nicht. Bei Beschwerden, die nicht weggehen, ersetzt das keine Physiotherapie.</p>
   </div>
 
-  <div id="view-nutrition" class="view is-soon">
-    <!-- Ernährung ist vorerst gesperrt: unscharf + "Coming soon" (css/m-graphit.css, m-app.js setzt inert). -->
+  <div id="view-nutrition" class="view">
+    <!-- Energie & Bedarf (js/components/energy.js, Rechnungen in js/analytics/energy.js) -->
+    <div id="energy-section">
+      <section class="card full">
+        <h2>Energie &amp; Bedarf
+          <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Wie viele Kalorien du verbrauchst und wie viel dein Körper wirklich braucht. Gibt es für einen Tag Garmin-Daten, werden die genommen. Sonst rechne ich selbst: Grundumsatz aus Gewicht, Größe, Alter und Geschlecht, dazu deine Schritte und deine Trainings. Alles sind gute Schätzungen, keine Labormessung – auch Garmin schätzt.</div></span>
+        </h2>
+        <p class="card-sub">Dein Kalorienverbrauch – heute, im Durchschnitt und über die Zeit. Zusammen mit deinem Gewicht siehst du, ob du gerade mehr oder weniger isst, als du verbrauchst.</p>
+      </section>
+
+      <div class="dash-grid">
+        <div class="card">
+          <h2>Energie heute
+            <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Voraussichtlicher Verbrauch für heute: dein durchschnittlicher Grundumsatz und Alltag der letzten 30 Tage plus das Training, das heute im Plan steht. Die Kalorien fürs Training schätze ich aus deinen eigenen bisherigen Einheiten derselben Sportart (sonst aus Durchschnittswerten). Gezählt wird nur, was das Training <i>zusätzlich</i> verbraucht.</div></span>
+          </h2>
+          <div id="energy-today-body"></div>
+        </div>
+
+        <div class="card">
+          <h2>Dein Energiebedarf
+            <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Durchschnittlicher Verbrauch pro Tag. Der heutige Tag zählt nicht mit, weil er noch nicht vorbei ist. Ein Trainingstag ist ein Tag mit mindestens 15 Minuten Training. <br><br><b>Grundumsatz</b>: Verbrauch in völliger Ruhe. <b>Alltag</b>: Gehen, Stehen, Arbeiten, Verdauen. <b>Training</b>: was deine Einheiten zusätzlich verbraucht haben.</div></span>
+          </h2>
+          <div id="energy-need-body"></div>
+        </div>
+
+        <div class="card full">
+          <h2>Verlauf
+            <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Tagesverbrauch über die Zeit, aufgeteilt in Grundumsatz, Alltag und Training. Die gestrichelte Linie ist dein Durchschnitt im gewählten Zeitraum. Bei 12 Monaten ist jeder Balken der Ø pro Tag in diesem Monat. Ein heller Balken ganz rechts ist der heutige Tag (noch nicht vorbei).</div></span>
+          </h2>
+          <div class="en-head-row">
+            <div class="mob-segmented en-range" id="energy-range" role="radiogroup" aria-label="Zeitraum">
+              <button type="button" data-range="30" class="is-on">30 Tage</button>
+              <button type="button" data-range="90">90 Tage</button>
+              <button type="button" data-range="12m">12 Monate</button>
+            </div>
+            <div class="en-legend en-legend-sm"><span><i style="background:var(--en-bmr)"></i>Grundumsatz</span><span><i style="background:var(--en-alltag)"></i>Alltag</span><span><i style="background:var(--en-train)"></i>Training</span></div>
+          </div>
+          <div class="chart-wrap" id="energy-history-chart"></div>
+        </div>
+
+        <div class="card full">
+          <h2>Gewicht &amp; Energiebilanz
+            <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Du trackst dein Essen nicht – aber dein Gewicht verrät es: Nimmst du ab, hast du weniger gegessen als verbraucht (Defizit), nimmst du zu, mehr (Überschuss). Faustregel: 1 kg Körpergewicht ≈ 7.700 kcal. <br><br>Damit Wasser und Tagesschwankungen nicht täuschen, nutze ich einen geglätteten Gewichtstrend (Linie) statt einzelner Wiegungen (Punkte). „Du isst ungefähr“ = Ø Verbrauch + Bilanz. „Zum Halten“ = so viel bräuchtest du, um dein Gewicht zu halten. Grundlage sind die letzten 4 Wochen (bei wenigen Wiegungen 8 Wochen).</div></span>
+          </h2>
+          <div id="energy-balance-body"></div>
+        </div>
+
+        <div class="card full">
+          <h2>Kennzahlen
+            <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Wichtige Werte rund um deinen Energiebedarf, aus den letzten 30 Tagen. Tipp auf das i an jeder Kachel für eine kurze Erklärung. Für den BMI und einen genaueren Grundumsatz trag deine Größe in den Einstellungen im Profil ein.</div></span>
+          </h2>
+          <div id="energy-figures-body"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ältere Ernährungs-Kacheln: vorerst gesperrt (unscharf + "Coming soon", css/m-graphit.css, m-app.js setzt inert). -->
+    <div class="nutri-legacy is-soon">
     <div class="soon-lock" role="status">
       <span class="soon-badge">Coming soon</span>
-      <b>Ernährung</b>
-      <span>Dieser Bereich wird gerade überarbeitet und ist bald wieder für dich da.</span>
+      <b>Makros &amp; Verpflegung</b>
+      <span>Tagesziele, Essen vor dem Training und Wettkampf-Verpflegung werden gerade überarbeitet.</span>
     </div>
     <section class="card full">
       <h2>Ernährung
@@ -632,6 +688,7 @@
         </h2>
         <div id="nutrition-racefueling-body"></div>
       </div>
+    </div>
     </div>
   </div>
 
@@ -958,6 +1015,14 @@
                 <button type="button" class="pf-src" hidden></button>
               </div>
             </div>
+            <div class="settings-list-row pf-row" data-pf="heightCm">
+              <label for="profile-height-cm">Größe</label>
+              <div class="pf-val">
+                <span class="pf-input-wrap"><input type="number" id="profile-height-cm" class="pf-input" min="0" step="1" placeholder="180"><span class="pf-unit">cm</span></span>
+                <button type="button" class="pf-garmin-val" title="Antippen zum Ändern"></button>
+                <button type="button" class="pf-src" hidden></button>
+              </div>
+            </div>
             <div class="settings-list-row pf-row" data-pf="maxHr">
               <label for="profile-max-hr">Max-Puls</label>
               <div class="pf-val">
@@ -1240,6 +1305,7 @@
 <script src="js/analytics/race-plan.js"></script>
 <script src="js/analytics/zones.js"></script>
 <script src="js/analytics/nutrition.js"></script>
+<script src="js/analytics/energy.js"></script>
 <script src="js/analytics/streak.js"></script>
 <script src="js/analytics/achievements.js"></script>
 <script src="js/analytics/triathlon.js"></script>
@@ -1273,6 +1339,7 @@
 <script src="js/components/morning-report.js"></script>
 <script src="js/components/ollama-setup.js"></script>
 <script src="js/components/nutrition.js"></script>
+<script src="js/components/energy.js"></script>
 <script src="js/components/achievements.js"></script>
 <script src="js/components/analysis.js"></script>
 <script src="js/components/workout-card.js"></script>

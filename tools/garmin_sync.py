@@ -496,10 +496,37 @@ def sync_wellness(client, start, end, path):
                             ("daily_steps", "get_daily_steps"), ("daily_summaries", "get_daily_summaries")):
             result = call(client, method, s, e)
             if result is not FAILED and result:  # leer/fehlgeschlagen: alten Stand behalten
-                ranges[key] = result
+                ranges[key] = merge_range(ranges.get(key), result)
     finally:
         save_cache(cache, path)   # auch beim Abbruch (Rate-Limit, Schluessel abgelehnt)
     return cache
+
+
+def _range_items(value):
+    """Liste der Tages-Eintraege einer Zeitraum-Antwort (Liste oder {"data": [...]})."""
+    if isinstance(value, dict) and isinstance(value.get("data"), list):
+        return value["data"]
+    return value if isinstance(value, list) else None
+
+
+def _range_day(item):
+    if not isinstance(item, dict):
+        return None
+    return item.get("calendarDate") or item.get("date") or item.get("summaryDate")
+
+
+def merge_range(old, new):
+    """Zeitraum-Antworten zusammenfuehren statt ersetzen: Der schnelle Abruf
+    holt nur die letzten Tage - ohne Zusammenfuehren verloeren aeltere Tage
+    bis zum naechtlichen Lauf ihre Werte (Body Battery, Kalorien ...).
+    Tage aus der neuen Antwort gewinnen; Unbekannte Formen: neue Antwort."""
+    old_items, new_items = _range_items(old), _range_items(new)
+    if old_items is None or new_items is None:
+        return new
+    fresh = {_range_day(i) for i in new_items if _range_day(i)}
+    merged = [i for i in old_items if _range_day(i) and _range_day(i) not in fresh] + list(new_items)
+    merged.sort(key=lambda i: _range_day(i) or "")
+    return {**new, "data": merged} if isinstance(new, dict) else merged
 
 
 # ------------------------------------------------------------ Aufbereitung
@@ -674,6 +701,17 @@ def normalize(cache):
             v = in_range(num(find_key(summ, key)), lo, hi)
             if v is not None and day_entry(ds).get(field) is None:
                 day_entry(ds)[field] = v
+        # Kalorien des Tages (Ernaehrung, js/analytics/energy.js): Gesamt-
+        # verbrauch, davon Grundumsatz (BMR) und Aktivitaet; "consumed" nur,
+        # wenn eine Ernaehrungs-App mit Garmin verbunden ist. Feldnamen wie in
+        # Garmin Connect - bei der offiziellen API evtl. verschachtelt.
+        for field, key, lo, hi in (("kcal_total", "totalKilocalories", 500, 12000),
+                                   ("kcal_active", "activeKilocalories", 0, 9000),
+                                   ("kcal_bmr", "bmrKilocalories", 500, 4500),
+                                   ("kcal_consumed", "consumedKilocalories", 1, 15000)):
+            v = in_range(num(find_key(summ, key)), lo, hi)
+            if v is not None and day_entry(ds).get(field) is None:
+                day_entry(ds)[field] = round(v)
         # Schritte hier als Reserve, falls der Zeitraum-Endpunkt nichts liefert
         st = num(summ.get("totalSteps"))
         if st is not None:

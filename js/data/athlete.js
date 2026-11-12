@@ -7,6 +7,7 @@ let athleteProfile = {
   experienceLevel: null, strongDiscipline: null, weakDiscipline: null, trainingDaysPerWeek: null,
   age: null, trainingDays: [], swimDays: [], longDays: [], typicalSessionMin: null,
   maxHr: null, restingHr: null, // für TRIMP/Herzfrequenzreserve in der Trainings-Detailansicht (js/analytics/workout-profile.js)
+  heightCm: null, // Körpergröße - für BMI und Grundumsatz (Ernährung, js/analytics/energy.js); kommt auch von Garmin
   weightKg: null, // nur für die Rad-VO2max-Schätzung aus Watt (js/analytics/performance.js) - ohne Wert gibt's keine Rad-Schätzung statt einer geratenen
   includeStrength: false, includeMobility: false, // für den automatisch erstellten Trainingsplan (js/analytics/training-plan.js)
   // Wochenplan (Einstellungen → Training & Planung), fest geprüft in js/analytics/plan-structure.js:

@@ -207,6 +207,7 @@ function renderRaceFueling() {
 }
 
 function renderNutrition() {
+  if (typeof renderEnergy === "function") renderEnergy();
   renderWeightSummary();
   renderNutritionMacros();
   renderPreWorkoutTiming();
@@ -215,6 +216,7 @@ function renderNutrition() {
 
 function initNutrition() {
   loadWeightLog();
+  if (typeof initEnergy === "function") initEnergy();
   const input = document.getElementById("nutrition-weight-input");
   const btn = document.getElementById("nutrition-weight-save-btn");
   if (weightLog.length) input.value = weightLog[weightLog.length - 1].weightKg;

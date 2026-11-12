@@ -294,6 +294,7 @@ const WELLNESS = {
       body_battery_high: 88, body_battery_low: 25,
       weight_kg: 72.4, body_fat_pct: 18.2, muscle_mass_kg: 31.5,
       steps: 11230,
+      kcal_total: 2950, kcal_active: 1240, kcal_bmr: 1710, // Tageszusammenfassung (Energie & Bedarf)
       vo2max: 52.3, vo2max_cycling: 49.1,
       training_status: "PRODUCTIVE",
     },
@@ -902,6 +903,32 @@ z. B. `{ value: 52.3, methodLabel: "...", trendLabel: "+2,1 % ggü. vor 3 Monate
    Bewusst KEIN Geschwindigkeits-Fallback, da Radgeschwindigkeit zu stark
    von Wind/Steigung/Windschatten abhängt, um verlässlich zu sein — ohne
    Leistungsmesser + Körpergewicht bleibt die Rad-Kachel leer statt geraten.
+
+## Energie & Bedarf (`js/analytics/energy.js`, oben im "Ernährung"-Tab)
+
+Kalorienverbrauch je Tag, rein rechnerisch, Anzeige in
+`js/components/energy.js`. Je Tag: hat Garmin `kcal_total`, gilt das
+(Grundumsatz `kcal_bmr`, sonst `kcal_total − kcal_active`); sonst eigene
+Schätzung = Grundumsatz (`bmrEstimate`: Mifflin-St Jeor mit
+`athleteProfile.heightCm`, sonst Henry/Oxford nur mit Gewicht) + Alltag
+(Schritte ohne die Laufschritte × kg × 0,0005, ohne Schritte 25 % des
+Grundumsatzes, plus Verdauung = 10 % des Gesamtverbrauchs) + Training
+(kcal der Einheiten netto, also minus Grundumsatz in der Zeit; ohne kcal
+über MET). Der heutige Tag ist unvollständig und zählt nie in Durchschnitte.
+
+- `energySeries` / `energyStats` — Tagesreihe, Ø 7/30/90 Tage, Ruhetag
+  (< 15 min Training) vs. Trainingstag, Vergleich mit den 30 Tagen davor.
+- `energyMonthly` — Ø pro Tag je Monat.
+- `weightTrendSeries` — geglätteter Gewichtstrend (10 % je Tag).
+- `energyBalance` — Bilanz aus dem Gewichtstrend der letzten 28 (sonst 56)
+  Tage: Δkg × 7.700 kcal ÷ Tage; „Du isst ungefähr“ = Ø Verbrauch + Bilanz.
+  Braucht ≥ 3 Wiegungen über ≥ die Hälfte des Zeitraums.
+- `plannedWorkoutKcal` / `energyTodayForecast` — geplante Einheit aus dem
+  Median kcal/min der eigenen Einheiten derselben Sportart (120 Tage,
+  ≥ 3 Stück) × Dauer × Intensität (leicht 0,85 / mittel 1 / hart 1,15),
+  sonst MET.
+- `energyKeyFigures` — Grundumsatz, PAL (FAO/WHO-Stufen), kcal/kg, BMI,
+  Magermasse (Garmin-Körperfett), kcal je Trainingsstunde, Trainingsanteil.
 
 ## Ernährung (`js/analytics/nutrition.js`, "Ernährung"-Tab)
 
