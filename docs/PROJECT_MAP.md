@@ -130,6 +130,7 @@ Bedarf schrittweise weiter aufgeteilt werden, sobald es sich lohnt.
 - `context-builder.js` — baut den kompakten Text-Kontext für das LLM (siehe `docs/AI_CONTEXT.md`).
 - `prompts.js` — baut den fertigen Prompt-Text aus dem Kontext.
 - `ollama.js` — Ollama-Einstellungen, Verbindungstest, Empfehlung generieren, Trainingsplan erstellen (Empfehlung Heute / Diese Woche / Nächste Woche; jeder KI-Plan läuft durch `validatePlan`, mit Auto-Korrektur oder höchstens 2 Nachfragen). Fragt nie Ollama direkt, sondern den eigenen Server (`POST /api/v1/ai/chat`, `GET /api/v1/ai/models`); die Ollama-Adresse steht in `.env` (`OLLAMA_URL`).
+- `plan-batch.js` — automatischer Wochenplan: mit Claude 5 Tage vorher als günstiger Sammelauftrag (halber Preis), Ergebnis abholen und einbauen, Notfall bei 1 Tag sofort; ohne Claude wie bisher (siehe `docs/AI_CONTEXT.md`).
 
 ### `js/components/` — UI-Komponenten (Rendering + Interaktion)
 - `chart.js` — wiederverwendbare SVG-Bausteine (Tooltip, `svgEl`, Mini-Liniencharts, Animationen).
@@ -205,7 +206,7 @@ einmalig `backend/import_workouts_json.py`, siehe `docs/DEPLOYMENT.md`.
 | `auth.py` | Passwort-Hash, signierte Token (30 Tage), geheimer Kalender-Schlüssel, Bremse 5 Fehlversuche/Minute/IP. |
 | `routes.py` | Bestehende Endpunkte + `require_login()` (401 außer `/health`, `/auth/login`) + `/auth/login`, `/auth/me`. |
 | `dashboard_routes.py` | `/store`, `/workouts/full`, `/wellness/daily`, `/ical-link`. |
-| `ai_routes.py` | `/ai/chat`, `/ai/models` – Weiterleitung an Ollama; `/ai/claude` (Stand/Schlüssel, nur Betreiber ändert) und `/ai/claude/chat`. |
+| `ai_routes.py` | `/ai/chat`, `/ai/models` – Weiterleitung an Ollama; `/ai/claude` (Stand/Schlüssel, nur Betreiber ändert), `/ai/claude/chat` und `/ai/claude/batch` (Sammelauftrag abgeben/abholen, nur eigene Aufträge). |
 | `invites.py` / `invite_routes.py` | Einladungscode für „Konto erstellen“ (`~/.triathlon/invite.json`), Verwaltung nur Betreiber (`/invites`). |
 | `usage.py` | Admin-Statistik: Tageszähler je Person in `usage_daily` (Öffnen, Bereiche, Funktionen, Login, Claude, Garmin-Abruf); `POST /usage` (feste Namensliste), `GET /admin/stats` nur Betreiber. Keine Inhalte. |
 | `claude_api.py` | Claude über das Anthropic-SDK: Schlüssel in `~/.triathlon/claude_api.json` (0600), Prüfen, Modelle, verständliche Fehler. |

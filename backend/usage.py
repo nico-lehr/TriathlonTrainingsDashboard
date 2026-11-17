@@ -85,7 +85,8 @@ def record_ai_call(athlete_id, task, tokens, ok=True, error_code=None):
     model = str(tokens.get("model") or "")[:40]
     if model:
         items += [("ai_model", model, 1), ("ai_model_in", model, t_in), ("ai_model_out", model, t_out)]
-        cost = claude_api.cost_micro_usd(model, t_in, t_out)
+        # Sammelauftrag (tokens["batch"]): halber Preis
+        cost = claude_api.cost_micro_usd(model, t_in, t_out, batch=bool(tokens.get("batch")))
         if cost:
             items += [("ai_cost", model, cost), ("ai_cost_task", (task or "chat")[:40], cost)]
     record_many(athlete_id, items)

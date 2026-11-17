@@ -289,7 +289,17 @@ let planCheckNotes = null;
 // Gespeichert wird erst nach der Regelprüfung (checkedPlanFromAi, s.o.).
 // Kommt kein Plan zustande (KI-Fehler oder Regelverstoß), werden die vorher
 // entfernten Einheiten wiederhergestellt - sonst stünde man ohne Plan da.
-async function generateTrainingPlan(goalId, { replace = false } = {}) {
+// Der komplette Prompt für einen Wochenplan - auch für den Sammelauftrag
+// (js/ai/plan-batch.js), der ihn vorab abschickt.
+function buildTrainingPlanPrompt(goal, windowDates, violations = []) {
+  const wishes = openPlanWishes().filter(w => windowDates.includes(w.date));
+  return buildPlanPrompt(goal, windowDates) + buildPlanRulesPrompt(goal) + buildPlanWishesPrompt(wishes) + buildPlanAheadPrompt(windowDates) + buildPlanRetryPrompt(violations);
+}
+
+// Optionen: replace (Plan ab heute neu), windowDates (festes Zeitfenster statt
+// computePlanningWindow), firstRaw (fertige KI-Antwort aus dem Sammelauftrag -
+// dann wird für den ersten Versuch nicht noch einmal gefragt).
+async function generateTrainingPlan(goalId, { replace = false, windowDates: fixedWindow = null, firstRaw = null } = {}) {
   const goal = goals.find(g => g.id === goalId);
   if (!goal) return;
   const before = plannedWorkouts;
@@ -300,25 +310,30 @@ async function generateTrainingPlan(goalId, { replace = false } = {}) {
   deleteFuturePlannedWorkoutsForOtherGoals(goal.id);
   const removed = before.filter(p => !plannedWorkouts.includes(p));
   const restoreRemoved = () => { if (removed.length) replacePlannedWorkouts([...plannedWorkouts, ...removed]); };
-  const windowDates = computePlanningWindow(goal.id);
+  const windowDates = fixedWindow && fixedWindow.length ? fixedWindow : computePlanningWindow(goal.id);
   goal._planLoading = true; goal._planError = null;
   renderTrainingPlanCard();
   renderCalendar();
   planCheckNotes = null;
   try {
     // Offene Terminwünsche (js/data/plan-wishes.js) im Fenster bekommt die KI
-    // als feste Vorgabe; was sie trotzdem nicht einplant - oder was auf einem
-    // schon verplanten Tag liegt -, ergänzt addOpenWishesToPlan() danach selbst.
-    const wishes = openPlanWishes().filter(w => windowDates.includes(w.date));
+    // als feste Vorgabe (buildTrainingPlanPrompt); was sie trotzdem nicht
+    // einplant - oder was auf einem schon verplanten Tag liegt -, ergänzt
+    // addOpenWishesToPlan() danach selbst.
     // Die Phase bekommt jede Einheit selbst aus ihrem Datum (buildPlannedWorkout).
     const defaults = { goalId: goal.id, source: "ai" };
     const planUntil = windowDates[windowDates.length - 1];
     let report = {};
+    let pendingRaw = firstRaw;
     const result = await checkedPlanFromAi({
       ask: async violations => {
-        const prompt = buildPlanPrompt(goal, windowDates) + buildPlanRulesPrompt(goal) + buildPlanWishesPrompt(wishes) + buildPlanRetryPrompt(violations);
         report = {};
-        const entries = parsePlanResponse(await callAiText(prompt, { task: "plan", json: true }), windowDates, report);
+        // Erster Versuch aus dem Sammelauftrag: Antwort liegt schon vor. Ein
+        // zweiter Versuch (selten - die harten Regeln repariert das Dashboard
+        // selbst) fragt sofort, damit der Plan nicht noch länger wartet.
+        const raw = pendingRaw != null ? pendingRaw : await callAiText(buildTrainingPlanPrompt(goal, windowDates, violations), { task: "plan", json: true });
+        pendingRaw = null;
+        const entries = parsePlanResponse(raw, windowDates, report);
         report.aiCount = entries.length;
         // Basis erst nach der (langen) KI-Anfrage lesen - Änderungen, die in
         // der Zwischenzeit gemacht wurden, bleiben so erhalten.

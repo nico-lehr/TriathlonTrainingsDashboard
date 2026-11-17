@@ -77,6 +77,7 @@ function renderTrainingPlanCard() {
       </div>
     </div>
     ${goal._planError ? `<p class="goal-error">${escapeHtml(goal._planError)}</p>` : ""}
+    ${typeof planBatchStatusText === "function" && planBatchStatusText(goal.id) ? `<p class="empty-note">${escapeHtml(planBatchStatusText(goal.id))}</p>` : ""}
     ${planCheckNotesHtml(goal)}
     <div class="plan-item-list">${listHtml}</div>
   `;

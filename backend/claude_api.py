@@ -54,7 +54,11 @@ MODEL_SHORT = {
 }
 
 
-def cost_micro_usd(model, tokens_in, tokens_out):
+# Sammelauftraege (Batches API) kosten die Haelfte.
+BATCH_PRICE_FACTOR = 0.5
+
+
+def cost_micro_usd(model, tokens_in, tokens_out, batch=False):
     """Kosten eines Aufrufs in Millionstel US-Dollar (ganze Zahl), None wenn der Preis unbekannt ist."""
     price = PRICES_USD_PER_MTOK.get(model)
     if price is None:
@@ -64,14 +68,15 @@ def cost_micro_usd(model, tokens_in, tokens_out):
     if long and tokens_in > long[0]:
         p_in, p_out = long[1], long[2]
     # Tokens x Dollar je Million = Millionstel Dollar
-    return int(round(tokens_in * p_in + tokens_out * p_out))
+    cost = tokens_in * p_in + tokens_out * p_out
+    return int(round(cost * (BATCH_PRICE_FACTOR if batch else 1)))
 
 
 # Modell je Aufgabe: Der Betreiber kann z. B. Plaene mit Opus und Analysen
 # mit Sonnet erstellen lassen. Gilt fuer alle, die den Schluessel nutzen.
 # Ohne eigene Wahl gilt das Standard-Modell ("model").
 TASK_GROUPS = [
-    ("plan", "Trainingsplan", "Plan erstellen und ändern, täglicher Plan-Check", {"plan", "dailycheck", "alternative", "replan"}),
+    ("plan", "Trainingsplan", "Plan erstellen und ändern, täglicher Plan-Check", {"plan", "planbatch", "dailycheck", "alternative", "replan"}),
     ("analysis", "Analysen", "Auswertung einzelner Einheiten, Lessons Learned, Belastung, Leistungszustand",
      {"analysis", "lessons", "focus", "perfSummary"}),
     ("coach", "Coach & Morgenbericht", "Empfehlungen zum Ziel und der Satz im Morgenbericht", {"recommendation", "morning", ""}),
@@ -83,7 +88,7 @@ KEY_MIN_LEN, KEY_MAX_LEN = 20, 300
 PROMPT_MAX_CHARS = 120_000
 # Obergrenze der Antwort je Aufgabe. Denken zaehlt bei den aktuellen Modellen
 # mit hinein, deshalb grosszuegig - bezahlt wird nur, was wirklich entsteht.
-MAX_TOKENS = {"plan": 16000, "replan": 16000, "mobility": 8000}
+MAX_TOKENS = {"plan": 16000, "planbatch": 16000, "replan": 16000, "mobility": 8000}
 MAX_TOKENS_DEFAULT = 6000
 # Gruendlichkeit je Aufgabe: kurze Texte brauchen wenig Nachdenken.
 # "alternative" (eine einzelne Einheit neu vorschlagen) ist klein und klar
@@ -94,7 +99,7 @@ EFFORT_DEFAULT = "low"
 # Nachdenken beim Trainingsplan (Plan erstellen + Nachricht an den Coach):
 # vom Betreiber waehlbar, um Qualitaet und Kosten zu vergleichen. Nachdenken
 # zaehlt als geschriebener Text und ist damit der groesste Kostenanteil.
-PLAN_EFFORT_TASKS = {"plan", "replan"}
+PLAN_EFFORT_TASKS = {"plan", "planbatch", "replan"}
 PLAN_EFFORTS = ("low", "medium")
 PLAN_EFFORT_DEFAULT = "low"
 
@@ -279,40 +284,33 @@ def verify_key(key, model):
         raise _translate(anthropic, e)
 
 
-def chat(prompt, task="", schema=None, usage_out=None):
-    """Ein Text-Aufruf. Mit schema kommt garantiert gueltiges JSON zurueck.
-    usage_out (dict): bekommt die verbrauchten Tokens (fuer die Admin-Statistik)."""
-    data = _read()
-    key = data.get("key")
-    if not key:
-        raise ClaudeError("Für den KI-Coach ist noch kein Schlüssel hinterlegt.", "claude_not_configured", 409)
-    model = model_for(data, task)
-    anthropic, client = _client(key)
+def _params(data, prompt, task, schema):
+    """Anfrage-Parameter - gleich fuer direkte Anfrage und Sammelauftrag."""
     output_config = {"effort": effort_for(data, task)}
     if schema:
         output_config["format"] = {"type": "json_schema", "schema": schema}
-    params = {
-        "model": model,
+    return {
+        "model": model_for(data, task),
         "max_tokens": MAX_TOKENS.get(task, MAX_TOKENS_DEFAULT),
         "output_config": output_config,
         "messages": [{"role": "user", "content": prompt}],
     }
-    try:
-        if model in FALLBACK_MODELS:
-            response = client.beta.messages.create(betas=[FALLBACK_BETA], fallbacks="default", **params)
-        else:
-            response = client.messages.create(**params)
-    except anthropic.AnthropicError as e:
-        raise _translate(anthropic, e)
 
-    if usage_out is not None:
-        u = getattr(response, "usage", None)
-        usage_out["in"] = int(getattr(u, "input_tokens", 0) or 0)
-        usage_out["out"] = int(getattr(u, "output_tokens", 0) or 0)
-        # Das Modell, das wirklich geantwortet hat (bei einer Ablehnung kann
-        # die API auf ein anderes ausweichen).
-        served = getattr(response, "model", None)
-        usage_out["model"] = served if isinstance(served, str) and served else model
+
+def _usage(response, model, usage_out):
+    if usage_out is None:
+        return
+    u = getattr(response, "usage", None)
+    usage_out["in"] = int(getattr(u, "input_tokens", 0) or 0)
+    usage_out["out"] = int(getattr(u, "output_tokens", 0) or 0)
+    # Das Modell, das wirklich geantwortet hat (bei einer Ablehnung kann
+    # die API auf ein anderes ausweichen).
+    served = getattr(response, "model", None)
+    usage_out["model"] = served if isinstance(served, str) and served else model
+
+
+def _text_of(response):
+    """Text der Antwort - oder ein verstaendlicher Fehler."""
     if response.stop_reason == "refusal":
         raise ClaudeError("Der KI-Coach hat diese Anfrage abgelehnt. Bitte anders formulieren.", "claude_refusal", 422)
     if response.stop_reason == "max_tokens":
@@ -321,3 +319,133 @@ def chat(prompt, task="", schema=None, usage_out=None):
     if not text:
         raise ClaudeError("Der KI-Coach hat keine Antwort geliefert. Bitte noch einmal versuchen.", "claude_empty", 502)
     return text
+
+
+def _key_or_error(data):
+    key = data.get("key")
+    if not key:
+        raise ClaudeError("Für den KI-Coach ist noch kein Schlüssel hinterlegt.", "claude_not_configured", 409)
+    return key
+
+
+def chat(prompt, task="", schema=None, usage_out=None):
+    """Ein Text-Aufruf. Mit schema kommt garantiert gueltiges JSON zurueck.
+    usage_out (dict): bekommt die verbrauchten Tokens (fuer die Admin-Statistik)."""
+    data = _read()
+    key = _key_or_error(data)
+    params = _params(data, prompt, task, schema)
+    model = params["model"]
+    anthropic, client = _client(key)
+    try:
+        if model in FALLBACK_MODELS:
+            response = client.beta.messages.create(betas=[FALLBACK_BETA], fallbacks="default", **params)
+        else:
+            response = client.messages.create(**params)
+    except anthropic.AnthropicError as e:
+        raise _translate(anthropic, e)
+    _usage(response, model, usage_out)
+    return _text_of(response)
+
+
+# ------------------------------------------------------------ Sammelauftraege
+
+# Nicht eilige Aufgaben (der automatische Wochenplan) laufen als Sammelauftrag
+# (Batches API): halber Preis, fertig meist in unter einer Stunde, spaetestens
+# nach 24 Stunden. Welcher Auftrag wem gehoert, steht in claude_batches.json
+# (gleicher Ordner wie der Schluessel, nur fuer den eigenen Benutzer lesbar) -
+# so kann niemand das Ergebnis eines anderen abholen. Das fertige Ergebnis wird
+# dort zwischengespeichert, damit die Kosten genau einmal gezaehlt werden.
+BATCH_FILE = "claude_batches.json"
+BATCH_KEEP_DAYS = 7
+BATCH_FAILED = {
+    "errored": "Der Sammelauftrag ist bei Claude fehlgeschlagen.",
+    "expired": "Der Sammelauftrag wurde nicht rechtzeitig bearbeitet (nach 24 Stunden abgelaufen).",
+    "canceled": "Der Sammelauftrag wurde abgebrochen.",
+}
+
+
+def _batch_path():
+    return os.path.join(KEY_DIR, BATCH_FILE)
+
+
+def _read_batches():
+    try:
+        with open(_batch_path(), encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _write_batches(jobs):
+    import datetime
+    cut = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=BATCH_KEEP_DAYS)).isoformat()
+    jobs = {k: v for k, v in jobs.items() if isinstance(v, dict) and str(v.get("created", "")) >= cut}
+    os.makedirs(KEY_DIR, exist_ok=True)
+    tmp = _batch_path() + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(jobs, f)
+    os.replace(tmp, _batch_path())
+
+
+def submit_batch(prompt, task, owner, schema=None):
+    """Sammelauftrag mit einer Anfrage abgeben. Gibt die Auftrags-ID zurueck."""
+    import datetime
+    data = _read()
+    key = _key_or_error(data)
+    params = _params(data, prompt, task, schema)
+    anthropic, client = _client(key)
+    try:
+        batch = client.messages.batches.create(requests=[{"custom_id": "auftrag", "params": params}])
+    except anthropic.AnthropicError as e:
+        raise _translate(anthropic, e)
+    with _lock:
+        jobs = _read_batches()
+        jobs[batch.id] = {"owner": owner, "task": task, "model": params["model"], "state": "pending",
+                          "created": datetime.datetime.now(datetime.timezone.utc).isoformat()}
+        _write_batches(jobs)
+    return batch.id
+
+
+def batch_result(batch_id, owner, usage_out=None):
+    """Stand eines Sammelauftrags: {"status": "pending"|"done"|"failed", "text"?, "error"?}.
+    usage_out bekommt die Tokens nur beim ersten Abholen (fuer die Statistik)."""
+    job = _read_batches().get(batch_id)
+    if not job or job.get("owner") != owner:
+        raise ClaudeError("Diesen Sammelauftrag gibt es nicht (mehr).", "claude_batch_unknown", 404)
+    if job.get("state") in ("done", "failed"):
+        return {"status": job["state"], "text": job.get("text"), "error": job.get("error")}
+    key = _key_or_error(_read())
+    anthropic, client = _client(key)
+    try:
+        batch = client.messages.batches.retrieve(batch_id)
+        if batch.processing_status != "ended":
+            return {"status": "pending"}
+        result = next(iter(client.messages.batches.results(batch_id)), None)
+    except anthropic.AnthropicError as e:
+        raise _translate(anthropic, e)
+    tokens = {}
+    outcome = {"status": "failed", "error": BATCH_FAILED["errored"]}
+    kind = getattr(getattr(result, "result", None), "type", None)
+    if kind == "succeeded":
+        message = result.result.message
+        _usage(message, job.get("model"), tokens)
+        tokens["batch"] = True
+        try:
+            outcome = {"status": "done", "text": _text_of(message)}
+        except ClaudeError as e:
+            outcome = {"status": "failed", "error": str(e)}
+    elif kind in BATCH_FAILED:
+        outcome = {"status": "failed", "error": BATCH_FAILED[kind]}
+    with _lock:
+        jobs = _read_batches()
+        current = jobs.get(batch_id) or job
+        if current.get("state") in ("done", "failed"):
+            # Inzwischen von einer anderen Anfrage abgeholt - nicht doppelt zaehlen
+            return {"status": current["state"], "text": current.get("text"), "error": current.get("error")}
+        jobs[batch_id] = {**current, "state": outcome["status"], "text": outcome.get("text"), "error": outcome.get("error")}
+        _write_batches(jobs)
+    if usage_out is not None and tokens:
+        usage_out.update(tokens)
+    return {"status": outcome["status"], "text": outcome.get("text"), "error": outcome.get("error")}

@@ -35,19 +35,12 @@ function renderAll() {
       (per Ordner-Scan ODER per Drag & Drop / Einzelauswahl)
    ====================================================================== */
 
-// Prüft einmal beim Laden, ob für das Hauptevent-Ziel weniger als ~3 geplante
-// Tage übrig sind (shouldAutoReplan, js/analytics/training-plan.js) und plant
-// dann automatisch im Hintergrund nach (generateTrainingPlan, js/ai/ollama.js)
-// - läuft nur einmal pro Sitzung, damit nicht bei jedem renderAll() (z.B.
-// Zeitraum-Filter ändern) erneut eine Ollama-Anfrage ausgelöst wird.
+// Automatischer Nachschub für den Trainingsplan: mit Claude vorab als günstiger
+// Sammelauftrag, sonst (lokale KI) wie bisher sofort - siehe js/ai/plan-batch.js.
+// Läuft beim Start und danach nur, wenn die App wieder in den Vordergrund kommt
+// oder ein Auftrag noch aussteht - nicht bei jedem renderAll().
 function checkAutoReplan() {
-  const goal = getPrimaryGoal();
-  if (!goal || !shouldAutoReplan(goal)) return;
-  // Ohne Trainingstage im Profil kann die KI ohnehin nichts sinnvoll planen -
-  // dann lieber gar nicht erst automatisch anfragen (der manuelle Button im
-  // Coach-Tab bleibt trotzdem nutzbar und zeigt bei Bedarf den echten Fehler).
-  if (!Array.isArray(athleteProfile.trainingDays) || !athleteProfile.trainingDays.length) return;
-  generateTrainingPlan(goal.id);
+  if (typeof initAutoPlan === "function") initAutoPlan();
 }
 
 /* ======================================================================

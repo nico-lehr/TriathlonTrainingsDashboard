@@ -264,6 +264,18 @@ Setze diese Nachricht um. Schreib NICHT die ganze Woche neu, sondern nur die Tag
 Antwortformat diesmal: {"antwort":"...","geaenderte_tage":["JJJJ-MM-TT"],"workouts":[...]} - "workouts" wie oben beschrieben, darf leer sein.`;
 }
 
+// Vorab erstellter Plan (Sammelauftrag, js/ai/plan-batch.js): das Zeitfenster
+// beginnt erst in ein paar Tagen. Dann gilt "Erholung heute" nur für heute -
+// die Tage kurz vorher passt der tägliche Plan-Check an die Verfassung an.
+function buildPlanAheadPrompt(windowDates) {
+  const first = windowDates && windowDates[0];
+  const tomorrow = planShiftDay(todayStr(), 1);
+  if (!first || first <= tomorrow) return "";
+  return `
+
+Hinweis: Dieser Plan wird vorab erstellt, das Zeitfenster beginnt erst am ${first}. Werte unter "Erholung heute" betreffen nur heute - plane die Tage im Zeitfenster normal nach Periodisierung und Belastung. Der tägliche Plan-Check passt sie kurz vorher an die Verfassung an.`;
+}
+
 // Ergänzung zum Trainingsplan-Prompt: die festen Regeln des Regelwerks als
 // Text (planRulesText, js/analytics/plan-rules.js) - dieselben Zahlen, mit
 // denen generateTrainingPlan() den Vorschlag danach prüft.

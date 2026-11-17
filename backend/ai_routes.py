@@ -7,6 +7,7 @@ Haengt am selben Blueprint wie routes.py, ist also nur mit Login erreichbar.
 Die Ollama-Adresse kommt nur aus der Server-Konfiguration, nie vom Browser.
 """
 import json
+import re
 import urllib.error
 import urllib.request
 
@@ -71,7 +72,9 @@ from . import claude_api, get_current_athlete_id  # noqa: E402
 from .auth import is_admin  # noqa: E402
 from .routes import get_session  # noqa: E402
 
-TASK_NAMES = {"plan", "analysis", "recommendation", "lessons", "focus", "perfSummary", "mobility", "dailycheck", "morning", "alternative", "replan"}
+TASK_NAMES = {"plan", "analysis", "recommendation", "lessons", "focus", "perfSummary", "mobility", "dailycheck", "morning", "alternative", "replan", "planbatch"}
+# Aufgaben, die als Sammelauftrag (halber Preis, Ergebnis spaeter) laufen duerfen
+BATCH_TASKS = {"planbatch"}
 
 
 def _is_admin():
@@ -123,22 +126,38 @@ def delete_claude():
     return response_success(claude_api.status(admin))
 
 
-@api_bp.route("/ai/claude/chat", methods=["POST"])
-def claude_chat():
+def _claude_request():
+    """Gemeinsame Pruefung fuer direkte Anfrage und Sammelauftrag:
+    (prompt, task, schema, None) oder (None, None, None, Fehlerantwort)."""
     data = request.get_json(silent=True)
     data = data if isinstance(data, dict) else {}
     prompt = data.get("prompt")
     if not isinstance(prompt, str) or not prompt.strip():
-        return response_error("'prompt' fehlt", "VALIDATION_ERROR", 400)
+        return None, None, None, response_error("'prompt' fehlt", "VALIDATION_ERROR", 400)
     if len(prompt) > claude_api.PROMPT_MAX_CHARS:
-        return response_error("Die Anfrage ist zu lang.", "VALIDATION_ERROR", 400)
+        return None, None, None, response_error("Die Anfrage ist zu lang.", "VALIDATION_ERROR", 400)
     task = data.get("task") if data.get("task") in TASK_NAMES else ""
     schema = data.get("schema") if isinstance(data.get("schema"), dict) else None
+    err = _claude_unavailable()
+    if err:
+        return None, None, None, err
+    return prompt, task, schema, None
+
+
+def _claude_unavailable():
     st = claude_api.status(_is_admin())
     if not st["configured"]:
         return response_error("Für den KI-Coach ist noch kein Schlüssel hinterlegt.", "claude_not_configured", 409)
     if not st["available"] and st["sdk"]:
         return response_error("Der Betreiber hat den KI-Coach für andere Personen nicht freigegeben.", "claude_not_shared", 403)
+    return None
+
+
+@api_bp.route("/ai/claude/chat", methods=["POST"])
+def claude_chat():
+    prompt, task, schema, err = _claude_request()
+    if err:
+        return err
     from .usage import record_ai_call
     athlete_id = get_current_athlete_id()
     tokens = {}
@@ -150,3 +169,44 @@ def claude_chat():
         return _claude_error(e)
     record_ai_call(athlete_id, task, tokens)
     return response_success({"response": text})
+
+
+# Sammelauftrag (halber Preis, Ergebnis meist nach Minuten, spaetestens 24 h):
+# POST /api/v1/ai/claude/batch       {prompt, task, schema?} -> {id}
+# GET  /api/v1/ai/claude/batch/<id>  -> {status: pending|done|failed, text?, error?}
+# Nur der eigene Auftrag ist abrufbar; die Kosten zaehlen beim ersten Abholen.
+@api_bp.route("/ai/claude/batch", methods=["POST"])
+def claude_batch_submit():
+    prompt, task, schema, err = _claude_request()
+    if err:
+        return err
+    if task not in BATCH_TASKS:
+        return response_error("Diese Aufgabe kann nicht als Sammelauftrag laufen.", "VALIDATION_ERROR", 400)
+    try:
+        batch_id = claude_api.submit_batch(prompt, task, get_current_athlete_id(), schema=schema)
+    except claude_api.ClaudeError as e:
+        return _claude_error(e)
+    return response_success({"id": batch_id})
+
+
+@api_bp.route("/ai/claude/batch/<batch_id>", methods=["GET"])
+def claude_batch_status(batch_id):
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", batch_id or ""):
+        return response_error("Ungültige Auftrags-ID.", "VALIDATION_ERROR", 400)
+    err = _claude_unavailable()
+    if err:
+        return err
+    from .usage import record_ai_call
+    athlete_id = get_current_athlete_id()
+    tokens = {}
+    try:
+        result = claude_api.batch_result(batch_id, athlete_id, usage_out=tokens)
+    except claude_api.ClaudeError as e:
+        return _claude_error(e)
+    if tokens:
+        task = "planbatch"
+        if result["status"] == "done":
+            record_ai_call(athlete_id, task, tokens)
+        else:
+            record_ai_call(athlete_id, task, tokens, ok=False, error_code="claude_batch")
+    return response_success(result)

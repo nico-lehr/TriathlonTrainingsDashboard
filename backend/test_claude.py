@@ -53,12 +53,31 @@ class FakeClient:
     calls = []
     raise_on_retrieve = None
     reply = None
+    # Sammelauftraege: id -> {"status": "in_progress"|"ended", "result": SimpleNamespace}
+    batches = {}
 
     def __init__(self):
         outer = self
         self.models = types.SimpleNamespace(retrieve=lambda model: outer._retrieve(model))
-        self.messages = types.SimpleNamespace(create=lambda **kw: outer._create(False, kw))
+        batches = types.SimpleNamespace(create=lambda **kw: outer._batch_create(kw),
+                                        retrieve=lambda bid: outer._batch_retrieve(bid),
+                                        results=lambda bid: outer._batch_results(bid))
+        self.messages = types.SimpleNamespace(create=lambda **kw: outer._create(False, kw), batches=batches)
         self.beta = types.SimpleNamespace(messages=types.SimpleNamespace(create=lambda **kw: outer._create(True, kw)))
+
+    def _batch_create(self, kw):
+        FakeClient.calls.append(("batch_create", kw))
+        bid = f"msgbatch_{len(FakeClient.batches) + 1}"
+        FakeClient.batches[bid] = {"status": "in_progress", "result": None}
+        return types.SimpleNamespace(id=bid, processing_status="in_progress")
+
+    def _batch_retrieve(self, bid):
+        FakeClient.calls.append(("batch_retrieve", bid))
+        return types.SimpleNamespace(id=bid, processing_status=FakeClient.batches[bid]["status"])
+
+    def _batch_results(self, bid):
+        FakeClient.calls.append(("batch_results", bid))
+        return iter([types.SimpleNamespace(custom_id="auftrag", result=FakeClient.batches[bid]["result"])])
 
     def _retrieve(self, model):
         FakeClient.calls.append(("retrieve", model))
@@ -92,6 +111,7 @@ class ClaudeTest(unittest.TestCase):
         FakeClient.calls = []
         FakeClient.raise_on_retrieve = None
         FakeClient.reply = None
+        FakeClient.batches = {}
         self.patches = [
             mock.patch.object(claude_api, "KEY_DIR", self.dir),
             mock.patch.object(claude_api, "_client", lambda key: (FakeErrors, FakeClient())),
@@ -229,6 +249,70 @@ class ClaudeTest(unittest.TestCase):
         # nur der Betreiber, nur bekannte Stufen
         self.assertEqual(self.put(self.friend, plan_effort="low").status_code, 403)
         self.assertEqual(self.put(self.admin, plan_effort="max").status_code, 400)
+
+    def _fertig(self, bid, text='{"workouts": []}', stop="end_turn", kind="succeeded"):
+        msg = types.SimpleNamespace(stop_reason=stop, model="claude-opus-5-5",
+                                    usage=types.SimpleNamespace(input_tokens=10_000, output_tokens=4_000),
+                                    content=[types.SimpleNamespace(type="text", text=text)])
+        FakeClient.batches[bid] = {"status": "ended",
+                                   "result": types.SimpleNamespace(type=kind, message=msg if kind == "succeeded" else None)}
+
+    def test_sammelauftrag_abgeben_und_abholen(self):
+        from backend import usage
+        self.put(self.admin, key=KEY, shared=True, plan_effort="low")
+        r = self.client.post("/api/v1/ai/claude/batch", headers=self.friend, json={"prompt": "Plan bitte", "task": "planbatch"})
+        self.assertEqual(r.status_code, 200, r.get_json())
+        bid = r.get_json()["data"]["id"]
+        kind, kw = FakeClient.calls[-1]
+        self.assertEqual(kind, "batch_create")
+        params = kw["requests"][0]["params"]
+        self.assertEqual(params["model"], "claude-opus-5-5")
+        self.assertEqual(params["output_config"], {"effort": "low"})
+        self.assertNotIn("fallbacks", params)  # gibt es bei Sammelauftraegen nicht
+        self.assertEqual(params["messages"], [{"role": "user", "content": "Plan bitte"}])
+        # Noch in Arbeit
+        get = lambda h: self.client.get(f"/api/v1/ai/claude/batch/{bid}", headers=h)
+        self.assertEqual(get(self.friend).get_json()["data"], {"status": "pending"})
+        # Fremde Auftraege sind nicht abrufbar
+        self.assertEqual(get(self.admin).status_code, 404)
+        self.assertEqual(self.client.get("/api/v1/ai/claude/batch/x/../y", headers=self.friend).status_code, 404)
+        # Fertig: Text kommt, Kosten zaehlen genau einmal und zum halben Preis
+        recorded = []
+        with mock.patch.object(usage, "record_ai_call", lambda *a, **k: recorded.append((a, k))):
+            self._fertig(bid, '  {"workouts": [1]}  ')
+            self.assertEqual(get(self.friend).get_json()["data"], {"status": "done", "text": '{"workouts": [1]}', "error": None})
+            self.assertEqual(get(self.friend).get_json()["data"]["status"], "done")
+        self.assertEqual(len(recorded), 1)
+        (aid, task, tokens), _ = recorded[0]
+        self.assertEqual(task, "planbatch")
+        self.assertEqual((tokens["in"], tokens["out"], tokens["batch"]), (10_000, 4_000, True))
+        # Opus: 10.000 x 4 $ + 4.000 x 20 $ je Mio. = 0,12 $ - halbiert 0,06 $
+        self.assertEqual(claude_api.cost_micro_usd("claude-opus-5-5", 10_000, 4_000, batch=True), 60_000)
+        self.assertEqual(claude_api.cost_micro_usd("claude-opus-5-5", 10_000, 4_000), 120_000)
+        # Die Auftrags-Datei ist nur fuer den eigenen Benutzer lesbar
+        self.assertEqual(stat.S_IMODE(os.stat(os.path.join(self.dir, claude_api.BATCH_FILE)).st_mode), 0o600)
+
+    def test_sammelauftrag_fehler_und_grenzen(self):
+        self.put(self.admin, key=KEY)
+        post = lambda body: self.client.post("/api/v1/ai/claude/batch", headers=self.admin, json=body)
+        # Nur der automatische Plan darf als Sammelauftrag laufen
+        self.assertEqual(post({"prompt": "x", "task": "analysis"}).status_code, 400)
+        self.assertEqual(post({"prompt": "", "task": "planbatch"}).status_code, 400)
+        # Freund ohne Freigabe: nicht erlaubt
+        self.assertEqual(self.client.post("/api/v1/ai/claude/batch", headers=self.friend, json={"prompt": "x", "task": "planbatch"}).status_code, 403)
+        # Abgelaufen / abgeschnitten -> failed mit verstaendlicher Meldung
+        bid = post({"prompt": "x", "task": "planbatch"}).get_json()["data"]["id"]
+        self._fertig(bid, kind="expired")
+        data = self.client.get(f"/api/v1/ai/claude/batch/{bid}", headers=self.admin).get_json()["data"]
+        self.assertEqual(data["status"], "failed")
+        self.assertIn("abgelaufen", data["error"])
+        bid2 = post({"prompt": "x", "task": "planbatch"}).get_json()["data"]["id"]
+        self._fertig(bid2, stop="max_tokens")
+        data = self.client.get(f"/api/v1/ai/claude/batch/{bid2}", headers=self.admin).get_json()["data"]
+        self.assertEqual(data["status"], "failed")
+        self.assertIn("abgeschnitten", data["error"])
+        # Unbekannte ID
+        self.assertEqual(self.client.get("/api/v1/ai/claude/batch/msgbatch_999", headers=self.admin).status_code, 404)
 
     def test_kosten_mit_dem_modell_das_geantwortet_hat(self):
         self.put(self.admin, key=KEY)

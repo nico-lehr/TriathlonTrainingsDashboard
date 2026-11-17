@@ -537,8 +537,10 @@ function mPlanCheckStatus() {
   const s = planCheckStatus();
   const today = todayStr();
   const when = s.at ? (localDateStr(new Date(s.at)) === today ? `heute ${new Date(s.at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}` : new Date(s.at).toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" })) : null;
-  const note = s.lastAi && s.lastAi.date === today && s.lastAi.text ? `<p class="m-say small">${mEsc(s.lastAi.text)}</p>` : "";
   const goal = typeof getPrimaryGoal === "function" ? getPrimaryGoal() : null;
+  const batch = goal && typeof planBatchStatusText === "function" ? planBatchStatusText(goal.id) : null;
+  const note = (s.lastAi && s.lastAi.date === today && s.lastAi.text ? `<p class="m-say small">${mEsc(s.lastAi.text)}</p>` : "")
+    + (batch ? `<p class="m-say small">${mEsc(batch)}</p>` : "");
   const report = goal && typeof planCheckNotes !== "undefined" && planCheckNotes && planCheckNotes.goalId === goal.id && typeof planReportLines === "function" ? planReportLines(planCheckNotes) : [];
   return `<div class="m-pc-status"><span><i class="${s.running ? "run" : ""}"></i>${s.running ? "Plan-Check läuft …" : when ? `Plan-Check: ${when} geprüft` : "Plan-Check: noch nicht gelaufen"}</span><button type="button" class="m-link" data-m-act="pc-run"${s.running ? " disabled" : ""}>Jetzt prüfen</button></div>${note}
     ${report.length ? `<details class="m-pc-report"><summary>So ist dein Plan entstanden</summary><ul>${report.map(t => `<li>${mEsc(t)}</li>`).join("")}</ul></details>` : ""}`;

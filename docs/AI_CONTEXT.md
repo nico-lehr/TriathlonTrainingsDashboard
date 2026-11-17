@@ -179,6 +179,21 @@ nicht das, was sie liest. Deshalb:
   bezahlt und ist beim Plan der größte Kostenanteil.
 * **Alternative zu einer Einheit** (`generatePlannedWorkoutAlternative`,
   Task `alternative`): gleiches Modell wie der Plan, aber Gründlichkeit „low“.
+* **Automatischer Wochenplan als Sammelauftrag** (`js/ai/plan-batch.js`,
+  Task `planbatch`, ab 2.4.49): Mit Claude geht die nächste Woche schon raus,
+  wenn nur noch **5 Tage** geplant sind - über die Batches API zum halben
+  Preis (`POST/GET /api/v1/ai/claude/batch`, Auftrag in
+  `~/.triathlon/claude_batches.json`). Die App holt das Ergebnis beim Start,
+  alle 10 Minuten und beim Zurückkehren in die App ab und baut es mit
+  `generateTrainingPlan(goalId, {windowDates, firstRaw})` ein (gleiche
+  Prüfung/Reparatur wie sofort). Ist nur noch **1 Tag** geplant (Auftrag
+  hängt, App lange zu), wird sofort zum vollen Preis geplant. Überholte
+  Ergebnisse (Tage inzwischen geplant, Hauptziel gewechselt) werden
+  verworfen. Knöpfe und Coach-Nachricht bleiben sofort; ohne Claude (Ollama)
+  plant die App wie bisher bei weniger als 3 Tagen. Der vorab erstellte Plan
+  bekommt den Hinweis, dass der tägliche Plan-Check die Tage kurz vorher an
+  die Verfassung anpasst (`buildPlanAheadPrompt`). Reihenfolge am Morgen
+  bleibt: Plan-Check, danach Morgenbericht.
 * **Zweiter Versuch beim Plan:** Alle „harten“ Regelverstöße (zwei harte Tage
   hintereinander, kein Ruhetag, schlechte Erholung) repariert das Dashboard
   selbst; ein zweiter KI-Durchlauf ist nur der seltene Notfall.

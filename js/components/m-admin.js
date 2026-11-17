@@ -90,7 +90,7 @@ function mUsd(v) {
 }
 
 const M_AI_TASK_NAMES = {
-  plan: "Trainingsplan", replan: "Plan nach Coach-Nachricht", alternative: "Alternative zu einer Einheit", dailycheck: "Täglicher Plan-Check", analysis: "Auswertung einer Einheit",
+  plan: "Trainingsplan", replan: "Plan nach Coach-Nachricht", alternative: "Alternative zu einer Einheit", planbatch: "Trainingsplan (Sammelauftrag)", dailycheck: "Täglicher Plan-Check", analysis: "Auswertung einer Einheit",
   lessons: "Lessons Learned", focus: "Belastung einordnen", perfSummary: "Leistungszustand",
   recommendation: "Coach-Empfehlung", morning: "Morgenbericht", mobility: "Mobility", chat: "Sonstiges",
 };

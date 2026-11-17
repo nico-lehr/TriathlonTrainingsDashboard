@@ -4,6 +4,16 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.49
+
+**Trainingsplan: nächste Woche zum halben Preis**
+- Mit Claude plant das Dashboard die nächste Woche jetzt früher vor: Sobald nur noch 5 Tage geplant sind, geht sie als „Sammelauftrag“ an Claude. Das kostet nur die Hälfte, dafür kommt die Antwort nicht sofort, sondern meist in unter einer Stunde.
+- Solange der Auftrag läuft, steht beim Trainingsplan ein kurzer Hinweis. Das Ergebnis wird automatisch abgeholt, sobald das Dashboard offen ist, und genauso geprüft wie bisher.
+- Sicherheitsnetz: Ist nur noch ein Tag geplant und der Auftrag noch nicht fertig, plant das Dashboard sofort (normaler Preis). Dir fehlt also nie ein Plan.
+- Der tägliche Plan-Check bleibt: Er schaut weiter jeden Morgen, ob heute und die nächsten Tage noch zu deiner Verfassung passen, danach kommt der Morgenbericht.
+- „Plan erstellen“, „Plan neu erstellen“ und Nachrichten an den Coach antworten weiter sofort. Mit der lokalen KI ändert sich nichts.
+- Unter Mehr → Statistik heißt der neue Posten „Trainingsplan (Sammelauftrag)“.
+
 ## 2.4.48
 
 **Trainingsplan: Nachdenken einstellbar**
