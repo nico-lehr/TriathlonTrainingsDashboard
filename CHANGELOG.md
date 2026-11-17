@@ -4,6 +4,14 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.47
+
+**Trainingsplan: weniger KI-Kosten bei gleicher Qualität**
+- Täglicher Plan-Check: Die festen Regeln prüfen den Plan weiterhin jeden Tag. Die KI wird aber nur noch gefragt, wenn es wirklich etwas abzuwägen gibt. Das ist der Fall bei Muskelkater oder wenig Energie im Erholungs-Check, einer verpassten Einheit, schnell steigender Belastung oder wenn mehrere Uhr-Werte gleichzeitig leicht auffällig sind. Ist alles im grünen Bereich, hätte die KI ohnehin „behalten“ gesagt, und diese Anfrage fällt jetzt weg. Der Knopf „Jetzt prüfen“ fragt die KI weiterhin immer.
+- Nachricht an den Coach: Die KI schreibt nicht mehr die ganze Woche neu, sondern schickt nur die Tage zurück, die sich ändern. Alle anderen Tage bleiben genau wie vorher.
+- „Kürzere Variante“ oder „Alternative“ für eine einzelne Einheit: Die KI denkt dafür weniger lange nach, denn es geht nur um eine Einheit statt um eine ganze Woche.
+- Statistik (Mehr → Statistik): Je Aufgabe steht jetzt, wie oft sie lief, was eine Anfrage im Schnitt kostet und wie viel die KI im Schnitt geschrieben hat. So sieht man, wo das Geld hingeht.
+
 ## 2.4.46
 
 **KI-Anfragen kürzer und günstiger**

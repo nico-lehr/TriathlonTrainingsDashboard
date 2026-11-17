@@ -274,3 +274,35 @@ function planGuardAcceptAi(envelope, proposal) {
   if (!(dur >= 15) || (maxDur && dur > maxDur)) return null;
   return { sport, intensity, duration_min: dur };
 }
+
+// Lohnt sich die KI-Prüfung für heute/morgen? Nur, wenn es etwas abzuwägen
+// gibt - sonst lautet die Antwort praktisch immer "behalten" und kostet nur.
+// Gibt die Gründe zurück (leer = KI nicht fragen). o: { gate, signs, strain,
+// recovery (Erholungs-Check von heute oder null), wellness ({ hrv_ms,
+// resting_hr, sleep_min } wie wellnessDeviation, readiness_score wie
+// latestWellness), missed (verpasste Einheiten), acwr, todayKey }.
+const PLAN_GUARD_AI_ACWR = 1.2;        // knapp unter der festen Grenze (1,3)
+const PLAN_GUARD_AI_HRV_PCT = -5;      // halbe Schwelle der festen Regel (-10 %)
+const PLAN_GUARD_AI_RHR_BPM = 3;       // feste Regel: +5
+const PLAN_GUARD_AI_SLEEP_PCT = -15;   // deutlich kürzer geschlafen als sonst
+const PLAN_GUARD_AI_READINESS = 50;    // feste Regel: unter 25
+function planGuardAiReasons(o) {
+  const reasons = [];
+  const add = r => { if (!reasons.includes(r)) reasons.push(r); };
+  if ((o.gate && o.gate.reasons && o.gate.reasons.length) || (o.signs && o.signs.length) || (o.strain && o.strain.length)) add("feste Regeln auffällig");
+  const rc = o.recovery || {};
+  if (["moderate", "severe"].includes(rc.soreness) || ["low", "reduced"].includes(rc.energy) || rc.injury === "yes") add("Erholungs-Check");
+  if (o.missed && o.missed.length) add("verpasste Einheit");
+  if (o.acwr != null && o.acwr >= PLAN_GUARD_AI_ACWR) add("Belastung steigt");
+  // Mehrere leicht auffällige Uhr-Werte zusammen (einzeln schwankt jeder Wert)
+  const minDate = planShiftDay(o.todayKey, -1);
+  const fresh = d => d && d.value != null && d.date >= minDate && d.date <= o.todayKey;
+  const w = o.wellness || {};
+  let mild = 0;
+  if (fresh(w.hrv_ms) && w.hrv_ms.baseline && w.hrv_ms.deltaPct <= PLAN_GUARD_AI_HRV_PCT) mild++;
+  if (fresh(w.resting_hr) && w.resting_hr.baseline && w.resting_hr.value - w.resting_hr.baseline >= PLAN_GUARD_AI_RHR_BPM) mild++;
+  if (fresh(w.sleep_min) && w.sleep_min.baseline && w.sleep_min.deltaPct <= PLAN_GUARD_AI_SLEEP_PCT) mild++;
+  if (fresh(w.readiness_score) && w.readiness_score.value < PLAN_GUARD_AI_READINESS) mild++;
+  if (mild >= 2) add("mehrere Uhr-Werte leicht auffällig");
+  return reasons;
+}

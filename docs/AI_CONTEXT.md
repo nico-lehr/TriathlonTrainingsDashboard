@@ -156,6 +156,31 @@ entscheidet nicht die KI, sondern `validatePlan()`
   Erholungswochen haben einen festen Zielumfang) und Regel 7 (nach dem
   Wettkampf nur lockere Einheiten) dazu.
 
+## Kosten der Plan-Aufgaben (Stand 2.4.47)
+
+Am teuersten ist bei der KI das, was sie schreibt (inklusive Nachdenken),
+nicht das, was sie liest. Deshalb:
+
+* **Täglicher Plan-Check** (`js/components/plan-check.js`): Die festen Regeln
+  laufen immer (kostenlos). Die KI wird nur noch gefragt, wenn es etwas
+  abzuwägen gibt - `planGuardAiReasons()` (`js/analytics/plan-guard.js`):
+  auffälliger Erholungs-Check, verpasste Einheit, ACWR ab 1,2, eine feste
+  Regel hat angeschlagen oder mindestens zwei Uhr-Werte sind leicht auffällig
+  (HRV −5 %, Ruhepuls +3, Schlaf −15 %, Trainingsbereitschaft unter 50).
+  Sonst wäre die Antwort praktisch immer „behalten“. Der Knopf „Jetzt prüfen“
+  fragt die KI trotzdem.
+* **Nachricht an den Coach** (`replanFromCoachNote`, Task `replan`): Die KI
+  schickt nur die geänderten Tage (`geaenderte_tage` + `workouts`), der Rest
+  der Woche bleibt. Ohne `geaenderte_tage` gilt die Antwort wie früher als
+  kompletter Plan.
+* **Alternative zu einer Einheit** (`generatePlannedWorkoutAlternative`,
+  Task `alternative`): gleiches Modell wie der Plan, aber Gründlichkeit „low“.
+* **Zweiter Versuch beim Plan:** Alle „harten“ Regelverstöße (zwei harte Tage
+  hintereinander, kein Ruhetag, schlechte Erholung) repariert das Dashboard
+  selbst; ein zweiter KI-Durchlauf ist nur der seltene Notfall.
+* **Statistik** (Mehr → Statistik): je Aufgabe Anzahl Anfragen, Ø Kosten und
+  Ø geschriebene Tokens (`ai_task_stats`, `backend/usage.py`).
+
 ## Empfehlungen Heute / Diese Woche / Nächste Woche (vierter Anwendungsfall)
 
 `buildOutlookFacts()` (`context-builder.js`) sammelt fertige Sätze aus den

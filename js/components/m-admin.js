@@ -90,7 +90,7 @@ function mUsd(v) {
 }
 
 const M_AI_TASK_NAMES = {
-  plan: "Trainingsplan", dailycheck: "Täglicher Plan-Check", analysis: "Auswertung einer Einheit",
+  plan: "Trainingsplan", replan: "Plan nach Coach-Nachricht", alternative: "Alternative zu einer Einheit", dailycheck: "Täglicher Plan-Check", analysis: "Auswertung einer Einheit",
   lessons: "Lessons Learned", focus: "Belastung einordnen", perfSummary: "Leistungszustand",
   recommendation: "Coach-Empfehlung", morning: "Morgenbericht", mobility: "Mobility", chat: "Sonstiges",
 };
@@ -109,7 +109,15 @@ function mAdminAiCostCard(d) {
       <span class="m-row-meta">vor Version 2.4.37 gezählt · ${mTok(legacy.in)} / ${mTok(legacy.out)}</span></span><b>–</b></div>` : "";
   const tasks = Object.entries(d.ai_cost_tasks || {}).sort((a, b) => b[1] - a[1]);
   const top = tasks.length ? tasks[0][1] : 0;
-  const taskHtml = tasks.length ? `<div class="m-adm-sub">Kosten je Aufgabe</div><div class="m-adm-rank">${tasks.map(([k, v]) => `<div class="m-adm-rank-row"><span>${mEsc(M_AI_TASK_NAMES[k] || k)}</span><b>${mUsd(v)}</b>
+  // Anfragen und Ø pro Anfrage je Aufgabe (zeigt, wo sich Sparen lohnt)
+  const tstat = d.ai_task_stats || {};
+  const taskMeta = k => {
+    const t = tstat[k];
+    if (!t || !t.requests) return "";
+    const avg = d.ai_cost_tasks[k] / t.requests;
+    return `<small class="m-adm-task-meta">${t.requests} ${t.requests === 1 ? "Anfrage" : "Anfragen"} · Ø ${mUsd(avg)}${t.tokens_out ? ` · Ø ${mTok(Math.round(t.tokens_out / t.requests))} geschrieben` : ""}</small>`;
+  };
+  const taskHtml = tasks.length ? `<div class="m-adm-sub">Kosten je Aufgabe</div><div class="m-adm-rank">${tasks.map(([k, v]) => `<div class="m-adm-rank-row"><span>${mEsc(M_AI_TASK_NAMES[k] || k)}${taskMeta(k)}</span><b>${mUsd(v)}</b>
       <div class="m-adm-rank-bar"><i style="width:${Math.max(3, Math.round(v / top * 100))}%;background:var(--m-r2)"></i></div></div>`).join("")}</div>` : "";
   return `<section class="m-card"><div class="m-head"><h2>KI-Kosten</h2><span class="m-adm-hint">${d.days} Tage</span></div>
     <div class="m-adm-cost"><b>${mUsd(total)}</b><span>geschätzt nach Listenpreis, in US-Dollar</span></div>

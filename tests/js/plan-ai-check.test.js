@@ -185,6 +185,27 @@ test("Coach-Nachricht: offene Einheiten der nächsten 7 Tage werden ersetzt, Erl
   assert.deepStrictEqual(plain(run("plannedWorkouts.map(p => p.id)")), ["a", "b", "c"]);
 });
 
+test("Coach-Nachricht im sparsamen Format: nur geänderte Tage kommen zurück, die übrigen bleiben", async () => {
+  const today = run("todayStr()");
+  const plus = n => run(`(() => { const d = new Date(); d.setHours(0,0,0,0); d.setDate(d.getDate() + ${n}); return localDateStr(d); })()`);
+  run(`getPrimaryGoal = () => ({ id: "g1", name: "Ziel" });
+    buildPlanPrompt = () => ""; buildPlanRulesPrompt = () => ""; buildPlanRetryPrompt = () => "";
+    buildCoachNotePrompt = () => ""; planRuleViolations = () => [];`);
+  run(`replacePlannedWorkouts(${JSON.stringify([
+    { id: "a", date: today, sport: "Rad", title: "Rad heute", duration_min: 90, status: "geplant", goalId: "g1" },
+    { id: "d", date: plus(2), sport: "Laufen", title: "Lauf bleibt", duration_min: 50, status: "geplant", goalId: "g1" },
+    { id: "e", date: plus(3), sport: "Rad", title: "Rad fällt weg", duration_min: 60, status: "geplant", goalId: "g1" },
+  ])})`);
+  // Heute geändert (Schwimmen statt Rad), übermorgen+1 wird frei, der Rest bleibt
+  run(`callAiText = async () => JSON.stringify({ antwort: "Erledigt.", geaenderte_tage: ["${today}", "${plus(3)}"], workouts: [
+    { date: "${today}", sport: "Schwimmen", title: "Schwimmen", duration_min: 45, intensity: "leicht", description: "locker" }] })`);
+  await run(`replanFromCoachNote("Heute schwimmen, Do frei").then(r => { globalThis.__res = r; })`);
+  const titles = plain(run("plannedWorkouts.map(p => p.title)")).sort();
+  assert.deepStrictEqual(titles, ["Lauf bleibt", "Schwimmen"]);
+  run("__res.undo()");
+  assert.deepStrictEqual(plain(run("plannedWorkouts.map(p => p.id)")).sort(), ["a", "d", "e"]);
+});
+
 test("Coach-Nachricht: leerer Text und fehlendes Ziel geben eine klare Meldung, der Plan bleibt", async () => {
   await assert.rejects(run(`replanFromCoachNote("  ")`), /Schreib kurz/);
   run(`getPrimaryGoal = () => null`);

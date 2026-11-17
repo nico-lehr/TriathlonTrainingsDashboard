@@ -78,6 +78,10 @@ def record_ai_call(athlete_id, task, tokens, ok=True, error_code=None):
     t_in, t_out = int(tokens.get("in", 0) or 0), int(tokens.get("out", 0) or 0)
     if tokens:
         items += [("ai_tokens", "in", t_in), ("ai_tokens", "out", t_out)]
+        if ok:
+            # Geschriebene Tokens je Aufgabe (inkl. Nachdenken) - zeigt, welche
+            # Aufgabe im Schnitt wie viel Antwort erzeugt (Statistik).
+            items.append(("ai_task_out", (task or "chat")[:40], t_out))
     model = str(tokens.get("model") or "")[:40]
     if model:
         items += [("ai_model", model, 1), ("ai_model_in", model, t_in), ("ai_model_out", model, t_out)]
@@ -239,7 +243,7 @@ def admin_stats():
         # KI-Nutzung und Kosten je Modell und je Aufgabe (alle Personen)
         all_by = {}
         for r in rows:
-            if r.kind.startswith("ai_"):
+            if r.kind == "ai" or r.kind.startswith("ai_"):
                 all_by.setdefault(r.kind, {})
                 all_by[r.kind][r.name] = all_by[r.kind].get(r.name, 0) + r.count
         ai_models = _model_rows(all_by)
@@ -248,6 +252,9 @@ def admin_stats():
         legacy_in = totals["ai_tokens_in"] - sum(m["tokens_in"] for m in ai_models)
         legacy_out = totals["ai_tokens_out"] - sum(m["tokens_out"] for m in ai_models)
         ai_cost_tasks = {k: round(v / 1e6, 6) for k, v in all_by.get("ai_cost_task", {}).items()}
+        # Anfragen und geschriebene Tokens je Aufgabe (geschriebene Tokens erst ab 2.4.47)
+        ai_task_stats = {k: {"requests": n, "tokens_out": all_by.get("ai_task_out", {}).get(k, 0)}
+                         for k, n in all_by.get("ai", {}).items()}
         pages, features = {}, {}
         for u in users:
             for k, v in u["pages"].items():
@@ -255,7 +262,7 @@ def admin_stats():
             for k, v in u["features"].items():
                 features[k] = features.get(k, 0) + v
         return response_success({"days": days, "since": since.isoformat(), "totals": totals, "pages": pages, "features": features,
-                                 "ai_models": ai_models, "ai_cost_tasks": ai_cost_tasks,
+                                 "ai_models": ai_models, "ai_cost_tasks": ai_cost_tasks, "ai_task_stats": ai_task_stats,
                                  "ai_tokens_without_model": {"in": max(0, legacy_in), "out": max(0, legacy_out)},
                                  "daily_active": daily_active, "weekly_active": weekly_active, "users": users})
     finally:

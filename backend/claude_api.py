@@ -71,7 +71,7 @@ def cost_micro_usd(model, tokens_in, tokens_out):
 # mit Sonnet erstellen lassen. Gilt fuer alle, die den Schluessel nutzen.
 # Ohne eigene Wahl gilt das Standard-Modell ("model").
 TASK_GROUPS = [
-    ("plan", "Trainingsplan", "Plan erstellen und ändern, täglicher Plan-Check", {"plan", "dailycheck"}),
+    ("plan", "Trainingsplan", "Plan erstellen und ändern, täglicher Plan-Check", {"plan", "dailycheck", "alternative", "replan"}),
     ("analysis", "Analysen", "Auswertung einzelner Einheiten, Lessons Learned, Belastung, Leistungszustand",
      {"analysis", "lessons", "focus", "perfSummary"}),
     ("coach", "Coach & Morgenbericht", "Empfehlungen zum Ziel und der Satz im Morgenbericht", {"recommendation", "morning", ""}),
@@ -83,10 +83,13 @@ KEY_MIN_LEN, KEY_MAX_LEN = 20, 300
 PROMPT_MAX_CHARS = 120_000
 # Obergrenze der Antwort je Aufgabe. Denken zaehlt bei den aktuellen Modellen
 # mit hinein, deshalb grosszuegig - bezahlt wird nur, was wirklich entsteht.
-MAX_TOKENS = {"plan": 16000, "mobility": 8000}
+MAX_TOKENS = {"plan": 16000, "replan": 16000, "mobility": 8000}
 MAX_TOKENS_DEFAULT = 6000
 # Gruendlichkeit je Aufgabe: kurze Texte brauchen wenig Nachdenken.
-EFFORT = {"plan": "medium", "mobility": "medium", "dailycheck": "medium"}
+# "alternative" (eine einzelne Einheit neu vorschlagen) ist klein und klar
+# umrissen - dafuer reicht wenig Nachdenken; "replan" (Nachricht an den Coach)
+# aendert meist nur wenige Tage einer Woche.
+EFFORT = {"plan": "medium", "replan": "medium", "mobility": "medium", "dailycheck": "medium", "alternative": "low"}
 EFFORT_DEFAULT = "low"
 TIMEOUT_S = 300
 

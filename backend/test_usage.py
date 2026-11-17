@@ -139,6 +139,10 @@ class UsageTest(unittest.TestCase):
         self.assertEqual(data["ai_models"][0]["model"], "claude-haiku-5-5")  # teuerstes zuerst
         self.assertEqual(data["totals"]["ai_cost_usd"], 0.62)
         self.assertEqual(data["ai_cost_tasks"], {"plan": 0.08, "analysis": 0.04, "morning": 0.5})
+        # Anfragen und geschriebene Tokens je Aufgabe (Fehler zählen nicht als Anfrage)
+        self.assertEqual(data["ai_task_stats"]["plan"], {"requests": 2, "tokens_out": 2_100})
+        self.assertEqual(data["ai_task_stats"]["analysis"], {"requests": 2, "tokens_out": 2_000})
+        self.assertNotIn("morning", data["ai_task_stats"])
         self.assertEqual(data["ai_tokens_without_model"], {"in": 7, "out": 0})
         self.assertEqual(data["totals"]["ai_errors"], 1)
         friend = next(u for u in data["users"] if u["username"] == "freundin")

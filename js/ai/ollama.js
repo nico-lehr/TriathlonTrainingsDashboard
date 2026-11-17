@@ -386,9 +386,9 @@ async function generateTrainingPlan(goalId, { replace = false } = {}) {
 }
 
 // "Sag dem Coach Bescheid" (Handy, Coach-Seite): freie Nachricht wie "heute
-// spontan 45 min schwimmen" -> die KI plant die nächsten 7 Tage (ab heute)
-// neu. Ersetzt werden nur noch offene ("geplant") Einheiten in diesem
-// Zeitraum; Erledigtes/Übersprungenes bleibt. Dieselbe Regelprüfung wie beim
+// spontan 45 min schwimmen" -> die KI passt die nächsten 7 Tage (ab heute)
+// an und schickt nur die Tage zurück, die sich ändern. Ersetzt werden nur
+// offene ("geplant") Einheiten an diesen Tagen; Erledigtes/Übersprungenes bleibt. Dieselbe Regelprüfung wie beim
 // normalen Plan (checkedPlanFromAi). Ergebnis: { reply, undo } - undo() stellt
 // den Plan von vorher wieder her. Wirft bei KI-Fehler/Regelverstoß, der Plan
 // bleibt dann unverändert.
@@ -408,13 +408,19 @@ async function replanFromCoachNote(note) {
   const result = await checkedPlanFromAi({
     ask: async violations => {
       const prompt = buildPlanPrompt(goal, windowDates) + buildPlanRulesPrompt(goal) + buildCoachNotePrompt(text, oldPlan, windowDates) + buildPlanRetryPrompt(violations);
-      const raw = await callAiText(prompt, { task: "plan", json: true });
+      const raw = await callAiText(prompt, { task: "replan", json: true });
       let data = null;
       try { const m = raw.match(/\{[\s\S]*\}/); data = JSON.parse(m ? m[0] : raw); } catch (e) { /* parsePlanResponse meldet den Fehler */ }
       if (data && typeof data.antwort === "string") reply = data.antwort.trim().slice(0, 400);
       const entries = data && Array.isArray(data.workouts) && !data.workouts.length ? [] : parsePlanResponse(raw, windowDates);
+      // Die KI schickt nur die geänderten Tage (spart Antwort-Tokens); alle
+      // anderen Tage behalten ihren Plan. Fehlt die Liste, gilt die Antwort
+      // wie früher als kompletter Plan für das ganze Zeitfenster.
+      const changed = data && Array.isArray(data.geaenderte_tage)
+        ? new Set([...data.geaenderte_tage.filter(d => windowDates.includes(d)), ...entries.map(e => e.date)])
+        : null;
       // Basis erst nach der KI-Anfrage lesen (Änderungen in der Zwischenzeit bleiben).
-      const base = plannedWorkouts.filter(p => !inWindow(p));
+      const base = plannedWorkouts.filter(p => !inWindow(p) || (changed && !changed.has(p.date)));
       return { base, list: [...base, ...entries.map(entry => buildPlannedWorkout({ ...entry, ...defaults }))] };
     },
     validate: list => planRuleViolations(list, { planUntil: windowDates[windowDates.length - 1] }),
@@ -524,7 +530,7 @@ async function generatePlannedWorkoutAlternative(pw, mode) {
   const goal = (pw.goalId && goals.find(g => g.id === pw.goalId)) || getPrimaryGoal();
   if (!goal) throw new Error("Kein Ziel/Event hinterlegt - dafür wird mindestens ein Ziel unter \"Deine Ziele\" benötigt.");
   const prompt = buildRegeneratePrompt(pw, mode, goal);
-  const text = await callAiText(prompt, { task: "plan", json: true });
+  const text = await callAiText(prompt, { task: "alternative", json: true });
   const entries = parsePlanResponse(text, [pw.date]);
   if (!entries.length) throw new Error("Kein gültiger Vorschlag in der Antwort gefunden.");
   return entries[0];

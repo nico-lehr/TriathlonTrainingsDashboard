@@ -18,7 +18,9 @@
 //
 // Die KI darf nur innerhalb der Regeln ändern: leichter, kürzer oder Ruhetag -
 // nie härter oder länger (planGuardAcceptAi). Sie wird nur gefragt, wenn heute
-// oder morgen eine fordernde Einheit ansteht, höchstens einmal je Datenstand.
+// oder morgen eine fordernde Einheit ansteht UND es etwas abzuwägen gibt
+// (Erholungs-Check, Uhr-Werte, verpasste Einheit, steigende Belastung -
+// planGuardAiReasons), höchstens einmal je Datenstand.
 
 const PLAN_CHECK_KEY = "triathlon_dashboard_plan_check_v1";
 const PLAN_CHECK_MID_EVERY = 3;
@@ -283,7 +285,7 @@ async function runPlanCheck({ force = false } = {}) {
     planCheckSave();
     if (entry) planCheckRerender();
 
-    if (due.near) await planCheckAi(goal, signals, entry);
+    if (due.near) await planCheckAi(goal, signals, entry, { force });
     return planCheckLoad().log[0] || null;
   } catch (e) {
     console.warn("Plan-Check fehlgeschlagen:", e);
@@ -349,12 +351,30 @@ const PLAN_CHECK_AI_SCHEMA = {
   additionalProperties: false,
 };
 
-async function planCheckAi(goal, signals, guardEntry) {
+// Gibt es überhaupt etwas abzuwägen (planGuardAiReasons, plan-guard.js)?
+// Ohne Auffälligkeit wäre die Antwort "behalten" - die Anfrage sparen wir uns.
+// Nur der Knopf "Jetzt prüfen" (force) fragt die KI trotzdem.
+function planCheckAiReasons(signals, todayKey) {
+  const rc = typeof recoveryCheck !== "undefined" && recoveryCheck && recoveryCheck.date === todayKey ? recoveryCheck : null;
+  const wellness = { ...(signals.wellness || {}) };
+  if (typeof wellnessDeviation === "function") wellness.sleep_min = wellnessDeviation("sleep_min");
+  return planGuardAiReasons({
+    gate: signals.gate, signs: signals.signs, strain: signals.strain, recovery: rc, wellness,
+    missed: planCheckMissed(todayKey), acwr: typeof planCurrentAcwr === "function" ? planCurrentAcwr() : null, todayKey,
+  });
+}
+
+async function planCheckAi(goal, signals, guardEntry, { force = false } = {}) {
   if (typeof callAiText !== "function") return;
   const st = planCheckLoad();
   const todayKey = todayStr();
   const cands = planCheckAiCandidates(todayKey).filter(p => !(st.skip[todayKey] || []).includes(p.id));
   if (!cands.length) return;
+  if (!force && typeof planGuardAiReasons === "function" && !planCheckAiReasons(signals, todayKey).length) {
+    st.aiSkipped = { date: todayKey, at: new Date().toISOString() };
+    planCheckSave();
+    return;
+  }
   const aiSig = planCheckSignature(todayKey);
   if (st.aiSig === aiSig) return; // derselbe Datenstand wurde schon geprüft
   const count = st.aiCount && st.aiCount.date === todayKey ? st.aiCount.n : 0;

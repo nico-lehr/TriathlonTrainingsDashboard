@@ -171,3 +171,26 @@ test("KI-Vorschlag: nur leichter/kürzer, Ausdauer bleibt Ausdauer", () => {
   assert.strictEqual(call("planGuardAcceptAi", env, { sport: "Kraft", intensity: "leicht", duration_min: 30 }), null);
   assert.strictEqual(call("planGuardAcceptAi", env, { intensity: "leicht", duration_min: 5 }), null);
 });
+
+test("KI-Tages-Check: nur fragen, wenn es etwas abzuwägen gibt", () => {
+  const none = { reasons: [], injury: false };
+  const base = { gate: none, signs: [], strain: [], recovery: null, wellness: {}, missed: [], acwr: 1.0, todayKey: TODAY };
+  const reasons = o => call("planGuardAiReasons", { ...base, ...o });
+  // Alles normal (oder nichts bekannt): keine Anfrage
+  assert.deepStrictEqual(reasons({}), []);
+  assert.deepStrictEqual(reasons({ recovery: { date: TODAY, soreness: "light", energy: "normal", injury: "no" } }), []);
+  // Ein einzelner, leicht auffälliger Uhr-Wert reicht nicht
+  const hrv = { date: TODAY, value: 60, baseline: 65, deltaPct: -7.7 };
+  assert.deepStrictEqual(reasons({ wellness: { hrv_ms: hrv } }), []);
+  // Zwei leicht auffällige Werte zusammen schon
+  const rhr = { date: TODAY, value: 52, baseline: 48 };
+  assert.deepStrictEqual(reasons({ wellness: { hrv_ms: hrv, resting_hr: rhr } }), ["mehrere Uhr-Werte leicht auffällig"]);
+  // ... aber nicht mit alten Werten (vorgestern)
+  const old = { ...rhr, date: day(-2) };
+  assert.deepStrictEqual(reasons({ wellness: { hrv_ms: hrv, resting_hr: old } }), []);
+  // Erholungs-Check, verpasste Einheit, steigende Belastung, feste Regeln
+  assert.deepStrictEqual(reasons({ recovery: { date: TODAY, energy: "reduced" } }), ["Erholungs-Check"]);
+  assert.deepStrictEqual(reasons({ missed: [{ id: "x" }] }), ["verpasste Einheit"]);
+  assert.deepStrictEqual(reasons({ acwr: 1.25 }), ["Belastung steigt"]);
+  assert.deepStrictEqual(reasons({ signs: ["HRV niedrig"] }), ["feste Regeln auffällig"]);
+});
