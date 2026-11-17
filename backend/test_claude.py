@@ -208,6 +208,28 @@ class ClaudeTest(unittest.TestCase):
         self.assertEqual(self.put(self.admin, task_models={"plan": "gpt-4"}).status_code, 400)
         self.assertEqual(self.put(self.admin, task_models={"egal": "claude-haiku-5-5"}).status_code, 400)
 
+    def test_nachdenken_beim_trainingsplan_waehlbar(self):
+        self.put(self.admin, key=KEY, shared=True)
+
+        def effort(headers, task):
+            self.client.post("/api/v1/ai/claude/chat", headers=headers, json={"prompt": "x", "task": task})
+            return FakeClient.calls[-1][1]["output_config"]["effort"]
+        # Standard: wenig - fuer Plan und Coach-Nachricht, der Rest unveraendert
+        self.assertEqual(self.client.get("/api/v1/ai/claude", headers=self.admin).get_json()["data"]["plan_effort"], "low")
+        self.assertEqual(effort(self.friend, "plan"), "low")
+        self.assertEqual(effort(self.friend, "replan"), "low")
+        self.assertEqual(effort(self.friend, "dailycheck"), "medium")
+        self.assertEqual(effort(self.friend, "alternative"), "low")
+        r = self.put(self.admin, plan_effort="medium")
+        self.assertEqual(r.status_code, 200, r.get_json())
+        self.assertEqual(r.get_json()["data"]["plan_effort"], "medium")
+        self.assertEqual(effort(self.friend, "plan"), "medium")
+        self.assertEqual(effort(self.friend, "replan"), "medium")
+        self.assertEqual(effort(self.friend, "analysis"), "low")
+        # nur der Betreiber, nur bekannte Stufen
+        self.assertEqual(self.put(self.friend, plan_effort="low").status_code, 403)
+        self.assertEqual(self.put(self.admin, plan_effort="max").status_code, 400)
+
     def test_kosten_mit_dem_modell_das_geantwortet_hat(self):
         self.put(self.admin, key=KEY)
         FakeClient.reply = types.SimpleNamespace(stop_reason="end_turn", model="claude-opus-5",

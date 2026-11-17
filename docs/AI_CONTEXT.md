@@ -173,6 +173,10 @@ nicht das, was sie liest. Deshalb:
   schickt nur die geänderten Tage (`geaenderte_tage` + `workouts`), der Rest
   der Woche bleibt. Ohne `geaenderte_tage` gilt die Antwort wie früher als
   kompletter Plan.
+* **Nachdenken beim Trainingsplan** (Einstellungen → Claude): „Wenig“ (Standard
+  ab 2.4.48, `effort: low`) oder „Mittel“ (`medium`), gilt für `plan` und
+  `replan` (`claude_api.plan_effort`). Nachdenken wird wie geschriebener Text
+  bezahlt und ist beim Plan der größte Kostenanteil.
 * **Alternative zu einer Einheit** (`generatePlannedWorkoutAlternative`,
   Task `alternative`): gleiches Modell wie der Plan, aber Gründlichkeit „low“.
 * **Zweiter Versuch beim Plan:** Alle „harten“ Regelverstöße (zwei harte Tage

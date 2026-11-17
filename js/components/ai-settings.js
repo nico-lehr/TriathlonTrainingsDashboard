@@ -95,7 +95,20 @@ function initAiSettings() {
           <option value="">Wie Standard (${escapeHtml(std)})</option>
           ${(st.models || []).map(m => `<option value="${m.id}"${own[g.id] === m.id ? " selected" : ""}>${escapeHtml(short(m.id))}</option>`).join("")}
         </select>
-      </div>`).join("");
+      </div>`).join("") + `
+      <div class="settings-list-row claude-task-row">
+        <label for="claude-plan-effort"><span>Nachdenken beim Trainingsplan</span><small>Wie gründlich die KI beim Plan erstellen und bei Nachrichten an den Coach nachdenkt. Nachdenken kostet wie geschriebener Text.</small></label>
+        <select id="claude-plan-effort" class="coach-input">
+          <option value="low"${st.plan_effort !== "medium" ? " selected" : ""}>Wenig – günstiger</option>
+          <option value="medium"${st.plan_effort === "medium" ? " selected" : ""}>Mittel – gründlicher</option>
+        </select>
+      </div>`;
+    const effortSel = taskList.querySelector("#claude-plan-effort");
+    if (effortSel) effortSel.addEventListener("change", async () => {
+      if (await put({ plan_effort: effortSel.value }, "Speichere …")) {
+        setStatus(`Nachdenken beim Trainingsplan: ${effortSel.value === "medium" ? "mittel" : "wenig"}.`, "ok");
+      }
+    });
     taskList.querySelectorAll("select[data-task-group]").forEach(sel => sel.addEventListener("change", async () => {
       const g = groups.find(x => x.id === sel.dataset.taskGroup);
       if (await put({ task_models: { [sel.dataset.taskGroup]: sel.value } }, "Speichere …")) {

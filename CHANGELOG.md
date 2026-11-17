@@ -4,6 +4,13 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.48
+
+**Trainingsplan: Nachdenken einstellbar**
+- Neu in den Einstellungen unter Claude: „Nachdenken beim Trainingsplan“ mit den Stufen „Wenig – günstiger“ und „Mittel – gründlicher“. Die Einstellung gilt für das Erstellen des Plans und für Nachrichten an den Coach.
+- Neuer Standard ist „Wenig“. Das Nachdenken der KI wird wie geschriebener Text bezahlt und ist beim Plan der größte Kostenanteil. Wirken dir die Pläne zu oberflächlich, stellst du einfach wieder auf „Mittel“.
+- Was eine Planerstellung im Schnitt kostet, siehst du unter Mehr → Statistik bei „Kosten je Aufgabe“.
+
 ## 2.4.47
 
 **Trainingsplan: weniger KI-Kosten bei gleicher Qualität**

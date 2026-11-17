@@ -91,6 +91,22 @@ MAX_TOKENS_DEFAULT = 6000
 # aendert meist nur wenige Tage einer Woche.
 EFFORT = {"plan": "medium", "replan": "medium", "mobility": "medium", "dailycheck": "medium", "alternative": "low"}
 EFFORT_DEFAULT = "low"
+# Nachdenken beim Trainingsplan (Plan erstellen + Nachricht an den Coach):
+# vom Betreiber waehlbar, um Qualitaet und Kosten zu vergleichen. Nachdenken
+# zaehlt als geschriebener Text und ist damit der groesste Kostenanteil.
+PLAN_EFFORT_TASKS = {"plan", "replan"}
+PLAN_EFFORTS = ("low", "medium")
+PLAN_EFFORT_DEFAULT = "low"
+
+
+def plan_effort(data):
+    return data.get("plan_effort") if data.get("plan_effort") in PLAN_EFFORTS else PLAN_EFFORT_DEFAULT
+
+
+def effort_for(data, task):
+    if task in PLAN_EFFORT_TASKS:
+        return plan_effort(data)
+    return EFFORT.get(task, EFFORT_DEFAULT)
 TIMEOUT_S = 300
 
 _lock = threading.Lock()
@@ -161,7 +177,7 @@ def settings():
     data = _read()
     model = data.get("model") if data.get("model") in MODELS else DEFAULT_MODEL
     return {"configured": bool(data.get("key")), "model": model, "shared": bool(data.get("shared")),
-            "task_models": _task_models(data)}
+            "task_models": _task_models(data), "plan_effort": plan_effort(data)}
 
 
 def status(admin):
@@ -176,7 +192,7 @@ def status(admin):
     }
 
 
-def save(key=None, model=None, shared=None, task_models=None):
+def save(key=None, model=None, shared=None, task_models=None, plan_effort=None):
     """Aenderungen uebernehmen. Ein neuer Schluessel wird vorher geprueft.
     task_models: {gruppe: modell} - "" setzt die Gruppe auf das Standard-Modell zurueck."""
     with _lock:
@@ -198,6 +214,10 @@ def save(key=None, model=None, shared=None, task_models=None):
                 else:
                     raise ValueError("Unbekanntes Modell.")
             data["task_models"] = current
+        if plan_effort is not None:
+            if plan_effort not in PLAN_EFFORTS:
+                raise ValueError("Unbekannte Stufe.")
+            data["plan_effort"] = plan_effort
         if shared is not None:
             data["shared"] = bool(shared)
         if key is not None:
@@ -268,7 +288,7 @@ def chat(prompt, task="", schema=None, usage_out=None):
         raise ClaudeError("Für den KI-Coach ist noch kein Schlüssel hinterlegt.", "claude_not_configured", 409)
     model = model_for(data, task)
     anthropic, client = _client(key)
-    output_config = {"effort": EFFORT.get(task, EFFORT_DEFAULT)}
+    output_config = {"effort": effort_for(data, task)}
     if schema:
         output_config["format"] = {"type": "json_schema", "schema": schema}
     params = {
