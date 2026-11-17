@@ -82,7 +82,7 @@ const MOBILITY_EXERCISES = [
     video: "Hüftbeuger dehnen im Stehen Ausfallschritt",
     fig: {
       frames: [
-        { p: [0, -36.6], lN: [-15, -2], ftN: 70, lF: [15, -2], aNr: [3, 24], aFr: [5, 23] },
+        { p: [0, -35.8], lN: [-15, -2], ftN: 70, lF: [15, -2], aNr: [3, 24], aFr: [5, 23] },
         { p: [3, -33.6], t: 184, lN: [-15, -2], ftN: 70, lF: [15, -2], aNa: [178, 180], aFa: [174, 178] },
       ],
       focus: ["pelvis"],
@@ -119,7 +119,7 @@ const MOBILITY_EXERCISES = [
     video: "Taube Yoga Dehnung Gesäß Anleitung",
     fig: {
       frames: [
-        { p: [0, -9], t: 178, lN: [-36, -3], ftN: -95, lF: [0, -2.5], ftF: -90, aN: [7, -4], aF: [8, -4] },
+        { p: [0, -9], t: 148, tb: -0.5, lN: [-36, -3], ftN: -95, lF: [0, -2.5], ftF: -90, aN: [16.5, -4.5], aF: [17.5, -4.5] },
         { p: [0, -9], t: 118, h: 110, lN: [-36, -3], ftN: -95, lF: [0, -2.5], ftF: -90, aN: [34, -3], aF: [35, -3] },
       ],
       focus: ["pelvis"],
@@ -137,8 +137,8 @@ const MOBILITY_EXERCISES = [
     video: "Liegende Vier Dehnung Gesäß Piriformis",
     fig: {
       frames: [
-        { ...SUPINE, lF: [-12, -2], lN: [-6, -21], lNb: -1, ftN: 150, aNa: [-92, -90] },
-        { ...SUPINE, lF: [-4, -26], lN: [4, -26], lNb: -1, ftN: 150, ftF: 180, aN: [3, -16], aF: [4, -16] },
+        { ...SUPINE, lF: [-12, -2], lNa: [195, 212], lNs: [0.6, 0.47], ftN: 200 },
+        { ...SUPINE, lFa: [-208, -92], ftF: 180, lNa: [154, 160], lNs: [0.61, 0.41], ftN: 170, aN: [9.5, -21], aF: [10.5, -21], aNb: 1, aFb: 1 },
       ],
       focus: ["pelvis"],
     },
@@ -155,7 +155,7 @@ const MOBILITY_EXERCISES = [
     video: "Beinpendel Leg Swings Aufwärmen Laufen",
     fig: {
       frames: [
-        { p: [0, -38.6], lNa: [-32, -26], ftN: 60, lF: [1, -2], aN: [17, -47], aFr: [4, 24] },
+        { p: [0, -38.6], lNa: [-30, -44], ftN: 50, lF: [1, -2], aN: [17, -47], aFr: [4, 24] },
         { p: [0, -38.6], lNa: [62, 54], ftN: 140, lF: [1, -2], aN: [17, -47], aFr: [4, 24] },
       ],
       props: [{ type: "wall", x: 19 }],
@@ -193,8 +193,8 @@ const MOBILITY_EXERCISES = [
     video: "Frosch Dehnung Adduktoren Mobility",
     fig: {
       frames: [
-        { p: [0, -21], t: 98, lN: [-18, -2], lF: [-17, -2], ftN: -90, ftF: -90, aN: [34, -2], aF: [35, -2] },
-        { p: [-7, -19.7], t: 94, lN: [-18, -2], lF: [-17, -2], ftN: -90, ftF: -90, aN: [34, -2], aF: [35, -2] },
+        { p: [0, -8.6], t: 104, h: 96, lNa: [0, -90], lFa: [2, -90], lNs: [0.35, 1], lFs: [0.35, 1], ftN: -90, ftF: -90, aNa: [25, 90], aFa: [27, 90] },
+        { p: [-5, -8.6], t: 96.6, h: 92, lNa: [37, -90], lFa: [39, -90], lNs: [0.436, 1], lFs: [0.436, 1], ftN: -90, ftF: -90, aNa: [47.6, 90], aFa: [49.6, 90] },
       ],
       move: 1.4, hold: 0.5,
       focus: ["pelvis"],
@@ -231,8 +231,8 @@ const MOBILITY_EXERCISES = [
     video: "World's Greatest Stretch Anleitung Deutsch",
     fig: {
       frames: [
-        { p: [0, -21], t: 92, lN: [-31, -3], ftN: 60, lF: [18, -2], aN: [23, -2], aF: [24, -2] },
-        { p: [0, -21], t: 98, h: 135, lN: [-31, -3], ftN: 60, lF: [18, -2], aNa: [182, 182], aF: [24, -2] },
+        { p: [0, -17], t: 112, lN: [-35, -7], ftN: 30, lF: [18, -2], aN: [21, -2], aF: [22, -2] },
+        { p: [0, -17], t: 114, h: 150, lN: [-35, -7], ftN: 30, lF: [18, -2], aNa: [180, 182], aF: [22, -2] },
       ],
       focus: ["pelvis", "shoulder"],
     },
@@ -250,8 +250,8 @@ const MOBILITY_EXERCISES = [
     video: "Oberschenkelrückseite dehnen liegend Handtuch",
     fig: {
       frames: [
-        { ...SUPINE, lFa: [-90, -90], ftF: 180, lNa: [-145, -145], ftN: 125, aN: [16, -13], aF: [17, -13] },
-        { ...SUPINE, lFa: [-90, -90], ftF: 180, lNa: [-172, -172], ftN: 98, aN: [14, -17], aF: [15, -17] },
+        { ...SUPINE, lFa: [-90, -90], ftF: 180, lNa: [-145, -145], ftN: 125, aN: [19, -13], aF: [20, -13], aNb: 1, aFb: 1 },
+        { ...SUPINE, lFa: [-90, -90], ftF: 180, lNa: [-172, -172], ftN: 98, aN: [18, -17], aF: [19, -17], aNb: 1, aFb: 1 },
       ],
       props: [{ type: "band", from: "wristN", to: "ankleN-toeN@0.6" }],
       focus: ["pelvis-kneeN@0.5"],
@@ -289,7 +289,7 @@ const MOBILITY_EXERCISES = [
     fig: {
       frames: [
         { p: [0, -20], t: 180, lF: [-24, -2], ftF: -90, lN: [19, -2], aNr: [4, 24], aFr: [6, 23] },
-        { p: [-6, -21], t: 138, lF: [-24, -2], ftF: -90, lN: [30, -3], ftN: 165, aN: [16, -2], aF: [17, -2] },
+        { p: [-9, -20.76], t: 120, h: 112, lF: [-24, -2], ftF: -90, lN: [23, -3.2], ftN: 165, aN: [18, -8.5], aF: [19, -8.5] },
       ],
       focus: ["pelvis-kneeN@0.5"],
     },
@@ -307,8 +307,8 @@ const MOBILITY_EXERCISES = [
     video: "Wade dehnen an der Wand Läufer",
     fig: {
       frames: [
-        { p: [0, -37], t: 175, lN: [-16, -2], ftN: 88, lF: [8, -2], aN: [24, -50], aF: [25, -50] },
-        { p: [4, -34.4], t: 160, lN: [-16, -2], ftN: 88, lF: [8, -2], aN: [24, -47], aF: [25, -47] },
+        { p: [0, -36.2], t: 175, lN: [-14, -2], ftN: 88, lF: [8, -2], aN: [24, -50], aF: [25, -50] },
+        { p: [4, -34.2], t: 160, lN: [-14, -2], ftN: 88, lF: [8, -2], aN: [24, -47], aF: [25, -47] },
       ],
       props: [{ type: "wall", x: 26 }],
       focus: ["kneeN-ankleN@0.35"],
@@ -345,8 +345,8 @@ const MOBILITY_EXERCISES = [
     video: "Knee to Wall Test Sprunggelenk Mobility",
     fig: {
       frames: [
-        { p: [0, -35], t: 178, lN: [14, -2], lF: [-14, -2], aN: [25, -48], aF: [26, -48] },
-        { p: [6, -31], t: 174, lN: [14, -2], lF: [-14, -2], aN: [25, -46], aF: [26, -46] },
+        { p: [0, -35], t: 178, lN: [14, -2], lF: [-14, -2], aN: [24.5, -50], aF: [25.5, -50] },
+        { p: [6, -31], t: 174, lN: [14, -2], lF: [-14, -2], aN: [24.5, -47], aF: [25.5, -47] },
       ],
       props: [{ type: "wall", x: 27 }],
       move: 1.1, hold: 0.5,
@@ -365,8 +365,8 @@ const MOBILITY_EXERCISES = [
     video: "Wade ausrollen Faszienrolle richtig",
     fig: {
       frames: [
-        { p: [0, -9], t: 200, lN: [36, -10.5], ftN: 160, lF: [14, -2], ftF: 90, aN: [-16, -2], aF: [-15, -2] },
-        { p: [-10, -9], t: 200, lN: [26, -10.5], ftN: 160, lF: [4, -2], ftF: 90, aN: [-26, -2], aF: [-25, -2] },
+        { p: [0, -7], t: 220, h: 190, lN: [36, -13], ftN: 160, lF: [9, -2], ftF: 90, aN: [-27, -2], aF: [-26, -2] },
+        { p: [-10, -7], t: 220, h: 190, lN: [26, -13], ftN: 160, lF: [9, -2], ftF: 90, aN: [-27, -2], aF: [-26, -2] },
       ],
       props: [{ type: "roller", x: 22 }],
       move: 1.8, hold: 0.3,
@@ -385,8 +385,8 @@ const MOBILITY_EXERCISES = [
     video: "Herabschauender Hund richtig Anfänger",
     fig: {
       frames: [
-        { p: [0, -33], t: 50, h: 34, lN: [-17, -2], lF: [-16, -2], ftN: 80, ftF: 80, aN: [42.5, -2], aF: [43.5, -2] },
-        { p: [0, -33], t: 50, h: 34, lN: [-14, -7], ftN: 40, lF: [-16, -2], ftF: 80, aN: [42.5, -2], aF: [43.5, -2] },
+        { p: [0, -33], t: 50, h: 34, lN: [-17, -2], lF: [-16, -2], ftN: 80, ftF: 80, aN: [42.5, -2], aF: [42.9, -2] },
+        { p: [0, -33], t: 50, h: 34, lN: [-14, -7], ftN: 40, lF: [-16, -2], ftF: 80, aN: [42.5, -2], aF: [42.9, -2] },
       ],
       move: 1, hold: 0.8,
       focus: ["kneeF-ankleF@0.5"],
@@ -405,8 +405,8 @@ const MOBILITY_EXERCISES = [
     video: "Oberschenkel vorne dehnen im Stehen richtig",
     fig: {
       frames: [
-        { p: [0, -38.6], lNa: [2, -170], ftN: -80, lF: [1, -2], aN: [-3, -38], aF: [18, -50] },
-        { p: [1, -38.6], lNa: [-12, -172], ftN: -80, lF: [1, -2], aN: [-6, -37], aF: [18, -50] },
+        { p: [0, -38.6], lNa: [0, -158], ftN: -160, lF: [1, -2], aN: [-8.2, -40.4], aF: [18, -50] },
+        { p: [1, -38.6], lNa: [-12, -170], ftN: -165, lF: [1, -2], aN: [-7.3, -42], aF: [18, -50] },
       ],
       props: [{ type: "wall", x: 20 }],
       focus: ["pelvis-kneeN@0.5"],
@@ -445,8 +445,8 @@ const MOBILITY_EXERCISES = [
     video: "Katze Kuh Übung richtig",
     fig: {
       frames: [
-        { ...QUAD, tb: 1, h: 40 },
-        { ...QUAD, tb: -0.9, h: 125 },
+        { ...QUAD, tb: 1, h: 50 },
+        { ...QUAD, tb: -0.9, h: 122 },
       ],
       move: 1.6, hold: 0.6,
       focus: ["pelvis-shoulder@0.5"],
@@ -465,7 +465,7 @@ const MOBILITY_EXERCISES = [
     fig: {
       frames: [
         { ...QUAD, lNa: [0, -90], lFa: [1, -90], lN: undefined, lF: undefined },
-        { p: [-15.4, -13.2], t: 80, tb: 0.6, h: 68, lNa: [54, -90], lFa: [55, -90], ftN: -90, ftF: -90, aN: [36, -2], aF: [37, -2] },
+        { p: [-15.4, -13.2], t: 80, tb: 0.6, h: 68, lNa: [54, -90], lFa: [55, -90], ftN: -90, ftF: -90, aN: [36, -2], aF: [36.3, -2] },
       ],
       move: 1.8, hold: 1.4,
       focus: ["pelvis-shoulder@0.4"],
@@ -484,7 +484,7 @@ const MOBILITY_EXERCISES = [
     fig: {
       frames: [
         { ...SUPINE },
-        { ...SUPINE, lNa: [-212, -60], lFa: [-210, -58], ftN: -150, ftF: -150, aN: [9, -17], aF: [10, -17] },
+        { ...SUPINE, lNa: [-212, -60], lFa: [-210, -58], ftN: -150, ftF: -150, aN: [9, -17], aF: [10, -17], aNb: 1, aFb: 1 },
       ],
       focus: ["pelvis"],
     },
@@ -501,8 +501,8 @@ const MOBILITY_EXERCISES = [
     video: "Sphinx Yoga Übung unterer Rücken",
     fig: {
       frames: [
-        { p: [0, -2.5], t: 92, h: 96, lNa: [-90, -90], lFa: [-91, -90], ftN: -90, ftF: -90, aNa: [80, 92], aFa: [82, 92] },
-        { p: [0, -2.5], t: 120, tb: -0.6, h: 108, lNa: [-90, -90], lFa: [-91, -90], ftN: -90, ftF: -90, aNa: [0, 90], aFa: [2, 90] },
+        { p: [0, -3], t: 92, h: 96, lNa: [-90, -90], lFa: [-91, -90], ftN: -90, ftF: -90, aNa: [88, 92], aFa: [89, 92] },
+        { p: [0, -3], t: 118, tb: -0.6, h: 108, lNa: [-90, -90], lFa: [-91, -90], ftN: -90, ftF: -90, aNa: [20, 90], aFa: [22, 90] },
       ],
       move: 1.6, hold: 1.4,
       focus: ["pelvis-shoulder@0.3"],
@@ -521,8 +521,8 @@ const MOBILITY_EXERCISES = [
     video: "Thoracic Rotation Vierfüßlerstand Brustwirbelsäule",
     fig: {
       frames: [
-        { ...QUAD, h: 30, aNa: [-20, 150] },
-        { ...QUAD, t: 104, h: 150, aNa: [168, 110] },
+        { ...QUAD, h: 55, aNa: [-20, 150] },
+        { ...QUAD, t: 104, h: 150, aNa: [200, 390] },
       ],
       move: 1.4, hold: 0.6,
       focus: ["shoulder"],
@@ -540,8 +540,8 @@ const MOBILITY_EXERCISES = [
     video: "Thread the Needle Übung Schulter",
     fig: {
       frames: [
-        { ...QUAD, t: 104, h: 150, aNa: [182, 182] },
-        { ...QUAD, p: [0, -21], t: 100, h: 25, aNa: [-64, -84] },
+        { ...QUAD, t: 104, h: 150, aN: [24.6, -54.2] },
+        { ...QUAD, t: 72, h: 62, aN: [-0.2, -3] },
       ],
       move: 1.5, hold: 0.7,
       focus: ["shoulder"],
@@ -600,10 +600,10 @@ const MOBILITY_EXERCISES = [
     video: "Brustmuskel dehnen Türrahmen",
     fig: {
       frames: [
-        { p: [0, -38.4], t: 180, lN: [7, -2], lF: [-5, -2], aN: [-21, -77], aFr: [4, 24] },
-        { p: [3, -38.2], t: 178, lN: [7, -2], lF: [-5, -2], aN: [-21, -77], aFr: [4, 24] },
+        { p: [0, -38.4], t: 180, lN: [7, -2], lF: [-5, -2], aNa: [-90, 180], aNs: [0.45, 1], aFr: [4, 24] },
+        { p: [3, -38.2], t: 178, lN: [7, -2], lF: [-5, -2], aNa: [-91, 180], aNs: [0.73, 1], aFr: [4, 24] },
       ],
-      props: [{ type: "wall", x: -22.5 }],
+      props: [{ type: "wall", x: -8 }],
       focus: ["shoulder"],
     },
   },
@@ -640,10 +640,10 @@ const MOBILITY_EXERCISES = [
     video: "Latissimus Dehnung kniend Ellbogen Bank",
     fig: {
       frames: [
-        { p: [-3, -21], t: 100, h: 98, lNa: [8, -90], lFa: [9, -90], ftN: -90, ftF: -90, aN: [33, -11], aF: [34, -11] },
-        { p: [-12, -16], t: 88, tb: -0.4, h: 75, lNa: [40, -90], lFa: [41, -90], ftN: -90, ftF: -90, aN: [35, -11], aF: [36, -11] },
+        { p: [-3, -20.8], t: 94.5, h: 92, lNa: [8, -90], lFa: [9, -90], ftN: -90, ftF: -90, aNa: [18, 170], aFa: [19, 172] },
+        { p: [-12, -16.55], t: 84, tb: -0.4, h: 75, lNa: [40, -90], lFa: [41, -90], ftN: -90, ftF: -90, aNa: [74, 200], aFa: [75, 202] },
       ],
-      props: [{ type: "block", x: 34, h: 8 }],
+      props: [{ type: "block", x: 32, h: 8, w: 12 }],
       move: 1.6, hold: 1.4,
       focus: ["shoulder"],
     },

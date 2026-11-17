@@ -17,6 +17,8 @@
 //   lN / lF: [x, y]   Knöchel-Ziel (Welt) - Knie per IK, lNr: relativ zum Becken, lNa: [Ober-, Unterschenkel]-Winkel
 //   aN / aF: [x, y]   Hand-Ziel (Welt) - Ellbogen per IK, aNr: relativ zur Schulter, aNa: Winkel
 //   lNb / aNb: Beugerichtung (+1 / -1), ftN / ftF: Fußwinkel
+//   lNs / aNs: [oben, unten] Verkürzung (1 = volle Länge) - für Gliedmaßen, die
+//              zur Seite aus dem Bild zeigen (von der Seite gesehen wirken sie kürzer)
 
 const FIG_BONES = { trunk: 26, neck: 4, head: 4.6, upper: 14, fore: 13, thigh: 19, shin: 18, foot: 6 };
 const FIG_DEFAULT = {
@@ -57,18 +59,32 @@ function figLimbForm(pose, kind, side) {
 
 function figMerge(pose) {
   const out = { ...FIG_DEFAULT };
+  const own = { ...pose };
+  const keys = Object.keys(pose);
   FIG_LIMBS.forEach(([kind, side]) => {
-    const k = kind + side;
-    if (pose[k] || pose[k + "r"] || pose[k + "a"]) { delete out[k]; delete out[k + "r"]; delete out[k + "a"]; }
+    const all = [kind + side, kind + side + "r", kind + side + "a"];
+    const given = all.filter(f => own[f]);
+    if (!given.length) return;
+    // Mehrere Formen für dieselbe Gliedmaße (Grundhaltung per ...SUPINE plus
+    // eigenes Ziel): die zuletzt genannte gilt.
+    const keep = given.reduce((a, b) => (keys.indexOf(b) > keys.indexOf(a) ? b : a));
+    all.forEach(f => { delete out[f]; if (f !== keep) delete own[f]; });
   });
-  return { ...out, ...pose };
+  return { ...out, ...own };
+}
+
+// Knochenlängen einer Gliedmaße in dieser Haltung (mit Verkürzung, falls angegeben).
+function figLimbLen(pose, kind, side) {
+  const [a, b] = kind === "l" ? [FIG_BONES.thigh, FIG_BONES.shin] : [FIG_BONES.upper, FIG_BONES.fore];
+  const s = pose[kind + side + "s"];
+  return s ? [a * s[0], b * s[1]] : [a, b];
 }
 
 // Haltung -> Gelenkwinkel (für Gliedmaßen, deren Form in zwei Frames nicht passt).
 function figLimbAngles(pose, kind, side, pelvis, shoulder) {
   const k = kind + side;
   const root = kind === "l" ? pelvis : shoulder;
-  const [a, b] = kind === "l" ? [FIG_BONES.thigh, FIG_BONES.shin] : [FIG_BONES.upper, FIG_BONES.fore];
+  const [a, b] = figLimbLen(pose, kind, side);
   const bend = pose[k + "b"] != null ? pose[k + "b"] : (kind === "l" ? 1 : -1);
   if (pose[k + "a"]) return pose[k + "a"];
   if (pose[k + "r"]) return figSolveLimb(root, addV(root, pose[k + "r"]), a, b, bend);
@@ -99,6 +115,7 @@ function figBlend(A, B, t) {
   FIG_LIMBS.forEach(([kind, side]) => {
     const k = kind + side;
     out[k + "b"] = t < 0.5 ? A[k + "b"] : B[k + "b"];
+    if (A[k + "s"] || B[k + "s"]) out[k + "s"] = figLerp(A[k + "s"] || [1, 1], B[k + "s"] || [1, 1], t);
     const fa = figLimbForm(A, kind, side), fb = figLimbForm(B, kind, side);
     if (fa && fa === fb) {
       const key = fa === "w" ? k : k + fa;
@@ -123,7 +140,7 @@ function figPoints(pose) {
   FIG_LIMBS.forEach(([kind, side]) => {
     const [t1, t2] = figLimbAngles(pose, kind, side, P, S);
     const root = kind === "l" ? P : S;
-    const [a, b] = kind === "l" ? [FIG_BONES.thigh, FIG_BONES.shin] : [FIG_BONES.upper, FIG_BONES.fore];
+    const [a, b] = figLimbLen(pose, kind, side);
     const mid = addV(root, dirVec(t1, a));
     const end = addV(mid, dirVec(t2, b));
     if (kind === "l") {

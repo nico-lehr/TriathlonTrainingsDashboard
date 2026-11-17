@@ -4,6 +4,16 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.51
+
+**Kraft & Mobility: Strichmännchen bewegen sich richtig**
+- Alle 83 Übungen durchgesehen und rund 40 Zeichnungen korrigiert. Gelenke knicken nicht mehr in die falsche Richtung: beim Liegestütz und bei den Dips am Stuhl zeigen die Ellbogen jetzt nach hinten statt nach vorn.
+- Hände und Füße schweben nicht mehr in der Luft, sondern stehen dort, wo sie hingehören (z. B. Wade ausrollen, Beinrückseite kniend, Taube, Beinpresse).
+- Bei mehreren Übungen im Liegen wurden die Arme bisher gar nicht richtig gezeichnet. Jetzt halten die Hände das Band (Beinrückseite liegend), umfassen die Knie (Knie zur Brust, Liegende Vier) oder liegen hinter dem Kopf (Oberer Rücken über der Rolle).
+- Richtige Bewegung statt falscher: Vogel-Hund hebt Arm und Bein über Kreuz, der Bergsteiger wechselt die Beine ab, beim Frosch und beim breiten Rücken auf dem Block liegen die Unterarme bzw. Ellbogen wirklich auf, beim Klimmzug kommt das Kinn über die Stange.
+- Natürlichere Haltungen bei Bankdrücken, Kreuzheben, Kettlebell-Swing, Latziehen, Rudern am Kabelzug, Ausfallschritt, Sphinx, Nadel einfädeln und Drehung im Vierfüßlerstand.
+- Arme und Beine, die zur Seite aus dem Bild zeigen, werden jetzt kürzer gezeichnet – so wie man sie von der Seite auch sieht (Brust im Türrahmen, Face Pull, Frosch, Liegende Vier).
+
 ## 2.4.50
 
 **Einstellungen: „Nachdenken“ steht beim Trainingsplan**

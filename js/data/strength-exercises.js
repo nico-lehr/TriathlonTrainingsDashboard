@@ -64,7 +64,7 @@ const STRENGTH_EXERCISES = [
     fig: {
       frames: [
         { p: [0, -38.6], lN: [-1, -2], lF: [2, -2], aNa: [-4, 0], aFa: [4, 0] },
-        { p: [2, -21], t: 182, lN: [-17, -4], ftN: 40, lF: [20, -2], aNa: [-2, 0], aFa: [3, 0] },
+        { p: [2, -22.5], t: 182, lN: [-19, -8], ftN: 20, lF: [20, -2], aNa: [-2, 0], aFa: [3, 0] },
       ],
       props: [{ type: "weight", at: "wristN", w: 4 }],
       move: 1.1, hold: 0.4, focus: ["pelvis-kneeF@0.5"],
@@ -138,8 +138,8 @@ const STRENGTH_EXERCISES = [
     video: "Liegestütz richtig",
     fig: {
       frames: [
-        { p: [-0.2, -18.7], t: 112, h: 112, lN: [-36, -4], lF: [-35, -4], ftN: 30, ftF: 30, aN: [25, -2], aF: [26, -2] },
-        { p: [0.8, -7.7], t: 96, h: 96, lN: [-36, -4], lF: [-35, -4], ftN: 30, ftF: 30, aN: [25, -2], aF: [26, -2], aNb: 1, aFb: 1 },
+        { p: [-0.2, -18.7], t: 112, h: 112, lN: [-34.9, -5], lF: [-34.7, -5], ftN: 35, ftF: 35, aN: [20, -2], aF: [21, -2] },
+        { p: [2.4, -7.7], t: 96, h: 100, lN: [-34.9, -5], lF: [-34.7, -5], ftN: 35, ftF: 35, aN: [20, -2], aF: [21, -2] },
       ],
       move: 0.9, hold: 0.3, focus: ["shoulder"],
     },
@@ -194,10 +194,10 @@ const STRENGTH_EXERCISES = [
     video: "Zugseil Training Schwimmen Band",
     fig: {
       frames: [
-        { p: [0, -37.5], t: 128, h: 118, lN: [-1, -2], lF: [2, -2], aNa: [128, 128], aFa: [126, 126] },
-        { p: [0, -37.5], t: 128, h: 118, lN: [-1, -2], lF: [2, -2], aNa: [-8, -20], aFa: [-6, -18] },
+        { p: [0, -37.5], t: 128, h: 118, lN: [-1, -2], lF: [2, -2], aNa: [112, 112], aFa: [110, 110] },
+        { p: [0, -37.5], t: 128, h: 118, lN: [-1, -2], lF: [2, -2], aNa: [-40, -30], aFa: [-38, -28] },
       ],
-      props: [{ type: "band", from: "wristN", to: [52, -46] }, { type: "wall", x: 53 }],
+      props: [{ type: "band", from: "wristN", to: [52, -66] }, { type: "wall", x: 53 }],
       move: 0.9, hold: 0.25, focus: ["shoulder"],
     },
   },
@@ -214,7 +214,7 @@ const STRENGTH_EXERCISES = [
     fig: {
       frames: [
         { p: [0, -38.6], aNa: [94, 94], aFa: [92, 92] },
-        { p: [0, -38.6], aNa: [-80, 120], aFa: [-78, 122] },
+        { p: [0, -38.6], aNa: [94, 135], aNs: [0.25, 0.7], aFa: [92, 133], aFs: [0.25, 0.7] },
       ],
       props: [{ type: "band", from: "wristN", to: [46, -63] }, { type: "wall", x: 47 }],
       move: 0.9, hold: 0.4, focus: ["shoulder"],
@@ -232,10 +232,10 @@ const STRENGTH_EXERCISES = [
     video: "Latzug mit Widerstandsband",
     fig: {
       frames: [
-        { p: [0, -38.6], aNa: [172, 176], aFa: [170, 174] },
-        { p: [0, -38.6], aNa: [-12, 170], aFa: [-10, 168] },
+        { p: [0, -38.6], aNr: [2, -26.5], aFr: [3, -26.4] },
+        { p: [0, -38.6], aNr: [8.5, 2], aFr: [9.5, 2] },
       ],
-      props: [{ type: "band", from: "wristN", to: [4, -92] }],
+      props: [{ type: "band", from: "wristN", to: [3, -93] }],
       move: 1.0, hold: 0.3, focus: ["shoulder"],
     },
   },
@@ -251,8 +251,8 @@ const STRENGTH_EXERCISES = [
     video: "Unterarmstütz Plank richtig",
     fig: {
       frames: [
-        { p: [0, -10.5], t: 100, h: 100, lN: [-36, -4], lF: [-35, -4], ftN: 30, ftF: 30, aNa: [0, 90], aFa: [2, 90] },
-        { p: [0, -11.5], t: 98, h: 100, lN: [-36, -4], lF: [-35, -4], ftN: 30, ftF: 30, aNa: [0, 90], aFa: [2, 90] },
+        { p: [0, -10.5], t: 100, h: 100, lN: [-36.5, -5], lF: [-35.5, -5], ftN: 30, ftF: 30, aNa: [0, 90], aFa: [2, 90] },
+        { p: [0, -11.5], t: 98, h: 100, lN: [-36.5, -5], lF: [-35.5, -5], ftN: 30, ftF: 30, aNa: [0, 90], aFa: [2, 90] },
       ],
       move: 1.6, hold: 1.2, focus: ["pelvis-shoulder@0.4"],
     },
@@ -287,8 +287,8 @@ const STRENGTH_EXERCISES = [
     video: "Bird Dog Übung richtig",
     fig: {
       frames: [
-        { p: [0, -21], t: 108, lN: [-18, -2], lF: [-17, -2], ftN: -90, ftF: -90, aN: [24.5, -2], aF: [25.5, -2] },
-        { p: [0, -21], t: 104, lNa: [-92, -92], ftN: -100, lF: [-17, -2], ftF: -90, aF: [25.5, -2], aNa: [96, 96] },
+        { p: [0, -21], t: 108, lN: [-18, -2], ftN: -90, lFa: [1, -90], ftF: -90, aN: [24.5, -2], aF: [25.5, -2] },
+        { p: [0, -21], t: 104, h: 100, lN: [-18, -2], ftN: -90, lFa: [-88, -90], ftF: -20, aNa: [100, 100], aF: [25.5, -2] },
       ],
       move: 1.1, hold: 0.7, focus: ["pelvis-shoulder@0.5"],
     },
@@ -306,7 +306,7 @@ const STRENGTH_EXERCISES = [
     fig: {
       frames: [
         { p: [0, -38.6], aNa: [-4, 0], aFa: [4, 0] },
-        { p: [1, -42.4], lN: [0, -6.5], lF: [3, -6.5], ftN: 40, ftF: 40, aNa: [-4, 0], aFa: [4, 0] },
+        { p: [1, -43], lN: [0, -6.5], lF: [3, -6.5], ftN: 40, ftF: 40, aNa: [-4, 0], aFa: [4, 0] },
       ],
       props: [{ type: "weight", at: "wristN", w: 4 }],
       move: 0.8, hold: 0.5, focus: ["kneeN-ankleN@0.5"],
@@ -419,7 +419,7 @@ const STRENGTH_EXERCISES = [
     fig: {
       frames: [
         { p: [0, -3], t: 90, h: 92, lNa: [-90, -90], lFa: [-90, -90], ftN: -90, ftF: -90, aNa: [90, 90], aFa: [90, 90] },
-        { p: [0, -3], t: 100, h: 102, lNa: [-99, -99], lFa: [-98, -98], ftN: -100, ftF: -100, aNa: [104, 104], aFa: [103, 103] },
+        { p: [0, -3], t: 100, tb: -0.5, h: 104, lNa: [-99, -99], lFa: [-98, -98], ftN: -100, ftF: -100, aNa: [106, 106], aFa: [105, 105] },
       ],
       move: 0.9, hold: 0.7, focus: ["pelvis-shoulder@0.6"],
     },
@@ -454,10 +454,10 @@ const STRENGTH_EXERCISES = [
     video: "Klimmzug lernen Anleitung",
     fig: {
       frames: [
-        { p: [2, -38.5], t: 178, lNa: [14, -40], lFa: [10, -44], ftN: 30, ftF: 30, aN: [4, -91], aF: [5, -91], aNb: -1, aFb: -1 },
-        { p: [-6.6, -55.3], t: 172, h: 176, lNa: [20, -34], lFa: [16, -38], ftN: 36, ftF: 36, aN: [4, -91], aF: [5, -91], aNb: -1, aFb: -1 },
+        { p: [2, -32.5], t: 178, lNa: [14, -66], lFa: [10, -70], ftN: -40, ftF: -44, aN: [4, -85], aF: [5, -85] },
+        { p: [-4.3, -54.6], t: 176, h: 178, lNa: [22, -62], lFa: [18, -66], ftN: -40, ftF: -44, aN: [4, -85], aF: [5, -85] },
       ],
-      props: [{ type: "bar", at: [4.5, -91] }],
+      props: [{ type: "bar", at: [4.5, -85] }],
       move: 1.0, hold: 0.4, focus: ["shoulder"],
     },
   },
@@ -473,8 +473,8 @@ const STRENGTH_EXERCISES = [
     video: "Dips am Stuhl Anleitung",
     fig: {
       frames: [
-        { p: [-9, -18], t: 182, lN: [20, -2], lF: [21, -2], aN: [-15, -15], aF: [-14, -15], aNb: 1, aFb: 1 },
-        { p: [-9, -8], t: 176, lN: [20, -2], lF: [21, -2], aN: [-15, -15], aF: [-14, -15], aNb: 1, aFb: 1 },
+        { p: [-10.1, -16], t: 182, lN: [20, -2], lF: [21, -2], aN: [-13, -15.5], aF: [-12, -15.5] },
+        { p: [-9.5, -8], t: 176, lN: [20, -2], lF: [21, -2], aN: [-13, -15.5], aF: [-12, -15.5] },
       ],
       props: [{ type: "block", x: -18, h: 14, w: 12 }],
       move: 0.9, hold: 0.3, focus: ["elbowN"],
@@ -492,8 +492,8 @@ const STRENGTH_EXERCISES = [
     video: "Mountain Climber Anleitung",
     fig: {
       frames: [
-        { p: [-0.2, -18.7], t: 112, h: 112, lN: [-36, -4], lF: [-35, -4], ftN: 30, ftF: 30, aN: [25, -2], aF: [26, -2] },
-        { p: [-0.2, -19.5], t: 113, h: 112, lN: [-6, -9], lNb: 1, ftN: 40, lF: [-35, -4], ftF: 30, aN: [25, -2], aF: [26, -2] },
+        { p: [-0.2, -21], t: 110, h: 110, lN: [3, -5.5], ftN: 60, lF: [-33.5, -5], ftF: 35, aN: [23.5, -3], aF: [24.5, -3] },
+        { p: [-0.2, -21], t: 110, h: 110, lN: [-33.5, -5], ftN: 35, lF: [4, -5.5], ftF: 60, aN: [23.5, -3], aF: [24.5, -3] },
       ],
       move: 0.45, hold: 0.1, focus: ["kneeN"],
     },
@@ -530,10 +530,10 @@ const STRENGTH_EXERCISES = [
     video: "Kurzhantel Bankdrücken Anleitung",
     fig: {
       frames: [
-        { p: [-8, -15.5], t: 90, h: 92, lN: [-20, -2], lF: [-18, -2], lNb: -1, lFb: -1, ftN: 90, ftF: 90, aNa: [178, 180], aFa: [176, 178] },
-        { p: [-8, -15.5], t: 90, h: 92, lN: [-20, -2], lF: [-18, -2], lNb: -1, lFb: -1, ftN: 90, ftF: 90, aNa: [298, 176], aFa: [300, 174] },
+        { p: [-10, -19.5], t: 90, h: 92, lN: [-28, -2], lF: [-27, -2], lNb: -1, lFb: -1, ftN: -90, ftF: -90, aN: [15, -46.3], aF: [16, -46.3], aNb: 1, aFb: 1 },
+        { p: [-10, -19.5], t: 90, h: 92, lN: [-28, -2], lF: [-27, -2], lNb: -1, lFb: -1, ftN: -90, ftF: -90, aN: [6, -28.5], aF: [7, -28.5], aNb: 1, aFb: 1 },
       ],
-      props: [{ type: "bench", x: 2, h: 13, w: 34 }, { type: "weight", at: "wristN", w: 4 }],
+      props: [{ type: "bench", x: 4, h: 17, w: 44 }, { type: "weight", at: "wristN", w: 4 }],
       move: 1.0, hold: 0.3, focus: ["shoulder"],
     },
   },
@@ -646,7 +646,7 @@ const STRENGTH_EXERCISES = [
     video: "Kettlebell Swing richtig Anleitung",
     fig: {
       frames: [
-        { p: [-9, -34], t: 124, h: 112, lN: [-1, -2], lF: [2, -2], aNa: [-14, -14], aFa: [-12, -12] },
+        { p: [-9, -34], t: 118, h: 108, lN: [-1, -2], lF: [2, -2], aNa: [-34, -34], aFa: [-32, -32] },
         { p: [0, -38.6], t: 182, aNa: [92, 92], aFa: [90, 90] },
       ],
       props: [{ type: "kettlebell", at: "wristN" }],
@@ -684,7 +684,7 @@ const STRENGTH_EXERCISES = [
     video: "Kettlebell Kreuzheben Anleitung",
     fig: {
       frames: [
-        { p: [-19.5, -21], t: 120, h: 108, lN: [-1, -2], lF: [2, -2], aNa: [1, 1], aFa: [3, 3] },
+        { p: [-17, -24.5], t: 119, h: 108, lN: [-1, -2], lF: [2, -2], aNa: [0, 0], aFa: [2, 2] },
         { p: [0, -38.6], aNa: [2, 2], aFa: [4, 4] },
       ],
       props: [{ type: "kettlebell", at: "wristN" }],
@@ -722,8 +722,8 @@ const STRENGTH_EXERCISES = [
     video: "Kettlebell Floor Press Anleitung",
     fig: {
       frames: [
-        { p: [0, -2.5], t: 90, h: 90, lN: [-11.5, -2], lNb: -1, ftN: -90, lF: [-10.5, -2], lFb: -1, ftF: -90, aNa: [270, 178], aFa: [272, 178] },
-        { p: [0, -2.5], t: 90, h: 90, lN: [-11.5, -2], lNb: -1, ftN: -90, lF: [-10.5, -2], lFb: -1, ftF: -90, aNa: [180, 180], aFa: [272, 178] },
+        { p: [0, -2.5], t: 90, h: 90, lN: [-11.5, -2], lNb: -1, ftN: -90, lF: [-10.5, -2], lFb: -1, ftF: -90, aNa: [270, 178], aFa: [-88, -90] },
+        { p: [0, -2.5], t: 90, h: 90, lN: [-11.5, -2], lNb: -1, ftN: -90, lF: [-10.5, -2], lFb: -1, ftF: -90, aNa: [180, 180], aFa: [-88, -90] },
       ],
       props: [{ type: "kettlebell", at: "wristN" }],
       move: 1.0, hold: 0.3, focus: ["shoulder"],
@@ -781,7 +781,7 @@ const STRENGTH_EXERCISES = [
     video: "Rudern mit Widerstandsband Anleitung",
     fig: {
       frames: [
-        { p: [0, -38.6], aNa: [88, 88], aFa: [86, 86] },
+        { p: [0, -38.6], aNa: [84, 84], aFa: [82, 82] },
         { p: [0, -38.6], aNa: [-40, 92], aFa: [-38, 90] },
       ],
       props: [{ type: "band", from: "wristN", to: [46, -50] }, { type: "wall", x: 47 }],
@@ -878,10 +878,10 @@ const STRENGTH_EXERCISES = [
     video: "Kreuzheben richtig lernen Anleitung",
     fig: {
       frames: [
-        { p: [-19.5, -21], t: 120, h: 108, lN: [-1, -2], lF: [2, -2], aNa: [1, 1], aFa: [3, 3] },
+        { p: [-17, -24.5], t: 119, h: 108, lN: [-1, -2], lF: [2, -2], aNa: [0, 0], aFa: [2, 2] },
         { p: [0, -38.6], aNa: [2, 2], aFa: [4, 4] },
       ],
-      props: [{ type: "plate", at: "wristN", r: 7 }],
+      props: [{ type: "plate", at: "wristN", r: 8 }],
       move: 1.2, hold: 0.4, focus: ["pelvis"],
     },
   },
@@ -897,10 +897,10 @@ const STRENGTH_EXERCISES = [
     video: "Bankdrücken richtig Anleitung",
     fig: {
       frames: [
-        { p: [-8, -15.5], t: 90, h: 92, lN: [-20, -2], lF: [-18, -2], lNb: -1, lFb: -1, ftN: 90, ftF: 90, aNa: [178, 180], aFa: [176, 178] },
-        { p: [-8, -15.5], t: 90, h: 92, lN: [-20, -2], lF: [-18, -2], lNb: -1, lFb: -1, ftN: 90, ftF: 90, aNa: [298, 176], aFa: [300, 174] },
+        { p: [-10, -19.5], t: 90, h: 92, lN: [-28, -2], lF: [-27, -2], lNb: -1, lFb: -1, ftN: -90, ftF: -90, aN: [15, -46.3], aF: [16, -46.3], aNb: 1, aFb: 1 },
+        { p: [-10, -19.5], t: 90, h: 92, lN: [-28, -2], lF: [-27, -2], lNb: -1, lFb: -1, ftN: -90, ftF: -90, aN: [6, -28.5], aF: [7, -28.5], aNb: 1, aFb: 1 },
       ],
-      props: [{ type: "bench", x: 2, h: 13, w: 34 }, { type: "plate", at: "wristN", r: 7 }],
+      props: [{ type: "bench", x: 4, h: 17, w: 44 }, { type: "plate", at: "wristN", r: 7 }],
       move: 1.0, hold: 0.3, focus: ["shoulder"],
     },
   },
@@ -916,8 +916,8 @@ const STRENGTH_EXERCISES = [
     video: "Latziehen richtig Anleitung",
     fig: {
       frames: [
-        { p: [-4, -16], t: 184, lN: [14, -2], lF: [15, -2], aNa: [176, 178], aFa: [174, 176] },
-        { p: [-4, -16], t: 190, lN: [14, -2], lF: [15, -2], aNa: [-24, 168], aFa: [-22, 166] },
+        { p: [-4, -16], t: 184, lN: [14, -2], lF: [15, -2], aN: [-1, -68.4], aF: [0, -68.4] },
+        { p: [-4, -16], t: 192, lN: [14, -2], lF: [15, -2], aN: [-4.4, -41], aF: [-3.4, -41] },
       ],
       props: [{ type: "block", x: -5, h: 14, w: 14 }, { type: "pulley", at: [0, -88] }, { type: "band", from: "wristN", to: [0, -88] }],
       move: 1.0, hold: 0.35, focus: ["shoulder"],
@@ -935,10 +935,10 @@ const STRENGTH_EXERCISES = [
     video: "Rudern am Kabelzug sitzend Anleitung",
     fig: {
       frames: [
-        { p: [-12, -9], t: 172, lN: [20, -9], lF: [21, -9], lNb: 1, lFb: 1, ftN: 170, ftF: 170, aNa: [92, 92], aFa: [90, 90] },
-        { p: [-12, -9], t: 182, lN: [20, -9], lF: [21, -9], lNb: 1, lFb: 1, ftN: 170, ftF: 170, aNa: [-40, 92], aFa: [-38, 90] },
+        { p: [-12, -9], t: 170, lN: [20, -6], lF: [21, -6], lNb: 1, lFb: 1, ftN: 170, ftF: 170, aNa: [70, 70], aFa: [68, 68] },
+        { p: [-12, -9], t: 184, lN: [20, -6], lF: [21, -6], lNb: 1, lFb: 1, ftN: 170, ftF: 170, aNa: [-40, 88], aFa: [-38, 86] },
       ],
-      props: [{ type: "block", x: -12, h: 7, w: 14 }, { type: "pulley", at: [36, -16] }, { type: "band", from: "wristN", to: [36, -16] }],
+      props: [{ type: "block", x: -12, h: 7, w: 14 }, { type: "line", from: [23.4, -2], to: [24.8, -13] }, { type: "pulley", at: [36, -16] }, { type: "band", from: "wristN", to: [36, -16] }],
       move: 0.9, hold: 0.35, focus: ["shoulder"],
     },
   },
@@ -955,7 +955,7 @@ const STRENGTH_EXERCISES = [
     fig: {
       frames: [
         { p: [-6, -16], t: 228, h: 214, lN: [16, -28], lF: [17, -28], lNb: 1, lFb: 1, ftN: 160, ftF: 160, aNa: [20, 30], aFa: [22, 32] },
-        { p: [-6, -16], t: 228, h: 214, lN: [24, -42], lF: [25, -42], lNb: 1, lFb: 1, ftN: 140, ftF: 140, aNa: [20, 30], aFa: [22, 32] },
+        { p: [-6, -16], t: 228, h: 214, lN: [22.4, -39.2], lF: [23.4, -39.2], lNb: 1, lFb: 1, ftN: 140, ftF: 140, aNa: [20, 30], aFa: [22, 32] },
       ],
       props: [{ type: "block", x: -8, h: 12, w: 18 }, { type: "line", from: [-6, -12], to: [-28, -32] }, { type: "line", from: [11, -3], to: [39, -52] }, { type: "plate", at: "ankleN", r: 7 }],
       move: 1.1, hold: 0.3, focus: ["pelvis-kneeN@0.5"],

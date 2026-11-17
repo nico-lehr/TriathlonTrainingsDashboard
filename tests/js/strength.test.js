@@ -49,30 +49,48 @@ test("Kraft-Sammlung: eindeutige ids (auch gegenüber Mobility), gültige Felder
   GROUPS.forEach(g => assert.ok(EXERCISES.some(ex => ex.group === g), "keine Übung für " + g));
 });
 
-test("Kraft-Figuren: alle Haltungen rechnen, Knochen bleiben gleich lang, nichts unter dem Boden", () => {
-  const result = plain(run(`
-    STRENGTH_EXERCISES.map(ex => {
-      const frames = ex.fig.frames.map(figMerge);
-      const poses = [];
-      frames.forEach((f, i) => {
-        const next = frames[(i + 1) % frames.length];
-        for (let t = 0; t <= 1.0001; t += 0.25) poses.push(figBlend(f, next, t));
-      });
-      return { id: ex.id, pts: poses.map(figPoints) };
-    })`));
-  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-  result.forEach(({ id, pts }) => pts.forEach(p => {
-    Object.entries(p).forEach(([k, v]) => {
-      if (Array.isArray(v)) {
+// Alle Haltungen und Zwischenschritte einer Sammlung: Punkte des Skeletts,
+// erwartete Beinlängen (mit Verkürzung) und unerreichbare Ziele.
+const figSamples = coll => plain(run(`
+  ${coll}.map(ex => {
+    const frames = ex.fig.frames.map(figMerge);
+    const tl = figTimeline(ex.fig);
+    const reach = [];
+    frames.forEach((f, fi) => FIG_LIMBS.forEach(([kind, side]) => {
+      const form = figLimbForm(f, kind, side);
+      if (form === "a") return;
+      const root = kind === "l" ? f.p : figShoulder(f);
+      const target = form === "r" ? addV(root, f[kind + side + "r"]) : f[kind + side];
+      const [a, b] = figLimbLen(f, kind, side);
+      reach.push({ limb: kind + side, frame: fi, over: Math.hypot(target[0] - root[0], target[1] - root[1]) - a - b });
+    }));
+    const poses = [];
+    tl.steps.forEach(st => {
+      for (let i = 0; i <= 20; i++) poses.push(figBlend(frames[st.from], frames[st.to], i / 20));
+    });
+    return { id: ex.id, reach, poses: poses.map(p => ({ pts: figPoints(p), len: { N: figLimbLen(p, "l", "N"), F: figLimbLen(p, "l", "F") } })) };
+  })`));
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+test("Kraft-Figuren: Ziele erreichbar, nichts springt, Knochen bleiben gleich lang, nichts unter dem Boden", () => {
+  figSamples("STRENGTH_EXERCISES").forEach(({ id, reach, poses }) => {
+    // Hände und Füße kommen dort an, wo sie hingehören (sonst schweben sie in der Luft).
+    reach.forEach(r => assert.ok(r.over <= 0.5, `${id}: ${r.limb} erreicht das Ziel in Haltung ${r.frame} nicht (${r.over.toFixed(1)} zu weit)`));
+    poses.forEach(({ pts: p, len }, i) => {
+      Object.entries(p).forEach(([k, v]) => {
+        if (!Array.isArray(v)) return;
         assert.ok(v.every(Number.isFinite), `${id}: ${k} ist keine Zahl`);
         assert.ok(v[1] <= 2.5, `${id}: ${k} liegt unter dem Boden (y=${v[1].toFixed(1)})`);
-      }
+        // Kein Gelenk springt von einem Bild zum nächsten (z. B. Ellbogen klappt um).
+        const prev = i % 21 ? poses[i - 1].pts[k] : null;
+        if (prev) assert.ok(dist(v, prev) < 6, `${id}: ${k} springt (${dist(v, prev).toFixed(1)})`);
+      });
+      ["N", "F"].forEach(s => {
+        assert.ok(Math.abs(dist(p.pelvis, p["knee" + s]) - len[s][0]) < 0.01, `${id}: Oberschenkel`);
+        assert.ok(Math.abs(dist(p["knee" + s], p["ankle" + s]) - len[s][1]) < 0.01, `${id}: Unterschenkel`);
+      });
     });
-    ["N", "F"].forEach(s => {
-      assert.ok(Math.abs(dist(p.pelvis, p["knee" + s]) - 19) < 0.01, `${id}: Oberschenkel`);
-      assert.ok(Math.abs(dist(p["knee" + s], p["ankle" + s]) - 18) < 0.01, `${id}: Unterschenkel`);
-    });
-  }));
+  });
 });
 
 test("Kraft-Einheit: je Bewegungsmuster eine Übung, nur vorhandene Hilfsmittel", () => {

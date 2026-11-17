@@ -53,31 +53,48 @@ test("Sammlung: eindeutige ids, gültige Felder, Texte vollständig", () => {
   Object.keys(AREAS).forEach(a => assert.ok(EXERCISES.filter(ex => ex.areas.includes(a)).length >= 4, a));
 });
 
-test("Figuren: alle Haltungen und Zwischenschritte rechnen, Knochen bleiben gleich lang, nichts unter dem Boden", () => {
-  const result = plain(run(`
-    MOBILITY_EXERCISES.map(ex => {
-      const frames = ex.fig.frames.map(figMerge);
-      const poses = [];
-      frames.forEach((f, i) => {
-        const next = frames[(i + 1) % frames.length];
-        for (let t = 0; t <= 1.0001; t += 0.25) poses.push(figBlend(f, next, t));
-      });
-      return { id: ex.id, pts: poses.map(figPoints) };
-    })`));
-  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-  result.forEach(({ id, pts }) => pts.forEach(p => {
-    Object.entries(p).forEach(([k, v]) => {
-      if (Array.isArray(v)) {
+// Alle Haltungen und Zwischenschritte einer Sammlung: Punkte des Skeletts,
+// erwartete Beinlängen (mit Verkürzung) und unerreichbare Ziele.
+const figSamples = coll => plain(run(`
+  ${coll}.map(ex => {
+    const frames = ex.fig.frames.map(figMerge);
+    const tl = figTimeline(ex.fig);
+    const reach = [];
+    frames.forEach((f, fi) => FIG_LIMBS.forEach(([kind, side]) => {
+      const form = figLimbForm(f, kind, side);
+      if (form === "a") return;
+      const root = kind === "l" ? f.p : figShoulder(f);
+      const target = form === "r" ? addV(root, f[kind + side + "r"]) : f[kind + side];
+      const [a, b] = figLimbLen(f, kind, side);
+      reach.push({ limb: kind + side, frame: fi, over: Math.hypot(target[0] - root[0], target[1] - root[1]) - a - b });
+    }));
+    const poses = [];
+    tl.steps.forEach(st => {
+      for (let i = 0; i <= 20; i++) poses.push(figBlend(frames[st.from], frames[st.to], i / 20));
+    });
+    return { id: ex.id, reach, poses: poses.map(p => ({ pts: figPoints(p), len: { N: figLimbLen(p, "l", "N"), F: figLimbLen(p, "l", "F") } })) };
+  })`));
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+test("Figuren: Ziele erreichbar, nichts springt, Knochen bleiben gleich lang, nichts unter dem Boden", () => {
+  figSamples("MOBILITY_EXERCISES").forEach(({ id, reach, poses }) => {
+    // Hände und Füße kommen dort an, wo sie hingehören (sonst schweben sie in der Luft).
+    reach.forEach(r => assert.ok(r.over <= 0.5, `${id}: ${r.limb} erreicht das Ziel in Haltung ${r.frame} nicht (${r.over.toFixed(1)} zu weit)`));
+    poses.forEach(({ pts: p, len }, i) => {
+      Object.entries(p).forEach(([k, v]) => {
+        if (!Array.isArray(v)) return;
         assert.ok(v.every(Number.isFinite), `${id}: ${k} ist keine Zahl`);
         assert.ok(v[1] <= 2.5, `${id}: ${k} liegt unter dem Boden (y=${v[1].toFixed(1)})`);
-      }
+        // Kein Gelenk springt von einem Bild zum nächsten (z. B. Ellbogen klappt um).
+        const prev = i % 21 ? poses[i - 1].pts[k] : null;
+        if (prev) assert.ok(dist(v, prev) < 6, `${id}: ${k} springt (${dist(v, prev).toFixed(1)})`);
+      });
+      ["N", "F"].forEach(s => {
+        assert.ok(Math.abs(dist(p.pelvis, p["knee" + s]) - len[s][0]) < 0.01, `${id}: Oberschenkel`);
+        assert.ok(Math.abs(dist(p["knee" + s], p["ankle" + s]) - len[s][1]) < 0.01, `${id}: Unterschenkel`);
+      });
     });
-    ["N", "F"].forEach(s => {
-      assert.ok(Math.abs(dist(p.pelvis, p["knee" + s]) - 19) < 0.01, `${id}: Oberschenkel`);
-      assert.ok(Math.abs(dist(p["knee" + s], p["ankle" + s]) - 18) < 0.01, `${id}: Unterschenkel`);
-      assert.ok(Math.abs(dist(p.shoulder, p["wrist" + s]) - 0) > 0, `${id}: Arm`);
-    });
-  }));
+  });
 });
 
 test("IK: erreichbares Ziel wird genau getroffen, Beugerichtung wirkt", () => {
@@ -90,6 +107,27 @@ test("IK: erreichbares Ziel wird genau getroffen, Beugerichtung wirkt", () => {
   })()`));
   assert.ok(Math.abs(r.end[0] - 5) < 0.01 && Math.abs(r.end[1] + 2) < 0.01);
   assert.ok(r.knee[0] > r.kneeBackX, "Knie nach vorn bei bend +1");
+});
+
+test("Haltung: bei zwei Formen für dieselbe Gliedmaße gilt die zuletzt genannte", () => {
+  const r = plain(run(`(() => {
+    const base = { aNa: [-92, -90], lN: [-14, -2] };
+    const a = figMerge({ ...base, aN: [9, -17] });       // Grundhaltung mit Winkeln, darüber ein Ziel
+    const b = figMerge({ ...base, lNa: [0, -90] });      // Grundhaltung mit Ziel, darüber Winkel
+    return { arm: figLimbForm(a, "a", "N"), leg: figLimbForm(b, "l", "N"), armGone: a.aNa === undefined };
+  })()`));
+  assert.strictEqual(r.arm, "w");
+  assert.ok(r.armGone);
+  assert.strictEqual(r.leg, "a");
+});
+
+test("Verkürzung: Gliedmaße zur Seite wird kürzer gezeichnet und weich gemischt", () => {
+  const r = plain(run(`(() => {
+    const A = figMerge({ aNa: [90, 90] }), B = figMerge({ aNa: [90, 90], aNs: [0.5, 1] });
+    const len = pose => { const p = figPoints(pose); return Math.hypot(p.elbowN[0] - p.shoulder[0], p.elbowN[1] - p.shoulder[1]); };
+    return { full: len(A), half: len(B), mid: len(figBlend(A, B, 0.5)) };
+  })()`));
+  assert.ok(Math.abs(r.full - 14) < 0.01 && Math.abs(r.half - 7) < 0.01 && Math.abs(r.mid - 10.5) < 0.01);
 });
 
 const session = (patch, opts = {}) => plain(run(`buildMobilitySession(${JSON.stringify({
