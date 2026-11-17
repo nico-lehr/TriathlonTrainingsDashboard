@@ -4,6 +4,11 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.50
+
+**Einstellungen: „Nachdenken“ steht beim Trainingsplan**
+- „Nachdenken beim Trainingsplan“ steht in den Claude-Einstellungen jetzt direkt unter der Zeile „Trainingsplan“ und nicht mehr ganz unten in der Liste.
+
 ## 2.4.49
 
 **Trainingsplan: nächste Woche zum halben Preis**

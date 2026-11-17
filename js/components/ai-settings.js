@@ -88,14 +88,8 @@ function initAiSettings() {
     const short = id => { const m = (st.models || []).find(x => x.id === id); return m ? m.label.split(" – ")[0].replace(/^Claude /, "") : id; };
     const std = short(st.model);
     const own = st.task_models || {};
-    taskList.innerHTML = groups.map(g => `
-      <div class="settings-list-row claude-task-row">
-        <label for="claude-task-${g.id}"><span>${escapeHtml(g.label)}</span><small>${escapeHtml(g.hint)}</small></label>
-        <select id="claude-task-${g.id}" class="coach-input" data-task-group="${g.id}">
-          <option value="">Wie Standard (${escapeHtml(std)})</option>
-          ${(st.models || []).map(m => `<option value="${m.id}"${own[g.id] === m.id ? " selected" : ""}>${escapeHtml(short(m.id))}</option>`).join("")}
-        </select>
-      </div>`).join("") + `
+    // "Nachdenken beim Trainingsplan" direkt unter der Zeile "Trainingsplan"
+    const effortRow = `
       <div class="settings-list-row claude-task-row">
         <label for="claude-plan-effort"><span>Nachdenken beim Trainingsplan</span><small>Wie gründlich die KI beim Plan erstellen und bei Nachrichten an den Coach nachdenkt. Nachdenken kostet wie geschriebener Text.</small></label>
         <select id="claude-plan-effort" class="coach-input">
@@ -103,6 +97,15 @@ function initAiSettings() {
           <option value="medium"${st.plan_effort === "medium" ? " selected" : ""}>Mittel – gründlicher</option>
         </select>
       </div>`;
+    const hasPlan = groups.some(g => g.id === "plan");
+    taskList.innerHTML = groups.map(g => `
+      <div class="settings-list-row claude-task-row">
+        <label for="claude-task-${g.id}"><span>${escapeHtml(g.label)}</span><small>${escapeHtml(g.hint)}</small></label>
+        <select id="claude-task-${g.id}" class="coach-input" data-task-group="${g.id}">
+          <option value="">Wie Standard (${escapeHtml(std)})</option>
+          ${(st.models || []).map(m => `<option value="${m.id}"${own[g.id] === m.id ? " selected" : ""}>${escapeHtml(short(m.id))}</option>`).join("")}
+        </select>
+      </div>${g.id === "plan" ? effortRow : ""}`).join("") + (hasPlan ? "" : effortRow);
     const effortSel = taskList.querySelector("#claude-plan-effort");
     if (effortSel) effortSel.addEventListener("change", async () => {
       if (await put({ plan_effort: effortSel.value }, "Speichere …")) {
