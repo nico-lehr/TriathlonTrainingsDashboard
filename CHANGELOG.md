@@ -4,6 +4,14 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.5.1
+
+**Mobility: 11 neue Übungen, vor allem für Knie und Hüfte**
+- Neuer Bereich „Knie“ mit 4 Übungen: Fersenrutschen, Knie strecken mit Band, Beinstrecken im Sitzen und Fersensitz. Im Trainingsprofil kannst du „Knie“ jetzt auch als Schwerpunkt oder als Bereich mit Beschwerden wählen – dann wird dort nur sanft gearbeitet.
+- 6 neue Übungen für die Hüfte: Schmetterling, Hüft-Scheibenwischer, Hüfttor öffnen, Ausfallschritt mit Drehung, Hüftkreisen im Vierfüßlerstand und Liegende Drehung.
+- Außerdem neu: Beinrückseite im Sitzen.
+- Alle neuen Übungen haben wie gewohnt eine bewegte Strichfigur, einfache Schritte, typische Fehler sowie eine leichtere und eine schwerere Variante. Insgesamt gibt es jetzt 44 Mobility-Übungen – mehr Abwechslung in deinen Einheiten.
+
 ## 2.5.0
 
 **Neu: Feed – gemeinsam motivieren**

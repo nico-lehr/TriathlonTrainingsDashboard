@@ -98,7 +98,7 @@ Serious amateur triathletes usually end up paying for **several subscriptions at
 <td width="50%" valign="top">
 
 ### 🏋️ Strength & mobility built in
-- **50 strength exercises** and **33 mobility exercises**, each with an animated stick figure, steps, common mistakes and easier or harder variants.
+- **50 strength exercises** and **44 mobility exercises**, each with an animated stick figure, steps, common mistakes and easier or harder variants.
 - **Follow-along mode** for your phone: big timer, side switch, "set done", and the screen stays on.
 - Bodyweight, dumbbells, kettlebell, band or gym: the plan uses what you have, and it remembers your weights.
 
