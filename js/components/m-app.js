@@ -436,59 +436,7 @@ function mRaceListCard() {
       ${!main ? `<p class="m-say small">Noch kein Hauptevent gewählt – tippe auf „Bearbeiten“ und markiere dein wichtigstes Rennen mit dem Stern.</p>` : ""}</section>`;
 }
 
-function mRenderKalender() {
-  const today = mDay(new Date());
-  if (!mState.calMonth) mState.calMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  if (!mState.calWeek) mState.calWeek = today; // Liste: 7 Tage ab diesem Tag (Standard: heute)
-  const m = mState.calMonth;
-  const first = new Date(m.getFullYear(), m.getMonth(), 1);
-  const daysIn = new Date(m.getFullYear(), m.getMonth() + 1, 0).getDate();
-  const lead = (first.getDay() + 6) % 7;
-  const done = new Map();
-  mAllWorkouts().forEach(w => { const k = localDateStr(w._date); if (!done.has(k)) done.set(k, w.sport); });
-  const plan = new Map();
-  (typeof plannedWorkouts !== "undefined" ? plannedWorkouts : []).forEach(p => { if (p.status === "geplant" && !plan.has(p.date)) plan.set(p.date, p.sport); });
-  let cells = mWeekdays.map(d => `<span class="m-wd">${d}</span>`).join("") + '<span class="m-mc empty"></span>'.repeat(lead);
-  const weekKey = localDateStr(mState.calWeek), weekEnd = localDateStr(mAddDays(mState.calWeek, 6));
-  for (let d = 1; d <= daysIn; d++) {
-    const date = new Date(m.getFullYear(), m.getMonth(), d);
-    const k = localDateStr(date);
-    const sport = done.get(k) || plan.get(k);
-    const cls = ["m-mc", k === localDateStr(today) ? "today" : "", date < today ? "past" : "", k >= weekKey && k <= weekEnd ? "inweek" : "", mGoalsOn(k).length ? "race" : ""].join(" ");
-    const evs = mWorkoutsOn(date).map(w => ({ t: w.title || w.name || w.sport, s: sportGroup(w.sport) === "Sonstiges" ? w.sport : sportGroup(w.sport), done: true }))
-      .concat(mPlannedOn(k).filter(p => p.status === "geplant").map(p => ({ t: p.title || p.sport, s: p.sport, done: false })));
-    mGoalsOn(k).forEach(g => evs.unshift({ t: `🏁 ${g.name}`, s: g.sport, race: true }));
-    const evHtml = evs.length ? `<span class="m-mc-evs">${evs.slice(0, 3).map(e => `<em class="${e.race ? "race" : e.done ? "done" : "plan"}" style="--c:${mSport(e.s).color}">${mEsc(e.t)}</em>`).join("")}${evs.length > 3 ? `<em class="more">+${evs.length - 3}</em>` : ""}</span>` : "";
-    cells += `<button type="button" class="${cls}" data-m-act="cal-day" data-date="${k}"><b>${d}</b>${evHtml}<i style="${sport ? `background:${mSport(sportGroup(sport) === "Sonstiges" ? sport : sportGroup(sport)).color}` : ""}${sport && !done.has(k) ? ";opacity:.5" : ""}"></i></button>`;
-  }
-  const agenda = [0, 1, 2, 3, 4, 5, 6].map(i => {
-    const d = mAddDays(mState.calWeek, i);
-    const wd = mWeekdays[(d.getDay() + 6) % 7];
-    const k = localDateStr(d);
-    const items = [];
-    mGoalsOn(k).forEach(g => items.push(`<button type="button" class="m-ev m-ev-race" data-m-classic="coach" data-m-scroll="goals"><span class="m-ev-stripe" style="background:var(--m-accent)"></span><span class="m-race-flag" aria-hidden="true">🏁</span><span class="m-grow"><span class="m-row-title">${mEsc(g.name)}</span><span class="m-row-meta">Wettkampf${typeof goalRaceBits === "function" ? goalRaceBits(g).map(b => ` · ${mEsc(b)}`).join("") : ""}${g.distanceKm ? ` · ${mNum(g.distanceKm, g.distanceKm < 10 ? 1 : 0)} km` : ""}${g.targetTime ? ` · Ziel ${mEsc(g.targetTime)}` : ""}</span></span>${g.isPrimary ? `<span class="m-tag plan">Hauptevent</span>` : ""}</button>`));
-    mWorkoutsOn(d).forEach(w => items.push(`<button type="button" class="m-ev" data-m-act="workout" data-file="${mEsc(w.file || w.id || "")}"><span class="m-ev-stripe" style="background:${mSport(sportGroup(w.sport)).color}"></span>${mIcon(sportGroup(w.sport) === "Sonstiges" ? w.sport : sportGroup(w.sport), "sm")}<span class="m-grow"><span class="m-row-title">${mEsc(w.title || w.name || w.sport)}</span><span class="m-row-meta">${mDur(w.duration_min || 0)}${w.distance_km ? ` · ${mNum(w.distance_km, 1)} km` : ""}</span></span><span class="m-tag done">✓</span></button>`));
-    mPlannedOn(k).filter(p => p.status !== "erledigt" || !mWorkoutsOn(d).length).forEach(p => items.push(`<button type="button" class="m-ev" data-m-act="plan" data-id="${mEsc(p.id)}"><span class="m-ev-stripe" style="background:${mSport(p.sport).color}"></span>${mIcon(p.sport, "sm")}<span class="m-grow"><span class="m-row-title">${mEsc(p.title || p.sport)}</span><span class="m-row-meta">${p.duration_min ? mDur(p.duration_min) : ""}${mSwimBit(p)}${p.intensity ? ` · ${mEsc(p.intensity)}` : ""}</span></span><span class="m-tag ${p.status === "erledigt" ? "done" : p.status === "uebersprungen" ? "bad" : "plan"}">${p.status === "erledigt" ? "✓" : p.status === "uebersprungen" ? "übersprungen" : "geplant"}</span></button>`));
-    return `<div class="m-ag-day${k === localDateStr(today) ? " today" : ""}"><div class="m-ag-date"><b>${k === localDateStr(today) ? "Heute" : wd}</b><span>${d.getDate()}.</span></div>
-      <div class="m-ag-items">${items.join("") || `<button type="button" class="m-ag-add" data-m-act="plan-new" data-date="${k}">${k < localDateStr(today) ? "–" : "+ Einheit"}</button>`}</div></div>`;
-  }).join("");
-  // Stunden der 7 Tage: Erledigtes plus noch Geplantes
-  const weekMin = [0, 1, 2, 3, 4, 5, 6].reduce((s, i) => {
-    const d = mAddDays(mState.calWeek, i);
-    return s + mWorkoutsOn(d).reduce((a, w) => a + (w.duration_min || 0), 0)
-      + mPlannedOn(localDateStr(d)).filter(p => p.status === "geplant").reduce((a, p) => a + (Number(p.duration_min) || 0), 0);
-  }, 0);
-  const fromToday = weekKey === localDateStr(today);
-  const span = `${mState.calWeek.toLocaleDateString("de-DE", { day: "numeric", month: "short" })} – ${mAddDays(mState.calWeek, 6).toLocaleDateString("de-DE", { day: "numeric", month: "short" })}`;
-  const listTitle = fromToday ? "Nächste 7 Tage" : weekKey < localDateStr(today) ? "Rückblick" : "Danach";
-  return mHeaderHtml(fromToday ? `Ab heute · ${span}` : span, "Kalender",
-    `<button type="button" class="m-icon" data-m-act="plan-new" data-date="${todayStr()}" aria-label="Neue Einheit">+</button>`)
-    + mCols(`<section class="m-card"><div class="m-head"><h2>${m.toLocaleDateString("de-DE", { month: "long", year: "numeric" })}</h2><span class="m-arrows"><button type="button" class="m-chip" data-m-act="month" data-dir="-1" aria-label="Vormonat">‹</button><button type="button" class="m-chip" data-m-act="month" data-dir="1" aria-label="Nächster Monat">›</button></span></div>
-        <div class="m-month">${cells}</div></section>`,
-    `<section class="m-card"><div class="m-head"><h2>${listTitle}</h2><span class="m-arrows">${fromToday ? "" : `<button type="button" class="m-chip" data-m-act="week" data-dir="-1" aria-label="Früher">‹</button>`}<span class="m-head-note">${mNum(weekMin / 60, 1)} h</span><button type="button" class="m-chip" data-m-act="week" data-dir="1" aria-label="Später">›</button></span></div>
-        <div class="m-agenda">${agenda}</div></section>`
-    + `<button type="button" class="m-more" data-m-classic="calendar">Großer Kalender mit Wetter</button>`, "cal");
-}
+// mRenderKalender: siehe js/components/m-calendar.js
 
 // Hinweis: neue Events aus dem Garmin-Kalender wurden als Ziel übernommen
 // (js/data/garmin-events.js). Verschwindet mit "OK".
@@ -782,7 +730,7 @@ function mPlayEnter(body) {
   body.classList.remove("m-anim");
   void body.offsetWidth; // Animation neu starten
   let i = 0;
-  body.querySelectorAll(".m-top, .m-subseg, .m-card, .m-more").forEach(el => { el.style.animationDelay = `${Math.min(i++, 8) * 40}ms`; });
+  body.querySelectorAll(".m-top, .m-subseg, .m-card, .m-more, .k-board, .k-panel").forEach(el => { el.style.animationDelay = `${Math.min(i++, 8) * 40}ms`; });
   body.classList.add("m-anim");
   mCountStart = performance.now();
   mCountUp(body);
@@ -876,6 +824,7 @@ async function mAction(btn) {
   const act = btn.dataset.mAct;
   const id = btn.dataset.id;
   if (M_TRACK_ACTS[act] && typeof mTrack === "function") mTrack("feature", M_TRACK_ACTS[act]);
+  if (typeof mCalAction === "function" && mCalAction(btn)) return;
   if (act === "adm-days") { mAdmin.days = Number(btn.dataset.days) || 30; mLoadAdminStats(true); renderMApp(); return; }
   if (act === "adm-reload") { mLoadAdminStats(true); renderMApp(); return; }
   if (act === "plan" && id) {
@@ -896,6 +845,7 @@ async function mAction(btn) {
   } else if (act === "cal-day") {
     const d = new Date(btn.dataset.date + "T12:00:00");
     mState.calWeek = mDay(d); // Liste ab dem angetippten Tag
+    mState.calFocus = mMonday(d); // Wochenansicht am Computer
     mState.calMonth = new Date(d.getFullYear(), d.getMonth(), 1);
     mState.calPicked = true;
     if (mState.page !== "kalender") mShow("kalender"); else { mState.calPicked = false; renderMApp(); }

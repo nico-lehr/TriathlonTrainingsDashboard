@@ -540,7 +540,7 @@ body.m-graphit.m-classic #m-body { display: none; }
 
 @media (prefers-reduced-motion: no-preference) {
   /* Bereich wechseln: Karten gleiten nacheinander herein */
-  .m-anim .m-top, .m-anim .m-subseg, .m-anim .m-card, .m-anim .m-more { animation: m-rise .5s cubic-bezier(.2,.8,.2,1) both; }
+  .m-anim .m-top, .m-anim .m-subseg, .m-anim .m-card, .m-anim .m-more, .m-anim .k-board, .m-anim .k-panel { animation: m-rise .5s cubic-bezier(.2,.8,.2,1) both; }
   /* Ringe zeichnen sich, Balken wachsen, Häkchen ploppen */
   .m-anim .m-ring-val { animation: m-ring-draw 1.1s .15s cubic-bezier(.2,.8,.2,1) both; }
   .m-anim .m-bar, .m-anim .m-phases { transform-origin: left center; animation: m-grow .8s .25s cubic-bezier(.2,.8,.2,1) both; }

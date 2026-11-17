@@ -57,7 +57,7 @@ const M_PAGE_NAMES = { heute: "Übersicht", kalender: "Kalender", coach: "Coach"
 const M_FEATURE_NAMES = { "coach-note": "Coach-Nachricht", "coach-undo": "Coach rückgängig", outlook: "Ausblick erstellt", "mob-start": "Mobility gestartet",
   "strength-start": "Kraft gestartet", "mob-claude": "Mobility mit KI-Coach", "plan-new": "Einheit geplant", "plan-open": "Geplante Einheit geöffnet",
   "workout-open": "Training angesehen", "garmin-send": "An Garmin gesendet", "garmin-push-login": "Uhr-Anmeldung", "classic-view": "Klassische Ansicht",
-  "group-join": "Feed beigetreten", "group-react": "Reaktion im Feed", "challenge-new": "Challenge gestartet" };
+  "group-join": "Feed beigetreten", "group-react": "Reaktion im Feed", "challenge-new": "Challenge gestartet", "cal-drag": "Einheit im Kalender verschoben" };
 
 function mAdminAgo(iso) {
   if (!iso) return "noch nie";

@@ -17,6 +17,13 @@ im Dashboard unter „Was ist neu?“. Neueste Version oben.
 - Drei Arten: Gruppenziel (alle sammeln zusammen, z. B. 1.500 km Rad im November), persönliche Challenge (jeder für sich, z. B. 60 km Laufen) und Rangliste (wer schafft am meisten?).
 - Gezählt werden Kilometer, Stunden oder Einheiten im gewählten Zeitraum. Ist das Ziel geschafft oder die Rangliste vorbei, erscheint automatisch ein Highlight im Feed.
 
+**Neu: Kalender mit neuem Aussehen und Verschieben per Ziehen**
+- Der Kalender wurde neu gestaltet: feine Linien wie in einem Papierplaner statt vieler Kästchen. Erledigte Einheiten sind farbig gefüllt, geplante gestrichelt umrandet.
+- Am Computer gibt es eine Monats- und eine Wochenansicht. Links steht die Kalenderwoche, rechts die Wochensumme mit einem farbigen Balken je Sportart und der noch geplanten Zeit.
+- Das Wetter steht direkt am Tag (Symbol und Temperatur, in der Woche auch die Regenwahrscheinlichkeit). Der bisherige „Große Kalender mit Wetter“ ist damit im neuen Kalender aufgegangen.
+- Geplante Einheiten lassen sich auf einen anderen Tag ziehen – am Computer mit der Maus, am Handy kurz gedrückt halten und ziehen. Die Trainingsregeln werden dabei wie gewohnt geprüft, und mit „Rückgängig“ geht es sofort zurück. In die Vergangenheit lässt sich nichts schieben.
+- Am Handy: kleiner Monat mit Strichen je Einheit, darunter die nächsten 7 Tage mit Wetter.
+
 ## 2.4.51
 
 **Kraft & Mobility: Strichmännchen bewegen sich richtig**
