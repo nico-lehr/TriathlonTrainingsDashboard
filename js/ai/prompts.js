@@ -15,8 +15,10 @@ Gib eine kurze, konkrete Trainingsempfehlung auf Deutsch:
 2. 3-5 konkrete Fokuspunkte bis zum Ziel - bei Zielzeit/Unterdisziplinen: einschätzen, ob sie angesichts von VO2max/Bestzeiten realistisch wirkt (kein exaktes Rechnen, nur grobe Einordnung)
 3. Grobe Wochenstruktur (Einheiten je Sportart, Intensitätsverteilung)
 4. Bei kritischem ACWR/TSB/Monotonie (Status "erhöht"/"kritisch"/"auffällig" o.ä.): expliziter Warnhinweis, welche Anpassung das konkret bedeutet
-5. Falls unter "Erholung heute" Muskelkater, wenig Energie oder eine Verletzung angegeben ist: explizit sagen, wie die Empfehlung dafür angepasst wird (z.B. Einheit tauschen, Intensität senken, Ruhetag einschieben, Arzt/Physio bei Verletzung) - nicht ignorieren.
-6. Falls unter "Ernährungsziel heute"/"Wettkampf-Verpflegungsplan" Werte angegeben sind: bei Bedarf kurz darauf Bezug nehmen (z.B. Carb-Loading oder Fettstoffwechsel-Fokus erwähnen, falls das gerade relevant ist) - die Zahlen dort sind bereits fertig berechnet, NICHT selbst neue Gramm-/Kalorienangaben erfinden oder ihnen widersprechen.
+${[
+  (ctx.includes("Erholung heute") || ctx.includes("Erholungs-Logbuch")) && `Unter "Erholung heute" ist Muskelkater, wenig Energie oder eine Verletzung angegeben: explizit sagen, wie die Empfehlung dafür angepasst wird (z.B. Einheit tauschen, Intensität senken, Ruhetag, Arzt/Physio bei Verletzung).`,
+  ctx.includes("Ernährungsziel heute") && `Falls passend, kurz auf das "Ernährungsziel heute" Bezug nehmen (z.B. Carb-Loading) - die Zahlen dort sind fertig berechnet, keine eigenen Gramm-/Kalorienangaben erfinden.`,
+].filter(Boolean).map((t, i) => `${5 + i}. ${t}`).join("\n")}
 
 Nur normaler Fließtext in kurzen Absätzen - KEIN Markdown (keine **, keine #-Überschriften, keine Aufzählungszeichen/nummerierten Listen), keine Tabellen/Code-Blöcke, max. ca. 240 Wörter.`;
 }
@@ -32,6 +34,19 @@ function buildPlanPrompt(goal, windowDates) {
   if (athleteProfile.includeStrength) sports.push("Kraft");
   if (athleteProfile.includeMobility) sports.push("Mobility");
 
+  // Regeln nur, wenn ihr Anlass im Kontext steht - jede Zeile kostet bei
+  // jeder Planung Tokens, auch wenn sie gerade gar nicht zutrifft.
+  const has = text => ctx.includes(text);
+  const optional = [
+    (has("Erholung heute") || has("Erholungs-Logbuch")) && `- Muskelkater, wenig Energie oder Verletzung unter "Erholung heute"/"Erholungs-Logbuch": leichter planen oder einen Ruhetag einschieben.`,
+    has("Zuletzt von dir vorgeschlagene") && `- Wiederholt übersprungene Einheiten (siehe "Zuletzt von dir vorgeschlagene Einheiten") nicht identisch wiederholen, sondern Umfang/Art anpassen.`,
+    has("Zusätzliche Wünsche des Athleten") && `- "Zusätzliche Wünsche des Athleten" konkret einplanen, sofern plausibel (z.B. "1x Zugseiltraining pro Woche" -> Kraft-Einheit mit passender Übung). Was Trainingstagen/Sportarten widerspricht, weglassen.`,
+    has("Streckenprofil") && `- Streckenprofil hügelig/bergig: in Rad-/Lauf-Einheiten gezielt Anstiege einbauen und in "description" nennen.`,
+    has("Priorität dieses Ziels") && `- Priorität A: konsequent auf das Renndatum hintrainieren (Taper ernst nehmen); B/C: mehr Spielraum für Grundlagentraining.`,
+    has("Wettkampf-Strategie-Notiz") && `- Die Wettkampf-Strategie-Notiz nur berücksichtigen, wenn sie die Trainingsgestaltung betrifft.`,
+    has("Verletzungen/Einschränkungen") && `- WICHTIG - Sicherheit: Die genannten Verletzungen/Einschränkungen UNBEDINGT beachten - keine Übungen/Belastungen, die sie verschlimmern könnten (z.B. bei Knieproblemen keine tiefen Kniebeugen/Sprünge), stattdessen Alternativen oder weniger Belastung.`,
+  ].filter(Boolean).join("\n");
+
   return `Du bist ein erfahrener Triathlon-Coach und erstellst einen konkreten Trainingsplan für die nächsten ${windowDates.length} Tage. Athletendaten:
 
 ${ctx}
@@ -41,25 +56,18 @@ Regeln:
 ${buildPlanTrainingDaysRule(windowDates)}
 - Sportarten ausschließlich aus: ${sports.join(", ")}. Schwimmen nur am angegebenen Schwimmtag, falls einer gesetzt ist. Lange Einheiten (Laufen/Rad) bevorzugt an den angegebenen "lange Einheit"-Tagen.
 ${typeof planStructureRuleText === "function" ? planStructureRuleText(planStructureSettings(athleteProfile, trainingProfile()), windowDates) : ""}
-- Intensitätsverteilung passend zur Trainingsphase: in Grundlagenausdauer/Aufbau überwiegend "leicht" (polarisiert, ca. 80/20), in der Taper-Phase Umfang deutlich reduzieren, Intensität nur noch kurz und moderat halten.
-- Bei "Erholung heute"/Erholungs-Logbuch mit Muskelkater, wenig Energie oder Verletzung: entsprechend leichter planen oder einen zusätzlichen Ruhetag einschieben.
-- Bei "Zuletzt von dir vorgeschlagene Einheiten + Status": wiederholt übersprungene Einheiten nicht identisch wiederholen, sondern Umfang/Art anpassen.
-- "Ernährungsziel heute"/"Wettkampf-Verpflegungsplan" sind reiner Kontext (z.B. um zu wissen, ob gerade Carb-Loading oder eine Fettstoffwechsel-fokussierte Grundlagenphase läuft) - im JSON-Ergebnis nicht wiederholen, das Schema hat dafür kein Feld.
-- Nie einen exakten Trainingsload/TSS-Wert erfinden - nur "intensity": "leicht"|"mittel"|"hart" angeben, keine Zahl.
-${typeof strengthPlanRule === "function" ? strengthPlanRule() : "- Bei \"Kraft\": \"exercises\"-Array mit 3-6 konkreten Übungen (Name, Sätze, Wiederholungen, kurzer Hinweis)."}
+- Intensität passend zur Trainingsphase: in Grundlage/Aufbau überwiegend "leicht" (ca. 80/20), im Taper Umfang deutlich reduzieren, Intensität nur kurz und moderat.
+- Nie einen Trainingsload/TSS-Wert erfinden - nur "intensity": "leicht"|"mittel"|"hart".
+${optional ? optional + "\n" : ""}${typeof strengthPlanRule === "function" ? strengthPlanRule() : "- Bei \"Kraft\": \"exercises\"-Array mit 3-6 konkreten Übungen (Name, Sätze, Wiederholungen)."}
 ${mobilityPlanRule()}
 ${swimPlanRule()}
-- Bei Rad/Laufen: "description" MUSS enthalten (a) eine kurze konkrete Struktur mit Einrollen/Hauptteil/Auslaufen (z.B. "10min Einrollen, 6x400m zügig mit 90s Pause, 10min Auslaufen") UND (b) den passenden Ziel-Bereich aus den oben angegebenen Zonen (Herzfrequenz-Zonen/Pace-Zonen/Leistungszonen) für die gewählte Intensität - z.B. "Hauptteil im Bereich Z2 Grundlage (128-142 bpm bzw. 5:20-5:45/km)". Nutze dafür AUSSCHLIESSLICH die im Kontext oben schon berechneten Zonenwerte, erfinde selbst keine Zahlen. Sind für eine Sportart keine Zonen im Kontext angegeben (kein Schwellenwert im Profil hinterlegt), einfach nur "leicht/mittel/hart" ohne Zahlen nennen.
-- Bei Schwimmen/Rad/Laufen zusätzlich: falls unter "Zuletzt tatsächlich absolviert" oder in einer früheren Analyse erkennbar ist, dass ähnliche Einheiten dieser Sportart zuletzt zu hart/zu leicht gelaufen sind oder häufig übersprungen wurden, das kurz in der "description" berücksichtigen (z.B. "diesmal bewusst 5min kürzer, da die letzten beiden Tempoläufe übersprungen wurden").
-- Kein "exercises"-Feld bei Schwimmen/Rad/Laufen (nur bei Kraft/Mobility, s.o.).
-- Alle Textfelder ("description", "title", Übungs-"note") als reiner Klartext ohne Markdown (kein **, kein #, keine Aufzählungszeichen) - werden teilweise in einfachen Textfeldern angezeigt, in denen Markdown-Zeichen nur störend wären.
-- Falls oben "Zusätzliche Wünsche des Athleten" angegeben sind: diese aktiv und konkret einplanen, sofern plausibel (z.B. "1x Zugseiltraining pro Woche" -> an einem passenden Tag als Kraft-Einheit mit einer entsprechenden Übung einbauen). Nicht plausibel Umsetzbares (z.B. widerspricht Trainingstagen/Sportart-Liste oben) einfach weglassen statt zu erzwingen.
-- Falls oben ein "Streckenprofil" mit Hügeligkeit angegeben ist ("hügelig"/"bergig"): bei Rad-/Lauf-Einheiten in dieser Trainingsphase gezielt auch Anstiege/Höhenmeter einbauen (in der "description" erwähnen, z.B. "inkl. 2-3 längere Anstiege"), nicht nur bei "flach" ignorieren. Falls eine "Priorität" (A/B/C) angegeben ist: bei A-Zielen konsequenter auf das Renndatum hintrainieren (Taper ernster nehmen), bei B/C-Zielen mehr Spielraum für das eigentliche Grundlagentraining lassen. Eine "Wettkampf-Strategie-Notiz" ist zusätzlicher Kontext (z.B. Pacing-Plan) - falls relevant für die Trainingsgestaltung kurz berücksichtigen, sonst ignorieren.
-- WICHTIG - Konsistenz zwischen den Feldern EINES Eintrags: "sport" muss exakt zu dem passen, was in "title"/"description" tatsächlich beschrieben wird (z.B. Zugseiltraining, Klimmzüge, Kniebeugen, Kreuzheben, Hanteltraining -> sport MUSS "Kraft" sein, niemals "Rad"/"Laufen"/"Schwimmen", auch wenn der Athlet an dem Tag sonst Rad fährt). "duration_min" muss der tatsächlichen Gesamtdauer entsprechen, die du selbst in "description" nennst (z.B. wenn "description" mit "20min ..." beginnt, muss duration_min=20 sein) - widersprüchliche Angaben zwischen den Feldern derselben Einheit sind ein Fehler.
-- WICHTIG - Sicherheit: falls oben "Verletzungen/Einschränkungen des Athleten" angegeben sind, DIESE UNBEDINGT beachten - keine Übungen/Belastungen vorschlagen, die die genannte Einschränkung verschlimmern könnten (z.B. bei Knieproblemen keine tiefen Kniebeugen/Sprünge, bei Schulterproblemen kein Bankdrücken/Zugseiltraining über Kopf), stattdessen alternative Übungen wählen oder die Belastung entsprechend anpassen.
+- Bei Rad/Laufen: "description" = kurze Struktur (z.B. "10 min Einrollen, 6x400 m zügig mit 90 s Pause, 10 min Auslaufen") plus Ziel-Bereich aus den Zonen oben für die gewählte Intensität (z.B. "Hauptteil Z2 128-142 bpm"). Nur die Zonenwerte von oben verwenden, keine eigenen Zahlen; ohne Zonen für die Sportart nur "leicht/mittel/hart".
+- Liefen ähnliche Einheiten laut "Zuletzt tatsächlich absolviert" zu hart/zu leicht oder wurden übersprungen: kurz in "description" berücksichtigen.
+- Kurz halten: "title" höchstens 4 Wörter, "description" höchstens 2 kurze Sätze (ca. 30 Wörter). Reiner Klartext ohne Markdown.
+- Konsistenz: "sport" muss zu "title"/"description" passen (Kräftigungsübungen wie Klimmzüge, Kniebeugen, Hanteltraining -> immer "Kraft"). "duration_min" = die Gesamtdauer, die "description" nennt.
 
 Antworte AUSSCHLIESSLICH mit einem JSON-Objekt in genau dieser Form, keinerlei Text davor/danach, keine Code-Block-Markierung:
-{"workouts":[{"date":"YYYY-MM-DD","sport":"Schwimmen|Rad|Laufen|Kraft|Mobility","title":"kurzer Titel","duration_min":60,"intensity":"leicht|mittel|hart","description":"...","distance_m":1800,"exercises":[{"name":"...","sets":3,"reps":"12","note":"..."}]}]}
+{"workouts":[{"date":"YYYY-MM-DD","sport":"Schwimmen|Rad|Laufen|Kraft|Mobility","title":"kurzer Titel","duration_min":60,"intensity":"leicht|mittel|hart","description":"...","distance_m":1800,"exercises":[{"id":"...","sets":3,"reps":"12"}]}]}
 
 "distance_m" nur bei sport="Schwimmen", "exercises" nur bei sport="Kraft"/"Mobility" angeben, sonst weglassen. Jedes "date" muss exakt eines der oben genannten ${windowDates.length} Zeitfenster-Daten sein. Kein Datum außerhalb, keine Duplikate am selben Tag+Sportart.`;
 }
@@ -262,7 +270,7 @@ function buildPlanRulesPrompt(goal) {
   return `
 
 Feste Trainingsregeln - dein Plan wird danach automatisch geprüft (zusammen mit den schon geplanten und den zuletzt absolvierten Einheiten); Verstöße werden korrigiert oder der Plan wird verworfen:
-${planRulesText(goal)}`;
+${planRulesText(goal, { daysUntil: goal && goal.date ? Math.round((new Date(goal.date + "T00:00:00") - new Date(new Date().setHours(0, 0, 0, 0))) / 86400000) : null })}`;
 }
 
 // Zweiter Versuch der Trainingsplan-Erstellung: diese Regelverstöße hatte der
@@ -305,10 +313,12 @@ Antworte AUSSCHLIESSLICH mit einem JSON-Objekt in genau dieser Form, keinerlei T
 // Mobility im Trainingsplan: nur Übungen aus der Sammlung (mit Zeichnung),
 // passend zum Trainingsprofil - parsePlanResponse übernimmt nur gültige ids.
 function mobilityPlanRule() {
-  if (typeof allowedMobilityExercises !== "function") return "- Bei \"Mobility\": \"exercises\"-Array mit 4-8 Übungen (Name, Wiederholungen, kurzer Hinweis).";
+  if (typeof allowedMobilityExercises !== "function") return "- Bei \"Mobility\": \"exercises\"-Array mit 4-8 Übungen (Name, Wiederholungen).";
   const allowed = allowedMobilityExercises(trainingProfile(), mobilityPainfulIds(todayStr()));
-  const list = allowed.map(ex => `${ex.id} (${ex.name})`).join(", ");
-  return `- Bei "Mobility": "exercises"-Array mit 4-8 Übungen AUSSCHLIESSLICH aus dieser Liste, je Eintrag {"id": exakt die id, "name": Name, "seconds": Dauer je Seite, "reps": z.B. "45 s je Seite", "note": kurzer Tipp}. Erlaubt: ${list}. Dauer passend zum Mobility-Wunsch im Profil. WICHTIG: Die Übungen müssen zusammen "duration_min" ergeben. Rechnung je Übung: seconds (bei "je Seite" doppelt) + 10 s Wechsel. Beispiel 10 Minuten: 5 Übungen à 45 s je Seite ≈ 10 Min. Dehnungen mindestens 30 s halten, höchstens 90 s.`;
+  // Nur die ids: sie sind sprechend, Name, Anleitung und Zeichnung ergänzt
+  // das Dashboard selbst aus der Sammlung (parsePlanResponse).
+  const list = allowed.map(ex => ex.id).join(", ");
+  return `- Bei "Mobility": "exercises" mit 4-8 Übungen AUSSCHLIESSLICH aus dieser Liste, je Eintrag nur {"id", "seconds": Haltedauer je Seite 30-90}. Erlaubt: ${list}. Zusammen etwa "duration_min" (je Übung seconds, bei Seitenwechsel doppelt, + 10 s Wechsel).`;
 }
 
 // KI-Tages-Check (js/components/plan-check.js): prüft NUR die fordernden

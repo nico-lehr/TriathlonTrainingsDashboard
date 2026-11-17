@@ -4,6 +4,20 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.4.46
+
+**KI-Anfragen kürzer und günstiger**
+- Beim Erstellen eines Trainingsplans schickt das Dashboard der KI nur noch, was sie dafür wirklich braucht. Bestzeiten, VO2max, Körperwerte oder Ernährungsziele fallen dort weg. Die Anfrage ist dadurch etwa ein Drittel kürzer.
+- Sonderregeln (z. B. zu Verletzungen, Wünschen oder dem Streckenprofil) stehen nur noch drin, wenn es dazu auch etwas gibt. Regeln für die Wochen vor dem Rennen kommen erst, wenn das Rennen näher als 5 Wochen ist.
+- Die Antwort der KI ist kürzer: Kraft- und Mobility-Übungen kommen nur noch als Kennung zurück, Name und Hinweise ergänzt das Dashboard selbst. Titel und Beschreibungen sind knapper. Antworten kosten am meisten, deshalb spart das am stärksten.
+- Garmin-Erholungswerte (HRV, Ruhepuls, Schlaf) stehen kompakter in einer Zeile. Die Sauerstoffsättigung erscheint nur, wenn sie auffällig niedrig ist.
+
+**Kleine Animationen am Computer**
+- Beim Öffnen eines Bereichs zählen die großen Zahlen kurz hoch. Kacheln und Listen-Zeilen erscheinen leicht versetzt nacheinander.
+- Unter der Maus heben sich Kacheln leicht an, Sport-Symbole wachsen mit, Ringe leuchten stärker und Pfeile rutschen ein Stück zur Seite.
+- Der heutige Tag im Kalender leuchtet beim Öffnen einmal kurz auf. Das Symbol des gewählten Bereichs in der Seitenleiste nickt kurz.
+- Ist am Computer „Bewegung reduzieren“ eingeschaltet, bleibt alles ruhig.
+
 ## 2.4.45
 
 **Ernährung: Neuer Bereich „Energie & Bedarf“**

@@ -113,11 +113,22 @@ Dritter Kontext/Prompt-Pfad neben Ziel-Tipps und Workout-Auswertung:
   gemachte harte Einheit draufsetzt)
 * die zuletzt vorgeschlagenen Einheiten + ob sie eingehalten wurden
   (`status` aus `plannedWorkouts`) — einfache Form von Adherence-Feedback
-* falls das Hauptevent-Ziel ≤ 21 Tage entfernt ist und Zielzeiten hinterlegt
-  sind: den Wettkampf-Verpflegungsplan (`computeRaceFuelingPlan()`,
-  Gesamt-Kohlenhydratbedarf + Flüssigkeits-Faustregel) — bewusst nur nah am
-  Wettkampf, damit der Kontext in einer normalen Grundlagenwoche nicht
-  unnötig aufgebläht wird
+
+Sparsam mit Tokens: `buildPlanContext` ruft `buildCompactContext(goal, { forPlan: true })`
+auf. Für die Planung lässt das weg, was die KI dort nicht braucht: VO2max,
+Bestzeiten, Körperzusammensetzung, Ernährungsziel, die „Diese Woche“-Zeile und
+die Einzelfaktoren des Race-Readiness-Scores (nur der Score bleibt). Die
+Verpflegungs-Planung für den Wettkampf steht nicht mehr im Plan-Kontext.
+`buildPlanPrompt()` nimmt Sonderregeln (Erholung, Wünsche, Streckenprofil,
+Priorität, Strategie-Notiz, Verletzungen, zuletzt vorgeschlagene Einheiten)
+nur auf, wenn der Kontext dazu überhaupt etwas enthält; Taper- und
+Nach-dem-Rennen-Regeln (`planRulesText(goal, { daysUntil })`) nur, wenn das
+Rennen höchstens 35 Tage entfernt oder gerade vorbei ist. Kraft- und
+Mobility-Übungen gibt die KI nur als `{"id", "sets", "reps"}` bzw.
+`{"id", "seconds"}` zurück; Name, Hinweise und Wiederholungen ergänzt
+`parsePlanResponse()`/`fitPlanMobility()` aus der Übungsbibliothek. Titel
+höchstens 4 Wörter, Beschreibung höchstens 2 kurze Sätze - das spart
+Antwort-Tokens, die am teuersten sind.
 
 `buildPlanPrompt()` fordert striktes JSON (`{"workouts":[...]}`) an; der
 Ollama-Call in `generateTrainingPlan()` (`js/ai/ollama.js`) nutzt zusätzlich

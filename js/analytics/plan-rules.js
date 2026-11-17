@@ -573,9 +573,13 @@ function validatePlan(plannedWorkouts, history, wellness, recovery, options = {}
 // oben erzeugt, damit die KI nie andere Zahlen bekommt als die Prüfung danach.
 // Mit `goal` kommt Regel 6 (lockere Einheit je Ziel-Sportart) dazu, mit
 // Zieldatum auch Taper/Erholung aus der Periodisierung.
-function planRulesText(goal) {
+// `daysUntil` (optional, Tage bis zum Wettkampf): Die Taper- und
+// Nach-dem-Rennen-Regeln kommen dann nur mit, wenn der Wettkampf in
+// Reichweite ist (spart bei jeder Planung in der Grundlagenzeit Tokens).
+function planRulesText(goal, { daysUntil = null } = {}) {
   const pct = x => Math.round(x * 100);
   const sports = goal ? goalRaceSports(goal) : [];
+  const raceNear = daysUntil == null || (daysUntil <= 35 && daysUntil >= -(PERIOD_RECOVERY_DAYS + 7));
   return [
     `Nie zwei harte Tage hintereinander. Hart ist eine Einheit mit Intensität "hart" oder mit mehr als ${PLAN_HARD_MIN_DURATION} Minuten (auch wenn sie locker ist).`,
     `Höchstens ${PLAN_MAX_HARD_PER_WEEK} harte Einheiten pro Woche (Montag bis Sonntag).`,
@@ -587,7 +591,7 @@ function planRulesText(goal) {
     `Die nächste Einheit nur "leicht", wenn der ACWR über ${fmtNum(PLAN_ACWR_LIMIT, 1)} liegt oder heute Erschöpfung, starker Muskelkater oder eine Verletzung gemeldet ist - bei einer Verletzung stattdessen ein Ruhetag.`,
     `Die nächste Einheit besser "leicht", wenn die HRV mindestens ${PLAN_HRV_DROP_PCT} % unter dem eigenen Durchschnitt oder der Ruhepuls mindestens ${PLAN_RHR_RISE_BPM} Schläge darüber liegt.`,
     ...(sports.length ? [`Jede Woche mindestens eine lockere ("leicht") Einheit in jeder Sportart des Ziels: ${sports.join(", ")}.`] : []),
-    ...(goal && goal.date ? [
+    ...(goal && goal.date && raceNear ? [
       `Taper-Wochen (die Rennwoche und die Woche davor) und die Erholungswoche nach dem Wettkampf höchstens mit dem Zielumfang der Periodisierung planen (etwa ${pct(PERIOD_TAPER_FACTORS[1])} %, ${pct(PERIOD_TAPER_FACTORS[0])} % und ${pct(PERIOD_RECOVERY_FACTOR)} % der letzten normalen Woche); der Wettkampf selbst zählt nicht mit. In der letzten Woche vor dem Taper keine Entlastungswoche - der Taper übernimmt sie.`,
       `In den ${PERIOD_RECOVERY_DAYS} Tagen nach dem Wettkampf nur "leicht" und höchstens ${PLAN_HARD_MIN_DURATION} Minuten pro Einheit.`,
     ] : []),

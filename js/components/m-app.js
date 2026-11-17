@@ -769,20 +769,49 @@ function renderMApp() {
   if (sel) { const ta = document.getElementById("m-coach-note"); if (ta && !ta.disabled) { ta.focus(); ta.setSelectionRange(sel[0], sel[1]); } }
   mFillFigures(body);
   if (mState.anim) { mState.anim = false; mPlayEnter(body); }
+  else if (performance.now() - mCountStart < 700) mCountUp(body); // neu gezeichnet, während noch gezählt wird
 }
 
 // Kleine Animationen beim Wechsel des Bereichs: Karten gleiten nacheinander
 // herein, Ringe und Balken füllen sich. Nur beim Wechsel, nicht bei jedem
 // Neuzeichnen (z. B. nach einem Tipp im Befinden).
-let mEnterTimer = null;
+let mEnterTimer = null, mCountStart = -1e9;
 function mPlayEnter(body) {
   body.classList.remove("m-anim");
   void body.offsetWidth; // Animation neu starten
   let i = 0;
   body.querySelectorAll(".m-top, .m-subseg, .m-card, .m-more").forEach(el => { el.style.animationDelay = `${Math.min(i++, 8) * 40}ms`; });
   body.classList.add("m-anim");
+  mCountStart = performance.now();
+  mCountUp(body);
   clearTimeout(mEnterTimer);
   mEnterTimer = setTimeout(() => body.classList.remove("m-anim"), 1400);
+}
+
+// Am Computer zählen die großen Zahlen (Kacheln, Ringe) beim Öffnen eines
+// Bereichs kurz von 0 hoch. Nur bei einfachen Zahlen wie "42", "+5", "12,3 h"
+// oder "1.250 kcal" - Zeiten wie "1:05" bleiben, wie sie sind.
+function mCountUp(root) {
+  if (!window.matchMedia || !window.matchMedia("(min-width: 900px) and (prefers-reduced-motion: no-preference)").matches) return;
+  root.querySelectorAll(".m-num > b, .m-ring-txt > b").forEach(el => {
+    const node = el.firstChild;
+    if (!node || node.nodeType !== 3) return;
+    const m = /^(\s*[+−-]?)(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d+))?(\s*[^\d:]*)$/.exec(node.nodeValue);
+    if (!m) return;
+    const decimals = m[3] ? m[3].length : 0;
+    const target = Number(m[2].replace(/\./g, "") + (decimals ? "." + m[3] : ""));
+    if (!(target > 0)) return;
+    const grouped = m[2].includes(".");
+    const fmt = v => m[1] + v.toLocaleString("de-DE", { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: grouped }) + m[4];
+    const final = node.nodeValue, dur = 700;
+    const step = now => {
+      if (!node.isConnected) return;
+      const t = Math.min(1, Math.max(0, (now - mCountStart) / dur));
+      node.nodeValue = t < 1 ? fmt(target * (1 - Math.pow(1 - t, 3))) : final;
+      if (t < 1) requestAnimationFrame(step);
+    };
+    step(performance.now());
+  });
 }
 
 // Markierung des aktiven Bereichs gleitet zum gewählten Knopf (oben bzw. in der Seitenleiste).

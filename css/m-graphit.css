@@ -808,3 +808,64 @@ body.m-graphit #modal-overlay .modal-stats .st { background: var(--m-surface); b
 .m-ptr.err { color: var(--m-bad); }
 @media (prefers-reduced-motion: reduce) { .m-ptr, .m-ptr-ic { transition: none; } }
 .m-keywarn h2 { color: var(--m-warn); }
+
+/* ------------------------------------------------------------------
+   Mikroanimationen am Computer (Maus vorhanden, Bildschirm ab 900px).
+   Alles kurz und leise; bei "Bewegung reduzieren" komplett aus.
+   ------------------------------------------------------------------ */
+@keyframes m-tick { 0% { transform: none; } 40% { transform: scale(1.22) rotate(-8deg); } 100% { transform: none; } }
+@keyframes m-rise-sm { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes m-today { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--m-accent) 45%, transparent); } 100% { box-shadow: 0 0 0 8px transparent; } }
+
+@media (prefers-reduced-motion: no-preference) and (min-width: 900px) {
+  /* Kennzahl-Kacheln erscheinen leicht versetzt nacheinander */
+  .m-anim .m-nums > .m-num, .m-anim .m-stats > .m-num { animation: m-rise-sm .45s cubic-bezier(.2,.8,.2,1) both; }
+  .m-anim .m-nums > :nth-child(2), .m-anim .m-stats > :nth-child(2) { animation-delay: .06s; }
+  .m-anim .m-nums > :nth-child(3), .m-anim .m-stats > :nth-child(3) { animation-delay: .12s; }
+  .m-anim .m-stats > :nth-child(4) { animation-delay: .18s; }
+  .m-anim .m-stats > :nth-child(5) { animation-delay: .24s; }
+  .m-anim .m-stats > :nth-child(6) { animation-delay: .3s; }
+  /* Listen-Zeilen gleiten nacheinander herein */
+  .m-anim .m-list > .m-row { animation: m-rise-sm .4s cubic-bezier(.2,.8,.2,1) both; }
+  .m-anim .m-list > .m-row:nth-child(2) { animation-delay: .05s; } .m-anim .m-list > .m-row:nth-child(3) { animation-delay: .1s; }
+  .m-anim .m-list > .m-row:nth-child(4) { animation-delay: .15s; } .m-anim .m-list > .m-row:nth-child(n+5) { animation-delay: .2s; }
+  /* Heute im Kalender: einmal sanft aufleuchten */
+  .m-anim .m-cols.cal .m-mc.today { animation: m-today 1.2s .5s ease-out both; }
+  /* Gewählter Bereich in der Seitenleiste: Symbol nickt kurz */
+  .m-tabs button.on .m-tab-ic { animation: m-tick .45s cubic-bezier(.3,1.4,.5,1); }
+}
+
+@media (prefers-reduced-motion: no-preference) and (min-width: 900px) and (hover: hover) {
+  /* Kennzahl-Kacheln heben sich unter der Maus leicht an */
+  #m-app .m-num { transition: background-color .2s ease, transform .2s cubic-bezier(.3,1.3,.5,1); }
+  #m-app .m-num:hover { background: color-mix(in srgb, var(--m-text) 8%, var(--m-surface-2)); transform: translateY(-2px); }
+  /* Ringe: etwas größer, Leuchten stärker */
+  #m-app .m-ring { transition: transform .3s cubic-bezier(.3,1.3,.5,1); }
+  #m-app .m-ring:hover { transform: scale(1.04); }
+  #m-app .m-ring-val { transition: stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1), filter .3s ease; }
+  #m-app .m-ring:hover .m-ring-val { filter: drop-shadow(0 0 10px color-mix(in srgb, currentColor 70%, transparent)); }
+  /* Zeilen: Sport-Symbol und Übungsbild wachsen mit, Titel rückt minimal nach rechts */
+  #m-app .m-row .m-ic, #m-app .m-ev .m-ic, #m-app .m-row .m-fig-sm { transition: transform .25s cubic-bezier(.3,1.4,.5,1); }
+  #m-app .m-row:hover .m-ic, #m-app .m-ev:hover .m-ic, #m-app .m-row:hover .m-fig-sm { transform: scale(1.08) rotate(-3deg); }
+  #m-app .m-row .m-grow { transition: transform .25s ease; }
+  #m-app .m-row:hover .m-grow { transform: translateX(3px); }
+  /* "Mehr"-Liste: Pfeil schiebt sich nach rechts */
+  #m-app .m-nav-row i { transition: transform .25s cubic-bezier(.3,1.4,.5,1), color .2s ease; }
+  #m-app .m-nav-row:hover i { transform: translateX(4px); color: var(--m-accent); }
+  /* Knöpfe */
+  #m-app .m-btn.primary { transition: transform .14s ease, filter .2s ease, box-shadow .25s ease; }
+  #m-app .m-btn.primary:hover { transform: translateY(-1px); box-shadow: 0 6px 18px color-mix(in srgb, var(--m-accent) 35%, transparent); }
+  #m-app .m-btn.primary:active { transform: scale(.97); box-shadow: none; }
+  #m-app .m-btn.soft:hover { background: color-mix(in srgb, var(--m-accent) 22%, transparent); }
+  #m-app .m-chip:hover, #m-app .m-icon:hover { background: color-mix(in srgb, var(--m-text) 12%, var(--m-surface-2)); }
+  #m-app .m-icon:hover { transform: rotate(90deg); }
+  #m-app .m-icon { transition: transform .3s cubic-bezier(.3,1.3,.5,1), background-color .2s ease; }
+  /* Textlinks: Unterstrich wächst von links */
+  #m-app .m-link { background: linear-gradient(currentColor, currentColor) left bottom / 0 1.5px no-repeat; transition: background-size .25s ease; }
+  #m-app .m-link:hover { background-size: 100% 1.5px; }
+  /* Garmin-Knopf oben */
+  #m-app .m-pill:hover { color: var(--m-text); background: var(--m-surface-2); }
+  /* Bisherige Seiten (Analyse, Ernährung ...): Kacheln heben sich leicht an */
+  body.m-graphit.m-classic .stat-tile { transition: transform .2s cubic-bezier(.3,1.3,.5,1), border-color .2s ease; }
+  body.m-graphit.m-classic .stat-tile:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--m-text) 14%, transparent); }
+}

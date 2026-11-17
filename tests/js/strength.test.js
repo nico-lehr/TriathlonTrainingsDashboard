@@ -126,6 +126,17 @@ test("KI-Trainingsplan: Kraft-Übungen aus der Sammlung behalten id, Sätze begr
   assert.strictEqual(run(`plannedToStrengthSession({ exercises: [{ name: "Eigene" }] })`), null);
 });
 
+test("KI-Trainingsplan: Kraft-Übungen nur als id (sparsames Format) bekommen Name und Wiederholungen aus der Sammlung", () => {
+  const known = EXERCISES[0];
+  const text = JSON.stringify({ workouts: [{ date: "2026-11-07", sport: "Kraft", title: "Kraft", duration_min: 30, intensity: "mittel", description: "x",
+    exercises: [{ id: known.id, sets: 3 }, { id: "gibt-es-nicht", sets: 3, reps: "8" }] }] });
+  const [entry] = plain(run(`parsePlanResponse(${JSON.stringify(text)}, ["2026-11-07"])`));
+  assert.strictEqual(entry.exercises.length, 1, "unbekannte id ohne Namen fliegt raus");
+  assert.strictEqual(entry.exercises[0].name, known.name);
+  assert.strictEqual(entry.exercises[0].sets, 3);
+  assert.ok(entry.exercises[0].reps, "Wiederholungen aus der Sammlung");
+});
+
 test("Trainingsart: jede Art deckt alle Bewegungsmuster ab und nutzt nur ihre Geräte", () => {
   const MODES = plain(run("STRENGTH_MODES"));
   assert.deepStrictEqual(Object.keys(MODES), ["body", "dumbbells", "kettlebell", "band", "gym"]);

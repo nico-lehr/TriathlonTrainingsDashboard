@@ -278,7 +278,9 @@ function strengthPlanRule() {
   const tp = trainingProfile();
   const allowed = allowedStrengthExercises(tp, strengthMode(tp));
   if (!allowed.length) return "- Bei \"Kraft\": \"exercises\"-Array mit 4-6 Übungen (Name, Sätze, Wiederholungen, kurzer Hinweis).";
-  const list = allowed.map(ex => `${ex.id} (${ex.name})`).join(", ");
+  // Nur die ids (sprechend) - Name, Anleitung und Zeichnung ergänzt das
+  // Dashboard selbst aus der Sammlung; das spart Tokens in Frage und Antwort.
+  const list = allowed.map(ex => ex.id).join(", ");
   const focus = (tp.strengthFocus || []).filter(a => STRENGTH_AREAS[a]);
   const focusRule = focus.length
     ? ` WICHTIG - Schwerpunkt dieser Person: ${focus.map(a => STRENGTH_AREAS[a]).join(", ")}. In JEDER Kraft-Einheit mindestens 2 Übungen je Schwerpunkt (passend: ${focus.map(a => allowed.filter(ex => ex.areas[0] === a || ex.areas.includes(a)).slice(0, 6).map(ex => ex.id).join("/")).join("; ")}), dazu Beine, Hüfte und Rumpf als Ausgleich; 5-8 Übungen.`
@@ -287,5 +289,5 @@ function strengthPlanRule() {
     ? ` Ziel: athletischer Körper / Muskelaufbau - 3-4 Sätze à 8-12 Wiederholungen, die letzten Wiederholungen schwer; Dauer ca. 40-50 min.`
     : "";
   const wishRule = tp.strengthWish && tp.strengthWish.trim() ? ` Wunsch der Person zum Krafttraining (in ihren Worten): "${tp.strengthWish.trim().slice(0, 300)}" - die Übungsauswahl daran ausrichten.` : "";
-  return `- Bei "Kraft": "exercises"-Array AUSSCHLIESSLICH aus dieser Liste, je Eintrag {"id": exakt die id, "name": Name, "sets": 2-4, "reps": z.B. "10" oder "8 je Seite", "note": kurzer Tipp}.${focusRule}${goalRule}${wishRule} Erlaubt: ${list}.`;
+  return `- Bei "Kraft": "exercises" AUSSCHLIESSLICH aus dieser Liste, je Eintrag nur {"id", "sets": 2-4, "reps": z.B. "10" oder "8 je Seite"}.${focusRule}${goalRule}${wishRule} Erlaubt: ${list}.`;
 }
