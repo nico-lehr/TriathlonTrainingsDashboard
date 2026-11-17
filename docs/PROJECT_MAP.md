@@ -99,6 +99,7 @@ Claude-API-Key, Kartenreihenfolge).
 - `equipment.js` — Material (Schuhe, Rad, Verschleißteile) über `/api/v1/equipment`, Kilometer und Fälligkeit; übernimmt einmalig die alte Liste aus der Ablage.
 - `weight-log.js` — Gewichtsverlauf (Laden/Speichern/Eintragen), hält `athleteProfile.weightKg` synchron, siehe `docs/DATA_MODEL.md`.
 - `achievements.js` — Laden/Speichern der bereits freigeschalteten Erfolge (`achievementsState`) + Erfolgs-Schnappschuss (z. B. letzte bekannte Bestzeit je Distanz). Die eigentliche Erkennung/Freischaltung passiert in `js/analytics/achievements.js`, siehe `docs/DATA_MODEL.md`.
+- `group.js` — Feed mit den anderen Nutzern (`groupState`, `loadGroup`): teilt neue Abzeichen (nur ab dem Beitritt, höchstens 7 Tage alt, je Art nur die höchste Stufe; schon geteilte IDs in `triathlon_dashboard_group_shared_v1`), Emoji-Reaktionen, Challenges anlegen/mitmachen. Nie Trainingsdetails. Server: `backend/group.py`.
 
 ### `js/analytics/` — reine Berechnungen, kein UI
 - `mobility-plan.js` — stellt eine Mobility-Einheit aus der Sammlung zusammen (Regeln) bzw. baut den Claude-Auftrag samt JSON-Schema und prüft die Antwort; Umwandlung in/aus geplanten Einheiten.
@@ -163,9 +164,10 @@ Bedarf schrittweise weiter aufgeteilt werden, sobald es sich lohnt.
 - `mobility.js` — Tab „Mobility“: Einheit für heute, Dauer/Schwerpunkt, Ablauf mit Austauschen, „Mit Claude persönlich anpassen“, Übungs-Sammlung, Anleitung (Bottom-Sheet), Verlauf.
 - `mobility-player.js` — Mitmach-Modus im Vollbild: Timer, Seitenwechsel, Ton/Ansage, Wake Lock, Rückmeldung am Ende.
 - `mobility-figure.js` — bewegte Strichfigur als SVG (Skelett mit festen Knochenlängen, Zwei-Knochen-IK, ein gemeinsamer Animationstakt; Gliedmaßen, die zur Seite aus dem Bild zeigen, lassen sich mit `aNs`/`lNs` verkürzt zeichnen).
-- `m-app.js` — Die Oberfläche „Graphit“ (seit 2.4.30 die einzige, auf allen Bildschirmen; die alte klassische Ansicht ist im Branch `archiv/klassische-ansicht` archiviert – die klassischen Seiten dienen nur noch als Unterseiten, z. B. Analyse, Insights, Einstellungen): Übersicht (Erholung/Woche/Schlaf-Ringe, Heute, Woche, Form, Ziel), Kalender, Coach, Training (Mobility | Kraft), Mehr (öffnet die bisherigen Seiten). Stil: `css/m-graphit.css`.
+- `m-app.js` — Die Oberfläche „Graphit“ (seit 2.4.30 die einzige, auf allen Bildschirmen; die alte klassische Ansicht ist im Branch `archiv/klassische-ansicht` archiviert – die klassischen Seiten dienen nur noch als Unterseiten, z. B. Analyse, Insights, Einstellungen): Übersicht (Erholung/Woche/Schlaf-Ringe, Heute, Woche, Form, Ziel), Kalender, Coach, Training (Mobility | Kraft), Feed (`m-group.js`), Mehr (öffnet die bisherigen Seiten). Stil: `css/m-graphit.css`.
 - `settings-hub.js` — Einstellungen als Liste (Profil, Training & Planung, Garmin, KI-Coach, Kalender-Abo, Wetter, Equipment, App); ein Tipp zeigt nur den Bereich (Karten mit `data-sp` in index.html). `openSettingsPanel(id)` für Direkt-Sprünge.
 - `m-admin.js` — Nutzungszähler `mTrack()` (nur feste Namen, gesammelt an `/usage`) und die Seite „Admin · Statistik“ unter Mehr (nur Betreiber, `/admin/stats`): nur Zahlen je Person, keine Inhalte.
+- `m-group.js` — Seite „Feed“ (Unterseiten Feed | Challenges): Beitritt mit Anzeigename, Highlight-Karten mit Medaille und Spruch, Emoji-Reaktionen (Tapback), Challenge-Karten (Gruppenziel, persönlich, Rangliste), Formular „Neue Challenge“, Einstellungen/Austreten. Stil: `css/m-group.css`.
 
 ### `js/app.js` — Einstiegspunkt
 Definiert `renderAll()` (ruft die Render-Funktionen aller Tabs auf) und
@@ -189,6 +191,9 @@ ausgeschlossen), jede Zeile mit `athlete_id`:
 - `athlete_logins` — Benutzername + Passwort-Hash.
 - `equipment`, `equipment_workouts` — Material je Person und die ausdrückliche
   Zuordnung Training → Material.
+- `group_members`, `group_highlights`, `group_reactions`, `challenges`,
+  `challenge_members` — Feed: wer mitmacht (Anzeigename), geteilte Highlights,
+  Emoji-Reaktionen und Challenges. Nur Ergebnisse, keine Trainingsdetails.
 - Die älteren Tabellen (`goals`, `planned_workouts`, `recovery_checks`) und ihre
   Endpunkte bestehen unverändert weiter, das Dashboard nutzt sie nicht.
 
@@ -209,6 +214,7 @@ einmalig `backend/import_workouts_json.py`, siehe `docs/DEPLOYMENT.md`.
 | `ai_routes.py` | `/ai/chat`, `/ai/models` – Weiterleitung an Ollama; `/ai/claude` (Stand/Schlüssel, nur Betreiber ändert), `/ai/claude/chat` und `/ai/claude/batch` (Sammelauftrag abgeben/abholen, nur eigene Aufträge). |
 | `invites.py` / `invite_routes.py` | Einladungscode für „Konto erstellen“ (`~/.triathlon/invite.json`), Verwaltung nur Betreiber (`/invites`). |
 | `usage.py` | Admin-Statistik: Tageszähler je Person in `usage_daily` (Öffnen, Bereiche, Funktionen, Login, Claude, Garmin-Abruf); `POST /usage` (feste Namensliste), `GET /admin/stats` nur Betreiber. Keine Inhalte. |
+| `group.py` | Feed: `/group` (Stand für Mitglieder), `/group/me` (beitreten/umbenennen/austreten), `/group/highlights` (Abzeichen teilen, nur feste Arten), Reaktionen, `/group/challenges` (anlegen, mitmachen, löschen). Fortschritt = nur Summen (km/Stunden/Einheiten) im Zeitraum. |
 | `claude_api.py` | Claude über das Anthropic-SDK: Schlüssel in `~/.triathlon/claude_api.json` (0600), Prüfen, Modelle, verständliche Fehler. |
 | `equipment_routes.py` | `/equipment…` – Material anlegen/ändern/löschen, Zuordnungen, einmaliger Import. |
 | `updater.py` | Programm-Updates: neueste GitHub-Release prüfen (einmal am Tag), Paket prüfen, sichern, installieren (ZIP oder `git`), Neustart anstoßen. Nutzerdaten sind geschützt. |

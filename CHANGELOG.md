@@ -4,6 +4,19 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.5.0
+
+**Neu: Feed – gemeinsam motivieren**
+- Neuer Bereich „Feed“ in der Leiste. Mitmachen ist freiwillig: Du wählst einen Anzeigenamen und bist dabei. Austreten geht jederzeit, dabei verschwinden deine Highlights und Reaktionen.
+- Geteilt werden nur Highlights, nie einzelne Trainings, Puls, Strecken oder Gesundheitswerte: neue Meilensteine (z. B. 100. Training), Serien, Bestzeiten über 1/5/10 km Laufen und 10/20/40 km Rad sowie geschaffte Challenges. Was du vor dem Beitritt erreicht hast, bleibt privat.
+- Jedes Highlight bekommt eine glänzende Medaille mit einem lockeren Spruch. Beim Öffnen dreht sie sich einmal herein.
+- Mit Emojis reagieren: 🔥 💪 👏 🎉 🤩 – du siehst, wer reagiert hat.
+
+**Neu: Challenges**
+- Unter „Feed → Challenges“ kann jeder eine Challenge starten, die anderen machen mit einem Tipp mit.
+- Drei Arten: Gruppenziel (alle sammeln zusammen, z. B. 1.500 km Rad im November), persönliche Challenge (jeder für sich, z. B. 60 km Laufen) und Rangliste (wer schafft am meisten?).
+- Gezählt werden Kilometer, Stunden oder Einheiten im gewählten Zeitraum. Ist das Ziel geschafft oder die Rangliste vorbei, erscheint automatisch ein Highlight im Feed.
+
 ## 2.4.51
 
 **Kraft & Mobility: Strichmännchen bewegen sich richtig**
