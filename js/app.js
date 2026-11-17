@@ -27,6 +27,7 @@ function renderAll() {
   renderAchievements(); // nutzt immer die volle Historie
   renderAnalysis(); // Analyse-Tab, nutzt immer die volle Historie
   showAchievementToast(checkAndUnlockAchievements());
+  if (typeof shareNewAchievements === "function") shareNewAchievements(); // neue Abzeichen in die Gruppe (nur wer mitmacht)
   checkAndShowBirthdayMessage();
 }
 
@@ -96,6 +97,7 @@ function checkAutoReplan() {
   initAnalysis();
   renderAll();
   initMApp();
+  if (typeof initGroupUi === "function") { initGroupUi(); initGroup(); }
   initSettingsHub();
   if (typeof initUsageTracking === "function") initUsageTracking();
   checkAutoReplan();

@@ -500,3 +500,103 @@ class MorningState(Base):
     late_sync_day = Column(String(10))   # zweiter Garmin-Abruf (8 Uhr) gestartet
     last_result = Column(JSON)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# ============================================================================
+# GRUPPE: Highlights, Reaktionen, Challenges (backend/group.py)
+#
+# Bewusst eigene, kleine Tabellen: geteilt werden nur Ergebnisse (Abzeichen,
+# Bestzeit, Challenge-Summen), nie einzelne Trainings oder Gesundheitswerte.
+# create_all legt sie in einer vorhandenen training.db an.
+# ============================================================================
+
+class GroupMember(Base):
+    """Wer in der Gruppe mitmacht (freiwillig, anfangs niemand).
+
+    joined_at: ab hier werden Abzeichen geteilt - aeltere nie.
+    Austreten loescht die Zeile samt eigenen Highlights, Reaktionen und
+    Challenge-Teilnahmen (group.py: leave_group).
+    """
+    __tablename__ = "group_members"
+
+    athlete_id = Column(Integer, primary_key=True)
+    display_name = Column(String(40), nullable=False)
+    joined_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class GroupHighlight(Base):
+    """Ein Highlight im Feed. Den Text baut der Server aus `data` (feste
+    Arten, gepruefte Werte) - es gibt keinen freien Text.
+
+    athlete_id leer = Highlight der ganzen Gruppe (Gruppenziel erreicht).
+    key verhindert Doppelte (z. B. "count_100", "ch12_done").
+    """
+    __tablename__ = "group_highlights"
+    __table_args__ = (
+        UniqueConstraint("athlete_id", "key", name="uq_group_highlight_key"),
+        Index("idx_group_highlight_created", "created_at"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id = Column(Integer, primary_key=True)
+    athlete_id = Column(Integer, index=True)
+    kind = Column(String(20), nullable=False)  # count, streak, pb, challenge_done, challenge_group, challenge_win
+    key = Column(String(80), nullable=False)
+    data = Column(JSON)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class GroupReaction(Base):
+    """Emoji-Reaktion auf ein Highlight (feste Auswahl, siehe group.REACTIONS)."""
+    __tablename__ = "group_reactions"
+    __table_args__ = (
+        UniqueConstraint("highlight_id", "athlete_id", "emoji", name="uq_group_reaction"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id = Column(Integer, primary_key=True)
+    highlight_id = Column(Integer, ForeignKey("group_highlights.id"), nullable=False, index=True)
+    athlete_id = Column(Integer, nullable=False, index=True)
+    emoji = Column(String(12), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Challenge(Base):
+    """Challenge, die jedes Gruppenmitglied anlegen kann.
+
+    kind: group (alle sammeln zusammen bis target), personal (jeder muss
+    target selbst schaffen), ranking (wer sammelt am meisten, ohne target).
+    sport: Laufen, Rad, Schwimmen oder alle. metric: km, hours, sessions.
+    Fortschritt rechnet group.py beim Abruf aus der Tabelle workouts.
+    completed_at: Gruppenziel erreicht bzw. Rangliste ausgewertet.
+    """
+    __tablename__ = "challenges"
+    __table_args__ = ({"sqlite_autoincrement": True},)
+
+    id = Column(Integer, primary_key=True)
+    creator_id = Column(Integer, nullable=False, index=True)
+    title = Column(String(60), nullable=False)
+    kind = Column(String(12), nullable=False)
+    sport = Column(String(20), nullable=False)
+    metric = Column(String(12), nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    target = Column(Float)
+    completed_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ChallengeMember(Base):
+    """Teilnahme an einer Challenge. done_at: persoenliches Ziel geschafft."""
+    __tablename__ = "challenge_members"
+    __table_args__ = (
+        UniqueConstraint("challenge_id", "athlete_id", name="uq_challenge_member"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id = Column(Integer, primary_key=True)
+    challenge_id = Column(Integer, ForeignKey("challenges.id"), nullable=False, index=True)
+    athlete_id = Column(Integer, nullable=False, index=True)
+    joined_at = Column(DateTime, default=datetime.utcnow)
+    done_at = Column(DateTime)

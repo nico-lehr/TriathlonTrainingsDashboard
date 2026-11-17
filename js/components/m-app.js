@@ -3,7 +3,7 @@
 // Whoop. Gleiche Daten und Funktionen wie die normale Ansicht; nur die
 // Darstellung ist anders. Am Computer bleibt alles wie gewohnt.
 //
-// Bereiche: Übersicht · Kalender · Coach · Training (Mobility | Kraft) · Mehr.
+// Bereiche: Übersicht · Kalender · Coach · Training (Mobility | Kraft) · Feed (Feed | Challenges) · Mehr.
 // "Mehr" und "Alle Diagramme" öffnen die bisherigen Seiten (Ernährung,
 // Rekorde, Analyse, Einstellungen, Übersicht mit allen Karten).
 // Abschaltbar unter Einstellungen → Konto ("Neue Handy-Ansicht").
@@ -764,7 +764,7 @@ function renderMApp() {
   mMoveTabIndicator();
   if (mState.classic) return;
   const body = document.getElementById("m-body");
-  const html = { heute: mRenderHeute, kalender: mRenderKalender, coach: mRenderCoach, training: mRenderTraining, mehr: mRenderMehr, admin: mRenderAdmin }[mState.page]();
+  const html = { heute: mRenderHeute, kalender: mRenderKalender, coach: mRenderCoach, training: mRenderTraining, gruppe: mRenderGruppe, mehr: mRenderMehr, admin: mRenderAdmin }[mState.page]();
   const focused = document.activeElement && document.activeElement.id === "m-coach-note" ? document.activeElement : null;
   const sel = focused ? [focused.selectionStart, focused.selectionEnd] : null;
   body.innerHTML = html;
@@ -1289,6 +1289,7 @@ function initMApp() {
       <button type="button" data-m-page="kalender"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></svg>Kalender</button>
       <button type="button" data-m-page="coach"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.5V16h0.5A2.5 2.5 0 0 1 5 13.5z"/></svg>Coach</button>
       <button type="button" data-m-page="training"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.5v5M6.5 7.5v9M17.5 7.5v9M20.5 9.5v5M6.5 12h11"/></svg>Training</button>
+      <button type="button" data-m-page="gruppe"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="16.5" cy="9.5" r="2.6"/><path d="M15.2 14.2c2.6-.3 4.6 1.2 5.3 4.3"/></svg>Feed</button>
       <button type="button" class="m-side-only" data-m-classic="analysis"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5h16M6.5 16l4-5 3.5 3 5-7"/></svg>Analyse</button>
       <button type="button" class="m-side-only" data-m-classic="overview"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19.5V12M10 19.5V7M15 19.5v-5M20 19.5V4.5"/></svg>Insights</button>
       <button type="button" data-m-page="mehr"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/></svg>Mehr</button>
