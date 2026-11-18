@@ -49,6 +49,30 @@ class AuthTest(unittest.TestCase):
         token = self.login(username).get_json()["data"]["token"]
         return {"Authorization": f"Bearer {token}"}
 
+    def test_api_bremse_je_person(self):
+        make_user("vielfrager")
+        make_user("ruhig")
+        busy, calm = self.headers("vielfrager"), self.headers("ruhig")
+        now = [1000.0]
+        with mock.patch.dict(app.config, {"API_RATE_PER_MINUTE": 5}), \
+                mock.patch.object(auth.time, "monotonic", lambda: now[0]):
+            app.extensions["api_hits"].clear()
+            for _ in range(5):
+                self.assertEqual(self.client.get("/api/v1/auth/me", headers=busy).status_code, 200)
+            now[0] += 20
+            r = self.client.get("/api/v1/auth/me", headers=busy)
+            self.assertEqual(r.status_code, 429)
+            self.assertEqual(r.get_json()["code"], "rate_limited")
+            self.assertEqual(r.headers["Retry-After"], "40")  # die erste Anfrage faellt nach 60 s heraus
+            # andere Personen merken davon nichts, der Login auch nicht
+            self.assertEqual(self.client.get("/api/v1/auth/me", headers=calm).status_code, 200)
+            self.assertEqual(self.login("vielfrager").status_code, 200)
+            now[0] += 41
+            self.assertEqual(self.client.get("/api/v1/auth/me", headers=busy).status_code, 200)
+        with mock.patch.dict(app.config, {"API_RATE_PER_MINUTE": 0}):  # 0 = aus
+            for _ in range(20):
+                self.assertEqual(self.client.get("/api/v1/auth/me", headers=busy).status_code, 200)
+
     def test_health_ohne_login(self):
         self.assertEqual(self.client.get("/api/v1/health").status_code, 200)
 

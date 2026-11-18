@@ -102,10 +102,21 @@ EFFORT_DEFAULT = "low"
 PLAN_EFFORT_TASKS = {"plan", "planbatch", "replan"}
 PLAN_EFFORTS = ("low", "medium")
 PLAN_EFFORT_DEFAULT = "low"
+# Tagesgrenze je Person (ausser dem Betreiber): so viele Anfragen an Claude
+# (direkt und Sammelauftrag) pro Kalendertag. 0 = ohne Grenze. Gezaehlt wird
+# in backend/usage.py (take_claude_call). Ein normaler Tag mit Morgenbericht,
+# Plan-Check, Auswertungen und ein paar Fragen braucht etwa 10.
+DAILY_LIMIT_DEFAULT = 30
+DAILY_LIMIT_MAX = 500
 
 
 def plan_effort(data):
     return data.get("plan_effort") if data.get("plan_effort") in PLAN_EFFORTS else PLAN_EFFORT_DEFAULT
+
+
+def daily_limit(data):
+    v = data.get("daily_limit")
+    return v if isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= DAILY_LIMIT_MAX else DAILY_LIMIT_DEFAULT
 
 
 def effort_for(data, task):
@@ -182,7 +193,7 @@ def settings():
     data = _read()
     model = data.get("model") if data.get("model") in MODELS else DEFAULT_MODEL
     return {"configured": bool(data.get("key")), "model": model, "shared": bool(data.get("shared")),
-            "task_models": _task_models(data), "plan_effort": plan_effort(data)}
+            "task_models": _task_models(data), "plan_effort": plan_effort(data), "daily_limit": daily_limit(data)}
 
 
 def status(admin):
@@ -197,7 +208,7 @@ def status(admin):
     }
 
 
-def save(key=None, model=None, shared=None, task_models=None, plan_effort=None):
+def save(key=None, model=None, shared=None, task_models=None, plan_effort=None, daily_limit=None):
     """Aenderungen uebernehmen. Ein neuer Schluessel wird vorher geprueft.
     task_models: {gruppe: modell} - "" setzt die Gruppe auf das Standard-Modell zurueck."""
     with _lock:
@@ -223,6 +234,10 @@ def save(key=None, model=None, shared=None, task_models=None, plan_effort=None):
             if plan_effort not in PLAN_EFFORTS:
                 raise ValueError("Unbekannte Stufe.")
             data["plan_effort"] = plan_effort
+        if daily_limit is not None:
+            if isinstance(daily_limit, bool) or not isinstance(daily_limit, int) or not 0 <= daily_limit <= DAILY_LIMIT_MAX:
+                raise ValueError(f"Tagesgrenze: eine ganze Zahl von 0 bis {DAILY_LIMIT_MAX} (0 = ohne Grenze).")
+            data["daily_limit"] = daily_limit
         if shared is not None:
             data["shared"] = bool(shared)
         if key is not None:

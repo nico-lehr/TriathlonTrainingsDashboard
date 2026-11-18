@@ -1,4 +1,6 @@
 """Triathlon Dashboard Backend - Phase 1 (Local)."""
+from collections import defaultdict, deque
+
 from flask import Flask, request
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
@@ -29,6 +31,8 @@ def create_app():
     )
     Base.metadata.create_all(engine)
     Session = scoped_session(sessionmaker(bind=engine))
+    # Anfragen je Person der letzten Minute (auth.api_rate_wait)
+    app.extensions["api_hits"] = defaultdict(deque)
 
     # Register blueprints
     from .routes import api_bp

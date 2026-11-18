@@ -6,13 +6,13 @@ ausser bei /health und /auth/login.
 
 Response format: {"data": [...], "meta": {}} or {"error": "...", "code": "...", "status": 404}
 """
-from flask import Blueprint, g, request, jsonify, Response
+from flask import Blueprint, current_app, g, request, jsonify, Response
 from datetime import datetime, date
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as SessionType
 
 from . import get_current_athlete_id
-from .auth import (RENEW_AFTER_S, athlete_id_from_ical_key, check_login, check_new_username, client_ip, create_login,
+from .auth import (RENEW_AFTER_S, api_rate_wait, athlete_id_from_ical_key, check_login, check_new_username, client_ip, create_login,
                    make_token, note_failed_login, note_registration, token_info, too_many_failed_logins,
                    too_many_registrations)
 from . import invites
@@ -38,6 +38,11 @@ def require_login():
     if info is None:
         return response_error("Nicht angemeldet", "unauthorized", 401)
     athlete_id, remember, age = info
+    wait = api_rate_wait(current_app.extensions["api_hits"], athlete_id, current_app.config.get("API_RATE_PER_MINUTE", 0))
+    if wait:
+        response, status = response_error("Zu viele Anfragen in kurzer Zeit - bitte einen Moment warten.", "rate_limited", 429)
+        response.headers["Retry-After"] = str(wait)
+        return response, status
     if remember and age > RENEW_AFTER_S:
         g.renewed_token = make_token(athlete_id, remember=True)
     return None

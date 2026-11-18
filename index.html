@@ -929,6 +929,10 @@
               <label for="claude-shared">Für alle Personen freigeben</label>
               <input type="checkbox" id="claude-shared" class="switch" role="switch">
             </div>
+            <div class="settings-list-row claude-task-row" id="claude-limit-row">
+              <label for="claude-daily-limit"><span>Anfragen pro Tag und Person</span><small>Gilt für alle außer dir. 0 = ohne Grenze. Ein normaler Tag braucht etwa 10.</small></label>
+              <input type="number" id="claude-daily-limit" class="coach-input claude-limit-input" min="0" max="500" step="1" inputmode="numeric">
+            </div>
           </div>
           <p class="card-sub settings-list-foot">Freigegeben zahlen Anfragen deiner Freunde über dein Guthaben.</p>
           <div id="claude-task-box" hidden>

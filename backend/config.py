@@ -25,6 +25,10 @@ class Config:
     API_VERSION = "v1"
     # Groesste erlaubte Anfrage (Flask und waitress): mehr als ein .fit-Import braucht.
     MAX_CONTENT_LENGTH = 64 * 1024 * 1024
+    # Bremse fuer die ganze API: hoechstens so viele Anfragen pro Minute je
+    # angemeldeter Person (auth.api_rate_wait). Normale Nutzung bleibt weit
+    # darunter; stoppt Fehlerschleifen und Spam. 0 = aus.
+    API_RATE_PER_MINUTE = int(os.getenv("API_RATE_PER_MINUTE", "300"))
 
     # KI: der Server leitet Anfragen an Ollama auf diesem PC weiter (ai_routes.py)
     OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")

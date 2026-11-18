@@ -9,6 +9,7 @@ ob der Garmin-Abruf klappte. Keine Inhalte - keine Trainings, keine
 Gesundheitswerte, keine Coach-Nachrichten. Trainingssummen (Anzahl, Stunden)
 rechnet die Statistik beim Abruf aus der Tabelle workouts aus.
 """
+import threading
 from datetime import date, timedelta
 
 from flask import request
@@ -91,6 +92,61 @@ def record_ai_call(athlete_id, task, tokens, ok=True, error_code=None):
         if cost:
             items += [("ai_cost", model, cost), ("ai_cost_task", (task or "chat")[:40], cost)]
     record_many(athlete_id, items)
+
+
+# Tagesgrenze fuer Claude (Einstellung in claude_api.daily_limit): ein eigener
+# Zaehler je Person und Tag. Er zaehlt beim Annehmen der Anfrage - so koennen
+# auch viele gleichzeitige Anfragen die Grenze nicht ueberholen.
+QUOTA_KIND, QUOTA_NAME = "quota", "claude"
+_quota_lock = threading.Lock()
+
+
+def _quota_row(session, athlete_id):
+    return session.query(UsageDaily).filter_by(
+        athlete_id=athlete_id, day=date.today(), kind=QUOTA_KIND, name=QUOTA_NAME).first()
+
+
+def claude_calls_today(athlete_id):
+    """Wie viele Claude-Anfragen diese Person heute schon gestellt hat."""
+    from . import Session
+    session = Session()
+    try:
+        row = _quota_row(session, athlete_id)
+        return row.count if row else 0
+    finally:
+        session.close()
+
+
+def take_claude_call(athlete_id, limit):
+    """Eine Anfrage von der Tagesgrenze abziehen. False, wenn sie schon
+    erreicht ist (dann wird nichts gezaehlt). limit 0 = ohne Grenze."""
+    from . import Session
+    with _quota_lock:
+        session = Session()
+        try:
+            row = _quota_row(session, athlete_id)
+            if limit and row is not None and row.count >= limit:
+                return False
+            bump(session, athlete_id, QUOTA_KIND, QUOTA_NAME)
+            session.commit()
+            return True
+        finally:
+            session.close()
+
+
+def give_back_claude_call(athlete_id):
+    """Anfrage zurueckgeben, wenn sie nichts gekostet hat (z. B. Claude
+    ueberlastet, Verbindung weg) - sonst verliert man dafuer einen Versuch."""
+    from . import Session
+    with _quota_lock:
+        session = Session()
+        try:
+            row = _quota_row(session, athlete_id)
+            if row is not None and row.count > 0:
+                row.count -= 1
+                session.commit()
+        finally:
+            session.close()
 
 
 @api_bp.route("/usage", methods=["POST"])

@@ -20,6 +20,7 @@ function initAiSettings() {
   const cancelBtn = document.getElementById("claude-cancel-btn");
   const taskBox = document.getElementById("claude-task-box");
   const taskList = document.getElementById("claude-task-models");
+  const limitInput = document.getElementById("claude-daily-limit");
   let changing = false; // Schlüssel-Feld nur ohne Schlüssel oder nach "Schlüssel ändern"
   let last = null;
   if (!keyRow || !keyActions || !keyHint || !manage || !changeBtn || !cancelBtn) return;
@@ -47,7 +48,9 @@ function initAiSettings() {
     }
     if (st.available) {
       const perTask = Object.keys(st.task_models || {}).length;
-      text.textContent = `Claude ist verbunden · ${modelLabel(st)}${perTask ? ` · für ${perTask === 1 ? "eine Aufgabe" : perTask + " Aufgaben"} ein eigenes Modell` : ""}`;
+      const q = st.quota || {};
+      const left = q.limit ? ` · heute noch ${Math.max(0, q.limit - (q.used || 0))} von ${q.limit} Anfragen` : "";
+      text.textContent = `Claude ist verbunden · ${modelLabel(st)}${perTask ? ` · für ${perTask === 1 ? "eine Aufgabe" : perTask + " Aufgaben"} ein eigenes Modell` : ""}${left}`;
       dot.classList.add("on");
     } else if (!st.sdk) {
       text.textContent = "Auf dem Server fehlt das Claude-Paket – bitte „pip install -r backend/requirements.txt“ ausführen.";
@@ -69,6 +72,7 @@ function initAiSettings() {
     }
     modelSelect.value = st.model;
     sharedInput.checked = !!st.shared;
+    if (limitInput && document.activeElement !== limitInput) limitInput.value = st.daily_limit ?? "";
     keyInput.placeholder = st.configured ? "Neuer Schlüssel" : "sk-ant-…";
     if (!st.configured) changing = false;
     const edit = !st.configured || changing;
@@ -76,6 +80,7 @@ function initAiSettings() {
     manage.hidden = edit;
     cancelBtn.hidden = !st.configured;
     modelSelect.disabled = sharedInput.disabled = !st.configured;
+    if (limitInput) limitInput.disabled = !st.configured;
     renderTaskModels(st);
   }
 
@@ -148,6 +153,16 @@ function initAiSettings() {
   sharedInput.addEventListener("change", async () => {
     if (await put({ shared: sharedInput.checked }, "Speichere …")) {
       setStatus(sharedInput.checked ? "Für alle freigegeben." : "Nur noch für dich.", "ok");
+    }
+  });
+  if (limitInput) limitInput.addEventListener("change", async () => {
+    const n = Number(limitInput.value);
+    if (!Number.isInteger(n) || n < 0 || n > 500) {
+      setStatus("Bitte eine ganze Zahl von 0 bis 500 eintragen (0 = ohne Grenze).", "err");
+      return;
+    }
+    if (await put({ daily_limit: n }, "Speichere …")) {
+      setStatus(n ? `Höchstens ${n} Anfragen pro Tag und Person (du selbst ohne Grenze).` : "Ohne Tagesgrenze.", "ok");
     }
   });
   deleteBtn.addEventListener("click", async () => {

@@ -47,7 +47,25 @@ function goToLogin() {
 
 // Zentrale Anfrage an die API. Liefert die JSON-Antwort ({data, meta}) oder
 // wirft einen Fehler mit der (deutschen) Meldung des Servers.
-async function apiCall(endpoint, method = "GET", body = null, { timeoutMs = 20000, redirectOn401 = true } = {}) {
+// Bremse des Servers (backend/auth.py: api_rate_wait): bei 429 "rate_limited"
+// so lange warten, wie der Server sagt (Retry-After), und es dann noch
+// einmal versuchen - z. B. beim Import vieler Einheiten auf einmal.
+const API_RATE_RETRIES = 3;
+const API_RATE_MAX_WAIT_S = 60;
+
+async function apiCall(endpoint, method = "GET", body = null, opts = {}) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await apiCallOnce(endpoint, method, body, opts);
+    } catch (e) {
+      if (!(e && e.status === 429 && e.code === "rate_limited") || attempt >= API_RATE_RETRIES) throw e;
+      const wait = Math.min(API_RATE_MAX_WAIT_S, Math.max(1, Number(e.retryAfter) || 5));
+      await new Promise(r => setTimeout(r, wait * 1000));
+    }
+  }
+}
+
+async function apiCallOnce(endpoint, method = "GET", body = null, { timeoutMs = 20000, redirectOn401 = true } = {}) {
   const headers = { "Accept": "application/json" };
   if (body !== null) headers["Content-Type"] = "application/json";
   const token = getAuthToken();
@@ -80,6 +98,7 @@ async function apiCall(endpoint, method = "GET", body = null, { timeoutMs = 2000
     err.status = response.status;
     err.code = json.code;
     err.body = json;
+    if (response.status === 429) err.retryAfter = response.headers && response.headers.get("Retry-After");
     throw err;
   }
   return json;

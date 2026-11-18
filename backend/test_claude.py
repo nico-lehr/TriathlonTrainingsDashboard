@@ -346,6 +346,65 @@ class ClaudeTest(unittest.TestCase):
         self.assertEqual(self.client.post("/api/v1/ai/claude/chat", headers=self.admin, json={"prompt": "x"}).status_code, 409)
         self.assertEqual(self.client.post("/api/v1/ai/claude/chat", headers=self.admin, json={}).status_code, 400)
 
+    def _quota_zuruecksetzen(self):
+        import backend
+        from backend.models import UsageDaily
+        session = backend.Session()
+        session.query(UsageDaily).filter_by(kind="quota").delete()
+        session.commit()
+        session.close()
+
+    def _frage(self, headers):
+        return self.client.post("/api/v1/ai/claude/chat", headers=headers, json={"prompt": "Hallo"})
+
+    def test_tagesgrenze_je_person_der_betreiber_ist_frei(self):
+        self._quota_zuruecksetzen()
+        self.put(self.admin, key=KEY, shared=True)
+        st = self.client.get("/api/v1/ai/claude", headers=self.admin).get_json()["data"]
+        self.assertEqual(st["daily_limit"], claude_api.DAILY_LIMIT_DEFAULT)
+        self.assertEqual(self.put(self.friend, daily_limit=0).status_code, 403)  # nur der Betreiber
+        self.assertEqual(self.put(self.admin, daily_limit=-1).status_code, 400)
+        self.assertEqual(self.put(self.admin, daily_limit="5").status_code, 400)
+        self.assertEqual(self.put(self.admin, daily_limit=claude_api.DAILY_LIMIT_MAX + 1).status_code, 400)
+        self.assertEqual(self.put(self.admin, daily_limit=2).status_code, 200)
+
+        self.assertEqual(self._frage(self.friend).status_code, 200)
+        q = self.client.get("/api/v1/ai/claude", headers=self.friend).get_json()["data"]
+        self.assertEqual(q["quota"], {"limit": 2, "used": 1, "exempt": False})
+        self.assertNotIn("daily_limit", q)  # die Einstellung sieht nur der Betreiber
+        self.assertEqual(self._frage(self.friend).status_code, 200)
+        calls = len(FakeClient.calls)
+        r = self._frage(self.friend)
+        self.assertEqual(r.status_code, 429)
+        self.assertEqual(r.get_json()["code"], "claude_daily_limit")
+        self.assertIn("2 Anfragen", r.get_json()["error"])
+        self.assertEqual(len(FakeClient.calls), calls)  # Claude wurde gar nicht erst gefragt
+        # Sammelauftrag zaehlt mit
+        r = self.client.post("/api/v1/ai/claude/batch", headers=self.friend, json={"prompt": "x", "task": "planbatch"})
+        self.assertEqual(r.status_code, 429)
+        # Betreiber: keine Grenze, wird aber mitgezaehlt
+        for _ in range(3):
+            self.assertEqual(self._frage(self.admin).status_code, 200)
+        q = self.client.get("/api/v1/ai/claude", headers=self.admin).get_json()["data"]["quota"]
+        self.assertEqual(q, {"limit": 0, "used": 3, "exempt": True})
+        # Hoeher stellen gibt sofort wieder frei, 0 = ohne Grenze
+        self.put(self.admin, daily_limit=3)
+        self.assertEqual(self._frage(self.friend).status_code, 200)
+        self.assertEqual(self._frage(self.friend).status_code, 429)
+        self.put(self.admin, daily_limit=0)
+        self.assertEqual(self._frage(self.friend).status_code, 200)
+
+    def test_tagesgrenze_fehlgeschlagene_anfrage_ohne_kosten_zaehlt_nicht(self):
+        self._quota_zuruecksetzen()
+        self.put(self.admin, key=KEY, shared=True, daily_limit=1)
+
+        def kaputt(beta, kw):
+            raise FakeErrors.APIConnectionError("weg")
+        with mock.patch.object(FakeClient, "_create", lambda self, beta, kw: kaputt(beta, kw)):
+            self.assertGreaterEqual(self._frage(self.friend).status_code, 500)
+        self.assertEqual(self._frage(self.friend).status_code, 200)  # Versuch nicht verloren
+        self.assertEqual(self._frage(self.friend).status_code, 429)
+
     def test_entfernen(self):
         self.put(self.admin, key=KEY)
         r = self.client.delete("/api/v1/ai/claude", headers=self.admin)

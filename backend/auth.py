@@ -12,6 +12,7 @@ X-Renewed-Token, siehe routes.py) - wer mindestens alle 90 Tage einmal
 vorbeischaut, bleibt also angemeldet. Ohne Haken gilt er hoechstens einen
 Tag, und der Browser vergisst ihn beim Schliessen (sessionStorage).
 """
+import math
 import os
 import re
 import threading
@@ -255,3 +256,26 @@ def too_many_registrations(ip):
 def note_registration(ip):
     with _failed_logins_lock:
         _registrations[ip].append(time.monotonic())
+
+
+# Bremse fuer die ganze API je angemeldeter Person (Fenster: eine Minute).
+# Die Zaehler liegen am App-Objekt (create_app legt sie neu an) und nur im
+# Arbeitsspeicher. Der Browser wartet bei 429 die Zeit aus Retry-After ab
+# und versucht es dann noch einmal (js/data/api-client.js).
+API_WINDOW_S = 60
+
+
+def api_rate_wait(store, athlete_id, max_per_window):
+    """0, wenn die Anfrage durchgeht (sie ist dann gezaehlt), sonst die
+    Sekunden, bis wieder eine frei ist. max_per_window 0 = ohne Bremse."""
+    if not max_per_window:
+        return 0
+    with _failed_logins_lock:
+        now = time.monotonic()
+        hits = store[athlete_id]
+        while hits and now - hits[0] >= API_WINDOW_S:
+            hits.popleft()
+        if len(hits) >= max_per_window:
+            return max(1, math.ceil(API_WINDOW_S - (now - hits[0])))
+        hits.append(now)
+        return 0

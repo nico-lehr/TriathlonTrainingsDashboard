@@ -89,9 +89,34 @@ def _claude_error(e):
     return response_error(str(e), e.code, e.status)
 
 
+def _status(admin):
+    """Stand fuer die Einstellungen, dazu die eigene Tagesgrenze:
+    quota = {limit (0 = ohne), used (heute), exempt (Betreiber)}."""
+    from .usage import claude_calls_today
+    st = claude_api.status(admin)
+    st["quota"] = {"limit": 0 if admin else st["daily_limit"],
+                   "used": claude_calls_today(get_current_athlete_id()), "exempt": bool(admin)}
+    if not admin:
+        st.pop("daily_limit", None)  # die Einstellung selbst sieht nur der Betreiber
+    return st
+
+
+def _take_quota():
+    """None, wenn die Anfrage laufen darf (sie ist dann mitgezaehlt), sonst
+    die Fehlerantwort 429. Fuer den Betreiber gilt keine Grenze."""
+    from .usage import take_claude_call
+    admin = _is_admin()
+    limit = 0 if admin else claude_api.settings()["daily_limit"]
+    if take_claude_call(get_current_athlete_id(), limit):
+        return None
+    return response_error(
+        f"Für heute sind deine {limit} Anfragen an den KI-Coach aufgebraucht. Ab morgen geht es weiter.",
+        "claude_daily_limit", 429)
+
+
 @api_bp.route("/ai/claude", methods=["GET"])
 def get_claude():
-    return response_success(claude_api.status(_is_admin()))
+    return response_success(_status(_is_admin()))
 
 
 @api_bp.route("/ai/claude", methods=["PUT"])
@@ -106,15 +131,19 @@ def put_claude():
     shared = data.get("shared") if isinstance(data.get("shared"), bool) else None
     task_models = data.get("task_models") if isinstance(data.get("task_models"), dict) else None
     plan_effort = data.get("plan_effort") if isinstance(data.get("plan_effort"), str) else None
-    if key is None and model is None and shared is None and task_models is None and plan_effort is None:
+    daily_limit = data.get("daily_limit")
+    if daily_limit is not None and (isinstance(daily_limit, bool) or not isinstance(daily_limit, int)):
+        return response_error("Tagesgrenze: bitte eine ganze Zahl.", "VALIDATION_ERROR", 400)
+    if key is None and model is None and shared is None and task_models is None and plan_effort is None and daily_limit is None:
         return response_error("Nichts zu speichern.", "VALIDATION_ERROR", 400)
     try:
-        claude_api.save(key=key, model=model, shared=shared, task_models=task_models, plan_effort=plan_effort)
+        claude_api.save(key=key, model=model, shared=shared, task_models=task_models, plan_effort=plan_effort,
+                        daily_limit=daily_limit)
     except ValueError as e:
         return response_error(str(e), "VALIDATION_ERROR", 400)
     except claude_api.ClaudeError as e:
         return _claude_error(e)
-    return response_success(claude_api.status(admin))
+    return response_success(_status(admin))
 
 
 @api_bp.route("/ai/claude", methods=["DELETE"])
@@ -123,7 +152,7 @@ def delete_claude():
     if not admin:
         return response_error("Den Claude-Schlüssel kann nur der Betreiber des Dashboards entfernen.", "forbidden", 403)
     claude_api.delete()
-    return response_success(claude_api.status(admin))
+    return response_success(_status(admin))
 
 
 def _claude_request():
@@ -158,7 +187,10 @@ def claude_chat():
     prompt, task, schema, err = _claude_request()
     if err:
         return err
-    from .usage import record_ai_call
+    err = _take_quota()
+    if err:
+        return err
+    from .usage import give_back_claude_call, record_ai_call
     athlete_id = get_current_athlete_id()
     tokens = {}
     try:
@@ -166,6 +198,8 @@ def claude_chat():
     except claude_api.ClaudeError as e:
         # Auch abgelehnte/abgeschnittene Antworten kosten Tokens - mitzaehlen.
         record_ai_call(athlete_id, task, tokens, ok=False, error_code=e.code)
+        if not tokens:  # nichts verbraucht -> zaehlt nicht fuer die Tagesgrenze
+            give_back_claude_call(athlete_id)
         return _claude_error(e)
     record_ai_call(athlete_id, task, tokens)
     return response_success({"response": text})
@@ -182,9 +216,14 @@ def claude_batch_submit():
         return err
     if task not in BATCH_TASKS:
         return response_error("Diese Aufgabe kann nicht als Sammelauftrag laufen.", "VALIDATION_ERROR", 400)
+    err = _take_quota()
+    if err:
+        return err
     try:
         batch_id = claude_api.submit_batch(prompt, task, get_current_athlete_id(), schema=schema)
     except claude_api.ClaudeError as e:
+        from .usage import give_back_claude_call
+        give_back_claude_call(get_current_athlete_id())
         return _claude_error(e)
     return response_success({"id": batch_id})
 
