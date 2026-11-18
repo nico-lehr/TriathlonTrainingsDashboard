@@ -4,7 +4,7 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
-## 2.6.0
+## 2.5.2
 
 **Schwimmen: konkrete Technik statt „6 × 50 m Technik“**
 - Der Coach wertet deine Bahn-Daten von der Uhr aus (Züge pro 25 m, Zugfrequenz, Anteil Brust-Bahnen, ob die Technik gegen Ende nachlässt, ob ein Freiwasser-Wettkampf ansteht) und legt daraus deine Technik-Schwerpunkte fest.
@@ -12,8 +12,6 @@ im Dashboard unter „Was ist neu?“. Neueste Version oben.
 - Aufbau wie bei Garmin Coach: Einschwimmen, Pause, Technikblock (25 m Übung + 25 m Kraul, Pause), Pause, Hauptsatz mit Pausen, ab 50 Minuten ein Pull-Satz mit Pullbuoy, Ausschwimmen. Alle Pausen sind eigene Schritte auf der Uhr.
 - Behoben: Die Uhr bekam oft einen anderen Ablauf als den, den der Coach beschrieben hat (statt „8 × 100 m“ z. B. „6 × 50 m“, dadurch deutlich weniger Meter). Hauptsatz, Ein- und Ausschwimmen kommen jetzt aus dem Text des Coaches, und die angezeigten Meter sind die Meter auf der Uhr.
 - Neu im Profil: „Hilfsmittel beim Schwimmen“ (Pullbuoy, Schwimmbrett, Flossen, Paddles, Schnorchel). Der Coach plant nur Übungen, die du damit machen kannst.
-
-## 2.5.1
 
 **Mobility: 11 neue Übungen, vor allem für Knie und Hüfte**
 - Neuer Bereich „Knie“ mit 4 Übungen: Fersenrutschen, Knie strecken mit Band, Beinstrecken im Sitzen und Fersensitz. Im Trainingsprofil kannst du „Knie“ jetzt auch als Schwerpunkt oder als Bereich mit Beschwerden wählen – dann wird dort nur sanft gearbeitet.
