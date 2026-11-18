@@ -4,6 +4,13 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.5.4
+
+**Sicherheit: Bremsen gegen zu viele Anfragen**
+- KI-Coach: Jede Person darf pro Tag nur noch eine bestimmte Zahl an Anfragen an Claude stellen (Standard: 30). Der Betreiber stellt die Zahl in den Einstellungen unter „KI-Coach“ ein („Anfragen pro Tag und Person“, 0 = ohne Grenze) und ist selbst davon ausgenommen. So kann niemand über den freigegebenen Schlüssel hohe Kosten verursachen.
+- Wer Claude nutzt, sieht in den Einstellungen „heute noch X von 30 Anfragen“. Ist die Grenze erreicht, kommt eine klare Meldung, und Claude wird gar nicht erst gefragt. Anfragen, die fehlschlagen, ohne etwas zu kosten, zählen nicht.
+- Für die ganze App gilt jetzt: höchstens 300 Anfragen pro Minute und Person. Bei normaler Nutzung merkt man davon nichts. Wird es doch einmal knapp (z. B. beim Import sehr vieler Einheiten), wartet die App kurz und macht dann selbst weiter. Einstellbar in `.env` mit `API_RATE_PER_MINUTE`.
+
 ## 2.5.3
 
 **Schwimmen: Strecke pro Einheit selbst festlegen**
