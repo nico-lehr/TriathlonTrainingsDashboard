@@ -172,7 +172,8 @@ class LoginPflichtTest(AccessTestBase):
     def test_mit_gueltigem_token_kein_401(self):
         # Gegenprobe: das 401 oben kommt wirklich vom fehlenden Login, nicht vom Endpunkt selbst.
         h = self.headers("login-pflicht")
-        for method, url, endpoint in api_calls(self.app):
+        # "Ueberall abmelden" macht den Token ungueltig - deshalb ganz zum Schluss.
+        for method, url, endpoint in sorted(api_calls(self.app), key=lambda c: c[2] == "api.logout_all"):
             with self.subTest(method=method, url=url):
                 r = self.client.open(url, method=method, json={}, headers=h)
                 if endpoint != "api.login":  # Login mit leerem Koerper: falsche Zugangsdaten

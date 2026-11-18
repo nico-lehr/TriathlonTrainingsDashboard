@@ -62,6 +62,19 @@ class AthleteLogin(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class LoginVersion(Base):
+    """Stand der Anmeldungen je Athlet (auth.py): Jeder Login-Token traegt
+    die Nummer, die beim Anmelden galt. "Ueberall abmelden" und ein neues
+    Passwort zaehlen sie hoch - damit sind alle bisherigen Token ungueltig,
+    auch auf verlorenen Geraeten. Ohne Zeile gilt 0 (so bleiben Token aus
+    aelteren Versionen gueltig). Eigene Tabelle, weil create_all() keine
+    Spalten an vorhandene Tabellen anfuegt."""
+    __tablename__ = "login_versions"
+
+    athlete_id = Column(Integer, ForeignKey("athletes.athlete_id"), primary_key=True)
+    version = Column(Integer, nullable=False, default=0)
+
+
 class AthleteStore(Base):
     """Ablage pro Person fuer die Dashboard-Daten, die der Browser frueher in
     localStorage hielt (Profil, Ziele, Plan, Erholung, Gewicht, Material, ...).

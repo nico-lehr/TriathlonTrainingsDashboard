@@ -11,6 +11,10 @@ und wird bei Benutzung taeglich durch einen frischen ersetzt (Kopfzeile
 X-Renewed-Token, siehe routes.py) - wer mindestens alle 90 Tage einmal
 vorbeischaut, bleibt also angemeldet. Ohne Haken gilt er hoechstens einen
 Tag, und der Browser vergisst ihn beim Schliessen (sessionStorage).
+
+Abmelden auf allen Geraeten: Jeder Token traegt den Stand der Anmeldungen
+(Tabelle login_versions). "Ueberall abmelden" (POST /auth/logout-all) und ein
+neues Passwort zaehlen ihn hoch - alle aelteren Token gelten dann nicht mehr.
 """
 import math
 import os
@@ -24,7 +28,7 @@ from itsdangerous import BadSignature, URLSafeSerializer, URLSafeTimedSerializer
 from sqlalchemy import func
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .models import Athlete, AthleteLogin, AthleteStore, Workout
+from .models import Athlete, AthleteLogin, AthleteStore, LoginVersion, Workout
 
 REMEMBER_MAX_AGE_S = 90 * 24 * 3600  # "Angemeldet bleiben": 90 Tage ohne Besuch
 SESSION_MAX_AGE_S = 24 * 3600        # ohne Haken: hoechstens ein Tag
@@ -49,23 +53,42 @@ def _serializer():
     return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt="login-token")
 
 
-def make_token(athlete_id, remember=True):
-    return _serializer().dumps({"athlete_id": athlete_id, "remember": bool(remember)})
+def make_token(athlete_id, remember=True, version=0):
+    """version: Stand der Anmeldungen (login_version) - steht im Token, damit
+    "Ueberall abmelden" alle aelteren Token ungueltig machen kann."""
+    return _serializer().dumps({"athlete_id": athlete_id, "remember": bool(remember), "v": int(version or 0)})
 
 
 def token_info(token):
-    """(athlete_id, remember, alter_in_sekunden) aus einem gueltigen Token, sonst None.
-    Aeltere Token ohne "remember" gelten als "angemeldet bleiben"."""
+    """(athlete_id, remember, alter_in_sekunden, version) aus einem gueltigen Token, sonst None.
+    Aeltere Token ohne "remember" gelten als "angemeldet bleiben", ohne "v" als Version 0.
+    Ob die Version noch aktuell ist, prueft routes.require_login (Datenbank)."""
     try:
         payload, issued = _serializer().loads(token, max_age=TOKEN_MAX_AGE_S, return_timestamp=True)
         athlete_id = payload["athlete_id"]
-    except (BadSignature, KeyError, TypeError):  # BadSignature deckt auch "abgelaufen" ab
+        version = int(payload.get("v", 0))
+    except (BadSignature, KeyError, TypeError, ValueError, AttributeError):  # BadSignature deckt auch "abgelaufen" ab
         return None
     remember = payload.get("remember", True) is not False
     age = max(0, time.time() - issued.timestamp())
     if not remember and age > SESSION_MAX_AGE_S:
         return None
-    return athlete_id, remember, age
+    return athlete_id, remember, age, version
+
+
+def login_version(session, athlete_id):
+    row = session.get(LoginVersion, athlete_id)
+    return row.version if row else 0
+
+
+def end_all_logins(session, athlete_id):
+    """Alle Anmeldungen dieser Person beenden (alle Geraete). Commit macht der Aufrufer."""
+    row = session.get(LoginVersion, athlete_id)
+    if row is None:
+        row = LoginVersion(athlete_id=athlete_id, version=0)
+        session.add(row)
+    row.version = (row.version or 0) + 1
+    return row.version
 
 
 def athlete_id_from_token(token):
@@ -189,13 +212,14 @@ def create_login(session, username, password, claim_unclaimed=True):
 
 def reset_password(session, username, password):
     """Neues Passwort fuer einen vorhandenen Benutzer (backend/create_user.py --reset).
-    Alte Token bleiben bis zu ihrem Ablauf gueltig. Wirft ValueError."""
+    Beendet alle bisherigen Anmeldungen dieser Person. Wirft ValueError."""
     if len(password) < MIN_PASSWORD_LENGTH:
         raise ValueError(f"Das Passwort muss mindestens {MIN_PASSWORD_LENGTH} Zeichen lang sein.")
     login = session.query(AthleteLogin).filter_by(username=normalize_username(username)).first()
     if not login:
         raise ValueError(f"Den Benutzernamen '{normalize_username(username)}' gibt es nicht.")
     login.password_hash = generate_password_hash(password)
+    end_all_logins(session, login.athlete_id)  # wer das alte Passwort kannte, fliegt raus
     session.commit()
     return login.athlete_id
 

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session as SessionType
 
 from . import get_current_athlete_id
 from .auth import (RENEW_AFTER_S, api_rate_wait, athlete_id_from_ical_key, check_login, check_new_username, client_ip, create_login,
-                   make_token, note_failed_login, note_registration, token_info, too_many_failed_logins,
+                   end_all_logins, login_version, make_token, note_failed_login, note_registration, token_info, too_many_failed_logins,
                    too_many_registrations)
 from . import invites
 from .models import Athlete, AthleteLogin, Workout, Wellness, PlannedWorkout, RecoveryCheck, Goal, IcalPlannedWorkout
@@ -37,14 +37,23 @@ def require_login():
     info = token_info(header[len("Bearer "):].strip()) if header.startswith("Bearer ") else None
     if info is None:
         return response_error("Nicht angemeldet", "unauthorized", 401)
-    athlete_id, remember, age = info
+    athlete_id, remember, age, version = info
+    session = get_session()
+    try:
+        current = login_version(session, athlete_id)
+    finally:
+        session.close()
+    if version != current:  # "Ueberall abmelden" oder neues Passwort seit diesem Token
+        return response_error("Nicht angemeldet", "unauthorized", 401)
+    g.athlete_id = athlete_id
+    g.login_version = current
     wait = api_rate_wait(current_app.extensions["api_hits"], athlete_id, current_app.config.get("API_RATE_PER_MINUTE", 0))
     if wait:
         response, status = response_error("Zu viele Anfragen in kurzer Zeit - bitte einen Moment warten.", "rate_limited", 429)
         response.headers["Retry-After"] = str(wait)
         return response, status
     if remember and age > RENEW_AFTER_S:
-        g.renewed_token = make_token(athlete_id, remember=True)
+        g.renewed_token = make_token(athlete_id, remember=True, version=current)
     return None
 
 
@@ -215,9 +224,27 @@ def login():
         except Exception:
             session.rollback()
         remember = data.get("remember") is not False  # Standard: angemeldet bleiben
-        return response_success({"token": make_token(athlete_id, remember=remember), "athlete": serialize_athlete(athlete)})
+        token = make_token(athlete_id, remember=remember, version=login_version(session, athlete_id))
+        return response_success({"token": token, "athlete": serialize_athlete(athlete)})
     finally:
         session.close()
+
+
+@api_bp.route("/auth/logout-all", methods=["POST"])
+def logout_all():
+    """POST /api/v1/auth/logout-all - beendet ALLE Anmeldungen dieser Person
+    (auch auf verlorenen oder fremden Geraeten) und meldet ihre Geraete fuer
+    Mitteilungen ab. Danach muss man sich ueberall neu anmelden."""
+    from .models import PushSubscription
+    athlete_id = get_current_athlete_id()
+    session = get_session()
+    try:
+        end_all_logins(session, athlete_id)
+        session.query(PushSubscription).filter_by(athlete_id=athlete_id).delete()
+        session.commit()
+    finally:
+        session.close()
+    return response_success({"ok": True})
 
 
 @api_bp.route("/auth/register", methods=["GET"])
@@ -257,7 +284,8 @@ def register():
         note_registration(ip)
         athlete = session.query(Athlete).filter_by(athlete_id=athlete_id).first()
         remember = data.get("remember") is not False
-        return response_success({"token": make_token(athlete_id, remember=remember), "athlete": serialize_athlete(athlete)}, status=201)
+        token = make_token(athlete_id, remember=remember, version=login_version(session, athlete_id))
+        return response_success({"token": token, "athlete": serialize_athlete(athlete)}, status=201)
     finally:
         session.close()
 

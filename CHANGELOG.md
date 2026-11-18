@@ -4,6 +4,15 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.5.5
+
+**Sicherheit: fünf Verbesserungen aus dem Sicherheitscheck**
+- **Nur über Tailscale erreichbar:** Neuer Schalter für den Betreiber unter Einstellungen → Sicherheit. Ist er an, beantwortet das Dashboard nur noch Geräte mit Tailscale (auch über die https-Adresse) und den Rechner selbst. Wer im WLAN die normale Adresse `http://…:5000` benutzt, sieht nur einen Hinweis. So geht kein Passwort mehr unverschlüsselt durchs Heimnetz. Aussperren kannst du dich damit nicht: Einschalten geht nur, wenn dein Gerät gerade über Tailscale verbunden ist.
+- **Überall abmelden:** Unter Einstellungen → Sicherheit beendet ein Knopf alle Anmeldungen auf allen Geräten, zum Beispiel wenn das Handy verloren ist. Ein neues Passwort meldet ebenfalls überall ab.
+- **Abmelden stoppt den Morgenbericht:** Nach dem Abmelden kommen auf diesem Gerät keine Mitteilungen mehr, also auch kein Schlaf, HRV oder Ruhepuls auf dem Sperrbildschirm.
+- **Dateien nur für dich lesbar:** Datenbank, Sicherungen und gespeicherte Schlüssel (Claude, Garmin) kann auf dem Server-Rechner nur noch dein eigenes Benutzerkonto lesen.
+- **Zusätzliche Schutzschicht im Browser:** Das Dashboard führt nur noch eigene Skripte aus und spricht nur mit dem eigenen Server. Sollte jemals fremder Code eingeschleust werden, blockiert der Browser ihn.
+
 ## 2.5.4
 
 **Sicherheit: Bremsen gegen zu viele Anfragen**

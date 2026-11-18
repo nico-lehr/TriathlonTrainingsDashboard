@@ -2491,6 +2491,9 @@
   .claude-task-row label { flex: 1 1 180px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .claude-task-row label small { font-size: 12px; font-weight: 400; color: var(--text-muted); line-height: 1.3; }
   .claude-task-row .coach-input { flex: 1 1 200px; max-width: none; }
+  .sec-row label { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .sec-row label small { font-size: 12px; font-weight: 400; color: var(--text-muted); line-height: 1.3; }
+  .sec-row .cal-today-btn { flex: 0 0 auto; }
   .claude-task-row .claude-limit-input { flex: 0 0 96px; max-width: 96px; text-align: right; }
   .settings-list-foot { margin-top: 8px; }
   .settings-disclosure { margin-top: 18px; border-top: 0.5px solid var(--border); padding-top: 10px; }

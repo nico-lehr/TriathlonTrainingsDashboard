@@ -212,7 +212,8 @@ Daten bleiben erhalten.
   Der Server glaubt die echte Besucher-Adresse nur dem Tailscale-Proxy auf
   demselben Rechner (127.0.0.1); gefälschte Weiterleitungs-Kopfzeilen von
   anderswo werden verworfen. Dazu Schutz-Kopfzeilen (kein Einbetten in fremde
-  Seiten, nur noch https nach dem ersten https-Besuch). Lange Passwörter
+  Seiten, nur noch https nach dem ersten https-Besuch, Skripte und
+  Verbindungen nur von der eigenen Adresse – Content-Security-Policy). Lange Passwörter
   verwenden. Abschalten: `bash deploy/raspberry-pi/oeffentlich.sh aus`.
 - Der Server liefert nur die Webseite aus (`index.html`, `login.html`,
   `css/`, `js/` …) – `.env`, `training.db`, `backups/`, `data/`, `backend/`
@@ -225,15 +226,28 @@ Daten bleiben erhalten.
 - **Angemeldet bleiben** (Standard an): Der Login gilt 90 Tage und wird bei
   Benutzung täglich erneuert – wer regelmäßig kommt, bleibt angemeldet. Ohne
   Haken: nur bis der Browser geschlossen wird, höchstens 1 Tag. **An
-  fremden/geteilten Geräten immer abmelden** (Einstellungen → Konto → Abmelden) – das löscht auch alles
-  Persönliche aus dem Browser. Ein einzelner Login lässt sich nicht
-  zurückziehen: auch nach „Passwort neu“ gilt ein alter Login weiter, solange
-  er benutzt wird. Sofort alle abmelden (z. B. bei verlorenem Handy): in `.env` den
-  `SECRET_KEY` ändern und neu starten – dann müssen sich alle neu anmelden.
+  fremden/geteilten Geräten immer abmelden** (Einstellungen → Abmelden) – das löscht auch alles
+  Persönliche aus dem Browser und meldet das Gerät für Mitteilungen ab
+  (kein Morgenbericht mehr auf dem Sperrbildschirm).
+  **Handy verloren?** Einstellungen → Sicherheit → „Überall abmelden“ beendet
+  jede Anmeldung dieser Person auf allen Geräten. Dasselbe passiert bei einem
+  neuen Passwort (`python backend/create_user.py --reset`). Alle Personen auf
+  einmal abmelden: in `.env` den `SECRET_KEY` ändern und neu starten.
 - **Erreichbar ist der Server im ganzen Heimnetz** (WLAN) und über Tailscale.
-  Daten sind durch den Login geschützt. Wer ihn nur über Tailscale
-  erreichbar machen will: in `.env` `DASHBOARD_HOST=100.x.y.z` (deine
-  Tailscale-IP) eintragen und neu starten.
+  Im WLAN unter `http://<rechner>:5000` gehen Passwort und Anmeldung
+  **unverschlüsselt** durchs Netz. Besser: Einstellungen → Sicherheit →
+  **„Nur über Tailscale erreichbar“** (nur der Betreiber). Dann antwortet der
+  Server nur noch Tailscale-Geräten (auch `https://…ts.net`) und dem Rechner
+  selbst; alle anderen sehen einen Hinweis. Einschalten geht nur, wenn dein
+  Gerät gerade selbst über Tailscale verbunden ist (kein Aussperren).
+  Notausgang, falls doch: in `.env` `NUR_TAILSCALE=0` setzen und neu starten
+  (`NUR_TAILSCALE=1` schaltet es fest ein).
+- **Bremsen:** höchstens 300 Anfragen pro Minute je Person
+  (`API_RATE_PER_MINUTE`) und eine Tagesgrenze für den KI-Coach je Person
+  (Einstellungen → KI-Coach, Betreiber ausgenommen).
+- **Dateirechte:** Beim Start setzt der Server `.env`, `training.db`,
+  `backups/` und `~/.triathlon/` (Schlüssel und Token) so, dass nur das eigene
+  Benutzerkonto sie lesen kann; alles, was er neu anlegt, ebenso.
 - Der **Kalender-Abo-Link** enthält einen geheimen Schlüssel – nicht
   weitergeben. Alte Abos ohne Schlüssel (`…/ical/1.ics`) funktionieren nicht
   mehr: den Link neu aus den Einstellungen kopieren und neu abonnieren. Ungültig machen lässt er sich nur zusammen mit allen Logins,

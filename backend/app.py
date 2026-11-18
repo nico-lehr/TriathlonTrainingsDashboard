@@ -17,6 +17,11 @@ from backend import create_app, Session
 from backend.models import Athlete, AthleteLogin
 from backend.config import config
 
+# Datenbank, Sicherungen und Schluessel nur fuer den eigenen Benutzer lesbar
+# (auch alles, was der Server ab jetzt neu anlegt).
+from backend.file_perms import secure_files
+secure_files()
+
 # Vor dem Start sichern: create_app() legt bei neuen Versionen evtl. neue Tabellen an.
 # Klappt die Sicherung nicht, wird NICHT gestartet (kein Datenbank-Eingriff ohne Backup).
 try:

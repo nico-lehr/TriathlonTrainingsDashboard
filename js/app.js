@@ -83,6 +83,7 @@ function checkAutoReplan() {
   initInfoPopovers();
   initCardSearch();
   initAccount();
+  initSecuritySettings();
   initGarminSettings();
   initGarminPushSettings();
   initUpdates();

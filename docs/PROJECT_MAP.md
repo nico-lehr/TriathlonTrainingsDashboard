@@ -38,6 +38,9 @@ geladen ist) — kritisch ist nur Code, der direkt beim Laden ausgeführt wird
 Ende). Deshalb diese Ladereihenfolge in `index.html`:
 
 ```
+js/theme-init.js           (im <head>: Hell/Dunkel vor dem ersten Bild setzen –
+                             eigene Datei, weil die Content-Security-Policy
+                             keine eingebetteten <script>-Blöcke erlaubt)
 js/data/api-client.js      (apiCall(), Login-Token, Ablage pro Person)
 js/utils/*.js
 js/data/*.js
@@ -83,7 +86,7 @@ und speichern per `storeSet()` (beides `api-client.js`); localStorage hält
 nur noch Login-Token, Theme und Geräte-Einstellungen (Ollama-Modell,
 Claude-API-Key, Kartenreihenfolge).
 
-- `api-client.js` — `apiCall()` (relative Adresse `api/v1/…`, Bearer-Token, bei 401 → `login.html`, bei 429 `rate_limited` warten laut Retry-After und bis zu 3× erneut), `requireLogin()`, `logout()` (leert den Browser bis aufs Theme), `showApiError()` (Hinweisbanner), Ablage pro Person `loadUserStore()`/`storeGet()`/`storeSet()` (GET/PUT `/api/v1/store`; mehrere schnelle Änderungen werden zu einer Anfrage zusammengefasst), dazu die älteren `TriathlonApiClient`-Komfortmethoden.
+- `api-client.js` — `apiCall()` (relative Adresse `api/v1/…`, Bearer-Token, bei 401 → `login.html`, bei 429 `rate_limited` warten laut Retry-After und bis zu 3× erneut), `requireLogin()`, `logout()` (meldet das Gerät für Mitteilungen ab und leert den Browser bis aufs Theme; `logout({everywhere: true})` beendet vorher alle Anmeldungen), `showApiError()` (Hinweisbanner), Ablage pro Person `loadUserStore()`/`storeGet()`/`storeSet()` (GET/PUT `/api/v1/store`; mehrere schnelle Änderungen werden zu einer Anfrage zusammengefasst), dazu die älteren `TriathlonApiClient`-Komfortmethoden.
 - `fit-parser.js` — Binärparser für Garmin `.fit`-Dateien (kein Netzwerk, keine Abhängigkeiten). Liest auch Bahnen-Nachrichten (Schwimmen, SWOLF) und generische Developer-Felder mit ein — Fundament für künftige Garmin-Connect-/Strava-Daten, siehe `docs/DATA_MODEL.md`.
 - `garmin-wellness.js` — Zugriffsschicht auf die Garmin-Gesundheitsdaten (`loadWellness()` → `GET /api/v1/wellness/daily`, je Benutzer vom Garmin-Sync in die Datenbank geschrieben): `latestWellness()`, `wellnessSeries()`, `wellnessBaseline()`, `wellnessDeviation()` (Abweichung vom eigenen 30-Tage-Mittel — nur so ist ein HRV-Wert interpretierbar) und `syncGarminWeightIntoLog()`. Startet mit leerem Bestand, wenn nie synchronisiert wurde.
 - `workouts.js` — Rohdaten (`ALL`/`DATA`), Laden vom Server (`loadPersistedWorkouts()` → `GET /api/v1/workouts/full`), Speichern neu eingelesener Workouts (`saveImportedWorkouts()` → `POST /api/v1/workouts`, Doppelte ignoriert der Server), Zeitraum-/Sportart-Filter. Enthält außerdem die zentralen Gruppierungs-Primitive, an denen JEDE Referenzgruppe hängt: `sportGroup()`, `rideEnvironment()` (Indoor/Outdoor beim Rad, als `_rideEnv` materialisiert), `comparisonGroupLabel()`, `isIndoorRide()`, `rideEnvBadgeHtml()` und vor allem `sameComparisonGroup()` — wer mit wem verglichen werden darf, wird nur dort entschieden (siehe `docs/DATA_MODEL.md`, Abschnitt "Indoor/Outdoor-Erkennung beim Rad").
@@ -161,6 +164,7 @@ Bedarf schrittweise weiter aufgeteilt werden, sobald es sich lohnt.
 - `garmin-settings.js` — „Daten von Garmin“-Karte in den Einstellungen: eigenen Personal-API-Schlüssel eintragen/entfernen, Ablaufwarnung, „Jetzt von Garmin holen“.
 - `garmin-import.js` — Garmin verbinden im Onboarding (Werte werden automatisch übernommen) und „Dein Profil“ in den Einstellungen: Garmin-Werte nur anzeigen, täglicher Abgleich, eigene Änderungen bleiben (`garminValues`/`garminOverrides`).
 - `invites.js` — „Freunde einladen“: Einladungen an/aus, Code teilen/erneuern, Kontenliste (nur Betreiber).
+- `security-settings.js` — Einstellungen → „Sicherheit“: „Überall abmelden“ für alle, „Nur über Tailscale erreichbar“ nur für den Betreiber (`backend/access_guard.py`).
 - `ai-settings.js` — „KI-Coach“-Karte: Stand der Claude-Verbindung; Schlüssel, Modell, Freigabe und Tagesgrenze je Person nur für den Betreiber (Server: `backend/claude_api.py`); andere sehen „heute noch X von N Anfragen“. Ollama darunter aufklappbar.
 - `training-profile.js` — „Dein Trainingsprofil“: Ziele, Beschwerden, Ausschlüsse, Hilfsmittel, Mobility-Wunsch, Zusatzwünsche (Daten: `js/data/training-profile.js`).
 - `mobility.js` — Tab „Mobility“: Einheit für heute, Dauer/Schwerpunkt, Ablauf mit Austauschen, „Mit Claude persönlich anpassen“, Übungs-Sammlung, Anleitung (Bottom-Sheet), Verlauf.
@@ -211,7 +215,7 @@ einmalig `backend/import_workouts_json.py`, siehe `docs/DEPLOYMENT.md`.
 | `app.py` | Start mit waitress (Host 0.0.0.0, Port 5000, änderbar in `.env`); sichert vorher `training.db` (`backup.py`). |
 | `__init__.py` | `create_app()` (verweigert den Start ohne `SECRET_KEY`), `get_current_athlete_id()` liest den Bearer-Token. |
 | `config.py` | Einstellungen, lädt `.env` (`SECRET_KEY`, `OLLAMA_URL`). |
-| `auth.py` | Passwort-Hash, signierte Token (30 Tage), geheimer Kalender-Schlüssel, Bremse 5 Fehlversuche/Minute/IP, API-Bremse je Person (`api_rate_wait`, `API_RATE_PER_MINUTE`, Standard 300/min, Prüfung in `routes.require_login`). |
+| `auth.py` | Passwort-Hash, signierte Token (30 Tage), geheimer Kalender-Schlüssel, Bremse 5 Fehlversuche/Minute/IP, API-Bremse je Person (`api_rate_wait`, `API_RATE_PER_MINUTE`, Standard 300/min, Prüfung in `routes.require_login`), Stand der Anmeldungen je Person (Tabelle `login_versions`, Nummer im Token; `end_all_logins` bei „Überall abmelden“ = `POST /auth/logout-all` und bei neuem Passwort). |
 | `routes.py` | Bestehende Endpunkte + `require_login()` (401 außer `/health`, `/auth/login`) + `/auth/login`, `/auth/me`. |
 | `dashboard_routes.py` | `/store`, `/workouts/full`, `/wellness/daily`, `/ical-link`. |
 | `ai_routes.py` | `/ai/chat`, `/ai/models` – Weiterleitung an Ollama; `/ai/claude` (Stand/Schlüssel, nur Betreiber ändert), `/ai/claude/chat` und `/ai/claude/batch` (Sammelauftrag abgeben/abholen, nur eigene Aufträge). |
@@ -219,6 +223,8 @@ einmalig `backend/import_workouts_json.py`, siehe `docs/DEPLOYMENT.md`.
 | `usage.py` | Admin-Statistik: Tageszähler je Person in `usage_daily` (Öffnen, Bereiche, Funktionen, Login, Claude, Garmin-Abruf); `POST /usage` (feste Namensliste), `GET /admin/stats` nur Betreiber. Keine Inhalte. Dazu der Tageszähler `quota/claude` für die Claude-Tagesgrenze (`take_claude_call`, `give_back_claude_call`). |
 | `group.py` | Feed: `/group` (Stand für Mitglieder), `/group/me` (beitreten/umbenennen/austreten), `/group/highlights` (Abzeichen teilen, nur feste Arten), Reaktionen, `/group/challenges` (anlegen, mitmachen, löschen). Fortschritt = nur Summen (km/Stunden/Einheiten) im Zeitraum. |
 | `claude_api.py` | Claude über das Anthropic-SDK: Schlüssel in `~/.triathlon/claude_api.json` (0600), Prüfen, Modelle, verständliche Fehler, Tagesgrenze je Person (`daily_limit`, Standard 30, Betreiber ausgenommen). |
+| `access_guard.py` | „Nur über Tailscale erreichbar“ (Schalter des Betreibers, `~/.triathlon/zugriff.json`, Notausgang `NUR_TAILSCALE` in `.env`): `guard()` läuft vor jeder Anfrage (create_app) und lässt nur localhost, Tailscale-Adressen und `tailscale serve/funnel` durch; `GET/PUT /admin/access`. |
+| `file_perms.py` | `secure_files()` beim Start (app.py): umask 077, `.env`, `training.db`, `backups/`, `~/.triathlon/` nur für den eigenen Benutzer. |
 | `equipment_routes.py` | `/equipment…` – Material anlegen/ändern/löschen, Zuordnungen, einmaliger Import. |
 | `updater.py` | Programm-Updates: neueste GitHub-Release prüfen (einmal am Tag), Paket prüfen, sichern, installieren (ZIP oder `git`), Neustart anstoßen. Nutzerdaten sind geschützt. |
 | `update_routes.py` | `/update`, `/update/check`, `/update/install` – Details und Installieren nur für den Betreiber (`auth.is_admin`). |

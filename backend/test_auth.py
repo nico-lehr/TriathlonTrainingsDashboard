@@ -73,6 +73,48 @@ class AuthTest(unittest.TestCase):
             for _ in range(20):
                 self.assertEqual(self.client.get("/api/v1/auth/me", headers=busy).status_code, 200)
 
+    def test_ueberall_abmelden_beendet_alle_anmeldungen(self):
+        athlete_id = make_user("handy-weg")
+        make_user("unbeteiligt")
+        handy, laptop, other = self.headers("handy-weg"), self.headers("handy-weg"), self.headers("unbeteiligt")
+        self.assertEqual(self.client.get("/api/v1/auth/me", headers=handy).status_code, 200)
+        self.assertEqual(self.client.post("/api/v1/auth/logout-all", headers=laptop).status_code, 200)
+        for h in (handy, laptop):  # beide Geraete sind abgemeldet
+            r = self.client.get("/api/v1/auth/me", headers=h)
+            self.assertEqual((r.status_code, r.get_json()["code"]), (401, "unauthorized"))
+        # Kalender-Feed nimmt den alten Token auch nicht mehr
+        self.assertEqual(self.client.get(f"/api/v1/ical/{athlete_id}.ics", headers=handy).status_code, 404)
+        # Andere Personen bleiben angemeldet, neu anmelden klappt
+        self.assertEqual(self.client.get("/api/v1/auth/me", headers=other).status_code, 200)
+        self.assertEqual(self.client.get("/api/v1/auth/me", headers=self.headers("handy-weg")).status_code, 200)
+
+    def test_erneuerter_token_behaelt_den_stand(self):
+        from itsdangerous import TimestampSigner
+        athlete_id = make_user("lange-dabei")
+        session = session_factory()
+        auth.end_all_logins(session, athlete_id)
+        session.commit()
+        session.close()
+        vor_2_tagen = int(__import__("time").time()) - 2 * 24 * 3600
+        with app.app_context(), mock.patch.object(TimestampSigner, "get_timestamp", return_value=vor_2_tagen):
+            alt = auth.make_token(athlete_id, version=1)
+        r = self.client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {alt}"})
+        self.assertEqual(r.status_code, 200)
+        renewed = r.headers["X-Renewed-Token"]
+        with app.app_context():
+            self.assertEqual(auth.token_info(renewed)[3], 1)
+        self.assertEqual(self.client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {renewed}"}).status_code, 200)
+
+    def test_neues_passwort_meldet_alte_geraete_ab(self):
+        make_user("passwort-neu")
+        old = self.headers("passwort-neu")
+        session = session_factory()
+        auth.reset_password(session, "passwort-neu", "ganz-neues-passwort")
+        session.close()
+        self.assertEqual(self.client.get("/api/v1/auth/me", headers=old).status_code, 401)
+        r = self.login("passwort-neu", "ganz-neues-passwort")
+        self.assertEqual(r.status_code, 200)
+
     def test_health_ohne_login(self):
         self.assertEqual(self.client.get("/api/v1/health").status_code, 200)
 
@@ -231,6 +273,21 @@ class AuthTest(unittest.TestCase):
         self.assertNotIn("Strict-Transport-Security", r.headers)  # im Heimnetz ohne HTTPS
         r = self.client.get("/api/v1/health", headers={"X-Forwarded-Proto": "https"}, environ_base={"REMOTE_ADDR": "127.0.0.1"})
         self.assertIn("Strict-Transport-Security", r.headers)
+        # Content-Security-Policy: nur Skripte und Verbindungen von hier, auch fuer die Webseite
+        for url in ("/api/v1/health", "/", "/login.html"):
+            csp = self.client.get(url).headers["Content-Security-Policy"]
+            self.assertIn("script-src 'self';", csp, url)
+            self.assertIn("connect-src 'self';", csp, url)
+            self.assertIn("frame-ancestors 'none'", csp, url)
+
+    def test_seiten_ohne_eingebettete_skripte(self):
+        # Sonst blockiert die Content-Security-Policy sie (script-src 'self').
+        import re
+        from pathlib import Path
+        for name in ("index.html", "login.html"):
+            html = (Path(__file__).parent.parent / name).read_text(encoding="utf-8")
+            self.assertEqual(re.findall(r"<script(?![^>]*\bsrc=)[^>]*>", html), [], name)
+            self.assertIsNone(re.search(r"\son[a-z]+=\"", html), name)
 
     def test_user_b_sieht_nichts_von_user_a(self):
         a_id = make_user("user-a")

@@ -111,13 +111,35 @@ function requireLogin() {
   return false;
 }
 
+// Mitteilungen auf diesem Gerät abmelden - sonst käme der Morgenbericht
+// (Schlaf, HRV, Ruhepuls) der abgemeldeten Person weiter auf den
+// Sperrbildschirm, auch wenn danach jemand anderes das Gerät nutzt.
+// Höchstens 4 Sekunden; Abmelden klappt auch, wenn das nicht geht.
+async function stopPushOnThisDevice() {
+  const work = (async () => {
+    if (typeof navigator === "undefined" || !navigator.serviceWorker) return;
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = reg && reg.pushManager ? await reg.pushManager.getSubscription() : null;
+    if (!sub) return;
+    await apiCallOnce("push/unsubscribe", "POST", { endpoint: sub.endpoint }, { timeoutMs: 3000, redirectOn401: false }).catch(() => null);
+    await sub.unsubscribe();
+  })().catch(() => null);
+  await Promise.race([work, new Promise(r => setTimeout(r, 4000))]);
+}
+
 // Abmelden: alles Persoenliche aus diesem Browser entfernen (Token, KI-Schluessel,
 // Einstellungen) - nur das gewaehlte Hell/Dunkel-Design bleibt.
-async function logout() {
+// logout({ everywhere: true }): vorher auf dem Server ALLE Anmeldungen dieser
+// Person beenden (alle Geraete, POST auth/logout-all). Schlaegt das fehl,
+// bleibt man angemeldet und bekommt den Fehler.
+async function logout(opts) {
+  const everywhere = !!(opts && opts.everywhere === true);
   // Noch Unterwegs-Gebliebenes vorher abschicken (hoechstens 3 Sekunden warten).
   retryFailedStore();
   const until = Date.now() + 3000;
   while ((storeSending.size || storeDirty.size) && Date.now() < until) await new Promise(r => setTimeout(r, 100));
+  await stopPushOnThisDevice();
+  if (everywhere) await apiCallOnce("auth/logout-all", "POST", {}, { redirectOn401: false });
   let theme = null;
   try {
     theme = localStorage.getItem("triathlon_dashboard_theme_v1");
