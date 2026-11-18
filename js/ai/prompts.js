@@ -67,9 +67,9 @@ ${swimPlanRule()}
 - Konsistenz: "sport" muss zu "title"/"description" passen (Kräftigungsübungen wie Klimmzüge, Kniebeugen, Hanteltraining -> immer "Kraft"). "duration_min" = die Gesamtdauer, die "description" nennt.
 
 Antworte AUSSCHLIESSLICH mit einem JSON-Objekt in genau dieser Form, keinerlei Text davor/danach, keine Code-Block-Markierung:
-{"workouts":[{"date":"YYYY-MM-DD","sport":"Schwimmen|Rad|Laufen|Kraft|Mobility","title":"kurzer Titel","duration_min":60,"intensity":"leicht|mittel|hart","description":"...","distance_m":1800,"exercises":[{"id":"...","sets":3,"reps":"12"}]}]}
+{"workouts":[{"date":"YYYY-MM-DD","sport":"Schwimmen|Rad|Laufen|Kraft|Mobility","title":"kurzer Titel","duration_min":60,"intensity":"leicht|mittel|hart","description":"...","distance_m":1800,"drills":["abschlag"],"exercises":[{"id":"...","sets":3,"reps":"12"}]}]}
 
-"distance_m" nur bei sport="Schwimmen", "exercises" nur bei sport="Kraft"/"Mobility" angeben, sonst weglassen. Jedes "date" muss exakt eines der oben genannten ${windowDates.length} Zeitfenster-Daten sein. Kein Datum außerhalb, keine Duplikate am selben Tag+Sportart.`;
+"distance_m" und "drills" nur bei sport="Schwimmen", "exercises" nur bei sport="Kraft"/"Mobility" angeben, sonst weglassen. Jedes "date" muss exakt eines der oben genannten ${windowDates.length} Zeitfenster-Daten sein. Kein Datum außerhalb, keine Duplikate am selben Tag+Sportart.`;
 }
 
 // Schwimmen in Metern statt mit Tempo-Vorgabe (Wunsch aus der Praxis: am
@@ -81,7 +81,8 @@ function swimMetersPer10Min() {
 }
 
 function swimPlanRule() {
-  return `- Bei "Schwimmen": "description" in METERN statt Minuten und OHNE Tempo-Vorgabe (keine Zeiten pro 100 m, keine Pace-Zonen), z.B. "400 m einschwimmen locker, 6 × 50 m Technik, 8 × 100 m zügig mit 20 s Pause, 200 m ausschwimmen – zusammen 1.900 m". Die Intensität nur in Worten (locker, zügig, hart, Atemgefühl). Zusätzlich "distance_m" = Gesamtmeter als Zahl (Vielfaches von 50). Richtwert für diese Person: etwa ${swimMetersPer10Min()} m pro 10 Minuten inklusive Pausen - die Meter müssen zu "duration_min" passen.`;
+  const drills = typeof SWIM_DRILLS !== "undefined";
+  return `- Bei "Schwimmen" planst du wie ein erfahrener Schwimm- und Triathlontrainer: immer Einschwimmen, Technikblock, Hauptsatz, Ausschwimmen - mit Pausen am Beckenrand zwischen allen Wiederholungen und nach jedem Block (Pausen in Sekunden nennen). "description" in METERN statt Minuten und OHNE Tempo-Vorgabe (keine Zeiten pro 100 m, keine Pace-Zonen), die Intensität nur in Worten (locker, zügig, hart, Atemgefühl).${drills ? ` Technik: 1-3 Übungen aus "Passende Technikübungen" oben, passend zu den Technik-Schwerpunkten, als "drills": ["id", ...] in der Reihenfolge der Einheit und in "description" mit Namen und Warum nennen (je Übung 25 m Übung + 25 m Kraul, 15 s Pause). Den Hauptsatz genau EINMAL als "Anzahl × Meter" schreiben, Technik nicht als "Anzahl × Meter".` : ""} Beispiel: "400 m einschwimmen, 30 s Pause. Technik: Abschlag und Seitlage für längere Züge. 8 × 100 m zügig mit 20 s Pause, lang machen. 200 m ausschwimmen – zusammen 1.900 m". Zusätzlich "distance_m" = Gesamtmeter als Zahl (Vielfaches von 50). Richtwert für diese Person: etwa ${swimMetersPer10Min()} m pro 10 Minuten inklusive Pausen - die Meter müssen zu "duration_min" passen.`;
 }
 
 // Die Trainingstage im Zeitfenster ausdrücklich nennen: Ohne diese Liste
@@ -178,9 +179,9 @@ ${mobilityPlanRule()}
 - WICHTIG - Konsistenz: "sport" muss exakt zur tatsächlichen Aktivität in "title"/"description" passen (z.B. Zugseiltraining/Klimmzüge/Kniebeugen -> sport MUSS "Kraft" sein), und "duration_min" muss der in "description" genannten Gesamtdauer entsprechen, falls dort eine genannt wird.
 
 Antworte AUSSCHLIESSLICH mit einem JSON-Objekt in genau dieser Form, keinerlei Text davor/danach, keine Code-Block-Markierung:
-{"workouts":[{"date":"${pw.date}","sport":"...","title":"kurzer Titel","duration_min":45,"intensity":"leicht|mittel|hart","description":"...","distance_m":1800,"exercises":[{"name":"...","sets":3,"reps":"12","note":"..."}]}]}
+{"workouts":[{"date":"${pw.date}","sport":"...","title":"kurzer Titel","duration_min":45,"intensity":"leicht|mittel|hart","description":"...","distance_m":1800,"drills":["abschlag"],"exercises":[{"name":"...","sets":3,"reps":"12","note":"..."}]}]}
 
-"distance_m" nur bei sport="Schwimmen", "exercises" nur bei sport="Kraft"/"Mobility" angeben, sonst weglassen. Genau EIN Eintrag im Array, mit date="${pw.date}".`;
+"distance_m" und "drills" nur bei sport="Schwimmen", "exercises" nur bei sport="Kraft"/"Mobility" angeben, sonst weglassen. Genau EIN Eintrag im Array, mit date="${pw.date}".`;
 }
 
 // Prompt fuer die kurze KI-Einordnung im "Trainingsbelastungsfokus"-Chart

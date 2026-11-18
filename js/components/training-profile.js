@@ -80,6 +80,15 @@ function initTrainingProfile() {
         <span class="tp-label">Schwimmtage<small class="tp-hint">Schwimmen nur an diesen Tagen</small></span>
         ${dayChips("swimDays", p.swimDays || [], days.length ? days : null)}
       </div>
+      ${typeof SWIM_GEAR !== "undefined" ? `<div class="tp-section">
+        <span class="tp-label">Hilfsmittel beim Schwimmen<small class="tp-hint">Der Coach plant nur Technikübungen, die damit gehen</small></span>
+        <div class="mob-chips" data-wp-gear>
+          ${Object.entries(SWIM_GEAR).map(([id, text]) => {
+            const on = swimGear(p).includes(id);
+            return `<button type="button" class="mob-chip${on ? " is-on" : ""}" data-id="${id}" aria-pressed="${on}">${text}</button>`;
+          }).join("")}
+        </div>
+      </div>` : ""}
       <div class="tp-section">
         <span class="tp-label">Lange Einheit<small class="tp-hint">Langer Lauf oder lange Radfahrt</small></span>
         ${dayChips("longDays", p.longDays || [], days.length ? days : null)}
@@ -127,6 +136,17 @@ function initTrainingProfile() {
         render();
         saved();
       });
+    });
+    const gear = body.querySelector("[data-wp-gear]");
+    if (gear) gear.addEventListener("click", e => {
+      const chip = e.target.closest(".mob-chip");
+      if (!chip) return;
+      const on = !chip.classList.contains("is-on");
+      chip.classList.toggle("is-on", on);
+      chip.setAttribute("aria-pressed", String(on));
+      athleteProfile.swimEquipment = [...gear.querySelectorAll(".mob-chip.is-on")].map(c => c.dataset.id);
+      saveAthleteProfile();
+      saved();
     });
     body.querySelectorAll(".mob-segmented[data-wp]").forEach(seg => {
       seg.addEventListener("click", e => {

@@ -209,6 +209,9 @@ function parsePlanResponse(rawText, windowDates, report) {
       intensity,
       description: entry.description ? String(entry.description).slice(0, 500) : null,
       distance_m: entry.sport === "Schwimmen" && Number(entry.distance_m) > 0 ? Math.round(Number(entry.distance_m)) : null,
+      // Technikübungen: nur IDs aus der Sammlung (js/data/swim-drills.js)
+      drills: entry.sport === "Schwimmen" && Array.isArray(entry.drills) && typeof SWIM_DRILL_BY_ID !== "undefined"
+        ? [...new Set(entry.drills.filter(id => typeof id === "string" && SWIM_DRILL_BY_ID[id]))].slice(0, 3) : null,
       exercises,
     });
   });

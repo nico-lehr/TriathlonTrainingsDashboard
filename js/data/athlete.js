@@ -26,6 +26,7 @@ let athleteProfile = {
   name: null, gender: null, birthDate: null,
   raceExperience: null, // Wettkampferfahrung (Chips: none/few/some/many) - Kontext für die KI-Trainingsplan-Erstellung
   limitations: null, // Verletzungen/Einschränkungen (Freitext) - wird im KI-Trainingsplan-Kontext berücksichtigt
+  swimEquipment: ["pullbuoy", "board"], // Hilfsmittel beim Schwimmen (SWIM_GEAR, js/data/swim-drills.js) - der Coach plant nur Technikübungen, die damit gehen
   swimCssTest: null, // { t400: "7:10", t200: "3:25", date: "YYYY-MM-DD" } - CSS-Test aus dem Analyse-Tab; das Ergebnis steht in swimCss (dasselbe Feld wie in den Einstellungen)
   homeLocation: null, // Heimatort für das Wetter im Kalender { name, lat, lon } - gesucht in den Einstellungen (js/data/weather.js)
   sportBalanceTarget: null, // Ziel-Anteile der Trainingszeit { Schwimmen, Rad, Laufen } in % (zusammen 100) - Analyse-Tab "Sport-Balance", null = Standard 15/50/35 (js/analytics/triathlon.js)

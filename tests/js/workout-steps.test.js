@@ -15,7 +15,7 @@ const vm = require("node:vm");
 
 const ROOT = path.join(__dirname, "..", "..");
 const SCRIPTS = ["js/utils/dates.js", "js/utils/formatting.js", "js/analytics/periodization.js", "js/analytics/zones.js",
-  "js/data/planned-workouts.js", "js/data/fit-workout-writer.js"];
+  "js/data/swim-drills.js", "js/analytics/swim-technique.js", "js/data/planned-workouts.js", "js/data/fit-workout-writer.js"];
 
 const app = vm.createContext({
   DATA: [], window: {}, TextEncoder, setTimeout: () => 0, clearTimeout: () => {},
@@ -77,19 +77,73 @@ test("Standard: Ziele aus dem Profil - Pace (Schwellenpace), Watt (FTP), sonst P
   assert.deepStrictEqual(defaults({ sport: "Laufen", duration_min: 45, intensity: "hart" })[1].steps[0].target, { kind: "hr_zone", zone: 5 });
 });
 
-test("Standard: Schwimmen = Einschwimmen / Technik 50 m / Hauptsatz mit Pausen / Ausschwimmen, in Metern mit Stil", () => {
-  const st = defaults({ sport: "Schwimmen", duration_min: 45, intensity: "mittel" });
-  assert.deepStrictEqual(st.map(s => s.type), ["warmup", "repeat", "repeat", "cooldown"]);
-  assert.deepStrictEqual([st[0].distance_km, st[0].stroke], [0.25, "free"]);
-  assert.deepStrictEqual(st[1].steps.map(s => [s.type, s.distance_km || s.duration_min * 60, s.stroke]), [["interval", 50, "drill"], ["rest", 15, undefined]].map(([t, v, k]) => [t, t === "interval" ? 0.05 : v, k]));
-  assert.deepStrictEqual([st[2].count, st[2].steps[0].distance_km, st[2].steps[0].stroke, st[2].steps[1].type, st[2].steps[1].duration_min * 60], [10, 0.1, "free", "rest", 15]);
-  assert.deepStrictEqual([st[3].distance_km, st[3].stroke], [0.2, "any"]);
-  // ohne CSS kein Pace-Ziel, mit CSS Pace-Zone im Hauptsatz
-  assert.strictEqual(st[2].steps[0].target.kind, "none");
+test("Standard: Schwimmen = Einschwimmen / Pause / Technik / Pause / Hauptsatz / Ausschwimmen, in Metern mit Stil", () => {
+  const st = defaults({ sport: "Schwimmen", duration_min: 45, intensity: "mittel", date: "2026-11-19" });
+  assert.deepStrictEqual(st.map(s => s.type), ["warmup", "rest", "repeat", "repeat", "repeat", "rest", "repeat", "cooldown"]);
+  assert.deepStrictEqual([st[0].distance_km, st[0].stroke, st[1].duration_min * 60], [0.25, "free", 30]);
+  // Technik: 3 verschiedene, konkrete Übungen mit Namen im Hinweis, jede Wiederholung endet mit Pause
+  const tech = st.slice(2, 5);
+  assert.strictEqual(new Set(tech.map(r => r.steps[0].note)).size, 3);
+  tech.forEach(r => {
+    assert.ok(r.count >= 2 && r.count <= 4);
+    assert.strictEqual(r.steps[r.steps.length - 1].type, "rest");
+    const name = r.steps[0].note.split(" · ")[0];
+    assert.ok(vm.runInContext("SWIM_DRILLS", app).some(d => d.short === name), name);
+  });
+  const drill = tech.find(r => r.steps.length === 3);
+  if (drill) assert.deepStrictEqual(drill.steps.map(s => [s.distance_km, s.stroke]), [[0.025, "drill"], [0.025, "free"], [undefined, undefined]]);
+  // Hauptsatz mit Pause, ohne Tempo-Vorgabe
+  const main = st[6];
+  assert.ok(main.steps[0].note.startsWith("Hauptsatz · Zügig"));
+  assert.deepStrictEqual([main.steps[0].distance_km, main.steps[0].stroke, main.steps[0].target, main.steps[1].type, main.steps[1].duration_min * 60], [0.1, "free", NONE, "rest", 20]);
+  assert.deepStrictEqual([st[7].distance_km, st[7].stroke], [0.2, "any"]);
   app.athleteProfile.swimCss = "1:50";
-  // Schwimmen ohne Tempo-Vorgabe: die Einheit steht in Metern
-  assert.deepStrictEqual(defaults({ sport: "Schwimmen", duration_min: 45, intensity: "hart" })[2].steps[0].target, { kind: "none" });
+  assert.deepStrictEqual(defaults({ sport: "Schwimmen", duration_min: 45, intensity: "hart" }).find(s => s.type === "repeat" && /^Hauptsatz/.test(s.steps[0].note)).steps[0].target, NONE);
   app.athleteProfile.swimCss = null;
+});
+
+test("Schwimmen: Pausen nach jedem Block und in jeder Wiederholung", () => {
+  [20, 30, 45, 60, 90].forEach(d => ["leicht", "mittel", "hart"].forEach(intensity => {
+    const st = defaults({ sport: "Schwimmen", duration_min: d, intensity, date: "2026-11-20" });
+    st.forEach((s, i) => {
+      if (s.type === "repeat") assert.strictEqual(s.steps[s.steps.length - 1].type, "rest", `${d} ${intensity}: Wiederholung ${i} ohne Pause`);
+      if (s.type === "rest") assert.ok(s.note && s.note.startsWith("Pause"));
+    });
+    assert.strictEqual(st[1].type, "rest", `${d} ${intensity}: Pause nach dem Einschwimmen`);
+    assert.ok(flat(st).length <= 200 && JSON.stringify(st).match(/"type"/g).length <= 50, "passt auf die Uhr");
+  }));
+});
+
+test("Schwimmen: der Coach-Text bestimmt Ein-/Ausschwimmen und Hauptsatz, nicht der Techniksatz", () => {
+  const pw = { sport: "Schwimmen", duration_min: 45, intensity: "mittel", date: "2026-11-19", distance_m: 1900,
+    description: "400 m einschwimmen locker, 6 × 50 m Technik, 8 × 100 m zügig mit 20 s Pause, 200 m ausschwimmen – zusammen 1.900 m" };
+  assert.deepStrictEqual(plain(app.parseSwimMainSet(pw)), { count: 8, distance_km: 0.1, rest_min: 20 / 60 });
+  const st = defaults(pw);
+  const main = st.find(s => s.type === "repeat" && /^Hauptsatz/.test(s.steps[0].note));
+  assert.deepStrictEqual([st[0].distance_km, main.count, main.steps[0].distance_km, main.steps[1].duration_min * 60, st[st.length - 1].distance_km], [0.4, 8, 0.1, 20, 0.2]);
+  assert.strictEqual(plain(app.parseSwimMainSet({ description: "Technik: 4 × 50 m Abschlag, dann 6 × 200 m locker / 30 s" })).count, 6);
+  assert.strictEqual(app.parseSwimMainSet({ description: "Technik 6 × 50 m, Beine 4 × 50 m mit Brett" }), null);
+  assert.strictEqual(plain(app.parseSwimMainSet({ title: "Technik + 6×100 m" })).count, 6);
+  // Uhr und App zeigen dieselben Meter
+  const sum = steps => steps.reduce((a, s) => a + (s.type === "repeat" ? s.count * sum(s.steps) : (s.distance_km || 0) * 1000), 0);
+  assert.strictEqual(app.plannedSwimMeters(pw), Math.round(sum(st) / 25) * 25);
+});
+
+test("Schwimmen: Gesamtmeter des Coaches stimmen den Hauptsatz ab", () => {
+  const sum = steps => steps.reduce((a, s) => a + (s.type === "repeat" ? s.count * sum(s.steps) : (s.distance_km || 0) * 1000), 0);
+  const st = defaults({ sport: "Schwimmen", duration_min: 50, intensity: "leicht", date: "2026-11-19", distance_m: 2000 });
+  assert.ok(Math.abs(sum(st) - 2000) <= 200, `${sum(st)} m`);
+});
+
+test("Schwimmen: gespeicherte Übungen des Coaches werden in dieser Reihenfolge geschwommen", () => {
+  const st = defaults({ sport: "Schwimmen", duration_min: 35, intensity: "leicht", date: "2026-11-19", drills: ["faust", "gibtsnicht", "seitlage", "abschlag"] });
+  const names = st.filter(s => s.type === "repeat" && !/^Hauptsatz|^Pull/.test(s.steps[0].note)).map(s => s.steps[0].note.split(" · ")[0]);
+  assert.deepStrictEqual(names, ["Faust", "Seitlage"]); // 35 min -> 2 Übungen
+  const pw = app.buildPlannedWorkout({ date: "2026-11-19", sport: "Schwimmen", duration_min: 45, drills: ["faust", "faust", "x"] });
+  assert.strictEqual(pw.drills.length, 3);
+  assert.strictEqual(pw.drills[0], "faust");
+  assert.strictEqual(new Set(pw.drills).size, 3);
+  assert.strictEqual(app.buildPlannedWorkout({ date: "2026-11-19", sport: "Laufen", duration_min: 45 }).drills, null);
 });
 
 test("Standard: Schwimm-Distanzen sind Bahnlängen und die geschätzte Zeit passt ungefähr", () => {
@@ -109,7 +163,8 @@ test("Standard: ein Satz im Titel (\"6×800 m\", \"5 x 4 min\") wird der Hauptsa
   const bike = defaults({ sport: "Rad", duration_min: 60, intensity: "hart", description: "Intervalle 5 x 4 min" });
   assert.deepStrictEqual([bike.find(s => s.type === "repeat").count, bike.find(s => s.type === "repeat").steps[0].duration_min], [5, 4]);
   const swim = defaults({ sport: "Schwimmen", duration_min: 45, intensity: "mittel", title: "10x100m P 20 s" });
-  assert.deepStrictEqual([swim[2].count, swim[2].steps[0].distance_km, swim[2].steps[1].duration_min * 60], [10, 0.1, 20]);
+  const main = swim.find(s => s.type === "repeat" && /^Hauptsatz/.test(s.steps[0].note));
+  assert.deepStrictEqual([main.count, main.steps[0].distance_km, main.steps[1].duration_min * 60], [10, 0.1, 20]);
   assert.deepStrictEqual(plain(app.parseMainSet({ title: "Locker 45 min" })), null);
 });
 

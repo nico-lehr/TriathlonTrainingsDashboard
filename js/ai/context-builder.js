@@ -353,6 +353,11 @@ function buildPlanContext(goal, windowDates) {
     lines.push(`Wettkampf-Strategie-Notiz des Athleten: "${goal.strategyNote}"`);
   }
 
+  // Schwimmtechnik aus den Uhrdaten (js/analytics/swim-technique.js): woran
+  // gearbeitet wird und welche Technikübungen zur Wahl stehen.
+  const swims = !goal || ["Triathlon", "Schwimmen"].includes(goal.sport) || (athleteProfile.swimDays || []).length;
+  if (swims && typeof swimTechniqueContextText === "function") lines.push(swimTechniqueContextText());
+
   const dowFull = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
   const windowBits = windowDates.map(d => `${d} (${dowFull[new Date(d + "T00:00:00").getDay()]})`);
   lines.push(`Zu planendes Zeitfenster (genau diese ${windowDates.length} Tage, keine anderen Daten verwenden): ${windowBits.join(", ")}`);

@@ -4,6 +4,15 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.6.0
+
+**Schwimmen: konkrete Technik statt „6 × 50 m Technik“**
+- Der Coach wertet deine Bahn-Daten von der Uhr aus (Züge pro 25 m, Zugfrequenz, Anteil Brust-Bahnen, ob die Technik gegen Ende nachlässt, ob ein Freiwasser-Wettkampf ansteht) und legt daraus deine Technik-Schwerpunkte fest.
+- Jede Schwimmeinheit hat jetzt 1–3 konkrete Technikübungen aus einer neuen Sammlung mit 18 Übungen, z. B. Abschlagschwimmen, Seitlage-Beinschlag, Faustschwimmen, 3er-Atmung oder Krokodilaugen. Auf der Uhr steht bei jedem Schritt, worauf du achten sollst. In der App steht unter „Technik heute“, wie die Übung geht und warum sie für dich dran ist.
+- Aufbau wie bei Garmin Coach: Einschwimmen, Pause, Technikblock (25 m Übung + 25 m Kraul, Pause), Pause, Hauptsatz mit Pausen, ab 50 Minuten ein Pull-Satz mit Pullbuoy, Ausschwimmen. Alle Pausen sind eigene Schritte auf der Uhr.
+- Behoben: Die Uhr bekam oft einen anderen Ablauf als den, den der Coach beschrieben hat (statt „8 × 100 m“ z. B. „6 × 50 m“, dadurch deutlich weniger Meter). Hauptsatz, Ein- und Ausschwimmen kommen jetzt aus dem Text des Coaches, und die angezeigten Meter sind die Meter auf der Uhr.
+- Neu im Profil: „Hilfsmittel beim Schwimmen“ (Pullbuoy, Schwimmbrett, Flossen, Paddles, Schnorchel). Der Coach plant nur Übungen, die du damit machen kannst.
+
 ## 2.5.1
 
 **Mobility: 11 neue Übungen, vor allem für Knie und Hüfte**

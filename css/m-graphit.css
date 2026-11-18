@@ -296,6 +296,19 @@ body.m-sheet-open { overflow: hidden; }
 .m-step > i { width: 4px; align-self: stretch; min-height: 34px; border-radius: 2px; flex: none; }
 .m-step b { font-size: 15px; font-weight: 650; }
 .m-step-amt { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Schwimmen: Technikübungen im Einheit-Blatt */
+.m-drills { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px; counter-reset: drill; }
+.m-drill { position: relative; padding-left: 30px; counter-increment: drill; }
+.m-drill::before { content: counter(drill); position: absolute; left: 0; top: 1px; width: 21px; height: 21px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; background: color-mix(in srgb, var(--c-schwimmen, var(--m-accent)) 22%, transparent); color: var(--m-text); }
+.m-drill-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.m-drill-head b { font-size: 15.5px; }
+.m-drill-head .m-tag { background: var(--m-surface-2); color: var(--m-muted); }
+.m-drill p { margin: 4px 0 0; font-size: 14.5px; line-height: 1.45; }
+.m-drill-how { color: color-mix(in srgb, var(--m-text) 90%, var(--m-muted)); }
+.m-drill-meta { color: var(--m-muted); font-size: 13px !important; }
+.m-drill-why { color: var(--m-muted); font-size: 13.5px !important; }
+.m-drill-why b { color: var(--m-text); font-weight: 600; }
 .m-notes { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
 .m-notes li { position: relative; padding-left: 16px; font-size: 15px; line-height: 1.45; color: color-mix(in srgb, var(--m-text) 90%, var(--m-muted)); }
 .m-notes li::before { content: ""; position: absolute; left: 2px; top: .6em; width: 6px; height: 6px; border-radius: 50%; background: var(--m-accent); }

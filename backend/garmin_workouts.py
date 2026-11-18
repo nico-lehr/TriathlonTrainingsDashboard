@@ -577,7 +577,11 @@ def land_steps(entry, d, intensity):
 
 
 def swim_steps(entry, d, intensity):
-    """Schwimmen wie swimSteps() im Browser (ohne CSS: 2:00 /100 m, ohne Pace-Ziel)."""
+    """Ersatz-Ablauf, falls der Browser (noch) keine Schritte geschickt hat.
+    Der Browser schickt fuer alle kommenden Einheiten die echten Schritte mit
+    den Technikuebungen aus den Uhrdaten (swimSteps() in
+    js/data/planned-workouts.js) - hier nur die einfache Grundform
+    (ohne CSS: 2:00 /100 m, ohne Pace-Ziel)."""
     def secs(m, f):
         return m / 100 * SWIM_PACE_S * f
 

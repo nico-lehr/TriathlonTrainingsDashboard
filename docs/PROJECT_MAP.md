@@ -90,6 +90,7 @@ Claude-API-Key, Kartenreihenfolge).
 - `goals.js` — Ziel-Events (Laden/Speichern/Anlegen/Löschen).
 - `athlete.js` — Athletenprofil (Laden/Speichern), Trainingstage-Konstanten.
 - `health.js` — Erholungs-Check-Zustand inkl. täglichem Reset + Logbuch-Archivierung.
+- `swim-drills.js` — Technikübungen fürs Kraulschwimmen (18 Stück: Schwerpunkt, Niveau, Hilfsmittel, Hinweis für die Uhr, „So geht's“), Hilfsmittel der Person (`swimGear`, `athleteProfile.swimEquipment`).
 - `strength-exercises.js` — Kraft-Sammlung (15 Übungen) mit Sätzen, Wiederholungen, Pausen, Startgewicht und Strichfigur (Hilfsmittel-Namen in `mobility-exercises.js`).
 - `planned-workouts.js` — geplante/KI-vorgeschlagene Trainingseinheiten (Laden/Speichern/Anlegen/Verschieben), getrennt von den echten Workouts (`ALL`/`DATA`); setzt die Phase je Einheit (`getPhase`), prüft Verschiebungen gegen die Planregeln (`planRuleViolations`, `applyPlanSuggestion`), nimmt KI-Pläne nur geprüft an (`checkedPlanFromAi`) und hält die Schritte einer Einheit (`validateWorkoutSteps`, `defaultWorkoutSteps`), siehe `docs/DATA_MODEL.md`.
 - `plan-wishes.js` — Terminwünsche für den Trainingsplan („Do 60 min Schwimmen“), werden bei der nächsten KI-Planung fest eingeplant.
@@ -103,6 +104,7 @@ Claude-API-Key, Kartenreihenfolge).
 
 ### `js/analytics/` — reine Berechnungen, kein UI
 - `mobility-plan.js` — stellt eine Mobility-Einheit aus der Sammlung zusammen (Regeln) bzw. baut den Claude-Auftrag samt JSON-Schema und prüft die Antwort; Umwandlung in/aus geplanten Einheiten.
+- `swim-technique.js` — Schwimmtechnik aus den Bahn-Daten der Uhr (Züge pro 25 m, Zugfrequenz, Brust-Anteil, Nachlassen bei Müdigkeit, Freiwasser-Wettkampf) → Schwerpunkte mit Begründung (`swimTechniqueAnalysis`), Auswahl der Übungen je Einheit (`pickSwimDrills`) und Kurztext für den KI-Coach. Die Schritte für die Uhr baut `swimSteps()` in `planned-workouts.js`.
 - `strength-plan.js` — stellt eine Kraft-Einheit aus der Kraft-Sammlung zusammen (je Bewegungsmuster eine Übung), merkt Gewichte und Verlauf (`triathlon_dashboard_strength_v1`), macht geplante Kraft-Einheiten abspielbar.
 - `training-load.js` — CTL/ATL/TSB (PMC), ACWR-Zeitreihen, Trainingsmonotonie/-Strain nach Foster (1998, `computeMonotonyStrainSeries`) und der Monatsvergleich (`computeMonthComparison`, aktueller vs. vorheriger Kalendermonat).
 - `performance.js` — kompakte Bestzeiten-Zusammenfassung für den KI-Kontext, sowie die getrennte VO2max-Schätzung + Trend für Laufen und Rad (`computeVo2MaxEstimate`, primär per Pace/Watt-Puls-Regression) für die zwei Kennzahlen-Kacheln ganz oben im Überblick.

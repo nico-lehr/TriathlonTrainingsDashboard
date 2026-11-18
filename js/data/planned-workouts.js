@@ -65,7 +65,7 @@ function newPlannedWorkoutId() {
 // auf denen Einheiten entstehen: addPlannedWorkout() (manuell),
 // applyPlanSuggestion() (add_easy_session), addOpenWishesToPlan() (Wünsche)
 // und die KI-Planung (generateTrainingPlan).
-// entry: { date, sport, title, duration_min, intensity, description, exercises, steps, goalId, phase, source }
+// entry: { date, sport, title, duration_min, intensity, description, distance_m, drills, exercises, steps, goalId, phase, source }
 // `phase` ergibt sich ohne Angabe aus Datum + Ziel (getPhase,
 // js/analytics/periodization.js) - die Phase am Tag der Einheit, nicht die von heute.
 function buildPlannedWorkout(entry) {
@@ -79,6 +79,7 @@ function buildPlannedWorkout(entry) {
     description: entry.description || null,
     distance_m: entry.sport === "Schwimmen" && Number(entry.distance_m) >= 100 && Number(entry.distance_m) <= 10000 ? Math.round(Number(entry.distance_m)) : null, // nur Schwimmen: Gesamtmeter
     exercises: Array.isArray(entry.exercises) && entry.exercises.length ? entry.exercises : null, // nur Kraft/Mobility: [{name, sets, reps, note}]
+    drills: swimDrillsForEntry(entry), // nur Schwimmen: Technikübungen (IDs aus js/data/swim-drills.js), siehe swimSteps()
     steps: entry.steps ? validateWorkoutSteps(entry.steps).steps : null, // optional, siehe validateWorkoutSteps unten
     status: "geplant", // "geplant" | "erledigt" | "uebersprungen"
     goalId: entry.goalId || null,
@@ -320,15 +321,16 @@ function stepTarget(sport, zone) {
   return { kind: "none" };
 }
 
-// Meter einer Schwimmeinheit: Angabe der KI (distance_m) oder - wie auf der
-// Uhr - aus den Schritten (Einschwimmen, Technik, Hauptsatz, Ausschwimmen).
+// Meter einer Schwimmeinheit - wie auf der Uhr aus den Schritten
+// (Einschwimmen, Technik, Hauptsatz, Ausschwimmen).
 function plannedSwimMeters(pw) {
   if (!pw || pw.sport !== "Schwimmen") return null;
-  if (Number(pw.distance_m) > 0) return Math.round(Number(pw.distance_m));
-  if (!(Number(pw.duration_min) > 0)) return null;
+  // Was auf der Uhr steht, zählt - die Meter des Coaches nur, wenn die
+  // Schritte keine Distanzen haben (z. B. ohne Dauer).
   const sum = steps => steps.reduce((a, st) => a + (st.type === "repeat" ? (st.count || 1) * sum(st.steps || []) : (Number(st.distance_km) || 0) * 1000), 0);
-  const m = Math.round(sum(plannedWorkoutSteps(pw)) / 50) * 50;
-  return m > 0 ? m : null;
+  const m = Number(pw.duration_min) > 0 || pw.steps ? Math.round(sum(plannedWorkoutSteps(pw)) / 25) * 25 : 0;
+  if (m > 0) return m;
+  return Number(pw.distance_m) > 0 ? Math.round(Number(pw.distance_m)) : null;
 }
 
 function fmtSwimMeters(m) {
@@ -454,53 +456,161 @@ function landSteps(pw, d, intensity) {
   return out;
 }
 
-// Schwimmen: Einschwimmen, Technik, Hauptsatz, Ausschwimmen - in Metern
-// (vielfache von 50 m bzw. 25 m), Zeit geschätzt aus CSS bzw. 2:00 /100 m.
+// "8 × 100 m zügig mit 20 s Pause" aus Titel/Beschreibung einer
+// Schwimmeinheit. Anders als parseMainSet() zählt nicht der erste Satz,
+// sondern der größte, der nicht Technik, Beine, Pull oder Ein-/Ausschwimmen
+// ist - der Coach schreibt z. B. "Technik 4 × 50 m, dann 8 × 100 m zügig".
+function parseSwimMainSet(pw) {
+  const text = `${pw.title || ""} ${pw.description || ""}`;
+  const re = /(\d{1,2})\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(km|m)\b/gi;
+  let best = null, m;
+  while ((m = re.exec(text))) {
+    const before = text.slice(Math.max(0, m.index - 14), m.index);
+    const after = text.slice(m.index + m[0].length, m.index + m[0].length + 25);
+    if (/techn|übung|drill|bein|kick|brett|pull|abschlag|faust|einschw|ausschw/i.test(`${before.split(/[,;.+]|\bdann\b|\bund\b/).pop()}|${after.split(/[,;.+]|\bdann\b|\bund\b/)[0]}`)) continue;
+    const count = Number(m[1]);
+    const meters = Number(m[2].replace(",", ".")) * (m[3].toLowerCase() === "km" ? 1000 : 1);
+    if (!(count >= 2 && count <= 30) || !(meters >= 25 && meters <= 1500)) continue;
+    if (best && best.count * best.meters >= count * meters) continue;
+    best = { count, meters, distance_km: meters / 1000 };
+    const r = /(?:\/|mit|P(?:ause)?)\s*(\d+(?:[.,]\d+)?)\s*(min|sek|s)\b/i.exec(after);
+    if (r) {
+      const v = Number(r[1].replace(",", "."));
+      const rest = /min/i.test(r[2]) ? v : v / 60;
+      if (rest > 0 && rest <= 15) best.rest_min = rest;
+    }
+  }
+  if (!best) return null;
+  delete best.meters;
+  return best;
+}
+
+// Ersatz, falls die Übungssammlung (js/data/swim-drills.js) fehlt.
+const SWIM_FALLBACK_DRILL = { short: "Abschlag", cue: "Hand wartet vorn, bis die andere sie berührt", swimCue: "Vorne kurz lang bleiben, dann ziehen", kind: "drill" };
+
+// Die Technikübungen einer Schwimmeinheit (Objekte aus SWIM_DRILLS):
+// je nach Dauer 1-3, zuerst die am Eintrag gespeicherten (vom Coach
+// gewählt), sonst passend zu den Uhrdaten (pickSwimDrills).
+function swimSessionDrills(pw, d) {
+  const n = d >= 45 ? 3 : d >= 30 ? 2 : d >= 20 ? 1 : 0;
+  if (!n) return [];
+  if (typeof SWIM_DRILL_BY_ID === "undefined") return [SWIM_FALLBACK_DRILL];
+  let ids = (Array.isArray(pw.drills) ? pw.drills : []).filter(id => SWIM_DRILL_BY_ID[id]);
+  if (ids.length < n && typeof pickSwimDrills === "function") ids = [...new Set([...ids, ...pickSwimDrills(pw.date)])];
+  return ids.slice(0, n).map(id => SWIM_DRILL_BY_ID[id]);
+}
+
+// Gespeicherte Übungen für eine neue Schwimmeinheit (buildPlannedWorkout):
+// die vom Coach genannten (nur bekannte IDs), aufgefüllt auf 3.
+function swimDrillsForEntry(entry) {
+  if (entry.sport !== "Schwimmen" || typeof SWIM_DRILL_BY_ID === "undefined") return null;
+  const own = (Array.isArray(entry.drills) ? entry.drills : []).filter(id => SWIM_DRILL_BY_ID[id]);
+  const ids = typeof pickSwimDrills === "function" ? [...new Set([...own, ...pickSwimDrills(entry.date)])] : own;
+  return ids.length ? ids.slice(0, 3) : null;
+}
+
+/* Schwimmen wie ein Trainer es an die Tafel schreibt (und Garmin Coach es
+   auf die Uhr legt) - in Metern auf der 25-m-Bahn, mit Pausen nach jedem
+   Block und zwischen allen Wiederholungen:
+     Einschwimmen -> Pause
+     Technik: je Übung 2-4 × (25 m Übung + 25 m Kraul umsetzen, Pause)
+     -> Pause -> Hauptsatz (Wiederholungen mit Pause)
+     [ab 50 min, mit Pullbuoy: Pause -> Pull-Satz] -> Ausschwimmen
+   Die Übungen kommen aus den Uhrdaten (js/analytics/swim-technique.js) bzw.
+   vom Coach. Zeiten geschätzt aus der CSS (ohne: 2:00 /100 m); nennt der
+   Coach Gesamtmeter (distance_m), wird der Hauptsatz darauf abgestimmt. */
 function swimSteps(pw, d, intensity) {
   const css = paceToSeconds(stepProfile().swimCss) || DEFAULT_SWIM_PACE_S;
-  const T = z => stepTarget("Schwimmen", z);
   const secs = (m, f) => m / 100 * css * f; // f = langsamer/schneller als CSS
   const km = m => Math.round(m) / 1000;
-  const swim = (type, meters, stroke, target, note) => ({ type, distance_km: km(meters), stroke, target, note });
-  const rest = (s, note) => ({ type: "rest", duration_min: s / 60, target: { kind: "none" }, note: note || "Pause am Rand" });
+  const swim = (type, meters, stroke, note) => ({ type, distance_km: km(meters), stroke, target: { kind: "none" }, note });
+  const rest = (s, note) => ({ type: "rest", duration_min: s / 60, target: { kind: "none" }, note });
+  const restInSet = s => rest(s, "Pause · am Rand, ruhig atmen");
+  const tech = typeof currentSwimTechnique === "function" ? currentSwimTechnique() : null;
+  const topFocus = tech && tech.focus.length ? tech.focus.slice(0, 2).map(f => f.id) : [];
+  const gear = typeof swimGear === "function" ? swimGear() : [];
   let budget = d * 60;
+  let meters = 0;
   const out = [];
 
-  const warmM = clampNum(roundTo(d * 60 * 0.15 / secs(1, 1.25), 50), 100, 400);
-  out.push(swim("warmup", warmM, "free", { kind: "none" }, "Einschwimmen · locker, lang gleiten"));
-  budget -= secs(warmM, 1.25);
-  const coolM = d >= 45 ? 200 : 100;
+  // Meter fürs Ein-/Ausschwimmen aus dem Text des Coaches ("400 m einschwimmen")
+  const text = `${pw.title || ""} ${pw.description || ""}`;
+  const said = word => {
+    const r = new RegExp(`(\\d{2,4})\\s*m\\s+(?:\\p{L}+\\s+)?${word}|${word}\\p{L}*\\s+(?:\\p{L}+\\s+)?(\\d{2,4})\\s*m\\b`, "iu").exec(text);
+    const v = r ? Number(r[1] || r[2]) : null;
+    return v >= 100 && v <= 800 && v % 25 === 0 ? v : null;
+  };
+
+  // Einschwimmen
+  const warmM = said("einschwimm") || clampNum(roundTo(d * 60 * 0.15 / secs(1, 1.25), 50), 100, 400);
+  out.push(swim("warmup", warmM, "free", "Einschwimmen · locker, lang ausatmen"));
+  out.push(rest(30, "Pause · Brille richten, durchatmen"));
+  budget -= secs(warmM, 1.25) + 30;
+  meters += warmM;
+  const coolM = said("ausschwimm") || (d >= 45 ? 200 : 100);
   budget -= secs(coolM, 1.3);
 
-  if (d >= 25) {
-    const n = d >= 50 ? 8 : d >= 35 ? 6 : 4;
-    out.push({ type: "repeat", count: n, steps: [
-      swim("interval", 50, "drill", { kind: "none" }, "Technik · z. B. Abschlag, Faust, Zählen"),
-      rest(15),
-    ] });
-    budget -= n * (secs(50, 1.4) + 15) - 15;
+  // Technik
+  const drills = swimSessionDrills(pw, d);
+  if (drills.length) {
+    const per = dr => (dr.kind === "drill" ? secs(25, 1.5) + secs(25, 1.1) + 15 : dr.kind === "kick" ? secs(50, 1.9) + 20 : secs(50, 1.1) + 15);
+    const perAll = drills.reduce((a, dr) => a + per(dr), 0);
+    const reps = clampNum(Math.round(d * 60 * 0.22 / perAll), 2, 4);
+    drills.forEach(dr => {
+      const note = `${dr.short} · ${dr.cue}`;
+      const inner = dr.kind === "drill" ? [swim("interval", 25, "drill", note), swim("interval", 25, "free", `Kraul · ${dr.swimCue}`), restInSet(15)]
+        : dr.kind === "kick" ? [swim("interval", 50, "drill", note), restInSet(20)]
+          : [swim("interval", 50, "free", note), restInSet(15)];
+      out.push({ type: "repeat", count: reps, steps: inner });
+    });
+    budget -= reps * perAll + 30;
+    meters += reps * drills.length * 50;
+    out.push(rest(30, "Pause · kurz erholen, gleich kommt der Hauptsatz"));
   }
 
-  const parsed = parseMainSet(pw);
+  // Pull-Satz (wird nach dem Hauptsatz geschwommen, Zeit schon hier abziehen)
+  const pullFocus = topFocus.find(f => ["zug", "gleiten", "rotation", "lage"].includes(f));
+  const pull = d >= 50 && intensity !== "hart" && gear.includes("pullbuoy") && pullFocus ? { count: d >= 70 ? 4 : 3, len: 100 } : null;
+  if (pull) {
+    budget -= pull.count * (secs(pull.len, 1.1) + 20) + 30;
+    meters += pull.count * pull.len;
+  }
+
+  // Hauptsatz: aus dem Text des Coaches, sonst je Intensität
+  const parsed = parseSwimMainSet(pw);
   let set;
-  if (parsed && parsed.distance_km != null) {
+  if (parsed) {
     const len = clampNum(roundTo(parsed.distance_km * 1000, 25), 25, 1500);
     const zone = intensity === "hart" ? (len <= 50 ? 5 : 4) : intensity === "mittel" ? 3 : 2;
     set = { len, count: parsed.count, rest: Math.round((parsed.rest_min != null ? parsed.rest_min * 60 : len <= 100 ? 20 : 30)), zone };
   } else {
     const len = intensity === "leicht" ? (d >= 60 ? 300 : 200) : intensity === "mittel" ? (d >= 60 ? 200 : 100) : (d < 35 ? 50 : 100);
-    const restS = intensity === "leicht" ? 20 : intensity === "mittel" ? 15 : (len <= 50 ? 30 : 20);
+    const restS = intensity === "leicht" ? 20 : intensity === "mittel" ? 20 : (len <= 50 ? 30 : 20);
     const zone = intensity === "leicht" ? 2 : intensity === "mittel" ? 3 : (len <= 50 ? 5 : 4);
     const f = { 2: 1.15, 3: 1.05, 4: 1.0, 5: 0.94 }[zone];
-    const count = clampNum(Math.floor((budget + restS) / (secs(len, f) + restS)), 2, 30);
-    set = { len, count, rest: restS, zone };
+    let count = Math.floor((budget + restS) / (secs(len, f) + restS));
+    // Gesamtmeter vom Coach: Hauptsatz so, dass die Summe passt
+    const wanted = Number(pw.distance_m) > 0 ? Math.round((Number(pw.distance_m) - meters - coolM) / len) : null;
+    if (wanted != null && wanted >= 2 && Math.abs(wanted - count) <= Math.max(2, count * 0.35)) count = wanted;
+    set = { len, count: clampNum(count, 2, 30), rest: restS, zone };
   }
-  const words = { 2: "Gleichmäßig locker · saubere Technik", 3: "Zügig · gleichmäßiges Tempo", 4: "Hart · CSS-Tempo halten", 5: "Sehr schnell · volle Kraft" };
+  const words = { 2: "Locker, gleichmäßig", 3: "Zügig, gleichmäßig", 4: "Hart, Tempo halten", 5: "Sehr schnell" };
+  const m = tech && tech.metrics;
+  const cue = m && m.fatigue && m.spl ? `höchstens ${Math.round(m.spl) + 1} Züge pro Bahn`
+    : topFocus.length && typeof SWIM_FOCUS_CUE !== "undefined" ? SWIM_FOCUS_CUE[topFocus[0]] : "saubere Technik";
   out.push({ type: "repeat", count: set.count, steps: [
-    swim("interval", set.len, "free", T(set.zone), `Hauptsatz · ${words[set.zone]}`),
-    rest(set.rest),
+    swim("interval", set.len, "free", `Hauptsatz · ${words[set.zone]} · ${cue}`),
+    rest(set.rest, "Pause · am Rand, ruhig atmen"),
   ] });
-  out.push(swim("cooldown", coolM, "any", { kind: "none" }, "Ausschwimmen · locker, beliebiger Stil"));
+
+  if (pull) {
+    out.push(rest(30, "Pause · trinken, Pullbuoy holen"));
+    out.push({ type: "repeat", count: pull.count, steps: [
+      swim("interval", pull.len, "free", `Pull · mit Pullbuoy, ${SWIM_FOCUS_CUE[pullFocus]}`),
+      restInSet(20),
+    ] });
+  }
+  out.push(swim("cooldown", coolM, "any", "Ausschwimmen · locker, gern Rücken oder Brust"));
   return out;
 }
 

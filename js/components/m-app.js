@@ -1005,7 +1005,7 @@ function mStepAmount(s) {
 
 // Zweite Zeile eines Schritts: Hinweis, Schwimmstil, Ziel.
 function mStepMeta(s) {
-  const stroke = s.stroke && s.stroke !== "any" && typeof WORKOUT_STROKE_LABELS !== "undefined" ? WORKOUT_STROKE_LABELS[s.stroke] : "";
+  const stroke = s.stroke && s.stroke !== "any" && typeof WORKOUT_STROKE_LABELS !== "undefined" && WORKOUT_STROKE_LABELS[s.stroke] !== mStepName(s) ? WORKOUT_STROKE_LABELS[s.stroke] : "";
   const note = s.note && s.note.includes(" · ") ? s.note.split(" · ").slice(1).join(" · ") : ""; // Teil 1 ist der Name
   return [stroke, mStepTarget(s), note].filter(Boolean).join(" · ");
 }
@@ -1084,6 +1084,7 @@ function mPlanSheetHtml(p) {
     }).join("")}</div></section>`;
   }
 
+  const tech = mSwimTechHtml(p);
   const sentences = mNoteParts(p.description);
   const notes = sentences.length ? `<section class="m-card"><div class="m-head"><h2>Worauf es ankommt</h2></div><ul class="m-notes">${sentences.map(t => `<li>${mEsc(t)}</li>`).join("")}</ul></section>` : "";
 
@@ -1112,7 +1113,33 @@ function mPlanSheetHtml(p) {
         <button type="button" class="m-btn soft" data-sh="${done ? "open" : "done"}">${done ? "Wieder offen" : "Erledigt"}</button>
       </div>
       ${!done && p.status !== "uebersprungen" ? `<button type="button" class="m-btn ghost wide" data-sh="skip">Überspringen</button>` : ""}</div>`;
-  return head + flow + notes + actions;
+  return head + flow + tech + notes + actions;
+}
+
+// Schwimmen: die Technikübungen der Einheit - so geht's und warum (aus den
+// Uhrdaten, js/analytics/swim-technique.js). Nur beim Standard-Ablauf; eigene
+// Schritte haben ihre eigenen Hinweise.
+function mSwimTechHtml(p) {
+  if (p.sport !== "Schwimmen" || p.steps || !(Number(p.duration_min) > 0) || typeof swimSessionDrills !== "function"
+    || typeof currentSwimTechnique !== "function") return "";
+  const drills = swimSessionDrills(p, Number(p.duration_min)).filter(d => d.id);
+  if (!drills.length) return "";
+  const a = currentSwimTechnique();
+  const m = a.metrics;
+  const facts = a.poolSessions
+    ? `Aus ${a.poolSessions} ${a.poolSessions === 1 ? "Beckeneinheit" : "Beckeneinheiten"}: ${[m.spl != null && `Ø ${fmtSwimNum(m.spl)} Züge pro 25 m`, m.rate != null && `${m.rate} Züge pro Minute`, m.breastShare >= 0.1 && `${Math.round(m.breastShare * 100)} % Brust`].filter(Boolean).join(" · ")}`
+    : a.note;
+  const kind = { drill: "je 25 m Übung + 25 m Kraul", kick: "50 m Beine", swim: "50 m Kraul mit Aufgabe" };
+  return `<section class="m-card"><div class="m-head"><h2>Technik heute</h2><span class="m-head-note">passend zu deinen Daten</span></div>
+    ${facts ? `<p class="m-say small">${mEsc(facts)}</p>` : ""}
+    <ol class="m-drills">${drills.map(d => {
+      const why = swimDrillReason(d, a);
+      const gear = d.gear.map(g => SWIM_GEAR[g]).join(", ");
+      return `<li class="m-drill"><div class="m-drill-head"><b>${mEsc(d.name)}</b><span class="m-tag">${mEsc(SWIM_FOCUS[d.focus[0]])}</span></div>
+        <p class="m-drill-how">${mEsc(d.how)}</p>
+        <p class="m-drill-meta">${mEsc(kind[d.kind])}${gear ? ` · mit ${mEsc(gear)}` : ""}</p>
+        ${why ? `<p class="m-drill-why"><b>Warum:</b> ${mEsc(why)}</p>` : ""}</li>`;
+    }).join("")}</ol></section>`;
 }
 
 function mPlanSheet(id) {
