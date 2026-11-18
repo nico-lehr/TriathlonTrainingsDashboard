@@ -80,6 +80,16 @@ function initTrainingProfile() {
         <span class="tp-label">Schwimmtage<small class="tp-hint">Schwimmen nur an diesen Tagen</small></span>
         ${dayChips("swimDays", p.swimDays || [], days.length ? days : null)}
       </div>
+      <div class="tp-section">
+        <div class="tp-row">
+          <span class="tp-label">Strecke pro Schwimmeinheit<small class="tp-hint">Leer lassen = der Coach entscheidet</small></span>
+          <span class="wp-range">
+            <span class="pf-input-wrap"><input type="number" id="wp-swim-min" class="pf-input" min="200" max="10000" step="100" placeholder="von" aria-label="Mindestens Meter pro Schwimmeinheit" value="${p.swimMetersMin || ""}"><span class="pf-unit">m</span></span>
+            <span class="wp-range-sep">–</span>
+            <span class="pf-input-wrap"><input type="number" id="wp-swim-max" class="pf-input" min="200" max="10000" step="100" placeholder="bis" aria-label="Höchstens Meter pro Schwimmeinheit" value="${p.swimMetersMax || ""}"><span class="pf-unit">m</span></span>
+          </span>
+        </div>
+      </div>
       ${typeof SWIM_GEAR !== "undefined" ? `<div class="tp-section">
         <span class="tp-label">Hilfsmittel beim Schwimmen<small class="tp-hint">Der Coach plant nur Technikübungen, die damit gehen</small></span>
         <div class="mob-chips" data-wp-gear>
@@ -175,6 +185,23 @@ function initTrainingProfile() {
     };
     min.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(commit, 700); });
     min.addEventListener("change", () => { clearTimeout(timer); commit(); });
+    // Strecke pro Schwimmeinheit (von - bis), beim Verlassen ordnen
+    const swimMin = document.getElementById("wp-swim-min"), swimMax = document.getElementById("wp-swim-max");
+    const meters = v => (Number(v) > 0 ? Math.min(10000, Math.max(200, Math.round(Number(v) / 50) * 50)) : null);
+    const commitSwim = tidy => {
+      let lo = meters(swimMin.value), hi = meters(swimMax.value);
+      if (tidy && lo && hi && lo > hi) [lo, hi] = [hi, lo];
+      athleteProfile.swimMetersMin = lo;
+      athleteProfile.swimMetersMax = hi;
+      if (tidy) { swimMin.value = lo || ""; swimMax.value = hi || ""; }
+      saveAthleteProfile();
+      saved();
+    };
+    let swimTimer = null;
+    [swimMin, swimMax].forEach(el => {
+      el.addEventListener("input", () => { clearTimeout(swimTimer); swimTimer = setTimeout(() => commitSwim(false), 700); });
+      el.addEventListener("change", () => { clearTimeout(swimTimer); commitSwim(true); });
+    });
     const on = document.getElementById("wp-strength-on");
     if (on) on.addEventListener("click", () => {
       athleteProfile.includeStrength = true;

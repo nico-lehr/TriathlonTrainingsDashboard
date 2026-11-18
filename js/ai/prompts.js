@@ -73,16 +73,20 @@ Antworte AUSSCHLIESSLICH mit einem JSON-Objekt in genau dieser Form, keinerlei T
 }
 
 // Schwimmen in Metern statt mit Tempo-Vorgabe (Wunsch aus der Praxis: am
-// Beckenrand zählt man Bahnen, nicht Sekunden pro 100 m). Richtwert aus der
-// CSS (Schwellentempo) inkl. Pausen, ohne CSS 2:00 /100 m.
-function swimMetersPer10Min() {
-  const css = (typeof paceToSeconds === "function" && paceToSeconds(athleteProfile.swimCss)) || 120;
-  return Math.max(200, Math.round(600 / (css * 1.3) * 100 / 50) * 50);
-}
-
+// Beckenrand zählt man Bahnen, nicht Sekunden pro 100 m). Richtwert und
+// gewünschter Meterbereich: swimMetersPer10Min()/swimMeterRange() in
+// js/data/planned-workouts.js.
 function swimPlanRule() {
   const drills = typeof SWIM_DRILLS !== "undefined";
-  return `- Bei "Schwimmen" planst du wie ein erfahrener Schwimm- und Triathlontrainer: immer Einschwimmen, Technikblock, Hauptsatz, Ausschwimmen - mit Pausen am Beckenrand zwischen allen Wiederholungen und nach jedem Block (Pausen in Sekunden nennen). "description" in METERN statt Minuten und OHNE Tempo-Vorgabe (keine Zeiten pro 100 m, keine Pace-Zonen), die Intensität nur in Worten (locker, zügig, hart, Atemgefühl).${drills ? ` Technik: 1-3 Übungen aus "Passende Technikübungen" oben, passend zu den Technik-Schwerpunkten, als "drills": ["id", ...] in der Reihenfolge der Einheit und in "description" mit Namen und Warum nennen (je Übung 25 m Übung + 25 m Kraul, 15 s Pause). Den Hauptsatz genau EINMAL als "Anzahl × Meter" schreiben, Technik nicht als "Anzahl × Meter".` : ""} Beispiel: "400 m einschwimmen, 30 s Pause. Technik: Abschlag und Seitlage für längere Züge. 8 × 100 m zügig mit 20 s Pause, lang machen. 200 m ausschwimmen – zusammen 1.900 m". Zusätzlich "distance_m" = Gesamtmeter als Zahl (Vielfaches von 50). Richtwert für diese Person: etwa ${swimMetersPer10Min()} m pro 10 Minuten inklusive Pausen - die Meter müssen zu "duration_min" passen.`;
+  return `- Bei "Schwimmen" planst du wie ein erfahrener Schwimm- und Triathlontrainer: immer Einschwimmen, Technikblock, Hauptsatz, Ausschwimmen - mit Pausen am Beckenrand zwischen allen Wiederholungen und nach jedem Block (Pausen in Sekunden nennen). "description" in METERN statt Minuten und OHNE Tempo-Vorgabe (keine Zeiten pro 100 m, keine Pace-Zonen), die Intensität nur in Worten (locker, zügig, hart, Atemgefühl).${drills ? ` Technik: 1-3 Übungen aus "Passende Technikübungen" oben, passend zu den Technik-Schwerpunkten, als "drills": ["id", ...] in der Reihenfolge der Einheit und in "description" mit Namen und Warum nennen (je Übung 25 m Übung + 25 m Kraul, 15 s Pause). Den Hauptsatz genau EINMAL als "Anzahl × Meter" schreiben, Technik nicht als "Anzahl × Meter".` : ""} Beispiel: "400 m einschwimmen, 30 s Pause. Technik: Abschlag und Seitlage für längere Züge. 8 × 100 m zügig mit 20 s Pause, lang machen. 200 m ausschwimmen – zusammen 1.900 m". Zusätzlich "distance_m" = Gesamtmeter als Zahl (Vielfaches von 50). Richtwert für diese Person: etwa ${swimMetersPer10Min()} m pro 10 Minuten inklusive Pausen - die Meter müssen zu "duration_min" passen.${swimRangeRule()}`;
+}
+
+function swimRangeRule() {
+  const r = typeof swimMeterRange === "function" ? swimMeterRange() : null;
+  if (!r) return "";
+  const m = v => `${Number(v).toLocaleString("de-DE")} m`;
+  const text = r.min && r.max ? `zwischen ${m(r.min)} und ${m(r.max)}` : r.min ? `mindestens ${m(r.min)}` : `höchstens ${m(r.max)}`;
+  return ` WICHTIG: Jede Schwimmeinheit ${text} ("distance_m"), so wünscht es der Athlet - "duration_min" passend dazu wählen.`;
 }
 
 // Die Trainingstage im Zeitfenster ausdrücklich nennen: Ohne diese Liste

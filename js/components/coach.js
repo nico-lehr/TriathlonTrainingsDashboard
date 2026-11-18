@@ -408,6 +408,8 @@ function resetOnbState() {
     swimDays: [...(athleteProfile.swimDays || [])],
     longDays: [...(athleteProfile.longDays || [])],
     typicalSessionMin: athleteProfile.typicalSessionMin || "",
+    swimMetersMin: athleteProfile.swimMetersMin || "",
+    swimMetersMax: athleteProfile.swimMetersMax || "",
     weeklyHours: athleteProfile.weeklyHours || "",
     ftpWatts: athleteProfile.ftpWatts || "",
     runThresholdPace: athleteProfile.runThresholdPace || "",
@@ -539,6 +541,7 @@ function buildOnbSummary() {
   if ((onbState.swimDays || []).length) refineBits.push(`Schwimmen ${onbState.swimDays.map(d => WEEKDAY_LABELS[d]).join("+")}`);
   if ((onbState.longDays || []).length) refineBits.push(`Lange Einheit ${onbState.longDays.map(d => WEEKDAY_LABELS[d]).join("+")}`);
   if (onbState.typicalSessionMin) refineBits.push(`~${onbState.typicalSessionMin} Min./Einheit`);
+  if (onbState.swimMetersMin || onbState.swimMetersMax) refineBits.push(`Schwimmen ${onbState.swimMetersMin && onbState.swimMetersMax ? `${onbState.swimMetersMin}–${onbState.swimMetersMax}` : onbState.swimMetersMin ? `ab ${onbState.swimMetersMin}` : `bis ${onbState.swimMetersMax}`} m`);
   if (refineBits.length) lines.push(`<div>Details: <b>${escapeHtml(refineBits.join(" · "))}</b></div>`);
   const perf = [];
   if (onbState.ftpWatts) perf.push(`FTP ${onbState.ftpWatts}W`);
@@ -636,6 +639,11 @@ function renderOnbStep() {
         <div class="onb-field"><label for="onb-session-min">Übliche Trainingsdauer (Minuten)</label><input type="number" id="onb-session-min" class="coach-input" min="0" step="5" placeholder="z.B. 60"></div>
         <div class="onb-field"><label for="onb-hours">Stunden pro Woche insgesamt (optional)</label><input type="number" id="onb-hours" class="coach-input" min="0" step="0.5" placeholder="z.B. 8"></div>
       </div>
+      <div class="onb-row">
+        <div class="onb-field"><label for="onb-swim-min">Schwimmen: mindestens (Meter, optional)</label><input type="number" id="onb-swim-min" class="coach-input" min="200" max="10000" step="100" placeholder="z.B. 1500"></div>
+        <div class="onb-field"><label for="onb-swim-max">Schwimmen: höchstens (Meter, optional)</label><input type="number" id="onb-swim-max" class="coach-input" min="200" max="10000" step="100" placeholder="z.B. 2500"></div>
+      </div>
+      <p class="onb-hint">So lang soll eine Schwimmeinheit sein – leer lassen, dann entscheidet der Coach.</p>
     </div>`;
   } else if (onbStep === 4) {
     html = `<div class="onb-step">
@@ -733,6 +741,8 @@ function wireOnbStepInputs() {
   bind("onb-strong", "strongDiscipline");
   bind("onb-weak", "weakDiscipline");
   bind("onb-session-min", "typicalSessionMin");
+  bind("onb-swim-min", "swimMetersMin");
+  bind("onb-swim-max", "swimMetersMax");
   bind("onb-hours", "weeklyHours");
   bind("onb-ftp", "ftpWatts");
   bind("onb-run-pace", "runThresholdPace");
@@ -802,6 +812,13 @@ function finishOnboarding() {
     athleteProfile.swimDays = onbState.swimDays ? [...onbState.swimDays] : [];
     athleteProfile.longDays = onbState.longDays ? [...onbState.longDays] : [];
     athleteProfile.typicalSessionMin = onbState.typicalSessionMin ? Number(onbState.typicalSessionMin) : null;
+    {
+      const m = v => (Number(v) > 0 ? Math.min(10000, Math.max(200, Math.round(Number(v) / 50) * 50)) : null);
+      let lo = m(onbState.swimMetersMin), hi = m(onbState.swimMetersMax);
+      if (lo && hi && lo > hi) [lo, hi] = [hi, lo];
+      athleteProfile.swimMetersMin = lo;
+      athleteProfile.swimMetersMax = hi;
+    }
     athleteProfile.weeklyHours = onbState.weeklyHours ? Number(onbState.weeklyHours) : null;
     athleteProfile.ftpWatts = onbState.ftpWatts ? Number(onbState.ftpWatts) : null;
     athleteProfile.runThresholdPace = onbState.runThresholdPace || null;

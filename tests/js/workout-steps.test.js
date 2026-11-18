@@ -146,6 +146,31 @@ test("Schwimmen: gespeicherte Übungen des Coaches werden in dieser Reihenfolge 
   assert.strictEqual(app.buildPlannedWorkout({ date: "2026-11-19", sport: "Laufen", duration_min: 45 }).drills, null);
 });
 
+test("Schwimmen: gewünschte Meter pro Einheit (von-bis) gelten für jede neue Einheit", () => {
+  const sum = steps => steps.reduce((a, s) => a + (s.type === "repeat" ? s.count * sum(s.steps) : (s.distance_km || 0) * 1000), 0);
+  assert.strictEqual(app.swimMeterRange(), null);
+  Object.assign(app.athleteProfile, { swimMetersMin: 2000, swimMetersMax: 3000 });
+  assert.deepStrictEqual(plain(app.swimMeterRange()), { min: 2000, max: 3000 });
+  // zu kurz (30 min ~ 1.150 m): auf 2.000 m hochgesetzt, Dauer passend
+  const short = app.buildPlannedWorkout({ date: "2026-11-19", sport: "Schwimmen", duration_min: 30, intensity: "leicht" });
+  assert.strictEqual(short.distance_m, 2000);
+  assert.ok(short.duration_min >= 50 && short.duration_min <= 55, String(short.duration_min));
+  assert.ok(Math.abs(sum(plain(app.plannedWorkoutSteps(short))) - 2000) <= 200, String(sum(plain(app.plannedWorkoutSteps(short)))));
+  // zu lang vom Coach: auf 3.000 m begrenzt
+  const long = app.buildPlannedWorkout({ date: "2026-11-19", sport: "Schwimmen", duration_min: 120, distance_m: 4500, intensity: "leicht" });
+  assert.strictEqual(long.distance_m, 3000);
+  // passt schon: bleibt wie vom Coach geplant
+  const fine = app.buildPlannedWorkout({ date: "2026-11-19", sport: "Schwimmen", duration_min: 60, distance_m: 2400, intensity: "mittel" });
+  assert.deepStrictEqual([fine.distance_m, fine.duration_min], [2400, 60]);
+  // andere Sportarten bleiben unberührt; vertauschte Werte werden geordnet
+  assert.strictEqual(app.buildPlannedWorkout({ date: "2026-11-19", sport: "Laufen", duration_min: 30 }).duration_min, 30);
+  Object.assign(app.athleteProfile, { swimMetersMin: 2500, swimMetersMax: 1500 });
+  assert.deepStrictEqual(plain(app.swimMeterRange()), { min: 1500, max: 2500 });
+  Object.assign(app.athleteProfile, { swimMetersMin: null, swimMetersMax: 1800 });
+  assert.strictEqual(app.buildPlannedWorkout({ date: "2026-11-19", sport: "Schwimmen", duration_min: 60, intensity: "leicht" }).distance_m, 1800);
+  Object.assign(app.athleteProfile, { swimMetersMin: null, swimMetersMax: null });
+});
+
 test("Standard: Schwimm-Distanzen sind Bahnlängen und die geschätzte Zeit passt ungefähr", () => {
   ["leicht", "mittel", "hart"].forEach(intensity => [30, 45, 60, 90].forEach(d => {
     const st = defaults({ sport: "Schwimmen", duration_min: d, intensity });

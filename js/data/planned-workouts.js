@@ -69,6 +69,7 @@ function newPlannedWorkoutId() {
 // `phase` ergibt sich ohne Angabe aus Datum + Ziel (getPhase,
 // js/analytics/periodization.js) - die Phase am Tag der Einheit, nicht die von heute.
 function buildPlannedWorkout(entry) {
+  entry = fitSwimToRange(entry);
   return {
     id: newPlannedWorkoutId(),
     date: entry.date,
@@ -331,6 +332,38 @@ function plannedSwimMeters(pw) {
   const m = Number(pw.duration_min) > 0 || pw.steps ? Math.round(sum(plannedWorkoutSteps(pw)) / 25) * 25 : 0;
   if (m > 0) return m;
   return Number(pw.distance_m) > 0 ? Math.round(Number(pw.distance_m)) : null;
+}
+
+// Wie viele Meter diese Person in 10 Minuten schafft, inklusive Pausen am
+// Rand - Richtwert aus der CSS (Schwellentempo), ohne CSS 2:00 /100 m.
+function swimMetersPer10Min() {
+  const css = (typeof paceToSeconds === "function" && paceToSeconds(stepProfile().swimCss)) || DEFAULT_SWIM_PACE_S;
+  return Math.max(200, Math.round(600 / (css * 1.3) * 100 / 50) * 50);
+}
+
+// Gewünschte Strecke pro Schwimmeinheit aus dem Profil (Einstellungen bzw.
+// Onboarding): { min, max } in Metern, eine Seite darf fehlen. null = egal.
+function swimMeterRange(profile) {
+  const p = profile || stepProfile();
+  const ok = v => (Number(v) >= 200 && Number(v) <= 10000 ? Math.round(Number(v) / 50) * 50 : null);
+  let min = ok(p.swimMetersMin), max = ok(p.swimMetersMax);
+  if (min && max && min > max) [min, max] = [max, min];
+  return min || max ? { min, max } : null;
+}
+
+// Neue Schwimmeinheit in den gewünschten Meterbereich bringen: Meter (vom
+// Coach oder aus der Dauer geschätzt) auf den Bereich begrenzen und - wenn
+// sich etwas ändert - die Dauer passend dazu setzen.
+function fitSwimToRange(entry) {
+  const range = entry.sport === "Schwimmen" ? swimMeterRange() : null;
+  if (!range) return entry;
+  const per10 = swimMetersPer10Min();
+  const dur = Number(entry.duration_min) > 0 ? Number(entry.duration_min) : null;
+  const meters = Number(entry.distance_m) > 0 ? Number(entry.distance_m) : dur ? dur / 10 * per10 : null;
+  if (!meters) return { ...entry, distance_m: range.min || range.max, duration_min: Math.max(15, Math.round((range.min || range.max) / per10 * 2) * 5) };
+  const fitted = Math.min(range.max || Infinity, Math.max(range.min || 0, Math.round(meters / 50) * 50));
+  if (fitted === Math.round(meters / 50) * 50) return entry; // liegt schon im Bereich
+  return { ...entry, distance_m: fitted, duration_min: Math.max(15, Math.round(fitted / per10 * 2) * 5) };
 }
 
 function fmtSwimMeters(m) {

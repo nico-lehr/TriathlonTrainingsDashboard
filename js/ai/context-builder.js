@@ -165,6 +165,8 @@ function buildCompactContext(goal, { forPlan = false } = {}) {
     profBits.push(`lange Einheit ${athleteProfile.longDays.map(d => WEEKDAY_LABELS[d] || d).join("+")}`);
   }
   if (athleteProfile.typicalSessionMin) profBits.push(`~${athleteProfile.typicalSessionMin} Min./Einheit`);
+  const swimRange = typeof swimMeterRange === "function" ? swimMeterRange() : null;
+  if (swimRange) profBits.push(`Schwimmeinheiten ${swimRange.min && swimRange.max ? `${swimRange.min}-${swimRange.max} m` : swimRange.min ? `mind. ${swimRange.min} m` : `max. ${swimRange.max} m`}`);
   if (athleteProfile.ftpWatts) profBits.push(`FTP ${athleteProfile.ftpWatts}W`);
   if (athleteProfile.runThresholdPace) profBits.push(`Schwellenpace Lauf ${athleteProfile.runThresholdPace}/km`);
   if (athleteProfile.swimCss) profBits.push(`CSS Schwimmen ${athleteProfile.swimCss}/100m`);

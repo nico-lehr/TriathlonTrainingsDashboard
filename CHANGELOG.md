@@ -4,6 +4,12 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.5.3
+
+**Schwimmen: Strecke pro Einheit selbst festlegen**
+- Neu in den Einstellungen (Training & Planung) und im Onboarding: „Strecke pro Schwimmeinheit“ von–bis in Metern, z. B. 2.000–3.000 m. Du kannst auch nur eine Grenze angeben („mindestens“ oder „höchstens“). Leer lassen heißt: Der Coach entscheidet wie bisher.
+- Der Coach plant jede neue Schwimmeinheit in diesem Bereich. Plant er trotzdem zu kurz oder zu lang, setzt die App die Meter selbst in den Bereich und passt die Dauer an. Der Hauptsatz auf der Uhr wird so lang, dass die Meter stimmen.
+
 ## 2.5.2
 
 **Schwimmen: konkrete Technik statt „6 × 50 m Technik“**

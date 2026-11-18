@@ -2630,6 +2630,9 @@
   .pf-row label { flex: 1 0 auto; }
   .pf-val { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; flex: 0 1 auto; }
   .pf-input-wrap { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .wp-range { display: flex; align-items: center; gap: 8px; }
+  .wp-range .pf-input { width: 84px; }
+  .wp-range-sep { color: var(--text-muted); }
   .pf-input {
     width: 130px; min-height: 36px; padding: 6px 10px; box-sizing: border-box; text-align: right;
     border: 1px solid transparent; border-radius: 10px; background: color-mix(in srgb, var(--text-primary) 6%, transparent);
