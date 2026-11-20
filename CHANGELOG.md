@@ -4,6 +4,13 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.5.51
+
+**Notizen zu Einheiten speichern sich selbst**
+- In der Workout-Ansicht unter „Deine Bewertung“ gibt es keinen „Notiz speichern“-Knopf mehr. Die Notiz wird automatisch gespeichert: kurz nachdem du aufhörst zu tippen, wenn du das Feld verlässt oder die Ansicht schließt und wenn du die App wechselst.
+- Unter dem Feld steht, was gerade passiert: „Wird gespeichert …“ und dann „Gespeichert ✓“.
+- Auch ohne Netz geht nichts verloren: Die Notiz wird im Gerät zwischengespeichert und nachgeschickt, sobald der Server wieder erreichbar ist.
+
 ## 2.5.5
 
 **Sicherheit: fünf Verbesserungen aus dem Sicherheitscheck**

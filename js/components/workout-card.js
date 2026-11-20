@@ -337,9 +337,9 @@ function metricInsightsHtml(list) {
 // Eigene Bewertung (1-5 Sterne, Klick toggelt an/aus) + Notiz zu dieser
 // Einheit (js/data/workout-notes.js) - bewusst VOR dem KI-Auswertungs-Block
 // platziert, damit die eigene Einschätzung zuerst kommt. Sterne speichern
-// sofort bei Klick, die Notiz erst über den "Speichern"-Button (wie beim
-// Gewichts-Eintrag im Ernährungs-Tab), damit nicht bei jedem Tastenanschlag
-// geschrieben wird.
+// sofort bei Klick, die Notiz automatisch (wireWorkoutRatingBlock): kurz
+// nach dem Tippen, beim Verlassen des Felds und wenn die App in den
+// Hintergrund geht - ohne Speichern-Knopf.
 function buildWorkoutRatingHtml(w) {
   const entry = getWorkoutNote(w.file) || {};
   const stars = [1, 2, 3, 4, 5].map(n =>
@@ -366,14 +366,30 @@ function buildWorkoutRatingHtml(w) {
       <div class="wd-rating-stars">${stars}</div>
       <textarea class="coach-input wd-rating-note" placeholder="Notiz zu dieser Einheit (z.B. wie es sich angefühlt hat, Wetter, Besonderheiten) …" maxlength="500">${escapeHtml(entry.note || "")}</textarea>
       <div class="wd-analysis-actions">
-        <button type="button" class="chip wd-rating-save-btn">Notiz speichern</button>
-        ${entry.updatedAt ? `<span class="goal-rec-date">Zuletzt geändert: ${fmtDateFull(new Date(entry.updatedAt))}</span>` : ""}
+        <span class="goal-rec-date wd-rating-saved" aria-live="polite">${workoutNoteSavedText(entry)}</span>
       </div>
       ${elevationRowHtml}
     </div>`;
 }
 
-// Verkabelt Sterne + Notiz-Button EINER Bewertungs-Instanz - gescoped auf
+function workoutNoteSavedText(entry) {
+  return entry && entry.updatedAt
+    ? `Wird automatisch gespeichert · zuletzt geändert: ${fmtDateFull(new Date(entry.updatedAt))}`
+    : "Wird automatisch gespeichert";
+}
+
+// Notizen speichern sich selbst. Noch nicht gespeicherte Eingaben (das Feld
+// wartet NOTE_AUTOSAVE_MS nach dem letzten Tastendruck) werden sofort
+// gesichert, wenn die App in den Hintergrund geht oder die Seite schließt -
+// storeSet legt sie dabei auch im Gerät ab (Ausgang, js/data/api-client.js),
+// sie gehen also selbst ohne Netz nicht verloren.
+const NOTE_AUTOSAVE_MS = 800;
+const pendingNoteSaves = new Set();
+function flushPendingNoteSaves() { [...pendingNoteSaves].forEach(save => save()); }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushPendingNoteSaves(); });
+window.addEventListener("pagehide", flushPendingNoteSaves);
+
+// Verkabelt Sterne + Notiz EINER Bewertungs-Instanz - gescoped auf
 // rootEl, gleiches Muster wie renderWorkoutDetailCharts (mehrere gleichzeitig
 // offene Instanzen derselben Einheit möglich: Modal + Kalender-Tageszeile).
 function wireWorkoutRatingBlock(rootEl, file) {
@@ -392,14 +408,30 @@ function wireWorkoutRatingBlock(rootEl, file) {
       starBtns.forEach((s, i) => s.classList.toggle("filled", (updated && updated.rating || 0) >= (i + 1)));
     });
   });
-  const saveBtn = block.querySelector(".wd-rating-save-btn");
   const textarea = block.querySelector(".wd-rating-note");
-  if (saveBtn && textarea) {
-    saveBtn.addEventListener("click", () => {
+  const savedEl = block.querySelector(".wd-rating-saved");
+  if (textarea) {
+    let timer = null;
+    const save = () => {
+      clearTimeout(timer);
+      pendingNoteSaves.delete(save);
+      const current = getWorkoutNote(file);
+      const before = (current && current.note) || "";
+      const now = textarea.value.trim().slice(0, 500);
+      if (now === before) {  // nichts geändert (z. B. nur Leerzeichen) - nichts schreiben
+        if (savedEl) savedEl.textContent = workoutNoteSavedText(current);
+        return;
+      }
       setWorkoutNoteText(file, textarea.value);
-      saveBtn.textContent = "Gespeichert ✓";
-      setTimeout(() => { saveBtn.textContent = "Notiz speichern"; }, 1500);
+      if (savedEl) savedEl.textContent = "Gespeichert ✓";
+    };
+    textarea.addEventListener("input", () => {
+      clearTimeout(timer);
+      pendingNoteSaves.add(save);
+      if (savedEl) savedEl.textContent = "Wird gespeichert …";
+      timer = setTimeout(save, NOTE_AUTOSAVE_MS);
     });
+    textarea.addEventListener("blur", () => { if (pendingNoteSaves.has(save)) save(); });
   }
 
   const elevationInput = block.querySelector(".wd-rating-elevation");
