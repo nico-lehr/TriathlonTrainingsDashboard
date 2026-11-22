@@ -116,7 +116,7 @@ Claude-API-Key, Kartenreihenfolge).
 - `hr-distribution.js` — Puls-Zeitanteil je Sportart aus den Sekunden-Pulswerten (`workout.stream.hr`), geglättetes Histogramm für das Ridgeline-Chart "Herzfrequenzverteilung nach Aktivität". Stellt `hrDensityFromValues()` bereit, die auch `workout-profile.js` nutzt.
 - `workout-profile.js` — Trainingsbelastung (TRIMP/Stress-Score), Herzfrequenzprofil und Belastungsprofil (Radar) einer einzelnen Einheit für die Detailansicht, siehe `docs/DATA_MODEL.md`.
 - `training-plan.js` — rein deterministischer Teil des automatischen Trainingsplans: Phase als Text (aus `periodization.js`), rollierendes Planungsfenster, Auto-Nachplan-Check (`computeTrainingPhase`/`computePlanningWindow`/`shouldAutoReplan`), siehe `docs/DATA_MODEL.md`.
-- `plan-rules.js` — Regelwerk für Trainingspläne (`validatePlan`, 7 Regeln, „block“/„warn“ mit konkretem Vorschlag). Entscheidet allein, ob ein Plan zu hart ist — die KI schlägt nur vor.
+- `plan-rules.js` — Regelwerk für Trainingspläne (`validatePlan`, 7 Regeln, „block“/„warn“ mit konkretem Vorschlag). Entscheidet allein, ob ein Plan zu hart ist — die KI schlägt nur vor. Selbst gewünschte Einheiten (`requested: true` – eigener Eintrag oder Nachricht an den Coach – bzw. `protectIds`) streicht die Ruhetag-Regel nie; bleibt kein anderer Tag, ist es nur ein Hinweis.
 - `periodization.js` — Trainingsphase eines Tages vor dem Hauptevent (`getPhase`, `getPhaseTimeline`) und Zielumfang je Woche (`getWeeklyTargets`). Einzige Quelle für Phasen.
 - `race-plan.js` — Rennplan je Ziel: Tempo je Disziplin aus Distanz + Zielzeit, Tage der Rennwoche, Standard-Checklisten.
 - `triathlon.js` — Analyse-Tab: Sport-Balance, Schwimm-CSS + Trend, Rad-FTP-Schätzung + Leistungszonen, Koppeltraining.

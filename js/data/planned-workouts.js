@@ -65,7 +65,7 @@ function newPlannedWorkoutId() {
 // auf denen Einheiten entstehen: addPlannedWorkout() (manuell),
 // applyPlanSuggestion() (add_easy_session), addOpenWishesToPlan() (Wünsche)
 // und die KI-Planung (generateTrainingPlan).
-// entry: { date, sport, title, duration_min, intensity, description, distance_m, drills, exercises, steps, goalId, phase, source }
+// entry: { date, sport, title, duration_min, intensity, description, distance_m, drills, exercises, steps, goalId, phase, source, requested }
 // `phase` ergibt sich ohne Angabe aus Datum + Ziel (getPhase,
 // js/analytics/periodization.js) - die Phase am Tag der Einheit, nicht die von heute.
 function buildPlannedWorkout(entry) {
@@ -86,6 +86,9 @@ function buildPlannedWorkout(entry) {
     goalId: entry.goalId || null,
     phase: entry.phase || plannedWorkoutPhase(entry),
     source: entry.source || "manual", // "ai" | "manual"
+    // Selbst gewünscht (eigener Eintrag oder Nachricht an den Coach): die
+    // Regelprüfung macht diesen Tag nie zum Ruhetag (checkPlanRestDay).
+    ...(entry.requested === true ? { requested: true } : {}),
     createdAt: new Date().toISOString(),
   };
 }

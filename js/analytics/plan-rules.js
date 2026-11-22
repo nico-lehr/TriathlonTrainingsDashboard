@@ -143,7 +143,7 @@ function planSessions(plannedWorkouts, history, todayKey) {
   const fromPlan = (plannedWorkouts || []).filter(p =>
     (p.status === "geplant" && p.date >= todayKey) ||
     (p.status === "erledigt" && p.date <= todayKey && !seen.has(p.date + "|" + p.sport))
-  ).map(p => ({ id: p.id, date: p.date, sport: p.sport, title: p.title || p.sport, duration_min: Number(p.duration_min) || 0, intensity: p.intensity || null, planned: p.status === "geplant" }));
+  ).map(p => ({ id: p.id, date: p.date, sport: p.sport, title: p.title || p.sport, duration_min: Number(p.duration_min) || 0, intensity: p.intensity || null, planned: p.status === "geplant", requested: p.requested === true }));
   return [...done, ...fromPlan];
 }
 
@@ -268,6 +268,11 @@ function planRestDaySafe(ctx, list, key) {
 
 // Vorgeschlagen wird der Tag ab heute (noch nichts absolviert) mit den
 // wenigsten Minuten, dessen Streichung keinen neuen Verstoß erzeugt.
+// Nie gestrichen wird ein Tag mit einer Einheit, die man sich selbst
+// gewünscht hat (requested: selbst eingetragen oder per Nachricht an den
+// Coach, bzw. ctx.protect für die laufende Planung) - sonst verschwände z. B.
+// "heute 45 min schwimmen" an einem Ruhetag gleich wieder. Bleibt so kein
+// Tag übrig, gibt es nur einen Hinweis.
 function checkPlanRestDay(ctx) {
   const out = [];
   ctx.weeks.forEach(wk => {
@@ -275,14 +280,22 @@ function checkPlanRestDay(ctx) {
     if (days.filter(k => !planDaySessions(ctx, k).length).length >= PLAN_MIN_FREE_DAYS) return;
     const list = planWeekSessions(ctx, wk);
     const dayMin = k => planMinutes(planDaySessions(ctx, k));
-    const pool = days.filter(k => k >= ctx.todayKey && planDaySessions(ctx, k).every(s => s.planned))
+    const open = days.filter(k => k >= ctx.todayKey && planDaySessions(ctx, k).every(s => s.planned))
       .sort((a, b) => dayMin(a) - dayMin(b));
-    if (!pool.length) return; // nichts mehr, was der Plan noch ändern könnte
-    const date = pool.find(k => planRestDaySafe(ctx, list, k)) || pool[0];
+    if (!open.length) return; // nichts mehr, was der Plan noch ändern könnte
+    const wanted = s => s.requested || ctx.protect.has(s.id);
+    const pool = open.filter(k => !planDaySessions(ctx, k).some(wanted));
+    // Nur gewünschte Tage übrig: Vorschlag bleibt ein Hinweis (warn) - die
+    // automatische Korrektur wendet ihn nie an, man entscheidet selbst.
+    const own = !pool.length;
+    const pick = own ? open : pool;
+    const date = pick.find(k => planRestDaySafe(ctx, list, k)) || pick[0];
     const sessions = planDaySessions(ctx, date);
     out.push({
-      rule: "rest_day", severity: "block", date: wk, workoutId: null,
-      text: `In der ${planWeekLabel(wk)} ist jeden Tag Training geplant. Stärker wird der Körper erst in den Pausen – mindestens ein freier Tag pro Woche muss sein.`,
+      rule: "rest_day", severity: own ? "warn" : "block", date: wk, workoutId: null,
+      text: own
+        ? `In der ${planWeekLabel(wk)} ist jeden Tag Training geplant – so wie du es dir gewünscht hast. Gönn dir trotzdem bald einen freien Tag, stärker wird der Körper erst in den Pausen.`
+        : `In der ${planWeekLabel(wk)} ist jeden Tag Training geplant. Stärker wird der Körper erst in den Pausen – mindestens ein freier Tag pro Woche muss sein.`,
       suggestion: {
         text: `Mach ${planDayLabel(date)} zum Ruhetag (${sessions.map(s => `„${s.title}“`).join(", ")} fällt weg).`,
         action: "make_rest_day", date, workoutIds: sessions.map(s => s.id),
@@ -532,7 +545,8 @@ function checkPlanRecoveryWeek(ctx) {
 // options: { goal (Hauptevent, für Regel 6 und die Periodisierung), today (Date, Standard jetzt),
 //   acwr (vorberechnet, sonst computePerformanceState()), planUntil
 //   ("YYYY-MM-DD", bis wohin der Plan reicht, Standard: letzte Einheit),
-//   structure (Wochenplan aus planStructureSettings - Verschiebungen nur auf passende Tage) }
+//   structure (Wochenplan aus planStructureSettings - Verschiebungen nur auf passende Tage),
+//   protectIds (Einheiten, die für einen Ruhetag nie gestrichen werden) }
 function validatePlan(plannedWorkouts, history, wellness, recovery, options = {}) {
   const todayKey = localDateStr(new Date(options.today || Date.now()));
   const sessions = planSessions(plannedWorkouts, history, todayKey);
@@ -554,6 +568,7 @@ function validatePlan(plannedWorkouts, history, wellness, recovery, options = {}
     goalSports: goal ? goalRaceSports(goal) : [], // Staffel: nur die eigenen Teilstrecken (js/data/race-formats.js)
     gateDay: gate.reasons.length ? open[0].date : null, // nur locker erlaubt (Regel 5)
     structure: options.structure || null, // Wochenplan-Vorgaben für Verschiebungen (planStructureSettings)
+    protect: new Set(options.protectIds || []), // gewünschte Einheiten: nie für einen Ruhetag streichen
   };
 
   const severityOrder = { block: 0, warn: 1 };

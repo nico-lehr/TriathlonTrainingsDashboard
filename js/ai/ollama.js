@@ -422,7 +422,11 @@ async function replanFromCoachNote(note) {
   const before = plannedWorkouts;
   const oldPlan = before.filter(inWindow).sort((a, b) => a.date.localeCompare(b.date));
   const defaults = { goalId: goal.id, source: "ai" };
-  let reply = "";
+  let reply = "", newIds = [];
+  // Tage, an denen bisher nichts Offenes geplant war (z. B. ein Ruhetag, an
+  // dem man jetzt doch trainieren will): Was der Coach dort einträgt, ist
+  // ausdrücklich gewünscht und bleibt auch beim täglichen Plan-Check stehen.
+  const busyBefore = new Set(oldPlan.map(p => p.date));
   const result = await checkedPlanFromAi({
     ask: async violations => {
       const prompt = buildPlanPrompt(goal, windowDates) + buildPlanRulesPrompt(goal) + buildCoachNotePrompt(text, oldPlan, windowDates) + buildPlanRetryPrompt(violations);
@@ -439,9 +443,13 @@ async function replanFromCoachNote(note) {
         : null;
       // Basis erst nach der KI-Anfrage lesen (Änderungen in der Zwischenzeit bleiben).
       const base = plannedWorkouts.filter(p => !inWindow(p) || (changed && !changed.has(p.date)));
-      return { base, list: [...base, ...entries.map(entry => buildPlannedWorkout({ ...entry, ...defaults }))] };
+      const built = entries.map(entry => buildPlannedWorkout({ ...entry, ...defaults, requested: !busyBefore.has(entry.date) }));
+      newIds = built.map(p => p.id);
+      return { base, list: [...base, ...built] };
     },
-    validate: list => planRuleViolations(list, { planUntil: windowDates[windowDates.length - 1] }),
+    // Die neuen Einheiten des Coachs nie für einen Ruhetag streichen - er hat
+    // sie dir gerade zugesagt (sonst: "erstellt", aber nicht im Kalender).
+    validate: list => planRuleViolations(list, { planUntil: windowDates[windowDates.length - 1], protectIds: newIds }),
     fix: (list, suggestion) => applyPlanSuggestion(list, suggestion, defaults),
   });
   if (!result.list) throw new Error(`Der neue Plan verstößt gegen Trainingsregeln und wurde nicht übernommen: ${result.violations.map(v => v.text).join(" ")}`);
@@ -455,7 +463,9 @@ async function replanFromCoachNote(note) {
   if (typeof renderCalendar === "function") renderCalendar();
   return {
     reply: reply || "Erledigt – dein Plan ist angepasst.",
-    hints: result.violations.map(v => v.text),
+    // Was die Regelprüfung danach noch selbst geändert hat, gehört mit in die
+    // Antwort - sonst passt "erledigt" nicht zu dem, was im Kalender steht.
+    hints: [...result.corrected.map(t => `Zusätzlich angepasst: ${t}`), ...result.violations.map(v => v.text)],
     undo: () => {
       replacePlannedWorkouts(before);
       if (typeof renderTrainingPlanCard === "function") renderTrainingPlanCard();

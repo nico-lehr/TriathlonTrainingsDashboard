@@ -4,6 +4,13 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.5.52
+
+**Fehler behoben: Gewünschtes Training verschwand wieder**
+- Wer dem Coach schrieb „heute 45 min schwimmen“ und heute eigentlich Ruhetag war, bekam die Antwort „eingetragen“, aber im Kalender stand nichts. Grund: Danach gab es in der Woche keinen freien Tag mehr, und die automatische Regelprüfung hat genau das neue Training wieder gestrichen.
+- Jetzt gilt: Was du dir selbst wünschst (per Nachricht an den Coach oder selbst im Plan eingetragen), streicht die Regelprüfung nie für einen Ruhetag. Wenn nötig, wird stattdessen ein anderer Tag frei. Bleibt kein anderer Tag übrig, bekommst du nur einen Hinweis, dass ein freier Tag guttun würde.
+- Ändert die Regelprüfung nach deiner Nachricht noch etwas, steht das jetzt auch in der Antwort des Coachs.
+
 ## 2.5.51
 
 **Notizen zu Einheiten speichern sich selbst**

@@ -179,6 +179,30 @@ test("Regel 3: Woche ohne Ruhetag -> block, Ruhetag kostet nicht die einzige loc
   assert.strictEqual(byRule(fixed, "goal_base").length, 0);
 });
 
+test("Regel 3: selbst gewünschte Einheiten werden nie für einen Ruhetag gestrichen", () => {
+  const plan = [
+    { ...pw(day(0), "Schwimmen", 30, "leicht"), requested: true }, // kürzester Tag, aber gewünscht
+    pw(day(1), "Laufen", 45, "leicht"),
+    pw(day(2), "Rad", 60, "hart"),
+    pw(day(3), "Laufen", 40, "leicht"),
+    pw(day(4), "Schwimmen", 45, "leicht"),
+    pw(day(5), "Rad", 100, "leicht"),
+    pw(day(6), "Laufen", 50, "leicht"),
+  ];
+  const v = byRule(validate(plan), "rest_day");
+  assert.strictEqual(v.length, 1);
+  assert.strictEqual(v[0].severity, "block");
+  assert.notStrictEqual(v[0].suggestion.date, day(0));
+  // Gleiches über protectIds (laufende Coach-Planung)
+  const plain = plan.map(p => ({ ...p, requested: undefined }));
+  const p2 = byRule(validate(plain, { protectIds: [plain[0].id, plain[3].id] }), "rest_day");
+  assert.ok(![day(0), day(3)].includes(p2[0].suggestion.date));
+  // Alles gewünscht: kein Streichen, nur ein Hinweis
+  const all = byRule(validate(plan.map(p => ({ ...p, requested: true }))), "rest_day");
+  assert.strictEqual(all.length, 1);
+  assert.strictEqual(all[0].severity, "warn"); // wird nie automatisch angewendet
+});
+
 test("Regel 4: +25 % Wochenumfang -> warn mit gleichmäßiger Kürzung", () => {
   const plan = [
     pw(day(1), "Schwimmen", 60, "leicht"),

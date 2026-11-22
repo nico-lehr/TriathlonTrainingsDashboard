@@ -752,7 +752,7 @@ function openPlanEdit(id, defaults) {
       steps,
     };
     if (isNew) {
-      addPlannedWorkout({ ...patch, goalId: p.goalId, phase: p.phase, source: "manual" });
+      addPlannedWorkout({ ...patch, goalId: p.goalId, phase: p.phase, source: "manual", requested: true });
     } else {
       patch.status = statusVal;
       // Jede Änderung einer bestehenden Einheit (neues Datum, aber auch ein

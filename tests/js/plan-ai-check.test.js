@@ -206,6 +206,38 @@ test("Coach-Nachricht im sparsamen Format: nur geänderte Tage kommen zurück, d
   assert.deepStrictEqual(plain(run("plannedWorkouts.map(p => p.id)")).sort(), ["a", "d", "e"]);
 });
 
+// Fehler aus der Praxis (2.5.52): "heute 45 min schwimmen" an einem Ruhetag.
+// Danach war die Woche ohne freien Tag; die Ruhetag-Regel strich den Tag mit
+// den wenigsten Minuten - genau das neue Schwimmen. Der Coach meldete
+// "erledigt", im Kalender stand nichts.
+test("Coach-Nachricht: gewünschtes Training am Ruhetag bleibt, auch wenn die Woche dadurch voll ist", async () => {
+  const today = run("todayStr()");
+  const monday = run("localDateStr(weekStart(new Date()))");
+  const week = [0, 1, 2, 3, 4, 5, 6].map(i => run(`planShiftDay("${monday}", ${i})`));
+  // Jeder Tag der Woche außer heute hat Training (vorher erledigt, danach geplant)
+  const plan = week.filter(d => d !== today).map((d, i) => ({ id: "w" + i, date: d, sport: "Laufen", title: "Lauf " + d,
+    duration_min: 60, intensity: "leicht", status: d < today ? "erledigt" : "geplant", goalId: "g1" }));
+  run(`getPrimaryGoal = () => ({ id: "g1", name: "Ziel" });
+    buildPlanPrompt = () => ""; buildPlanRulesPrompt = () => ""; buildPlanRetryPrompt = () => ""; buildCoachNotePrompt = () => "";
+    planRuleViolations = (list, o) => validatePlan(list, [], null, null, { acwr: 1.0, ...o });`);
+  run(`replacePlannedWorkouts(${JSON.stringify(plan)})`);
+  run(`callAiText = async () => JSON.stringify({ antwort: "Ich habe dir heute 45 min Schwimmen eingetragen.", geaenderte_tage: ["${today}"], workouts: [
+    { date: "${today}", sport: "Schwimmen", title: "Schwimmen locker", duration_min: 45, intensity: "leicht", description: "locker" }] })`);
+  await run(`replanFromCoachNote("Heute 45 min schwimmen").then(r => { globalThis.__res = r; })`);
+  const swim = plain(run(`plannedWorkouts.filter(p => p.date === "${today}")`));
+  assert.strictEqual(swim.length, 1, "das gewünschte Schwimmen steht im Plan");
+  assert.strictEqual(swim[0].sport, "Schwimmen");
+  assert.strictEqual(swim[0].requested, true);
+  // Ist die Woche danach voll, sagt der Coach das ehrlich dazu
+  const res = plain(run("({ reply: __res.reply, hints: __res.hints })"));
+  const full = week.every(d => plain(run(`plannedWorkouts.filter(p => p.date === "${d}" && p.status !== "uebersprungen")`)).length);
+  if (full) assert.ok(res.hints.some(h => /jeden Tag Training/.test(h)), JSON.stringify(res.hints));
+  else assert.ok(res.hints.some(h => /Zusätzlich angepasst/.test(h)), JSON.stringify(res.hints));
+  // Auch der tägliche Plan-Check (dieselbe Regel ohne protectIds) streicht es nicht
+  const blocks = plain(run("planRuleViolations(plannedWorkouts)")).filter(v => v.severity === "block" && v.rule === "rest_day");
+  blocks.forEach(b => assert.ok(!b.suggestion.workoutIds.includes(swim[0].id)));
+});
+
 test("Coach-Nachricht: leerer Text und fehlendes Ziel geben eine klare Meldung, der Plan bleibt", async () => {
   await assert.rejects(run(`replanFromCoachNote("  ")`), /Schreib kurz/);
   run(`getPrimaryGoal = () => null`);
