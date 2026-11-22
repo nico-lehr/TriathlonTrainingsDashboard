@@ -108,9 +108,12 @@ async function planBatchCollect(goal, job) {
 }
 
 // Hauptlauf: beim Start, alle 10 Minuten solange ein Auftrag läuft und wenn
-// die App wieder in den Vordergrund kommt.
+// die App wieder in den Vordergrund kommt - aber nur, wenn jemand da ist
+// (userIsActive, js/utils/user-active.js).
 async function runAutoPlan({ force = false } = {}) {
   if (planBatchBusy) return;
+  // Niemand da (Tab verdeckt oder 2 h nicht benutzt): keine Tokens - onUserBack holt es nach
+  if (typeof userIsActive === "function" && !userIsActive()) return;
   if (!force && Date.now() - planBatchLastRun < PLAN_BATCH_MIN_POLL_MS) return;
   planBatchBusy = true;
   planBatchLastRun = Date.now();
@@ -153,6 +156,7 @@ async function runAutoPlan({ force = false } = {}) {
 
 function initAutoPlan() {
   runAutoPlan({ force: true });
+  if (typeof onUserBack === "function") onUserBack(() => runAutoPlan({ force: true }));
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") runAutoPlan();
   });

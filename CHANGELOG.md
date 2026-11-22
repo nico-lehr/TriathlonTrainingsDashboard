@@ -4,6 +4,14 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.5.53
+
+**Keine KI-Kosten mehr, wenn keiner hinschaut**
+- Die App fragt die KI an drei Stellen von selbst: den automatischen Wochenplan, den täglichen Plan-Check und den Text im Morgenbericht. Das passiert jetzt nur noch, wenn die App wirklich offen und sichtbar ist und in den letzten 2 Stunden jemand getippt, geklickt oder gescrollt hat.
+- Ein Browser-Tab, der tagelang offen herumliegt, verbraucht also keine Tokens mehr.
+- Kommst du zurück, holt die App alles sofort nach: Plan-Check, Wochenplan und Morgenbericht.
+- Was du selbst anstößt (Knopf drücken, Nachricht an den Coach), läuft wie bisher sofort.
+
 ## 2.5.52
 
 **Fehler behoben: Gewünschtes Training verschwand wieder**

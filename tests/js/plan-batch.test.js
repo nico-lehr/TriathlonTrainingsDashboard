@@ -163,3 +163,14 @@ test("runAutoPlan: ohne Trainingstage im Profil passiert nichts", async () => {
   run("athleteProfile.trainingDays = [1, 3, 5]");
   assert.strictEqual(s.calls.submit + s.calls.generate.length, 0);
 });
+
+test("runAutoPlan: keiner da (Tab verdeckt oder 2 h nicht benutzt) - keine KI-Anfrage, kein Auftrag", async () => {
+  const s = setup({ plannedDays: 0 });
+  run("globalThis.userIsActive = () => false");
+  await app.runAutoPlan({ force: true });
+  assert.strictEqual(s.calls.submit + s.calls.generate.length, 0);
+  run("globalThis.userIsActive = () => true");
+  await app.runAutoPlan({ force: true });
+  assert.strictEqual(s.calls.generate.length, 1, "sobald jemand da ist, wird nachgeholt");
+  run("delete globalThis.userIsActive");
+});

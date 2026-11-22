@@ -75,6 +75,7 @@ Gelegenheit weiter in eigene Dateien (z. B. `coach.css`) aufgeteilt werden.
 
 ### `js/utils/` — reine Hilfsfunktionen, keine App-Logik
 - `dates.js` — Datum/Zeit-Formatierung, Wochenstart, Pace↔Sekunden, `goalTimeToSeconds()` (der eine Parser für Zielzeiten `H:MM(:SS)`).
+- `user-active.js` — „Ist gerade jemand da?“ (`userIsActive`, `onUserBack`): Wochenplan, Plan-Check und Morgenbericht-Text fragen die KI nur bei sichtbarer App und Benutzung in den letzten 2 Stunden (`USER_IDLE_MS`); beim Zurückkommen wird nachgeholt.
 - `formatting.js` — Text-/Zahlen-Formatierung (`fmtH`, `fmtNum`, `escapeHtml`, …).
 - `calculations.js` — reine, DOM-freie Berechnungen (`niceMax`, Bestleistungen).
 

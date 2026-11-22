@@ -233,6 +233,9 @@ function planCheckRerender() {
 // Hauptlauf. force: alles prüfen (z. B. Button). Läuft nie doppelt.
 async function runPlanCheck({ force = false } = {}) {
   if (planCheckRunning || typeof plannedWorkouts === "undefined") return null;
+  // Stundentakt in einem Tab, den keiner ansieht: warten, bis jemand da ist
+  // (onUserBack in initPlanCheck) - spart die KI-Rückfrage des Tages-Checks.
+  if (!force && typeof userIsActive === "function" && !userIsActive()) return null;
   const goal = typeof getPrimaryGoal === "function" ? getPrimaryGoal() : null;
   if (!goal) return null;
   planCheckRunning = true;
@@ -305,11 +308,13 @@ function schedulePlanCheck(delayMs = 1500) {
 }
 
 // Beim Start und danach stündlich (fängt den Tageswechsel und neue
-// Garmin-Daten ab, ohne dass die Seite neu geladen werden muss).
+// Garmin-Daten ab, ohne dass die Seite neu geladen werden muss). Ist keiner
+// da, fällt der Stundentakt aus und läuft, sobald jemand zurückkommt.
 function initPlanCheck() {
   planCheckReady = true;
   schedulePlanCheck(2500);
   setInterval(() => runPlanCheck(), 60 * 60 * 1000);
+  if (typeof onUserBack === "function") onUserBack(() => schedulePlanCheck(1500));
 }
 
 /* ---------- KI-Tages-Check (sparsam) ---------- */

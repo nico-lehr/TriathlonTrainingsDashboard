@@ -130,6 +130,7 @@ function morningVisible(now = new Date()) {
 
 async function ensureMorningText() {
   if (morningAiRunning || typeof callAiText !== "function" || !morningVisible()) return;
+  if (typeof userIsActive === "function" && !userIsActive()) return; // keiner da: kein KI-Text (kommt beim Zurückkommen)
   // Läuft gerade der Plan-Check, kommt der Aufruf danach noch einmal (plan-check.js)
   if (typeof planCheckRunning !== "undefined" && planCheckRunning) return;
   const key = todayStr();

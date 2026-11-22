@@ -194,6 +194,13 @@ nicht das, was sie liest. Deshalb:
   bekommt den Hinweis, dass der tägliche Plan-Check die Tage kurz vorher an
   die Verfassung anpasst (`buildPlanAheadPrompt`). Reihenfolge am Morgen
   bleibt: Plan-Check, danach Morgenbericht.
+* **Nur wenn jemand da ist** (`js/utils/user-active.js`, ab 2.5.53):
+  Automatischer Wochenplan, täglicher Plan-Check und Morgenbericht-Text
+  laufen nur bei sichtbarer App und Benutzung (Tippen, Klicken, Scrollen) in
+  den letzten 2 Stunden. Ein offen liegender Tab verbraucht keine Tokens;
+  `onUserBack` holt alles nach, sobald jemand zurückkommt. Knöpfe und
+  Coach-Nachricht sind nicht betroffen. Der Server fragt die KI nie von sich
+  aus (Morgen-Mitteilung und Garmin-Abruf kommen ohne KI aus).
 * **Zweiter Versuch beim Plan:** Alle „harten“ Regelverstöße (zwei harte Tage
   hintereinander, kein Ruhetag, schlechte Erholung) repariert das Dashboard
   selbst; ein zweiter KI-Durchlauf ist nur der seltene Notfall.
