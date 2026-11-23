@@ -4,6 +4,21 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.5.55
+
+**Kein altes Design mehr beim Laden**
+- Beim Öffnen war kurz das alte Design zu sehen, bis alle Daten geladen waren. Jetzt erscheint so lange nur ein dunkler Hintergrund mit Ladekreis und danach direkt die neue Ansicht.
+
+**Wochenumfang wird wirklich erreicht**
+- Plant der Coach eine Woche deutlich unter ihrem Zielumfang (weniger als 90 %), füllt das Dashboard selbst auf, ohne weitere KI-Anfrage: Lockere Rad- und Laufeinheiten werden etwas länger (je höchstens um die Hälfte).
+- Steht im Trainingsprofil „Haupttrainings pro Tag“ auf 2, kommt bei Bedarf auch eine kurze zweite lockere Einheit (20–45 min) an Tagen mit nur einem Training dazu.
+- Ruhetage, Schwimmeinheiten, harte Einheiten und Trainings, die du dir selbst gewünscht hast, bleiben dabei unverändert. Die Trainingsregeln gelten weiter.
+- Im Plan-Bericht steht, was ergänzt wurde.
+
+**Sicherer veröffentlichen**
+- Vor jeder neuen Version laufen jetzt automatisch alle Tests auf GitHub. Ist einer rot, wird die Version nicht veröffentlicht.
+- Aufgeräumt: alte, nicht mehr lauffähige Testdateien entfernt; zwei veraltete Server-Tests repariert.
+
 ## 2.5.54
 
 **Trainingsplan steigert schneller zu deinen verfügbaren Stunden**

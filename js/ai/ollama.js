@@ -379,6 +379,19 @@ async function generateTrainingPlan(goalId, { replace = false, windowDates: fixe
         filled = planCheckFill(result.list, goal, windowDates[0], planUntil);
         finalList = filled.list;
       }
+      // Bleibt eine Woche deutlich unter ihrem Zielumfang, füllt das Dashboard
+      // selbst auf (js/analytics/plan-guard.js) - nur neue Einheiten dieses Plans.
+      let topped = [];
+      if (typeof planGuardTopUp === "function" && typeof planCheckFillOptions === "function") {
+        const known = new Set(before.map(p => p.id));
+        const st = planGuardTopUp(finalList, DATA, {
+          ...planCheckFillOptions(goal, windowDates[0], planUntil),
+          defaults, mutableIds: finalList.filter(p => !known.has(p.id)).map(p => p.id),
+          structure: typeof planStructureSettings === "function" && typeof trainingProfile === "function" ? planStructureSettings(athleteProfile, trainingProfile()) : null,
+        });
+        finalList = st.list;
+        topped = st.changes;
+      }
       replacePlannedWorkouts(finalList);
       goal.lastPlannedAt = new Date().toISOString();
       goal._planError = null;
@@ -386,7 +399,7 @@ async function generateTrainingPlan(goalId, { replace = false, windowDates: fixe
         goalId: goal.id, corrected: result.corrected, hints: result.violations.map(v => v.text),
         aiCount: report.aiCount || 0, dropped: report.dropped || [], structure: report.structure || [],
         filled: filled.added.map(p => ({ date: p.date, sport: p.sport, title: p.title, duration_min: p.duration_min })),
-        skipped: filled.skipped,
+        skipped: filled.skipped, topped,
       };
     } else {
       goal._planError = `Der KI-Vorschlag verstößt auch nach ${PLAN_AI_MAX_ATTEMPTS} Versuchen gegen Trainingsregeln und wurde deshalb nicht gespeichert: ${result.violations.map(v => v.text).join(" ")}`;

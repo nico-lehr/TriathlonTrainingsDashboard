@@ -111,6 +111,11 @@ Dritter Kontext/Prompt-Pfad neben Ziel-Tipps und Workout-Auswertung:
   mit 2 Haupttrainings pro Tag darf die KI dafür eine kurze zweite lockere
   Einheit ergänzen. Die verfügbaren Stunden (`weeklyHours`) sind Obergrenze
   der Zielkurve; darunter steigt sie um 10 % je Belastungswoche.
+  Hält sich die KI nicht daran, füllt `planGuardTopUp`
+  (`js/analytics/plan-guard.js`, ab 2.5.55) nach `generateTrainingPlan`
+  ohne KI auf: neue lockere Rad-/Laufeinheiten länger (max. +50 %,
+  höchstens 120 min), mit 2 Haupttrainings pro Tag eine kurze zweite
+  Einheit; nie mit neuem Regelverstoß, nie über das Wochenbudget.
 * das konkrete, zu planende Zeitfenster (rollierend, siehe `computePlanningWindow`)
 * ob Kraft-/Mobility-Einheiten gewünscht sind (`athleteProfile.includeStrength/includeMobility`)
 * die letzten tatsächlich absolvierten Einheiten (granularer als die

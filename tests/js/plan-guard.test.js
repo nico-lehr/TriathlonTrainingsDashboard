@@ -11,7 +11,7 @@ const vm = require("node:vm");
 
 const ROOT = path.join(__dirname, "..", "..");
 const SCRIPTS = ["js/data/race-formats.js", "js/utils/dates.js", "js/utils/formatting.js", "js/analytics/training-load.js", "js/analytics/plan-rules.js", "js/analytics/periodization.js",
-  "js/data/planned-workouts.js", "js/analytics/plan-guard.js"];
+  "js/data/planned-workouts.js", "js/analytics/plan-structure.js", "js/analytics/plan-guard.js"];
 
 const store = {};
 const GOAL = { id: "g1", name: "Ironman 70.3", sport: "Triathlon", date: "2027-06-13", isPrimary: true };
@@ -193,4 +193,50 @@ test("KI-Tages-Check: nur fragen, wenn es etwas abzuwägen gibt", () => {
   assert.deepStrictEqual(reasons({ missed: [{ id: "x" }] }), ["verpasste Einheit"]);
   assert.deepStrictEqual(reasons({ acwr: 1.25 }), ["Belastung steigt"]);
   assert.deepStrictEqual(reasons({ signs: ["HRV niedrig"] }), ["feste Regeln auffällig"]);
+});
+
+/* ---------- Wochenumfang auffüllen (planGuardTopUp) ---------- */
+
+function topUp(list, { mainPerDay = 1, mutable = list.map(p => p.id), profile = { trainingDays: ALL_DAYS, weeklyHours: 10 } } = {}) {
+  app.__.list = list; app.__.profile = profile; app.__.mutable = mutable; app.__.history = HISTORY;
+  run(`__.structure = planStructureSettings({ ...__.profile, mainPerDay: ${mainPerDay} }, {})`);
+  return plain(run(`planGuardTopUp(__.list, __.history, { from: "${day(0)}", to: "${day(6)}", todayKey: "${TODAY}", today: new Date(${TODAY_MS}),
+    profile: __.profile, goal: goals[0], defaults: { goalId: "g1" }, validate: l => __.validate(l, __.history),
+    mutableIds: __.mutable, structure: __.structure })`));
+}
+const weekMin = list => plain(run(`planGuardWeekMinutes(${JSON.stringify(list)}, __.history, "${TODAY}", "${day(0)}")`));
+const weekTarget = list => plain(run(`planGuardWeekTarget(${JSON.stringify(list)}, __.history, { goal: goals[0], todayKey: "${TODAY}", today: new Date(${TODAY_MS}), profile: { weeklyHours: 10 } }, "${day(0)}")`));
+
+test("Auffüllen: zu kurze Woche - lockere Rad-/Laufeinheiten werden länger (je höchstens +50 %), Regeln bleiben eingehalten", () => {
+  const list = [pw(day(1), "Laufen", 40, "leicht"), pw(day(2), "Rad", 40, "leicht"), pw(day(4), "Laufen", 40, "leicht"), pw(day(5), "Rad", 40, "leicht")];
+  const res = topUp(list);
+  assert.ok(res.changes.length > 0);
+  assert.ok(res.changes.every(c => c.kind === "longer" && c.after <= c.before * 1.5));
+  assert.ok(weekMin(res.list) > weekMin(list));
+  assert.ok(weekMin(res.list) <= weekTarget(list), "nie über das Wochenbudget");
+  const before = plain(run(`__.validate(${JSON.stringify(list)}, __.history)`)).filter(v => v.severity === "block").length;
+  assert.strictEqual(plain(run(`__.validate(${JSON.stringify(res.list)}, __.history)`)).filter(v => v.severity === "block").length, before);
+  assert.match(res.list.find(p => p.id === res.changes[0].id || p.duration_min > 40).description, /verlängert/);
+});
+
+test("Auffüllen mit 2 Haupttrainings pro Tag: kurze zweite lockere Einheit an Tagen mit einem Training", () => {
+  const list = [pw(day(1), "Laufen", 30, "leicht"), pw(day(2), "Rad", 30, "leicht"), pw(day(4), "Laufen", 30, "leicht")];
+  const res = topUp(list, { mainPerDay: 2 });
+  const added = res.changes.filter(c => c.kind === "added");
+  assert.ok(added.length > 0, JSON.stringify(res.changes));
+  added.forEach(c => {
+    const sameDay = res.list.filter(p => p.date === c.date);
+    assert.ok(sameDay.length === 2 && new Set(sameDay.map(p => p.sport)).size === 2, "andere Sportart am selben Tag");
+    assert.ok(c.after >= 20 && c.after <= 45);
+  });
+  assert.ok(!res.list.some(p => [day(0), day(3), day(6)].includes(p.date)), "Ruhetage bleiben frei");
+});
+
+test("Auffüllen: Woche schon nah am Ziel, Schwimmen, gewünschte und ältere Einheiten bleiben unverändert", () => {
+  const target = weekTarget([]);
+  const near = [pw(day(1), "Laufen", Math.ceil(target * 0.5 / 5) * 5, "leicht"), pw(day(3), "Rad", Math.ceil(target * 0.45 / 5) * 5, "leicht")];
+  assert.deepStrictEqual(topUp(near).changes, [], "ab 90 % passiert nichts");
+  const keep = [pw(day(1), "Schwimmen", 40, "leicht"), pw(day(2), "Laufen", 40, "leicht", { requested: true }), pw(day(4), "Rad", 40, "leicht"), pw(day(5), "Laufen", 40, "hart")];
+  const res = topUp(keep, { mutable: keep.slice(0, 2).map(p => p.id).concat(keep[3].id) });
+  assert.deepStrictEqual(res.changes, [], "Schwimmen, gewünscht, nicht neu, hart: nichts verlängert");
 });

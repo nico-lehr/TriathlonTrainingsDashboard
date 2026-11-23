@@ -306,3 +306,97 @@ function planGuardAiReasons(o) {
   if (mild >= 2) add("mehrere Uhr-Werte leicht auffällig");
   return reasons;
 }
+
+/* ---------- Wochenumfang auffüllen (nach der KI-Planung) ---------- */
+
+// Bleibt eine Woche nach der KI-Planung deutlich unter ihrem Budget
+// (planGuardWeekTarget: Zielumfang, höchstens die verfügbaren Stunden),
+// füllt das Dashboard selbst auf - ohne weitere KI-Anfrage:
+//   1. neue lockere Rad-/Laufeinheiten (o.mutableIds) in 5-Minuten-Schritten
+//      verlängern, je höchstens um die Hälfte und nie über 120 min (sonst
+//      zählt sie als hart). Schwimmen nicht (Meterbereich), keine Einheiten
+//      mit eigenen Schritten (die passen dann nicht mehr), keine selbst
+//      gewünschten (requested).
+//   2. Mit 2 Haupttrainings pro Tag (o.structure.mainPerDay) an Tagen mit
+//      genau einem Haupttraining eine kurze zweite lockere Einheit ergänzen.
+// Jede Änderung, die einen neuen "block"-Verstoß erzeugt, wird verworfen.
+// Aufgefüllt wird bis zum Budget, sobald die Woche unter PLAN_TOPUP_SHARE liegt.
+// o: { from, to, todayKey, today, profile, goal, defaults, validate, mutableIds, structure }
+// Ergebnis: { list, changes: [{ date, kind: "longer"|"added", title, before?, after }] }
+const PLAN_TOPUP_SHARE = 0.9;
+const PLAN_TOPUP_MAX_FACTOR = 1.5;
+const PLAN_TOPUP_SECOND_MIN = 20;
+const PLAN_TOPUP_SECOND_MAX = 45;
+
+function planGuardTopUp(list, history, o) {
+  let cur = list.slice();
+  const changes = [];
+  const mutable = new Set(o.mutableIds || []);
+  const ok = next => !o.validate || !newPlanViolations(o.validate(cur), o.validate(next)).some(v => v.severity === "block");
+  const raceDays = o.goal && o.goal.date ? [o.goal.date, planShiftDay(o.goal.date, -1)] : [];
+  const weeks = [...new Set(Array.from({ length: 400 }, (_, i) => planShiftDay(o.from, i)).filter(k => k <= o.to).map(planWeekKey))];
+
+  weeks.forEach(wk => {
+    const target = planGuardWeekTarget(cur, history, o, wk);
+    if (target == null) return;
+    const missing = () => target - planGuardWeekMinutes(cur, history, o.todayKey, wk);
+    if (missing() <= target * (1 - PLAN_TOPUP_SHARE)) return;
+    const inRange = k => planWeekKey(k) === wk && k >= o.from && k <= o.to && k >= o.todayKey && !raceDays.includes(k);
+
+    // 1. Verlängern
+    const start = new Map();
+    const cands = () => cur.filter(p => mutable.has(p.id) && p.status === "geplant" && inRange(p.date)
+      && (p.sport === "Rad" || p.sport === "Laufen") && p.intensity === "leicht" && !p.requested && !(p.steps && p.steps.length)
+      && Number(p.duration_min) > 0);
+    for (let guard = 0; guard < 200 && missing() >= 5; guard++) {
+      const pick = cands().map(p => {
+        const base = start.has(p.id) ? start.get(p.id) : Number(p.duration_min);
+        return { p, base, cap: Math.min(PLAN_GUARD_LONG_MAX, planGuardRound5(base * PLAN_TOPUP_MAX_FACTOR)) };
+      }).filter(c => Number(c.p.duration_min) + 5 <= c.cap)
+        .sort((a, b) => Number(a.p.duration_min) / a.base - Number(b.p.duration_min) / b.base || a.p.date.localeCompare(b.p.date))[0];
+      if (!pick) break;
+      if (!start.has(pick.p.id)) start.set(pick.p.id, Number(pick.p.duration_min));
+      const next = cur.map(p => (p.id === pick.p.id ? { ...p, duration_min: Number(p.duration_min) + 5 } : p));
+      if (!ok(next)) { mutable.delete(pick.p.id); continue; }
+      cur = next;
+    }
+    start.forEach((before, id) => {
+      const p = cur.find(x => x.id === id);
+      if (!p || p.duration_min === before) return;
+      const note = `Auf ${p.duration_min} min verlängert, damit die Woche ihren Zielumfang erreicht: den lockeren Hauptteil entsprechend länger fahren bzw. laufen.`;
+      cur = cur.map(x => (x.id === id ? { ...x, description: x.description ? `${x.description} ${note}` : note } : x));
+      changes.push({ date: p.date, kind: "longer", title: p.title, before, after: p.duration_min });
+    });
+
+    // 2. Kurze zweite Einheit
+    const s = o.structure;
+    if (!s || s.mainPerDay !== 2 || typeof planStructDayAccepts !== "function") return;
+    const days = planWeekDays(wk).filter(inRange);
+    for (const k of days) {
+      const left = missing();
+      if (left < PLAN_TOPUP_SECOND_MIN) break;
+      const others = cur.filter(p => p.date === k && p.status !== "uebersprungen");
+      const mains = others.filter(p => !planStructIsExtra(p));
+      if (mains.length !== 1) continue; // Ruhetage bleiben frei, volle Tage auch
+      const goalSports = o.goal ? goalRaceSports(o.goal) : [];
+      const sports = (goalSports.length ? goalSports : ["Rad", "Laufen", "Schwimmen"]).filter(sp => !others.some(p => p.sport === sp));
+      const dur = Math.max(PLAN_TOPUP_SECOND_MIN, Math.min(PLAN_TOPUP_SECOND_MAX, planGuardRound5(left)));
+      for (const sport of sports) {
+        const probe = { sport, intensity: "leicht", duration_min: dur };
+        if (!planStructDayAccepts(s, k, probe, others)) continue;
+        const entry = buildPlannedWorkout({
+          ...(o.defaults || {}), date: k, sport, title: `${PLAN_GUARD_SPORT_TITLE[sport] || sport} (kurz)`,
+          duration_min: dur, intensity: "leicht", source: "guard",
+          description: "Kurze zweite Einheit am Tag, ganz locker (Zone 1-2) - ergänzt, damit die Woche ihren Zielumfang erreicht.",
+        });
+        if (sport === "Schwimmen") entry.description = planGuardSwimDescription(entry);
+        const next = [...cur, entry];
+        if (!ok(next)) continue;
+        cur = next;
+        changes.push({ date: k, kind: "added", title: entry.title, after: entry.duration_min });
+        break;
+      }
+    }
+  });
+  return { list: cur, changes };
+}
