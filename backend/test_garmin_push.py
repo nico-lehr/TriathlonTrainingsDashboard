@@ -14,6 +14,10 @@ import tempfile
 import unittest
 from datetime import date
 from unittest import mock
+import importlib.util
+# Abruf und Anmeldung brauchen die Garmin-Bibliotheken (requirements.txt);
+# ohne sie werden nur diese Tests uebersprungen statt rot zu sein.
+HAVE_GARMIN_LIBS = all(importlib.util.find_spec(m) is not None for m in ("garminconnect", "fitdecode"))
 
 import tools.garmin_sync
 from backend import auth, create_app, garmin_official, garmin_push
@@ -230,6 +234,7 @@ class AbgleichTest(PushTestBase):
         r = self.push()
         self.assertEqual((r["created"], r["stopped"]), (2, None))  # der Rest kommt beim naechsten Mal
 
+    @unittest.skipUnless(HAVE_GARMIN_LIBS, "garminconnect/fitdecode nicht installiert (requirements.txt)")
     def test_ohne_anmeldung_nichts_kaputt(self):
         self.set_plan([entry("a", "2026-11-09")])
         r = garmin_push.run_push(self.aid, self.Session, today=TODAY)  # echter open_client, aber kein Token
@@ -396,6 +401,7 @@ class EndpunkteTest(PushTestBase):
             return self.client.post("/api/v1/garmin/workouts/login", headers=self.h,
                                     json=body or {"email": "p@example.org", "password": "geheim-123"})
 
+    @unittest.skipUnless(HAVE_GARMIN_LIBS, "garminconnect/fitdecode nicht installiert (requirements.txt)")
     def test_anmeldung_speichert_nur_das_token(self):
         g = mock.MagicMock()
         g.return_value.login.return_value = (None, None)
@@ -415,6 +421,7 @@ class EndpunkteTest(PushTestBase):
         r = self.client.post("/api/v1/garmin/workouts/disconnect", headers=self.h)
         self.assertFalse(r.get_json()["data"]["connected"])
 
+    @unittest.skipUnless(HAVE_GARMIN_LIBS, "garminconnect/fitdecode nicht installiert (requirements.txt)")
     def test_anmeldung_mit_zwei_faktor_code(self):
         g = mock.MagicMock()
         g.return_value.login.return_value = ("needs_mfa", None)
@@ -429,6 +436,7 @@ class EndpunkteTest(PushTestBase):
         r = self.client.post("/api/v1/garmin/workouts/login/mfa", headers=self.h, json={"code": "123456"})
         self.assertEqual(r.get_json()["code"], "garmin_mfa_expired")
 
+    @unittest.skipUnless(HAVE_GARMIN_LIBS, "garminconnect/fitdecode nicht installiert (requirements.txt)")
     def test_falsches_passwort(self):
         class AuthErr(Exception):
             pass
@@ -441,6 +449,7 @@ class EndpunkteTest(PushTestBase):
         self.assertNotIn("geheim-123", repr(printed.call_args_list) + json.dumps(r.get_json()))
         self.assertFalse(os.path.exists(tools.garmin_sync.token_path(self.aid)))
 
+    @unittest.skipUnless(HAVE_GARMIN_LIBS, "garminconnect/fitdecode nicht installiert (requirements.txt)")
     def test_anmeldung_braucht_email_und_passwort(self):
         for body in ({"email": "x", "password": "y"}, {"email": "a@b.de"}, {"email": "a@b.de", "password": 5}):
             self.assertEqual(self.login(mock.MagicMock(), body).status_code, 400, body)

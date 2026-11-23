@@ -2,19 +2,24 @@
 # Versionsnummer in VERSION steht. Der Release-Text kommt aus CHANGELOG.md
 # (Abschnitt "## <Version>"). Gibt es die Release schon, passiert nichts.
 # Die Dashboards finden die neue Version dann ueber backend/updater.py.
+# Vorher laufen alle Tests (tests.yml) - ist einer rot, gibt es keine Release.
 name: Release aus VERSION
 
 on:
   push:
     branches: [main]
-    paths: [VERSION, CHANGELOG.md, .github/workflows/release.yml]
+    paths: [VERSION, CHANGELOG.md, .github/workflows/release.yml, .github/workflows/tests.yml]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  tests:
+    uses: ./.github/workflows/tests.yml
+
   release:
+    needs: tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

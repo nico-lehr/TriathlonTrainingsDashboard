@@ -5,7 +5,10 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import parse_fit  # noqa: E402
+try:
+    import parse_fit  # noqa: E402  (braucht fitdecode, requirements.txt)
+except ImportError as e:
+    raise unittest.SkipTest(f"parse_fit nicht ladbar: {e}")
 
 
 class SportNameTest(unittest.TestCase):

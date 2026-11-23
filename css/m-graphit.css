@@ -4,6 +4,18 @@
 
 #m-app[hidden], .m-backbar { display: none; }
 
+/* Ladeschirm beim Öffnen (js/theme-init.js): Seite verdeckt, bis die
+   Graphit-Ansicht steht - das bisherige Design blitzt nicht mehr auf. */
+html.m-boot { background: #0c0d0f; color-scheme: dark; }
+html.m-boot body { visibility: hidden; background: #0c0d0f; }
+html.m-boot::after {
+  content: ""; position: fixed; top: 50%; left: 50%; width: 40px; height: 40px; margin: -20px 0 0 -20px;
+  border-radius: 50%; border: 3px solid rgba(127,178,255,0.18); border-top-color: #7fb2ff;
+  animation: m-boot-spin 0.9s linear infinite;
+}
+@keyframes m-boot-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { html.m-boot::after { animation-duration: 3s; } }
+
 body.m-graphit {
   /* Graphit-Farben */
   --m-bg: #0c0d0f; --m-surface: #16181b; --m-surface-2: #1e2125; --m-text: #f2f3f5; --m-muted: #8d929a;

@@ -11,6 +11,10 @@ import os
 import shutil
 import tempfile
 import unittest
+import importlib.util
+# Abruf und Anmeldung brauchen die Garmin-Bibliotheken (requirements.txt);
+# ohne sie werden nur diese Tests uebersprungen statt rot zu sein.
+HAVE_GARMIN_LIBS = all(importlib.util.find_spec(m) is not None for m in ("garminconnect", "fitdecode"))
 from unittest import mock
 
 try:
@@ -231,6 +235,7 @@ class GarminWorkoutTest(unittest.TestCase):
 class SwimAndDefaultsTest(unittest.TestCase):
     """Umwandlung ohne Server: Schwimmstil, Bahnlaenge, Ersatz-Variante, Standard-Ablauf."""
 
+    @unittest.skipUnless(HAVE_GARMIN_LIBS, "garminconnect/fitdecode nicht installiert (requirements.txt)")
     def test_jede_kraftuebung_hat_garmin_eintrag_aus_dem_katalog(self):
         import re
         from garminconnect.exercises import _RAW

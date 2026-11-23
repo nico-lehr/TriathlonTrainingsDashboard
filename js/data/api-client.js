@@ -163,6 +163,7 @@ function showApiError(message) {
   if (!el) return;
   el.textContent = message || "";
   el.hidden = !message;
+  if (message) document.documentElement.classList.remove("m-boot"); // Fehler nicht hinter dem Ladeschirm verstecken
 }
 
 /* ----------------------------------------------------------------------

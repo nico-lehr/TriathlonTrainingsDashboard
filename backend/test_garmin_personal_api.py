@@ -20,6 +20,10 @@ import zipfile
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from datetime import date, datetime, timedelta
 from unittest import mock
+import importlib.util
+# Abruf und Anmeldung brauchen die Garmin-Bibliotheken (requirements.txt);
+# ohne sie werden nur diese Tests uebersprungen statt rot zu sein.
+HAVE_GARMIN_LIBS = all(importlib.util.find_spec(m) is not None for m in ("garminconnect", "fitdecode"))
 
 import tools.garmin_sync as garmin_sync
 import backend
@@ -557,6 +561,7 @@ class EinstellungenTest(TempDirsMixin, unittest.TestCase):
         self.client.delete("/api/v1/garmin/personal-api", headers=self.h["garmin-anna"])
         self.assertFalse(personal_api.has_key(self.ids["garmin-anna"]))
 
+    @unittest.skipUnless(HAVE_GARMIN_LIBS, "garminconnect/fitdecode nicht installiert (requirements.txt)")
     def test_nach_dem_speichern_startet_gleich_der_erste_abruf(self):
         self.fake({personal_api.TOKEN_PATH: jwt(time.time() + 86400).encode()})
         r = self.put("garmin-anna", {"key": API_KEY})
@@ -586,11 +591,12 @@ class EinstellungenTest(TempDirsMixin, unittest.TestCase):
         self.assertEqual(garmin.requests, [])
         self.assertFalse(personal_api.has_key(self.ids["garmin-anna"]))
 
+    @unittest.skipUnless(HAVE_GARMIN_LIBS, "garminconnect/fitdecode nicht installiert (requirements.txt)")
     def test_abruf_im_hintergrund(self):
         self.assertEqual(self.client.post("/api/v1/garmin/sync", headers=self.h["garmin-anna"]).status_code, 409)
         personal_api.save_key(self.ids["garmin-anna"], API_KEY)
         with mock.patch.object(garmin_sync, "sync_user", return_value="Aktivitaeten 2 neu") as sync_user, \
-                mock.patch("threading.Thread") as thread, mock.patch.object(backend, "Session") as session:
+                mock.patch("threading.Thread") as thread, mock.patch.object(backend, "Session", wraps=backend.Session) as session:
             r = self.client.post("/api/v1/garmin/sync", headers=self.h["garmin-anna"])
             self.assertEqual(r.status_code, 202)
             self.assertTrue(r.get_json()["data"]["sync"]["running"])
@@ -604,6 +610,7 @@ class EinstellungenTest(TempDirsMixin, unittest.TestCase):
         # Ben ist davon nicht betroffen
         self.assertFalse(self.client.get("/api/v1/garmin/personal-api", headers=self.h["garmin-ben"]).get_json()["data"]["sync"]["running"])
 
+    @unittest.skipUnless(HAVE_GARMIN_LIBS, "garminconnect/fitdecode nicht installiert (requirements.txt)")
     def test_automatischer_abruf_schnell_und_hoechstens_alle_30_minuten(self):
         anna, post = self.ids["garmin-anna"], lambda body: self.client.post("/api/v1/garmin/sync", headers=self.h["garmin-anna"], json=body)
         # Ohne Schluessel: kein Fehler, nur "uebersprungen" (kommt bei jedem Oeffnen)
@@ -611,7 +618,7 @@ class EinstellungenTest(TempDirsMixin, unittest.TestCase):
         self.assertEqual((r.status_code, r.get_json()["data"]["skipped"]), (200, "not_connected"))
         personal_api.save_key(anna, API_KEY)
         with mock.patch.object(garmin_sync, "sync_user", return_value="Aktivitaeten 1 neu") as sync_user, \
-                mock.patch("threading.Thread") as thread, mock.patch.object(backend, "Session"):
+                mock.patch("threading.Thread") as thread, mock.patch.object(backend, "Session", wraps=backend.Session):
             r = post({"auto": True})
             self.assertEqual(r.status_code, 202)
             self.assertEqual(thread.call_args.kwargs["kwargs"], {"days": garmin_sync.QUICK_DAYS})
@@ -696,6 +703,7 @@ class EinstellungenTest(TempDirsMixin, unittest.TestCase):
         self.assertEqual(r.status_code, 409)
         thread.assert_not_called()
 
+    @unittest.skipUnless(HAVE_GARMIN_LIBS, "garminconnect/fitdecode nicht installiert (requirements.txt)")
     def test_abbruch_per_systemexit_haengt_nicht_auf_laeuft(self):
         personal_api.save_key(self.ids["garmin-anna"], API_KEY)
         with mock.patch.object(garmin_sync, "sync_user", side_effect=SystemExit("Die Bibliothek fehlt.")), \
@@ -708,6 +716,7 @@ class EinstellungenTest(TempDirsMixin, unittest.TestCase):
         with mock.patch("threading.Thread"):
             self.assertEqual(self.client.post("/api/v1/garmin/sync", headers=self.h["garmin-anna"]).status_code, 202)
 
+    @unittest.skipUnless(HAVE_GARMIN_LIBS, "garminconnect/fitdecode nicht installiert (requirements.txt)")
     def test_auch_ein_harter_abbruch_laesst_den_abruf_nicht_auf_laeuft(self):
         personal_api.save_key(self.ids["garmin-anna"], API_KEY)
         with mock.patch.object(garmin_sync, "sync_user", side_effect=KeyboardInterrupt), \
@@ -718,6 +727,7 @@ class EinstellungenTest(TempDirsMixin, unittest.TestCase):
         st = self.client.get("/api/v1/garmin/personal-api", headers=self.h["garmin-anna"]).get_json()["data"]["sync"]
         self.assertEqual((st["running"], st["ok"]), (False, False))
 
+    @unittest.skipUnless(HAVE_GARMIN_LIBS, "garminconnect/fitdecode nicht installiert (requirements.txt)")
     def test_fehler_beim_abruf_als_klare_meldung(self):
         personal_api.save_key(self.ids["garmin-anna"], API_KEY)
         with mock.patch.object(garmin_sync, "sync_user", side_effect=personal_api.GarminApiAuthenticationError(personal_api.KEY_REJECTED)), \

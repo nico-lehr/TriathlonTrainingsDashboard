@@ -702,6 +702,7 @@ function renderMApp() {
   document.documentElement.classList.toggle("m-graphit-root", active);
   mThemeColor(active);
   document.body.classList.toggle("m-classic", active && !!mState.classic);
+  document.documentElement.classList.remove("m-boot"); // Ladeschirm weg (js/theme-init.js)
   if (!active) { host.hidden = true; return; }
   host.hidden = false; // bei bisherigen Seiten blendet CSS den Inhalt aus (am Computer bleibt die Seitenleiste)
   document.querySelectorAll("#m-tabs button").forEach(b => {
