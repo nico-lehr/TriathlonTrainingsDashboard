@@ -292,3 +292,53 @@ test("Vorausschau höchstens +30 % über dem Anker, Horizont 104 Wochen, auch be
   const types = targets(HISTORY, [], goal).weeks.map(w => w.type);
   assert.ok(!types.join(",").includes("entlastung,taper"), types.join(","));
 }));
+
+/* ---------- verfügbare Stunden aus dem Profil (athleteProfile.weeklyHours) ---------- */
+
+const withHours = (h, fn) => { app.athleteProfile = { weeklyHours: h }; try { return fn(); } finally { delete app.athleteProfile; } };
+
+test("verfügbare Stunden: Steigerung um 10 % je Belastungswoche bis dahin, nie darüber", () => {
+  withHours(8, () => {
+    const t = targets(HISTORY);
+    const loads = t.weeks.filter(w => w.type === "belastung").map(w => w.targetMin);
+    assert.strictEqual(loads[0], Math.floor(330 * 1.1), "erste Woche +10 % statt +3 %");
+    assert.ok(loads.every(m => m <= 480), "nie über 8 h");
+    assert.ok(loads.includes(480), "die 8 h werden erreicht");
+    assert.strictEqual(t.availableMin, 480);
+  });
+});
+
+test("verfügbare Stunden unter dem bisherigen Training: Ziel = verfügbare Zeit", () => {
+  withHours(4, () => {
+    const t = targets(HISTORY);
+    t.weeks.filter(w => w.type === "belastung").forEach(w => assert.ok(w.targetMin <= 240));
+  });
+});
+
+test("verfügbare Stunden ohne bisheriges Training: Start bei 60 % in Minuten", () => {
+  withHours(10, () => {
+    const t = targets([]);
+    assert.strictEqual(t.baselineMin, 360);
+    assert.strictEqual(t.fromProfile, true);
+    assert.ok(t.weeks[0].targetMin >= 360);
+  });
+});
+
+test("verfügbare Stunden: ein Plan genau nach der schnelleren Kurve verstößt gegen keine Umfangsregel", () => {
+  withHours(10, () => {
+    const t = targets(HISTORY);
+    const days = [1, 3, 5, 2, 4, 0];
+    const sports = ["Schwimmen", "Rad", "Laufen"];
+    const plan = [];
+    t.weeks.forEach((w, wi) => {
+      const n = Math.ceil(w.targetMin / 100);
+      const part = Math.floor(w.targetMin / n / 5) * 5;
+      for (let i = 0; i < n; i++) {
+        plan.push({ id: `q${wi}-${i}`, date: run(`planShiftDay("${w.weekStart}", ${days[i]})`), sport: sports[i % 3], title: "locker",
+          duration_min: i === 0 ? w.targetMin - part * (n - 1) : part, intensity: "leicht", status: "geplant" });
+      }
+    });
+    const result = plain(app.validatePlan(plan, HISTORY, null, null, { today: TODAY, acwr: 1.0, goal: SUNDAY_RACE }));
+    assert.deepStrictEqual(result.filter(v => ["volume_increase", "deload", "phase_volume", "recovery_week"].includes(v.rule)), []);
+  });
+});

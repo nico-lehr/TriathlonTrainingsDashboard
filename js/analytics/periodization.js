@@ -52,6 +52,21 @@ const PERIOD_GROWTH = { grundlage: 0.03, aufbau: 0.05, spezifisch: 0 };
 // einem Rennen in weiter Ferne (sonst z. B. 925 statt 370 Minuten in einem Jahr).
 const PERIOD_MAX_GROWTH = 0.3;
 
+// Verfügbare Stunden aus dem Profil (athleteProfile.weeklyHours):
+// - Obergrenze: kein Wochenziel liegt darüber (statt der 30-%-Grenze oben).
+// - Liegt das Training noch darunter, steigt der Plan schneller - um die
+//   +10-%-Grenze von plan-rules.js (PLAN_MAX_WEEKLY_INCREASE) je
+//   Belastungswoche statt 3-5 %, auch in der spezifischen Phase.
+// - Ohne Training in den letzten 8 Wochen startet der Plan bei
+//   PERIOD_START_SHARE der verfügbaren Zeit (statt nur in Prozent).
+// Entlastungswochen, Taper und Erholung bleiben wie oben.
+const PERIOD_START_SHARE = 0.6;
+
+function periodAvailableMin() {
+  const h = typeof athleteProfile !== "undefined" && athleteProfile ? Number(athleteProfile.weeklyHours) : 0;
+  return h > 0 && h <= 60 ? Math.round(h * 60) : null;
+}
+
 // Taper: Anteil der letzten Belastungswoche - [Rennwoche, Woche davor] (ein
 // Eintrag je PERIOD_TAPER_WEEKS). Erholungswoche nach dem Rennen.
 const PERIOD_TAPER_FACTORS = [0.5, 0.7];
@@ -172,7 +187,9 @@ function getWeeklyTargets(goal, plannedWorkouts, history, today = new Date()) {
   const taperWeeksBehind = Math.max(0, PERIOD_TAPER_WEEKS - 1 - periodWeeksToRace(wk0, goal));
   const returning = base !== ref && light - taperWeeksBehind >= PLAN_RETURN_LIGHT_WEEKS;
   const anchor = returning ? base : ref;
-  const baselineMin = anchor != null ? planFloorMin(anchor) : null;
+  const avail = periodAvailableMin();
+  const fromProfile = anchor == null && avail != null; // noch kein Training: Start aus dem Profil
+  const baselineMin = anchor != null ? planFloorMin(anchor) : fromProfile ? planFloorMin(avail * PERIOD_START_SHARE) : null;
 
   // In Minuten mit ganzzahlig abgerundeten Werten; ohne Umfang in Prozent
   // (Anker 100, ungerundet). `last` = angezeigter Wert der letzten
@@ -180,7 +197,10 @@ function getWeeklyTargets(goal, plannedWorkouts, history, today = new Date()) {
   // sich Entlastung, Taper und Erholung.
   const start = baselineMin != null ? baselineMin : 100;
   const show = baselineMin != null ? planFloorMin : x => x;
-  const cap = start * (1 + PERIOD_MAX_GROWTH);
+  const cap = avail != null && baselineMin != null ? avail : start * (1 + PERIOD_MAX_GROWTH);
+  // Unter den verfügbaren Stunden: so schnell steigern, wie Regel 4 erlaubt
+  const growth = phase => (avail != null && baselineMin != null && last < avail
+    ? Math.max(PERIOD_GROWTH[phase], PLAN_MAX_WEEKLY_INCREASE) : PERIOD_GROWTH[phase]);
   let last = start, streak = streak0;
 
   const weeks = [];
@@ -193,7 +213,7 @@ function getWeeklyTargets(goal, plannedWorkouts, history, today = new Date()) {
       if (streak >= PLAN_DELOAD_EVERY_WEEKS - 1 && k !== PERIOD_TAPER_WEEKS) {
         type = "entlastung"; value = show(last * (1 - PLAN_DELOAD_REDUCTION)); streak = 0;
       } else {
-        last = show(Math.min(cap, last * (1 + PERIOD_GROWTH[phase])));
+        last = show(Math.min(cap, last * (1 + growth(phase))));
         type = "belastung"; value = last; streak++;
       }
     } else if (phase === "taper") {
@@ -209,5 +229,5 @@ function getWeeklyTargets(goal, plannedWorkouts, history, today = new Date()) {
       doneMin: Math.round(e.done), plannedMin: Math.round(e.planned),
     });
   }
-  return { baselineMin, baselineWeek: returning ? null : refWeek, returnAfterWeeks: returning ? light : 0, weeks };
+  return { baselineMin, baselineWeek: returning || fromProfile ? null : refWeek, returnAfterWeeks: returning ? light : 0, fromProfile, availableMin: avail, weeks };
 }

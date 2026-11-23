@@ -92,9 +92,11 @@ function raceCountdownWeekHtml(w, plan) {
 // Bezugswert der Prozentangabe: die letzte normale Woche, beim
 // Wiedereinstieg nach leichteren Wochen der Ausgangswert aus Regel 4.
 function raceCountdownBaselineText(plan) {
-  return plan.returnAfterWeeks
+  if (plan.fromProfile) return `vom Startwert aus deinen verfügbaren Stunden (${plan.baselineMin} min)`;
+  const cap = plan.availableMin ? `, höchstens deine ${fmtNum(plan.availableMin / 60, 1)} h` : "";
+  return (plan.returnAfterWeeks
     ? `deines Wiedereinstiegs-Werts (${plan.baselineMin} min nach ${plan.returnAfterWeeks} leichteren Wochen in Folge)`
-    : `deiner letzten normalen Trainingswoche (ab ${fmtDate(new Date(plan.baselineWeek + "T00:00:00"))}: ${plan.baselineMin} min)`;
+    : `deiner letzten normalen Trainingswoche (ab ${fmtDate(new Date(plan.baselineWeek + "T00:00:00"))}: ${plan.baselineMin} min)`) + cap;
 }
 
 // Balken: erledigt + noch geplant, Strich = Ziel. Gestreckt auf volle Breite

@@ -105,7 +105,12 @@ Dritter Kontext/Prompt-Pfad neben Ziel-Tipps und Workout-Auswertung:
   Taper/Rennwoche/Erholung), Zielumfang in Minuten und was davon schon
   absolviert/geplant ist, der aktuelle Wochenumfang (bzw. „Wiedereinstieg
   nach n leichteren Wochen“) und der nächste Phasenwechsel. Die KI plant den
-  Rest bis zum Ziel, statt eigene Umfänge zu erfinden.
+  Rest bis zum Ziel, statt eigene Umfänge zu erfinden. Die Regel
+  „Umfang“ (`planVolumeRule`, `prompts.js`, ab 2.5.54) verlangt mindestens
+  90 % des Zielumfangs, nie mehr als das Ziel und die verfügbaren Stunden;
+  mit 2 Haupttrainings pro Tag darf die KI dafür eine kurze zweite lockere
+  Einheit ergänzen. Die verfügbaren Stunden (`weeklyHours`) sind Obergrenze
+  der Zielkurve; darunter steigt sie um 10 % je Belastungswoche.
 * das konkrete, zu planende Zeitfenster (rollierend, siehe `computePlanningWindow`)
 * ob Kraft-/Mobility-Einheiten gewünscht sind (`athleteProfile.includeStrength/includeMobility`)
 * die letzten tatsächlich absolvierten Einheiten (granularer als die

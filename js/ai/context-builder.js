@@ -285,7 +285,7 @@ function buildCompactContext(goal, { forPlan = false } = {}) {
     if (targets && targets.weeks.length) {
       const w = targets.weeks[0];
       if (!forPlan) lines.push(`Diese Woche: ${periodWeekText(w)}; bisher absolviert ${w.doneMin} min, noch geplant ${w.plannedMin} min`);
-      if (targets.baselineMin != null) lines.push(`Aktueller Wochenumfang: ${targets.baselineMin} min (${targets.returnAfterWeeks ? `Wiedereinstieg nach ${targets.returnAfterWeeks} leichteren Wochen in Folge` : `letzte normale Woche ab ${targets.baselineWeek}`})`);
+      if (targets.baselineMin != null) lines.push(`Aktueller Wochenumfang: ${targets.baselineMin} min (${targets.returnAfterWeeks ? `Wiedereinstieg nach ${targets.returnAfterWeeks} leichteren Wochen in Folge` : targets.fromProfile ? "noch kein Training aufgezeichnet - Startwert aus den verfügbaren Stunden" : `letzte normale Woche ab ${targets.baselineWeek}`})${targets.availableMin ? `; Ziel steigt bis zu den verfügbaren ${targets.availableMin} min/Woche` : ""}`);
     }
     if (goal.subDisciplines && goal.subDisciplines.length) {
       const relay = goalIsRelay(goal);

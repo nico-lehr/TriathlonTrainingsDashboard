@@ -4,6 +4,15 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.5.54
+
+**Trainingsplan steigert schneller zu deinen verfügbaren Stunden**
+- Bisher richtete sich der Wochenumfang fast nur nach dem, was du zuletzt wirklich trainiert hast, und stieg dann nur um 3–5 % pro Woche. Mit 10 h im Profil und bisher 6 h pro Woche hätte es so etwa ein halbes Jahr bis zu den 10 h gedauert.
+- Jetzt sind deine verfügbaren Stunden (Profil → „Stunden pro Woche“) das Ziel und die Obergrenze: Solange du darunter liegst, steigt der Plan um bis zu 10 % pro Woche – die übliche Sicherheitsgrenze. Von 6 h aus bist du so nach etwa 7 Wochen bei 10 h. Jede 4. Woche bleibt eine Erholungswoche.
+- Der Plan geht nie über deine verfügbaren Stunden hinaus.
+- Ohne frühere Trainings startet der Plan bei etwa 60 % deiner Stunden.
+- Der Coach soll den Wochenumfang jetzt wirklich ausfüllen (mindestens 90 % des Ziels) statt deutlich darunter zu bleiben. Stellst du im Trainingsprofil „Haupttrainings pro Tag“ auf 2, darf er dafür auch eine kurze zweite lockere Einheit am Tag einplanen.
+
 ## 2.5.53
 
 **Keine KI-Kosten mehr, wenn keiner hinschaut**

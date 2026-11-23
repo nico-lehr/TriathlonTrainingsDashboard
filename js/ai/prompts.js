@@ -57,6 +57,7 @@ ${buildPlanTrainingDaysRule(windowDates)}
 - Sportarten ausschließlich aus: ${sports.join(", ")}. Schwimmen nur am angegebenen Schwimmtag, falls einer gesetzt ist. Lange Einheiten (Laufen/Rad) bevorzugt an den angegebenen "lange Einheit"-Tagen.
 ${typeof planStructureRuleText === "function" ? planStructureRuleText(planStructureSettings(athleteProfile, trainingProfile()), windowDates) : ""}
 - Intensität passend zur Trainingsphase: in Grundlage/Aufbau überwiegend "leicht" (ca. 80/20), im Taper Umfang deutlich reduzieren, Intensität nur kurz und moderat.
+${planVolumeRule()}
 - Nie einen Trainingsload/TSS-Wert erfinden - nur "intensity": "leicht"|"mittel"|"hart".
 ${optional ? optional + "\n" : ""}${typeof strengthPlanRule === "function" ? strengthPlanRule() : "- Bei \"Kraft\": \"exercises\"-Array mit 3-6 konkreten Übungen (Name, Sätze, Wiederholungen)."}
 ${mobilityPlanRule()}
@@ -74,6 +75,20 @@ Antworte AUSSCHLIESSLICH mit einem JSON-Objekt in genau dieser Form, keinerlei T
 
 // Schwimmen in Metern statt mit Tempo-Vorgabe (Wunsch aus der Praxis: am
 // Beckenrand zählt man Bahnen, nicht Sekunden pro 100 m). Richtwert und
+// Umfang: Die KI soll den Zielumfang der Woche (Periodisierung, oben im
+// Kontext) wirklich ausschöpfen - früher blieb der Plan oft deutlich darunter.
+// Mit 2 Haupttrainings pro Tag (Trainingsprofil) darf sie dafür eine kurze
+// zweite lockere Einheit ergänzen.
+function planVolumeRule() {
+  const s = typeof planStructureSettings === "function" && typeof trainingProfile === "function"
+    ? planStructureSettings(athleteProfile, trainingProfile()) : null;
+  const hours = typeof athleteProfile !== "undefined" && athleteProfile && Number(athleteProfile.weeklyHours) > 0 ? ` und nie über die verfügbaren ${String(athleteProfile.weeklyHours).replace(".", ",")} h` : "";
+  const second = s && s.mainPerDay === 2
+    ? " oder ergänze an Tagen mit nur einem Haupttraining eine kurze zweite lockere Einheit (20-45 min, andere Sportart) - der Athlet möchte gern mehr trainieren"
+    : "";
+  return `- Umfang: Plane jede Woche auf ihren Zielumfang aus der Periodisierung - alle Minuten der Woche zusammen (schon absolviert/geplant + neu) mindestens 90 % davon, höchstens der Zielumfang selbst${hours}. Fehlen Minuten, verlängere lockere Einheiten${second}. Entlastungs-, Taper- und Erholungswochen bewusst beim (niedrigeren) Zielumfang lassen.`;
+}
+
 // gewünschter Meterbereich: swimMetersPer10Min()/swimMeterRange() in
 // js/data/planned-workouts.js.
 function swimPlanRule() {
