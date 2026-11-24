@@ -2828,10 +2828,12 @@ body.m-graphit .settings-page-head, body.m-graphit .sh-back { display: none; }
 .mi-tip[hidden] { display: none; }
 .mi-mark { pointer-events: none; position: absolute; top: -4px; width: 4px; height: 14px; margin-left: -2px; border-radius: 2px; background: var(--text-primary); box-shadow: 0 0 0 2px var(--surface-1, #fff); }
 .mi-meta { font-size: 12px; color: var(--text-muted); }
+.mi-intro { margin: 4px 0 0; font-size: 13px; color: var(--text-secondary); line-height: 1.4; }
 .mi-plan, .mi-cmp { font-size: 13px; margin-top: 6px; color: var(--text-secondary); line-height: 1.4; }
 .mi-cmp-dir { font-weight: 600; }
 .mi-cmp-better .mi-cmp-dir, .mi-t-good { color: #1f9d55; }
 .mi-cmp-worse .mi-cmp-dir, .mi-t-warn { color: #d9730d; }
+.mi-cmp-more .mi-cmp-dir, .mi-cmp-less .mi-cmp-dir { color: var(--text-primary); }
 .mi-more { margin-top: 6px; font-size: 13px; color: var(--text-secondary); }
 .mi-more summary { cursor: pointer; color: var(--accent); font-size: 13px; list-style: none; }
 .mi-more summary::-webkit-details-marker { display: none; }

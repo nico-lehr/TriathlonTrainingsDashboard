@@ -140,3 +140,28 @@ test("Farbbalken: jeder Abschnitt nennt seinen Wertebereich (für Zeigen/Antippe
   const sb = get(insights(swim, null, { swimCss: "1:55" }), "swim_pace").scale.bands.map(b => b.text);
   assert.deepStrictEqual([sb[0], sb[3]], ["schneller als CSS: schneller als 1:53 min/100 m", "locker: langsamer als 2:10 min/100 m"]);
 });
+
+test("Trainingsbelastung: TRIMP & Co. mit Skala, Erklärung und Vergleich", () => {
+  vm.runInContext(fs.readFileSync(path.join(ROOT, "js/analytics/workout-profile.js"), "utf8"), app, { filename: "workout-profile.js" });
+  app.athleteProfile = { maxHr: 190, restingHr: 50 };
+  // 30 min bei Ø 135 bpm = 61 % Reserve (wie im Screenshot)
+  const w = { file: "now", sport: "Laufen", _date: at("2026-11-08"), duration_min: 30, avg_hr: 135 };
+  const earlier = [1, 2, 3, 4].map(i => ({ file: "e" + i, sport: "Laufen", _date: at(`2026-11-0${i}`), duration_min: 60, avg_hr: 140 }));
+  app.__all = [...earlier, w].map(app.__fix);
+  app.__w = app.__fix(w);
+  const list = plain(run("workoutLoadInsights(__w, __all)"));
+  assert.deepStrictEqual(list.map(x => x.id), ["load_trimp", "load_trimp_min", "load_stress", "load_hrr"]);
+  const [trimp, rate, stress, hrr] = list;
+  assert.strictEqual(trimp.verdict, "leicht");
+  assert.strictEqual(trimp.compare.dir, "less"); // 30 statt 60 min
+  assert.match(trimp.compare.baseText, /^sonst Ø \d+ \(letzte 4 Läufe\)$/);
+  assert.strictEqual(rate.verdict, "locker (Grundlage)");
+  assert.strictEqual(rate.scale.bands[1].text, "locker (Grundlage): 1,22–1,72");
+  assert.strictEqual(stress.verdict, "leicht");
+  assert.strictEqual(hrr.verdict, "Zone 2 · locker");
+  assert.strictEqual(hrr.scale.bands[1].text, "Zone 2 · locker: 60–70 % (134–148 bpm)");
+  list.forEach(x => { assert.ok(x.explain.length > 40); assert.ok(x.tip); });
+  // ohne Max-/Ruhepuls: nichts (keine erfundenen Werte)
+  app.athleteProfile = {};
+  assert.deepStrictEqual(plain(run("workoutLoadInsights(__w, __all)")), []);
+});

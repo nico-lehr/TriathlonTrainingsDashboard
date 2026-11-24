@@ -414,6 +414,91 @@ function miTrainingEffect(w) {
   };
 }
 
+// Trainingsbelastung (Block "Trainingsbelastung" der Detailansicht): TRIMP,
+// TRIMP/Min., Stress-Score und Ø Herzfrequenzreserve aus
+// computeTrainingLoadStats (js/analytics/workout-profile.js), jeweils mit
+// Farbskala, Vergleich mit früheren Einheiten derselben Art und Erklärung.
+// TRIMP pro Minute bei einem bestimmten Anteil der Herzfrequenzreserve
+// (Formel wie in computeTrainingLoadStats) - so passen die Grenzen genau zu
+// den Pulszonen.
+const miTrimpRate = r => r * 0.64 * Math.exp(1.92 * r);
+
+function workoutLoadInsights(w, all, profile) {
+  if (!w || typeof computeTrainingLoadStats !== "function") return [];
+  const stats = computeTrainingLoadStats(w);
+  if (!stats) return [];
+  all = all || (typeof ALL !== "undefined" ? ALL : []);
+  profile = profile || (typeof athleteProfile !== "undefined" ? athleteProfile : {}) || {};
+  const max = Number(profile.maxHr), rest = Number(profile.restingHr);
+  const g = typeof sportGroup === "function" ? sportGroup(w.sport) : w.sport;
+  const word = (MI_UNIT_WORD[g] || ["Einheiten"])[0];
+
+  // Vergleich: für alle (auch diese Einheit) nur aus Ø-Puls und Dauer
+  // gerechnet - frühere Einheiten haben meist keine Sekundendaten geladen,
+  // so wird nicht Äpfel mit Birnen verglichen.
+  const plainStats = o => { try { return computeTrainingLoadStats({ ...o, stream: null }); } catch (e) { return null; } };
+  const mine = plainStats(w);
+  const cmp = (key, dec, rel) => {
+    if (!mine) return null;
+    const base = miBaseline(w, all, o => { const st = plainStats(o); return st ? st[key] : null; });
+    if (!base) return null;
+    const diff = mine[key] - base.avg;
+    const baseText = `sonst Ø ${miFmt(base.avg, dec)} (letzte ${base.n} ${word})`;
+    if (Math.abs(diff) < Math.max(rel * base.avg, Math.pow(10, -dec))) return { dir: "same", delta: 0, text: "wie sonst", baseText };
+    return { dir: diff > 0 ? "more" : "less", delta: diff, text: diff > 0 ? "mehr als sonst" : "weniger als sonst", baseText };
+  };
+  const make = (id, label, value, valueText, bands, fmt, span, rangeText, explain, tip, compare) => {
+    const band = miBand(bands, value);
+    return { id, label, value, valueText, level: band[2], verdict: band[3], rangeText,
+      scale: miScale(bands, Math.min(bands[bands.length - 1][1] - 1e-6, Math.max(bands[0][0], value)), fmt, { span }),
+      compare, explain, tip };
+  };
+  const out = [];
+
+  const trimpBands = [[0, 50, "i1", "leicht"], [50, 120, "i2", "mittel"], [120, 200, "i3", "hoch"], [200, 300, "i4", "sehr hoch"], [300, 450, "i5", "extrem"]];
+  out.push(make("load_trimp", "TRIMP", stats.trimp, String(stats.trimp), trimpBands,
+    x => String(x), (lo, hi) => `${lo}–${hi}`,
+    "1 Stunde locker ≈ 80–100",
+    "TRIMP (Trainingsimpuls) ist die gesamte Belastung der Einheit: Dauer mal Anstrengung. Harte Minuten zählen deutlich mehr als lockere – eine Minute in Zone 4 ungefähr doppelt so viel wie in Zone 2. So kann man ganz verschiedene Einheiten (kurz und hart, lang und locker) miteinander vergleichen.",
+    stats.trimp >= 200
+      ? "Eine große Belastung – plane danach einen lockeren Tag oder Ruhe ein, damit sich der Körper erholen kann."
+      : "Zähl die TRIMP einer Woche zusammen: Steigt die Summe von Woche zu Woche nur langsam (höchstens etwa 10 %), wirst du fitter, ohne dich zu überlasten.",
+    cmp("trimp", 0, 0.1)));
+
+  const rates = [0.3, 0.6, 0.7, 0.8, 0.9, 1].map(miTrimpRate);
+  const rateBands = [[rates[0], rates[1], "i1", "sehr locker"], [rates[1], rates[2], "i2", "locker (Grundlage)"], [rates[2], rates[3], "i3", "mittel"], [rates[3], rates[4], "i4", "hart"], [rates[4], rates[5], "i5", "sehr hart"]];
+  out.push(make("load_trimp_min", "TRIMP / Min.", stats.trimpPerMin, miFmt(stats.trimpPerMin, 2), rateBands,
+    x => miFmt(x, 2), (lo, hi) => `${miFmt(lo, 2)}–${miFmt(hi, 2)}`,
+    `locker (Grundlage): ${miFmt(rates[1], 2)}–${miFmt(rates[2], 2)}`,
+    "Wie viel Belastung pro Minute entstanden ist – also wie intensiv die Einheit im Schnitt war, unabhängig von ihrer Länge. Die Grenzen entsprechen den Pulszonen: Zone 2 (locker) liegt etwa bei 1,2–1,7.",
+    stats.trimpPerMin >= rates[2]
+      ? "Eine intensive Einheit. Solche Tage sind wertvoll, aber höchstens 2–3 pro Woche – die übrigen locker halten."
+      : "Eine lockere Einheit – genau richtig für den Großteil deines Trainings (etwa 80 %).",
+    cmp("trimpPerMin", 2, 0.05)));
+
+  const stressBands = [[0, 25, "i1", "leicht"], [25, 30, "i2", "mittel"], [30, 35, "i3", "fordernd"], [35, 40, "i4", "hart"], [40, 60, "i5", "sehr hart"]];
+  out.push(make("load_stress", "Herzfrequenz-Stress-Score", stats.stressScore, String(stats.stressScore), stressBands,
+    x => String(x), (lo, hi) => `${lo}–${hi}`,
+    "1 Stunde locker ≈ 25–28",
+    "Eine eigene Zahl dieser App: Sie verbindet, wie hoch dein Puls war, mit der Dauer. Die Dauer zählt dabei gedämpft, damit sehr lange lockere Einheiten nicht allein durch ihre Länge riesig werden. Gut, um deine eigenen Einheiten untereinander zu vergleichen – nicht mit Werten anderer Apps (z. B. TSS).",
+    "Nutze ihn als schnellen Vergleich: Liegt eine „lockere“ Einheit plötzlich deutlich höher als sonst, warst du müder, es war heiß oder du warst schneller unterwegs als geplant.",
+    cmp("stressScore", 0, 0.08)));
+
+  const hrrBands = [[30, 60, "i1", "Zone 1 · sehr locker"], [60, 70, "i2", "Zone 2 · locker"], [70, 80, "i3", "Zone 3 · mittel"], [80, 90, "i4", "Zone 4 · hart"], [90, 101, "i5", "Zone 5 · sehr hart"]];
+  const bpm = x => Math.round(rest + (max - rest) * x / 100);
+  const hasHr = max > rest && rest > 0;
+  out.push(make("load_hrr", "Ø Herzfrequenzreserve", stats.hrrPercent, `${miFmt(stats.hrrPercent, 0)} %`, hrrBands,
+    x => hasHr ? `${Math.round(x)} % (${bpm(x)} bpm)` : `${Math.round(x)} %`,
+    (lo, hi) => hasHr ? `${Math.round(lo)}–${Math.round(hi)} % (${bpm(lo)}–${bpm(hi)} bpm)` : `${Math.round(lo)}–${Math.round(hi)} %`,
+    "Grundlage: 60–70 %",
+    "Die Herzfrequenzreserve ist der Bereich zwischen deinem Ruhepuls (0 %) und deinem Maximalpuls (100 %). Der Wert zeigt, wo dein Puls im Schnitt in diesem Bereich lag. Das ist genauer als „% vom Maximalpuls“, weil dein Ruhepuls mit einfließt. Daraus ergeben sich die Pulszonen (wie bei „Puls-Intensität“ weiter oben).",
+    stats.hrrPercent >= 70
+      ? "Für lockere Einheiten unter 70 % bleiben – ein Puls-Alarm auf der Uhr hilft dabei."
+      : "Gut für Grundlagentraining: Hier wächst die Ausdauer, ohne dass du dich stark ermüdest.",
+    cmp("hrrPercent", 0, 0.03)));
+  return out;
+}
+
 // Alle Einordnungen einer Einheit. chart: unter welchem Diagramm sie steht.
 function workoutMetricInsights(w, all, profile) {
   if (!w) return [];

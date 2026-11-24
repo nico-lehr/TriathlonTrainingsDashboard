@@ -512,17 +512,15 @@ function wireWorkoutRatingBlock(rootEl, file) {
 // diese zwei Profilwerte (oder ohne Pulsdaten in dieser Einheit) bleibt der
 // Block komplett weg statt erfundene Zahlen zu zeigen.
 function buildWorkoutLoadStatsHtml(w) {
-  const stats = computeTrainingLoadStats(w);
-  if (!stats) return "";
+  // Jeder Wert als Karte mit Farbskala, Vergleich und Erklärung
+  // (workoutLoadInsights, js/analytics/metric-insights.js).
+  const list = typeof workoutLoadInsights === "function" ? workoutLoadInsights(w) : [];
+  if (!list.length) return "";
   return `
     <div class="wd-loadstats">
       <h4>Trainingsbelastung</h4>
-      <div class="modal-stats">
-        <div class="st"><div class="l">TRIMP</div><div class="v">${stats.trimp}</div></div>
-        <div class="st"><div class="l">TRIMP / Min.</div><div class="v">${fmtNum(stats.trimpPerMin, 2)}</div></div>
-        <div class="st"><div class="l">Herzfrequenz-Stress-Score</div><div class="v">${stats.stressScore}</div></div>
-        <div class="st"><div class="l">Ø Herzfrequenzreserve</div><div class="v">${fmtNum(stats.hrrPercent, 0)}<small> %</small></div></div>
-      </div>
+      <p class="mi-intro">Wie stark hat dich diese Einheit belastet? Tippe auf eine Farbe für ihren Bereich und auf „Was heißt das?“ für die Erklärung.</p>
+      ${metricInsightsHtml(list)}
     </div>`;
 }
 

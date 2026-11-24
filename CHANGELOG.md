@@ -4,6 +4,12 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.5.57
+
+**Trainingsbelastung erklärt**
+- TRIMP, TRIMP pro Minute, Herzfrequenz-Stress-Score und Ø Herzfrequenzreserve stehen in der Detailansicht jetzt als eigene Karten – wie die anderen Werte: mit Farbskala (leicht bis extrem bzw. Pulszonen), Einordnung, Vergleich mit deinen letzten Einheiten derselben Sportart und „Was heißt das?“ mit Erklärung und Tipp.
+- Richtwerte zur Orientierung, z. B. „1 Stunde locker ≈ 80–100 TRIMP“.
+
 ## 2.5.56
 
 **Farbskalen zeigen ihre Bereiche**
