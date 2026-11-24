@@ -17,6 +17,8 @@ Gib eine kurze, konkrete Trainingsempfehlung auf Deutsch:
 4. Bei kritischem ACWR/TSB/Monotonie (Status "erhöht"/"kritisch"/"auffällig" o.ä.): expliziter Warnhinweis, welche Anpassung das konkret bedeutet
 ${[
   (ctx.includes("Erholung heute") || ctx.includes("Erholungs-Logbuch")) && `Unter "Erholung heute" ist Muskelkater, wenig Energie oder eine Verletzung angegeben: explizit sagen, wie die Empfehlung dafür angepasst wird (z.B. Einheit tauschen, Intensität senken, Ruhetag, Arzt/Physio bei Verletzung).`,
+  (ctx.includes("Soll-Ist") || ctx.includes("Gedächtnis (Muster")) && `Soll-Ist und "Gedächtnis" zeigen, wie der Athlet den Plan wirklich umsetzt - darauf eingehen, wenn dort etwas auffällt (z. B. lockere Einheiten zu hart).`,
+  (ctx.includes("Besondere Tage laut Uhr") || ctx.includes("Gefühlte Anstrengung")) && `Besondere Tage (krank, Reise, Alkohol ...) und die gefühlte Anstrengung von der Uhr mit einbeziehen, wenn sie die Erholung erklären.`,
   ctx.includes("Ernährungsziel heute") && `Falls passend, kurz auf das "Ernährungsziel heute" Bezug nehmen (z.B. Carb-Loading) - die Zahlen dort sind fertig berechnet, keine eigenen Gramm-/Kalorienangaben erfinden.`,
 ].filter(Boolean).map((t, i) => `${5 + i}. ${t}`).join("\n")}
 
@@ -44,6 +46,12 @@ function buildPlanPrompt(goal, windowDates) {
     has("Streckenprofil") && `- Streckenprofil hügelig/bergig: in Rad-/Lauf-Einheiten gezielt Anstiege einbauen und in "description" nennen.`,
     has("Priorität dieses Ziels") && `- Priorität A: konsequent auf das Renndatum hintrainieren (Taper ernst nehmen); B/C: mehr Spielraum für Grundlagentraining.`,
     has("Wettkampf-Strategie-Notiz") && `- Die Wettkampf-Strategie-Notiz nur berücksichtigen, wenn sie die Trainingsgestaltung betrifft.`,
+    has("Soll-Ist Auffälligkeiten") && `- Wurden lockere Einheiten zu hart gelaufen (siehe "Soll-Ist"), in "description" lockerer Einheiten eine klare Pulsobergrenze aus den Zonen nennen.`,
+    has("Gedächtnis (Muster") && `- Muster unter "Gedächtnis" beachten: wichtige Einheiten nicht auf Tage legen, die oft ausfallen; Hinweise dort umsetzen.`,
+    has("Wetter-Vorhersage") && `- Wetter: bei Gewitter, Sturm, Glätte oder starkem Regen Rad als Rolle/Indoor planen (im Titel nennen); ab etwa 28 °C harte Einheiten kürzer und früh am Tag, auf Trinken hinweisen.`,
+    has("Besondere Tage laut Uhr") && `- "Besondere Tage" der letzten 2 Tage (Krank, Reise, Alkohol, Stress, wenig Schlaf): die nächste Einheit leichter planen; bei "Krank" Ruhetag oder nur sehr locker.`,
+    has("Zyklus (Garmin)") && `- Zyklus: in der Periode bei Beschwerden lieber locker; harte Einheiten bevorzugt in der Follikelphase.`,
+    has("fühlte sich lockerer Puls hart an") && `- Die gefühlte Anstrengung passt nicht zum Puls (Müdigkeit): die nächsten 2-3 Tage leichter planen.`,
     has("Verletzungen/Einschränkungen") && `- WICHTIG - Sicherheit: Die genannten Verletzungen/Einschränkungen UNBEDINGT beachten - keine Übungen/Belastungen, die sie verschlimmern könnten (z.B. bei Knieproblemen keine tiefen Kniebeugen/Sprünge), stattdessen Alternativen oder weniger Belastung.`,
   ].filter(Boolean).join("\n");
 
@@ -70,7 +78,7 @@ ${swimPlanRule()}
 Antworte AUSSCHLIESSLICH mit einem JSON-Objekt in genau dieser Form, keinerlei Text davor/danach, keine Code-Block-Markierung:
 {"workouts":[{"date":"YYYY-MM-DD","sport":"Schwimmen|Rad|Laufen|Kraft|Mobility","title":"kurzer Titel","duration_min":60,"intensity":"leicht|mittel|hart","description":"...","distance_m":1800,"drills":["abschlag"],"exercises":[{"id":"...","sets":3,"reps":"12"}]}]}
 
-"distance_m" und "drills" nur bei sport="Schwimmen", "exercises" nur bei sport="Kraft"/"Mobility" angeben, sonst weglassen. Jedes "date" muss exakt eines der oben genannten ${windowDates.length} Zeitfenster-Daten sein. Kein Datum außerhalb, keine Duplikate am selben Tag+Sportart.`;
+"distance_m" und "drills" nur bei sport="Schwimmen", "exercises" nur bei sport="Kraft"/"Mobility" angeben, sonst weglassen.${has("Leistungstests fällig") ? ' "test" ("ftp"|"run"|"css") nur bei den fälligen Leistungstests von oben.' : ""} Jedes "date" muss exakt eines der oben genannten ${windowDates.length} Zeitfenster-Daten sein. Kein Datum außerhalb, keine Duplikate am selben Tag+Sportart.`;
 }
 
 // Schwimmen in Metern statt mit Tempo-Vorgabe (Wunsch aus der Praxis: am
@@ -402,6 +410,14 @@ function buildDailyCheckContext(goal, candidates, signals, guardEntry) {
   const from = new Date(now.getTime() - 7 * 86400000);
   const recent = (DATA || []).filter(w => w._date && w._date >= from).sort((a, b) => a._date - b._date);
   lines.push(`Letzte 7 Tage absolviert: ${recent.length ? recent.map(w => `${dayFmt(localDateStr(w._date))} ${w.sport} ${Math.round(w.duration_min || 0)} min${w.training_load != null ? `, Load ${Math.round(w.training_load)}` : ""}${w.avg_hr ? `, Ø HF ${Math.round(w.avg_hr)}` : ""}`).join("; ") : "nichts"}`);
+
+  // Besondere Tage, Trends, gefühlte Anstrengung und Wetter (js/ai/context-extras.js)
+  if (typeof ctxSpecialDaysLine === "function") {
+    const daily = typeof wellnessDaily === "function" ? wellnessDaily() : {};
+    [ctxSpecialDaysLine(daily, todayKey, 3), ctxTrendLine(daily, todayKey), ctxRpeLine(DATA || [], athleteProfile, todayKey, 4),
+      typeof weatherForDate === "function" ? ctxWeatherLine([todayKey, planShiftDay(todayKey, 1)], weatherForDate) : ""]
+      .filter(Boolean).forEach(l => lines.push(l));
+  }
 
   const missed = typeof planCheckMissed === "function" ? planCheckMissed(todayKey) : [];
   if (missed.length) lines.push(`Verpasst oder übersprungen (letzte 3 Tage): ${missed.map(p => `${dayFmt(p.date)} ${p.sport} ${p.duration_min} min ${p.intensity || ""}`.trim()).join("; ")}`);

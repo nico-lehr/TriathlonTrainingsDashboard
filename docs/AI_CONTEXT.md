@@ -81,12 +81,31 @@ vorhanden sind):
     dieses eine Ziel berechnet; vorher nur im Coach-Tab sichtbar, nie an die
     KI selbst weitergegeben.
 
+12. **Zusatzfakten (3.0, `js/ai/context-extras.js`, `extraContextLines()`)** —
+    jeweils eine Zeile, nur mit genug Daten:
+    tatsächliche Intensität aus dem Puls (4 Wochen, locker/mittel/hart nach
+    Herzfrequenzreserve 70 %/80 %), Soll-Ist der letzten 14 Tage (gemacht,
+    übersprungen, Dauer, als „leicht“ geplant aber zu hart gelaufen),
+    7-Tage-Trend von HRV/Ruhepuls/Schlaf/Stress gegen die 4 Wochen davor
+    (mit „fällt seit n Tagen“), besondere Tage aus dem Lifestyle-Protokoll
+    der Uhr und Zyklus, Kennwerte der Uhr (Belastung akut/chronisch,
+    Belastungsfokus, Wettkampfprognose, Scores), gefühlte Anstrengung (RPE)
+    mit Puls-Abgleich, und das „Gedächtnis“: Muster aus 90 Tagen (oft
+    ausgelassene Wochentage/Sportarten, lockere Einheiten zu hart, Puls bei
+    Hitze). Jedes Muster braucht mindestens 4 Beispiele.
+    Der Plan-Kontext bekommt zusätzlich die Wetter-Vorhersage für das
+    Zeitfenster und die fälligen Leistungstests (`js/analytics/perf-tests.js`)
+    mit festem Tag. Die passenden Regeln im Prompt kommen nur mit, wenn die
+    Zeile im Kontext steht.
+
 `buildWorkoutAnalysisContext()` (dieselbe Datei, für die Einzel-Workout-
 Auswertung) bekommt zusätzlich zu Pace/HF/Load/Höhenmeter/Kadenz-Vergleich
 auch die im selben Detail-Modal ohnehin berechnete Trainingsbelastung
 (TRIMP, Herzfrequenzreserve, Stress-Score) und den negativen Split
 (`js/analytics/workout-profile.js`) — dieselbe Berechnung, jetzt auch als
-KI-Kontext statt nur visuell in der Kachel/im Chart.
+KI-Kontext statt nur visuell in der Kachel/im Chart. Seit 3.0 auch die auf
+der Uhr eingetragene gefühlte Anstrengung (RPE), das Gefühl, die Temperatur
+und die Runden/Intervalle (`ctxLapsLine`, höchstens 16).
 
 `buildCoachPrompt()`/`buildWorkoutAnalysisPrompt()` (`js/ai/prompts.js`)
 verpacken diesen Kontext zusammen mit einer kurzen System-Anweisung in den

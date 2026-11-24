@@ -189,7 +189,13 @@ def get_garmin_profile():
         return response_error("Garmin ist für dich noch nicht verbunden – zuerst den Schlüssel eintragen.",
                               "garmin_not_connected", 409)
     try:
-        values = garmin_profile.fetch(personal_api.PersonalApiClient(athlete_id))
+        client = personal_api.PersonalApiClient(athlete_id)
+        values = garmin_profile.fetch(client)
     except personal_api.GarminApiError as e:
         return response_error(e.user_message, "garmin_error", 502)
-    return response_success({"values": values})
+    # Zusatzwerte (Prognosen, Scores, CSS): jeder einzeln tolerant - sie
+    # duerfen den Profilabgleich nie scheitern lassen.
+    metrics = garmin_profile.fetch_metrics(client)
+    if metrics.get("swimCss") and "swimCss" not in values:
+        values["swimCss"] = metrics["swimCss"]
+    return response_success({"values": values, "metrics": metrics})

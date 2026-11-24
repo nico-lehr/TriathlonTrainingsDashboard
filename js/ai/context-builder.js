@@ -172,6 +172,12 @@ function buildCompactContext(goal, { forPlan = false } = {}) {
   if (athleteProfile.swimCss) profBits.push(`CSS Schwimmen ${athleteProfile.swimCss}/100m`);
   if (athleteProfile.weeklyHours) profBits.push(`verfügbar ${athleteProfile.weeklyHours}h/Woche`);
   if (profBits.length) lines.push(`Profil: ${profBits.join(" | ")}`);
+  // Ausgewertete, noch nicht übernommene Leistungstests (js/analytics/perf-tests.js)
+  if (typeof perfTestResults === "function") {
+    const applied = athleteProfile.perfTestApplied || {};
+    const res = perfTestResults(plannedWorkouts, DATA, athleteProfile).filter(r => applied[r.key] !== r.date);
+    if (res.length) lines.push(`Neue Testergebnisse (Schwellen im Profil evtl. veraltet): ${res.map(r => r.text).join(" | ")}`);
+  }
 
   const rec = forPlan ? {} : computeCompactRecords();
   if (rec.laufen) {
@@ -249,6 +255,11 @@ function buildCompactContext(goal, { forPlan = false } = {}) {
     });
     lines.push(`Erholungs-Logbuch (letzte ${recentLog.length} Tage mit Eintrag): ${logBits.join(" | ")}`);
   }
+
+  // Fertig berechnete Zusatzfakten (js/ai/context-extras.js): echte Intensität
+  // aus dem Puls, Soll-Ist, 7-Tage-Trends, besondere Tage, Kennwerte der Uhr,
+  // gefühlte Anstrengung und Muster aus 90 Tagen ("Gedächtnis").
+  if (typeof extraContextLines === "function") extraContextLines().forEach(l => lines.push(l));
 
   // Ernährungsziel heute (js/analytics/nutrition.js, "Ernährung"-Tab) - dieselbe
   // Berechnung, die auch dort angezeigt wird, damit die Trainingsempfehlung/der
@@ -359,6 +370,18 @@ function buildPlanContext(goal, windowDates) {
   // gearbeitet wird und welche Technikübungen zur Wahl stehen.
   const swims = !goal || ["Triathlon", "Schwimmen"].includes(goal.sport) || (athleteProfile.swimDays || []).length;
   if (swims && typeof swimTechniqueContextText === "function") lines.push(swimTechniqueContextText());
+
+  // Wetter-Vorhersage für die geplanten Tage (js/data/weather.js, nur mit Wohnort)
+  if (typeof ctxWeatherLine === "function" && typeof weatherForDate === "function") {
+    const wl = ctxWeatherLine(windowDates, weatherForDate);
+    if (wl) lines.push(wl);
+  }
+
+  // Fällige Leistungstests (js/analytics/perf-tests.js) mit festem Tag.
+  if (typeof perfTestsDue === "function") {
+    const testLine = perfTestsContextLine(perfTestsDue(goal, windowDates, { planned: plannedWorkouts, history: DATA, profile: athleteProfile, todayKey: todayStr() }));
+    if (testLine) lines.push(testLine);
+  }
 
   const dowFull = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
   const windowBits = windowDates.map(d => `${d} (${dowFull[new Date(d + "T00:00:00").getDay()]})`);
@@ -582,7 +605,15 @@ function buildWorkoutAnalysisContext(w, comparable) {
   const effElev = (typeof effectiveElevationGainM === "function") ? effectiveElevationGainM(w) : w.elevation_gain_m;
   if (effElev != null && !indoor) bits.push(`${Math.round(effElev)} Hm${w.elevation_gain_m == null ? " (nachgetragen)" : ""}`);
   if (ownEntry && ownEntry.rating != null) bits.push(`eigene Bewertung ${ownEntry.rating}/5`);
+  // Auf der Uhr eingetragen (Garmin): gefühlte Anstrengung und Gefühl
+  if (w.rpe != null) bits.push(`gefühlte Anstrengung (Uhr) RPE ${fmtNum(w.rpe, 1)}/10`);
+  if (w.feel != null) bits.push(`Gefühl (Uhr) ${Math.round(w.feel)}/100`);
+  if (w.avg_temp_c != null) bits.push(`Temperatur Ø ${Math.round(w.avg_temp_c)} °C${w.avg_temp_c >= 25 ? " (warm - Puls höher als sonst normal)" : ""}`);
   lines.push(`Diese Einheit: ${bits.filter(Boolean).join(" | ")}`);
+  if (typeof ctxLapsLine === "function") {
+    const lapLine = ctxLapsLine(w);
+    if (lapLine) lines.push(lapLine);
+  }
   if (workoutDisplayName(w)) lines.push(`Name der Einheit: „${workoutDisplayName(w)}“`);
   lines.push(ownEntry && ownEntry.note ? `Eigene Notiz des Athleten zu dieser Einheit: "${ownEntry.note}"` : "Zu dieser Einheit gibt es keine eigene Notiz des Athleten.");
   lines.push(...workoutTimelineContextLines(w));

@@ -297,6 +297,55 @@ class SyncMitApiTest(TempDirsMixin, unittest.TestCase):
         self.assertEqual((day["weight_kg"], day["body_fat_pct"]), (72.4, 15.5))
         self.assertIsNone(day["vo2max"])  # liefert die Personal API nicht - nie geraten
 
+    def test_besondere_tage_und_zyklus(self):
+        raw = {"lifestyle": {"dailyLogsReport": [
+                   {"name": "Alcohol", "logStatus": "YES", "amount": 2},
+                   {"name": "Caffeine", "logStatus": "NO"},
+                   {"name": "Travel", "logStatus": "YES"},
+                   {"name": "Bergwandern", "logStatus": "YES"}]},
+               "cycle": {"daySummary": {"currentPhaseType": "FOLLICULAR", "dayInCycle": 9}}}
+        day = garmin_sync.normalize({"days": {"2026-10-01": raw}})["2026-10-01"]
+        self.assertEqual(day["special"], ["Alkohol", "Reise", "Bergwandern"])
+        self.assertEqual((day["cycle_phase"], day["cycle_day"]), ("FOLLICULAR", 9))
+        day = garmin_sync.normalize({"days": {"2026-10-02": {"lifestyle": {"x": []}, "cycle": None, "hrv": {"hrvSummary": {"lastNightAvg": 50}}}}})["2026-10-02"]
+        self.assertIsNone(day["special"])
+        self.assertIsNone(day["cycle_phase"])
+
+    def test_nicht_freigegebener_dienst_wird_im_lauf_ausgelassen(self):
+        client = mock.Mock(spec=["get_sleep_data", "get_hrv_data", "get_rhr_day", "get_max_metrics", "get_training_status",
+                                 "get_user_summary", "get_training_readiness", "get_lifestyle_log", "get_menstrual_day",
+                                 "get_body_battery", "get_body_composition", "get_daily_steps", "get_daily_summaries"])
+        for name in ("get_sleep_data", "get_hrv_data", "get_rhr_day", "get_max_metrics", "get_training_status",
+                     "get_user_summary", "get_training_readiness", "get_menstrual_day",
+                     "get_body_battery", "get_body_composition", "get_daily_steps", "get_daily_summaries"):
+            getattr(client, name).return_value = None
+        client.get_lifestyle_log.side_effect = personal_api.GarminApiError("gesperrt")
+        today = date.today()
+        path = os.path.join(self.key_dir, "cache.json")
+        with mock.patch.object(garmin_sync, "REQUEST_PAUSE_S", 0):
+            cache = garmin_sync.sync_wellness(client, today - timedelta(days=9), today, path)
+        self.assertEqual(client.get_lifestyle_log.call_count, garmin_sync.SECTION_DEAD_AFTER)
+        self.assertEqual(client.get_menstrual_day.call_count, 10)
+        # Die ersten Tage merken sich den Fehlschlag (naechster Lauf versucht es erneut),
+        # die uebrigen gelten fuer diesen Lauf als "keine Daten".
+        self.assertEqual(cache["days"][(today - timedelta(days=9)).isoformat()]["_failed"], {"lifestyle": 1})
+        self.assertIsNone(cache["days"][today.isoformat()]["lifestyle"])
+
+    def test_belastung_akut_chronisch_und_fokus(self):
+        ts = {"mostRecentTrainingStatus": {"latestTrainingStatusData": {"123": {
+                  "trainingStatusFeedbackPhrase": "PRODUCTIVE_1",
+                  "acuteTrainingLoadDTO": {"dailyTrainingLoadAcute": 620, "dailyTrainingLoadChronic": 540, "acwrPercent": 115}}}},
+              "mostRecentTrainingLoadBalance": {"metricsTrainingLoadBalanceDTOMap": {"123": {
+                  "monthlyLoadAerobicLow": 900, "monthlyLoadAerobicHigh": 700, "monthlyLoadAnaerobic": 80,
+                  "monthlyLoadAerobicLowTargetMin": 600, "monthlyLoadAerobicLowTargetMax": 1100,
+                  "trainingBalanceFeedbackPhrase": "ANAEROBIC_SHORTAGE"}}}}
+        day = garmin_sync.normalize({"days": {"2026-10-01": {"training_status": ts}}})["2026-10-01"]
+        self.assertEqual((day["load_acute"], day["load_chronic"], day["acwr"]), (620, 540, 1.15))
+        self.assertEqual((day["load_aerobic_low"], day["load_aerobic_high"], day["load_anaerobic"]), (900, 700, 80))
+        self.assertEqual(day["load_aerobic_low_target"], [600, 1100])
+        self.assertIsNone(day["load_anaerobic_target"])
+        self.assertEqual(day["load_balance"], "ANAEROBIC_SHORTAGE")
+
     def test_temperatur_atmung_spo2_stress_und_bereitschaft(self):
         cache = {"days": {"2026-10-04": {
             "sleep": {"dailySleepDTO": {"sleepTimeSeconds": 25200, "averageRespirationValue": 14.5, "averageSpO2Value": 95,
@@ -687,9 +736,11 @@ class EinstellungenTest(TempDirsMixin, unittest.TestCase):
         self.assertEqual(self.client.get("/api/v1/garmin/profile", headers=self.h["garmin-anna"]).status_code, 409)
         personal_api.save_key(self.ids["garmin-anna"], API_KEY)
         seen = []
-        with mock.patch("tools.garmin_profile.fetch", side_effect=lambda c: seen.append(c.athlete_id) or {"weightKg": 72.4}):
+        with mock.patch("tools.garmin_profile.fetch", side_effect=lambda c: seen.append(c.athlete_id) or {"weightKg": 72.4}), \
+                mock.patch("tools.garmin_profile.fetch_metrics", return_value={"swimCss": "1:40", "hillScore": 55}):
             r = self.client.get("/api/v1/garmin/profile", headers=self.h["garmin-anna"])
-            self.assertEqual(r.get_json()["data"]["values"], {"weightKg": 72.4})
+            self.assertEqual(r.get_json()["data"]["values"], {"weightKg": 72.4, "swimCss": "1:40"})
+            self.assertEqual(r.get_json()["data"]["metrics"]["hillScore"], 55)
             self.assertEqual(seen, [self.ids["garmin-anna"]])  # mit Annas Schluessel, nie dem einer anderen Person
             self.assertEqual(self.client.get("/api/v1/garmin/profile", headers=self.h["garmin-ben"]).status_code, 409)
         with mock.patch("tools.garmin_profile.fetch", side_effect=personal_api.GarminApiUnreachableError("Garmin ist nicht erreichbar.")):

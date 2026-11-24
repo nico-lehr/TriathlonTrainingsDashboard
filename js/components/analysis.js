@@ -243,6 +243,8 @@ function initSwimCssTest() {
     if (res.error) { anaSetStatus(status, res.error, "err"); return; }
     athleteProfile.swimCssTest = { t400: in400.value.trim(), t200: in200.value.trim(), date: todayStr() };
     athleteProfile.swimCss = res.pace;
+    // Selbst getestet: nicht vom täglichen Garmin-Abgleich überschreiben lassen.
+    athleteProfile.garminOverrides = [...new Set([...(athleteProfile.garminOverrides || []), "swimCss"])];
     saveAthleteProfile();
     syncProfileInputsFromState(); // Feld "CSS Schwimmen" in den Einstellungen nachziehen
     anaSetStatus(status, `CSS ${res.pace} /100 m gespeichert ✓ – gilt jetzt auch in den Einstellungen.`, "ok");

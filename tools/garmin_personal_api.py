@@ -315,6 +315,14 @@ class PersonalApiClient:
         """Training Readiness (0-100) eines Tages - Liste, neuester Eintrag zuerst."""
         return self._get(f"/metrics-service/metrics/trainingreadiness/{cdate}", missing_ok=True)
 
+    def get_lifestyle_log(self, cdate):
+        """Lifestyle-Protokoll der Uhr (Krank, Reise, Alkohol, Koffein ...)."""
+        return self._get(f"/lifestylelogging-service/dailyLog/{cdate}", missing_ok=True)
+
+    def get_menstrual_day(self, cdate):
+        """Zyklus-Tag (nur wenn in Garmin Connect eingerichtet)."""
+        return self._get("/periodichealth-service/menstrualcycle/dayview", {"calendarDate": cdate}, missing_ok=True)
+
     def get_body_battery(self, startdate, enddate):
         return self._get("/wellness-service/wellness/bodyBattery/reports/daily",
                          {"startDate": startdate, "endDate": enddate})

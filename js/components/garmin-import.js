@@ -12,6 +12,7 @@ const GARMIN_IMPORT_FIELDS = [
   ["restingHr", "Ruhe-Herzfrequenz", v => `${v} bpm`],
   ["runThresholdPace", "Schwellenpace Laufen", v => `${v} /km`],
   ["ftpWatts", "FTP Rad", v => `${v} W`],
+  ["swimCss", "CSS Schwimmen", v => `${v} /100m`],
   ["birthDate", "Geburtsdatum", v => new Date(v + "T12:00:00").toLocaleDateString("de-DE")],
   ["gender", "Geschlecht", v => (v === "m" ? "männlich" : v === "w" ? "weiblich" : v)],
 ];
@@ -237,6 +238,8 @@ async function renderProfileGarmin() {
     else if (gv[key] != null) { src.hidden = false; src.textContent = "↺ Garmin"; src.title = `Garmin-Wert nehmen (${garminFieldFmt(key)(gv[key])})`; src.dataset.act = "garmin"; }
     else { src.hidden = true; }
   });
+  const gm = document.getElementById("pf-garmin-metrics");
+  if (gm) { gm.innerHTML = garminMetricsHtml(); gm.hidden = !gm.innerHTML; }
   const status = document.getElementById("pf-garmin-status");
   if (!status) return;
   const ok = await garminConnected();
@@ -249,6 +252,39 @@ async function renderProfileGarmin() {
     status.innerHTML = `<span class="pf-status-dot"></span><span class="pf-status-text"><b>Garmin nicht verbunden</b><small>Verbinde Garmin, dann füllen sich Gewicht, Pulswerte und Schwellen von selbst.</small></span>
       <button type="button" class="pf-status-btn" data-pf-connect>Verbinden</button>`;
   }
+}
+
+// Weitere Kennwerte der Uhr (nur Anzeige + KI, nichts davon wird ins Profil
+// übernommen): Wettkampf-Prognosen, Ausdauer-/Hill-Score, Hitze-Gewöhnung.
+const GARMIN_METRIC_FIELDS = [
+  ["race5kS", "Prognose 5 km", v => fmtGarminDuration(v)],
+  ["race10kS", "Prognose 10 km", v => fmtGarminDuration(v)],
+  ["raceHalfS", "Prognose Halbmarathon", v => fmtGarminDuration(v)],
+  ["raceMarathonS", "Prognose Marathon", v => fmtGarminDuration(v)],
+  ["enduranceScore", "Ausdauer-Score", v => String(v)],
+  ["hillScore", "Hill-Score", v => String(v)],
+  ["heatAcclimationPct", "Hitze-Gewöhnung", v => `${v} %`],
+  ["altitudeAcclimationM", "Höhen-Gewöhnung", v => `${v} m`],
+];
+
+function fmtGarminDuration(sec) {
+  const s = Math.round(Number(sec) || 0);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")} h` : `${m}:${String(r).padStart(2, "0")} min`;
+}
+
+function applyGarminMetrics(metrics) {
+  const got = {};
+  GARMIN_METRIC_FIELDS.forEach(([k]) => { if (metrics && metrics[k] != null) got[k] = metrics[k]; });
+  athleteProfile.garminMetrics = Object.keys(got).length ? { ...got, at: new Date().toISOString().slice(0, 10) } : null;
+}
+
+function garminMetricsHtml() {
+  const m = athleteProfile.garminMetrics;
+  if (!m) return "";
+  const items = GARMIN_METRIC_FIELDS.filter(([k]) => m[k] != null)
+    .map(([k, label, fmt]) => `<span class="pf-gm-item"><small>${escapeHtml(label)}</small><b>${escapeHtml(fmt(m[k]))}</b></span>`);
+  return items.length ? `<div class="pf-gm-title">Weitere Werte deiner Uhr</div><div class="pf-gm-list">${items.join("")}</div>` : "";
 }
 
 function applyGarminProfileValues(values) {
@@ -272,8 +308,9 @@ async function syncProfileFromGarmin(force, btn) {
   if (!force && Date.now() - last < GARMIN_SYNC_EVERY_MS) return;
   if (btn) { btn.disabled = true; btn.textContent = "Gleiche ab …"; }
   try {
-    const values = (await apiCall("garmin/profile", "GET", null, { timeoutMs: 60000 })).data.values || {};
-    applyGarminProfileValues(values);
+    const data = (await apiCall("garmin/profile", "GET", null, { timeoutMs: 60000 })).data || {};
+    applyGarminMetrics(data.metrics);
+    applyGarminProfileValues(data.values || {});
   } catch (e) {
     if (force) await confirmDialog(e.message, { okLabel: "OK", danger: false });
   } finally {

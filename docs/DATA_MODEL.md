@@ -108,6 +108,16 @@ gehalten wird. Felder, wie sie aktuell tatsächlich befüllt werden:
   is_indoor: null,                    // true/false/null - Developer-Feld, nicht von jeder Quelle befüllt
   has_gps: true,                      // true/false/null - echte GPS-Punkte in der Aufzeichnung (kein Developer-Feld)
   rpe_estimated: null,                // geschätzte gefühlte Anstrengung (RPE) einer Quelle, falls vorhanden
+  rpe: 7,                             // gefühlte Anstrengung, auf der Uhr eingetragen (Borg CR10, 1-10; FIT session 193 ÷ 10)
+  feel: 75,                           // "Wie hast du dich gefühlt?" auf der Uhr (0-100; FIT session 192)
+  avg_temp_c: 21, max_temp_c: 24,     // Temperatur am Gerät (FIT session 57/58)
+  laps: [                             // Runden/Intervalle (FIT lap, höchstens 100), kompakt:
+    { n: 1, start_s: 0, dur_s: 600, dist_m: 2000, hr: 140, max_hr: 150, speed: 3.33, power: null, np: null,
+      cad: 170, ascent: 4, temp: 21, intensity: "warmup", trigger: "manual", step: 0 },
+  ],                                  // intensity: active|rest|warmup|cooldown|recovery|interval|other
+  parser_version: 2,                  // Stand des Parsers (parse_fit.py PARSER_VERSION / FIT_PARSER_VERSION).
+                                      // Ältere Garmin-Einheiten liest tools/garmin_sync.py (reparse_outdated)
+                                      // beim nächsten Abruf aus der archivierten .fit-Datei nach.
   avg_mets: null,                     // Ø MET-Wert einer Quelle, falls vorhanden
   dev_raw: null,                      // { "Feldname aus der Datei": Wert, ... } - alle übrigen
                                        // Developer-Felder unverändert, als Fallback/Debug
@@ -432,6 +442,24 @@ aus dem Browser-Import speichert `saveImportedWorkouts()` per
 **Zeitformat:** `targetTime` ist `H:MM:SS` oder `H:MM` — zwei Teile heißen
 Stunden:Minuten („5:30“ = 5 h 30 min). Gelesen wird überall mit
 `goalTimeToSeconds()` (`js/utils/dates.js`), dem einen Parser für Zielzeiten.
+
+### Neu in 3.0 (Tageswerte)
+
+- `load_acute`, `load_chronic`, `acwr` — Belastung der Uhr (7 Tage / 4 Wochen, Verhältnis), aus `training_status`.
+- `load_aerobic_low`, `load_aerobic_high`, `load_anaerobic` (+ `_target` = [min, max]), `load_balance` — Belastungsfokus der letzten 4 Wochen.
+- `special` — Liste deutscher Etiketten aus dem Lifestyle-Protokoll der Uhr („Alkohol“, „Reise“, „Krank“ …), nur letzte 45 Tage.
+- `cycle_phase`, `cycle_day` — Zyklus (nur wenn in Garmin Connect eingerichtet).
+
+Ob die Personal API Lifestyle und Zyklus freigibt, ist nicht dokumentiert: scheitert ein
+Abschnitt in einem Lauf dreimal hintereinander, wird er für den Rest des Laufs als „keine
+Daten“ vermerkt.
+
+Seltener wechselnde Kennwerte holt `GET /api/v1/garmin/profile` als `metrics`
+(`tools/garmin_profile.py`, `fetch_metrics`): `race5kS`, `race10kS`, `raceHalfS`,
+`raceMarathonS`, `enduranceScore`, `hillScore`, `heatAcclimationPct`,
+`altitudeAcclimationM`, `swimCss`. Das Dashboard legt sie in
+`athleteProfile.garminMetrics` ab (Anzeige in den Einstellungen und KI-Kontext);
+`swimCss` wird wie die anderen Profilwerte übernommen.
 
 ## Geplantes Workout (`js/data/planned-workouts.js`, Ablage)
 
@@ -1103,3 +1131,16 @@ zurück statt erfundener Werte, wenn die nötigen Daten fehlen:
   diese Einheit + mind. 5 vergleichbare Einheiten derselben Sportart. Fehlt
   auch nur eine Achse (z.B. Negativer Split ohne Streckendaten), wird das
   ganze Profil weggelassen statt eine Achse zu erfinden.
+
+## Leistungstests (`js/analytics/perf-tests.js`)
+
+Alle 8 Wochen ein Test je trainierter Ziel-Sportart: FTP-Test Rad (20 min, FTP = 95 %),
+5-km-Test Laufen (Schwellenpace ≈ 5-km-Tempo × 1,06), CSS-Test Schwimmen (400/200 m).
+Geplante Tests tragen `perfTest: "ftp" | "run" | "css"`. Nie im Taper/in der Rennwoche/in
+der Erholung, nur an Trainingstagen (Schwimmen am Schwimmtag), mit mindestens 2 Tagen
+Abstand. Die KI bekommt die fälligen Tests mit festem Tag; fehlt einer im Plan, setzt
+`perfTestsEnsure` ihn selbst ein (nur ohne neue „block“-Verstöße).
+Erledigte Tests der letzten 21 Tage wertet `perfTestResults` aus (Messwert aus der
+Trainingsdatei des Tages) und schlägt in der Trainingsplan-Kachel neue Schwellen vor.
+Profil: `perfTestDates` (letzter Test je Art), `perfTestApplied` (übernommen/ausgeblendet).
+

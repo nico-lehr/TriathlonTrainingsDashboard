@@ -4,6 +4,37 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 3.0.0
+
+**Großes Update: Das Dashboard holt sich (fast) alles von deiner Garmin-Uhr**
+
+**Gefühlte Anstrengung von der Uhr**
+- Was du nach dem Training auf der Uhr einträgst (Anstrengung 1–10 und „Wie hast du dich gefühlt?“), steht jetzt in der Detailansicht jeder Einheit.
+- Neu: „Gefühl und Puls“. Das Dashboard vergleicht deine Angabe mit dem gemessenen Puls. War der Puls locker, die Einheit hat sich aber hart angefühlt, bekommst du einen Hinweis – das ist oft ein frühes Zeichen für Müdigkeit oder einen Infekt.
+- Auch ältere Trainings bekommen diese Werte: Beim nächsten Garmin-Abruf liest das Dashboard sie aus den gespeicherten Trainingsdateien nach.
+
+**Runden und Intervalle**
+- Die Runden aus der Uhr (z. B. 8 × 400 m oder deine Kilometer-Splits) stehen als Tabelle in der Detailansicht: Zeit, Strecke, Tempo, Puls, Leistung.
+- Der KI-Coach sieht bei der Auswertung jetzt jede einzelne Wiederholung, nicht nur den Durchschnitt.
+- Dazu die Temperatur während des Trainings.
+
+**Mehr Werte von Garmin**
+- Belastung der letzten 7 Tage und 4 Wochen sowie der Belastungsfokus („zu wenig Grundlage“ usw.) wie auf der Uhr.
+- „Besondere Tage“ aus dem Lifestyle-Protokoll der Uhr (krank, Reise, Alkohol, Stress …) und – falls eingerichtet – der Zyklus.
+- In den Einstellungen unter „Dein Profil“: Wettkampf-Prognosen (5 km bis Marathon), Ausdauer-Score, Hill-Score, Hitze-Gewöhnung. Die Schwimm-Schwelle (CSS) kommt jetzt ebenfalls von Garmin, wenn die Uhr sie kennt.
+- Hinweis: Ob Garmin alle diese Werte über die offizielle Schnittstelle herausgibt, ist nicht dokumentiert. Was Garmin nicht liefert, bleibt einfach leer – es wird nie geraten.
+
+**Leistungstests alle 8 Wochen**
+- Der Coach plant automatisch alle 8 Wochen einen Test je Sportart ein: FTP-Test Rad (20 min), 5-km-Test Laufen und CSS-Test Schwimmen (400 m + 200 m). Nie im Taper, nur an deinen Trainingstagen, mit Abstand zueinander. Im Plan sind sie mit „Test“ markiert.
+- Nach dem Test rechnet das Dashboard deine neue FTP bzw. Schwellenpace aus und zeigt sie in der Trainingsplan-Kachel mit „Übernehmen“ an. So stimmen deine Zonen immer.
+
+**Ein schlauerer KI-Coach**
+- Der Coach sieht jetzt, wie du den Plan wirklich umsetzt: was gemacht oder ausgelassen wurde und ob lockere Einheiten zu hart gelaufen sind (am Puls gemessen, nicht am geplanten Etikett).
+- Deine echte Intensitätsverteilung (locker/mittel/hart) aus dem Puls der letzten 4 Wochen.
+- 7-Tage-Trends von HRV, Ruhepuls, Schlaf und Stress, z. B. „HRV fällt seit 4 Tagen“.
+- Die Wetter-Vorhersage für die geplanten Tage: bei Sturm oder Glätte z. B. Rad auf der Rolle, bei Hitze kürzer und früher.
+- Ein „Gedächtnis“: Muster aus den letzten 90 Tagen, etwa „Dienstags fällt oft aus“ oder „bei Hitze ist dein Puls 8 Schläge höher“. Der Coach legt wichtige Einheiten dann nicht mehr auf solche Tage.
+
 ## 2.5.57
 
 **Trainingsbelastung erklärt**

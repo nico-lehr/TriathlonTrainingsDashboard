@@ -50,6 +50,7 @@ function renderTrainingPlanCard() {
             <span class="plan-item-sport">${escapeHtml(p.sport)}</span>
             <span class="plan-item-title">${escapeHtml(p.title)}</span>
             ${p.intensity ? `<span class="plan-intensity plan-intensity-${p.intensity}">${PLAN_INTENSITY_LABELS[p.intensity]}</span>` : ""}
+            ${p.perfTest ? `<span class="plan-test-badge" title="Leistungstest – alle 8 Wochen, damit deine Zonen stimmen">Test</span>` : ""}
           </div>
           <div class="plan-item-meta">${p.duration_min != null ? Math.round(p.duration_min) + " min" : ""}${p.sport === "Schwimmen" && plannedSwimMeters(p) ? " · " + fmtSwimMeters(plannedSwimMeters(p)) : ""}${p.status !== "geplant" ? " · " + PLAN_STATUS_LABELS[p.status] : ""}</div>
         </div>
@@ -79,10 +80,12 @@ function renderTrainingPlanCard() {
     ${goal._planError ? `<p class="goal-error">${escapeHtml(goal._planError)}</p>` : ""}
     ${typeof planBatchStatusText === "function" && planBatchStatusText(goal.id) ? `<p class="empty-note">${escapeHtml(planBatchStatusText(goal.id))}</p>` : ""}
     ${planCheckNotesHtml(goal)}
+    ${perfTestResultsHtml()}
     <div class="plan-item-list">${listHtml}</div>
   `;
 
   host.querySelector(".plan-generate-btn").addEventListener("click", () => generateTrainingPlan(goal.id));
+  host.querySelectorAll("[data-perf-apply]").forEach(btn => btn.addEventListener("click", () => applyPerfTestResult(btn.dataset.perfApply, btn.dataset.date)));
   const replaceBtn = host.querySelector(".plan-replace-btn");
   if (replaceBtn) replaceBtn.addEventListener("click", () => generateTrainingPlan(goal.id, { replace: true }));
   host.querySelector(".plan-add-btn").addEventListener("click", () => openPlanEdit(null, { goalId: goal.id }));
@@ -203,6 +206,41 @@ function planCheckNotesHtml(goal) {
     </div>`;
 }
 
+// Ausgewertete Leistungstests (js/analytics/perf-tests.js) mit "Übernehmen".
+// Schon übernommene/verworfene Ergebnisse merkt sich athleteProfile.perfTestApplied.
+function perfTestOpenResults() {
+  if (typeof perfTestResults !== "function") return [];
+  const done = athleteProfile.perfTestApplied || {};
+  return perfTestResults(plannedWorkouts, DATA, athleteProfile).filter(r => done[r.key] !== r.date);
+}
+
+function perfTestResultsHtml() {
+  const res = perfTestOpenResults();
+  if (!res.length) return "";
+  return `<div class="plan-check-notes perf-test-results"><p>Neue Testergebnisse</p><ul>${res.map(r => `<li>${escapeHtml(r.text)}
+    ${r.value != null && r.value !== r.current ? `<button type="button" class="chip" data-perf-apply="${r.key}" data-date="${r.date}">Übernehmen</button>` : ""}
+    <button type="button" class="chip" data-perf-apply="${r.key}:skip" data-date="${r.date}">Ausblenden</button></li>`).join("")}</ul></div>`;
+}
+
+function applyPerfTestResult(key, date) {
+  const skip = key.endsWith(":skip");
+  const k = skip ? key.slice(0, -5) : key;
+  const r = perfTestOpenResults().find(x => x.key === k && x.date === date);
+  athleteProfile.perfTestApplied = { ...(athleteProfile.perfTestApplied || {}), [k]: date };
+  athleteProfile.perfTestDates = { ...(athleteProfile.perfTestDates || {}), [k]: date };
+  if (!skip && r && r.value != null) {
+    const field = { ftp: "ftpWatts", run: "runThresholdPace" }[k];
+    if (field) {
+      athleteProfile[field] = r.value;
+      // Selbst getesteter Wert: nicht vom täglichen Garmin-Abgleich überschreiben lassen.
+      athleteProfile.garminOverrides = [...new Set([...(athleteProfile.garminOverrides || []), field])];
+    }
+  }
+  saveAthleteProfile();
+  if (typeof syncProfileInputsFromState === "function") syncProfileInputsFromState();
+  renderTrainingPlanCard();
+}
+
 // Plan-Bericht in einfachen Sätzen: was die KI geliefert hat, was verworfen,
 // was ergänzt und warum ein Trainingstag frei geblieben ist.
 function planReportLines(n) {
@@ -215,6 +253,8 @@ function planReportLines(n) {
   if ((n.filled || []).length) out.push(`Leere Trainingstage ergänzt: ${n.filled.map(f => `${day(f.date)} ${f.title} ${f.duration_min} min`).join(", ")}.`);
   const why = { rest: "bleibt als freier Tag der Woche zur Erholung", volume: "frei, weil der Wochenumfang schon erreicht ist (langsamer Aufbau schützt vor Verletzungen)", rules: "frei, weil eine Einheit dort eine Trainingsregel verletzen würde" };
   (n.skipped || []).forEach(s => out.push(`${day(s.date)} ${why[s.reason] || "bleibt frei"}.`));
+  if ((n.tests || []).length) out.push(`Leistungstest eingeplant (alle 8 Wochen, damit deine Zonen stimmen): ${n.tests.map(t => `${day(t.date)} ${t.title}`).join(", ")}.`);
+  (n.testsSkipped || []).forEach(l => out.push(`${l}: kein passender Tag ohne Regelverstoß gefunden – kommt mit der nächsten Planung.`));
   return out;
 }
 

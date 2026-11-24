@@ -142,6 +142,72 @@ def extract(profiles, zones, weights):
     return {k: v for k, v in values.items() if v is not None}
 
 
+def _swim_css(v):
+    """Kritische Schwimmgeschwindigkeit (m/s) -> "m:ss" je 100 m (1:00-3:30)."""
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return None
+    if x <= 0:
+        return None
+    sec = 100 / x
+    if not 60 <= sec <= 210:
+        return None
+    sec = round(sec)
+    return f"{sec // 60}:{sec % 60:02d}"
+
+
+def _secs(lo, hi):
+    return _num(lo, hi, round)
+
+
+# Weitere Kennwerte, die die Uhr berechnet. Ob die offizielle Personal API sie
+# freigibt, ist nicht dokumentiert - jeder Abruf ist deshalb einzeln und
+# tolerant: fehlt ein Dienst (404) oder antwortet er anders, bleibt der Wert leer.
+def metric_paths(today):
+    d = today.isoformat()
+    return {
+        "race": ("/metrics-service/metrics/racepredictions", None),
+        "endurance": ("/metrics-service/metrics/endurancescore", {"calendarDate": d}),
+        "hill": ("/metrics-service/metrics/hillscore", {"calendarDate": d}),
+        "heat": (f"/metrics-service/metrics/heataltitudeacclimation/latest/{d}", None),
+        "css": (f"/biometric-service/criticalSwimSpeed/latest/{d}", None),
+    }
+
+
+def extract_metrics(raw):
+    """Rohantworten {name: json} -> flache, plausible Kennwerte."""
+    raw = raw or {}
+    def one(key):
+        v = raw.get(key)
+        if isinstance(v, list):  # manche Dienste liefern eine Liste - der juengste zuerst/zuletzt
+            v = v[-1] if v else None
+        return [v] if v else []
+    out = {
+        "race5kS": _first(one("race"), ["time5K"], _secs(600, 3600)),
+        "race10kS": _first(one("race"), ["time10K"], _secs(1200, 7200)),
+        "raceHalfS": _first(one("race"), ["timeHalfMarathon"], _secs(2700, 14400)),
+        "raceMarathonS": _first(one("race"), ["timeMarathon"], _secs(5400, 28800)),
+        "enduranceScore": _first(one("endurance"), ["overallScore", "enduranceScore"], _num(1000, 15000, round)),
+        "hillScore": _first(one("hill"), ["overallScore", "hillScore"], _num(1, 100, round)),
+        "heatAcclimationPct": _first(one("heat"), ["heatAcclimationPercentage"], _num(0, 100, round)),
+        "altitudeAcclimationM": _first(one("heat"), ["altitudeAcclimation", "currentAltitude"], _num(0, 9000, round)),
+        "swimCss": _first(one("css"), ["criticalSwimSpeed", "speed", "value"], _swim_css),
+    }
+    return {k: v for k, v in out.items() if v is not None}
+
+
+def fetch_metrics(client, today=None):
+    from tools.garmin_personal_api import GarminApiError
+    raw = {}
+    for key, (path, params) in metric_paths(today or date.today()).items():
+        try:
+            raw[key] = client._get(path, params, missing_ok=True)
+        except GarminApiError:
+            raw[key] = None  # z.B. 403: dieser Dienst ist fuer die Personal API gesperrt
+    return extract_metrics(raw)
+
+
 def fetch(client):
     """Holt die Rohdaten ueber einen PersonalApiClient und wertet sie aus.
     Fehlende Dienste (404) sind kein Fehler - der Wert bleibt dann leer."""

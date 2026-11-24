@@ -50,6 +50,26 @@ class ExtractTest(unittest.TestCase):
         for call in client._get.call_args_list:
             self.assertTrue(call.kwargs.get("missing_ok"))
 
+    def test_zusatzwerte_prognosen_scores_css(self):
+        m = garmin_profile.extract_metrics({
+            "race": {"time5K": 1260, "time10K": 2640.4, "timeHalfMarathon": 5900, "timeMarathon": 12500},
+            "endurance": {"overallScore": 6800, "classification": 3},
+            "hill": [{"overallScore": 48}],
+            "heat": {"heatAcclimationPercentage": 35, "altitudeAcclimation": 0},
+            "css": {"criticalSwimSpeed": 1.0},
+        })
+        self.assertEqual((m["race5kS"], m["race10kS"], m["raceHalfS"], m["raceMarathonS"]), (1260, 2640, 5900, 12500))
+        self.assertEqual((m["enduranceScore"], m["hillScore"], m["heatAcclimationPct"]), (6800, 48, 35))
+        self.assertEqual(m["swimCss"], "1:40")
+        self.assertNotIn("altitudeAcclimationM", m)  # 0 = keine Angabe
+
+    def test_zusatzwerte_unplausibel_oder_gesperrt(self):
+        self.assertEqual(garmin_profile.extract_metrics({"race": {"time5K": 30}, "css": {"criticalSwimSpeed": 9}}), {})
+        from tools.garmin_personal_api import GarminApiError
+        client = mock.Mock()
+        client._get.side_effect = GarminApiError("gesperrt")
+        self.assertEqual(garmin_profile.fetch_metrics(client), {})  # Fehler je Dienst -> leer, kein Abbruch
+
 
 if __name__ == "__main__":
     unittest.main()

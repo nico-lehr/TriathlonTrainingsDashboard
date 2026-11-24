@@ -107,6 +107,7 @@ Claude-API-Key, Kartenreihenfolge).
 - `group.js` — Feed mit den anderen Nutzern (`groupState`, `loadGroup`): teilt neue Abzeichen (nur ab dem Beitritt, höchstens 7 Tage alt, je Art nur die höchste Stufe; schon geteilte IDs in `triathlon_dashboard_group_shared_v1`), Emoji-Reaktionen, Challenges anlegen/mitmachen. Nie Trainingsdetails. Server: `backend/group.py`.
 
 ### `js/analytics/` — reine Berechnungen, kein UI
+- `perf-tests.js` — Leistungstests alle 8 Wochen (FTP, 5 km, CSS): welche fällig sind und an welchem Tag, Sicherheitsnetz für den KI-Plan, Auswertung erledigter Tests mit Vorschlag für neue Schwellen.
 - `mobility-plan.js` — stellt eine Mobility-Einheit aus der Sammlung zusammen (Regeln) bzw. baut den Claude-Auftrag samt JSON-Schema und prüft die Antwort; Umwandlung in/aus geplanten Einheiten.
 - `swim-technique.js` — Schwimmtechnik aus den Bahn-Daten der Uhr (Züge pro 25 m, Zugfrequenz, Brust-Anteil, Nachlassen bei Müdigkeit, Freiwasser-Wettkampf) → Schwerpunkte mit Begründung (`swimTechniqueAnalysis`), Auswahl der Übungen je Einheit (`pickSwimDrills`) und Kurztext für den KI-Coach. Die Schritte für die Uhr baut `swimSteps()` in `planned-workouts.js`.
 - `strength-plan.js` — stellt eine Kraft-Einheit aus der Kraft-Sammlung zusammen (je Bewegungsmuster eine Übung), merkt Gewichte und Verlauf (`triathlon_dashboard_strength_v1`), macht geplante Kraft-Einheiten abspielbar.
@@ -135,6 +136,7 @@ Bedarf schrittweise weiter aufgeteilt werden, sobald es sich lohnt.
 
 ### `js/ai/` — KI-Anbindung
 - `context-builder.js` — baut den kompakten Text-Kontext für das LLM (siehe `docs/AI_CONTEXT.md`).
+- `context-extras.js` — fertig berechnete Zusatzfakten für die KI (3.0): echte Intensität aus dem Puls, Soll-Ist, 7-Tage-Trends, besondere Tage und Zyklus von der Uhr, Kennwerte der Uhr, gefühlte Anstrengung (RPE) mit Puls-Abgleich, Wetter im Planungsfenster, „Gedächtnis“ (Muster aus 90 Tagen) und Runden einer Einheit.
 - `prompts.js` — baut den fertigen Prompt-Text aus dem Kontext.
 - `ollama.js` — Ollama-Einstellungen, Verbindungstest, Empfehlung generieren, Trainingsplan erstellen (Empfehlung Heute / Diese Woche / Nächste Woche; jeder KI-Plan läuft durch `validatePlan`, mit Auto-Korrektur oder höchstens 2 Nachfragen). Fragt nie Ollama direkt, sondern den eigenen Server (`POST /api/v1/ai/chat`, `GET /api/v1/ai/models`); die Ollama-Adresse steht in `.env` (`OLLAMA_URL`).
 - `plan-batch.js` — automatischer Wochenplan: mit Claude 5 Tage vorher als günstiger Sammelauftrag (halber Preis), Ergebnis abholen und einbauen, Notfall bei 1 Tag sofort; ohne Claude wie bisher (siehe `docs/AI_CONTEXT.md`).

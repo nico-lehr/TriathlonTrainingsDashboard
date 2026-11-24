@@ -213,6 +213,8 @@ function parsePlanResponse(rawText, windowDates, report) {
       drills: entry.sport === "Schwimmen" && Array.isArray(entry.drills) && typeof SWIM_DRILL_BY_ID !== "undefined"
         ? [...new Set(entry.drills.filter(id => typeof id === "string" && SWIM_DRILL_BY_ID[id]))].slice(0, 3) : null,
       exercises,
+      // Leistungstest nur, wenn Art und Sportart zusammenpassen (js/analytics/perf-tests.js)
+      ...(typeof PERF_TEST_BY_KEY !== "undefined" && PERF_TEST_BY_KEY[entry.test] && PERF_TEST_BY_KEY[entry.test].sport === entry.sport ? { perfTest: entry.test } : {}),
     });
   });
   if (!valid.length) throw new Error("Keine gültigen Trainingsvorschläge in der Antwort gefunden.");
@@ -371,12 +373,25 @@ async function generateTrainingPlan(goalId, { replace = false, windowDates: fixe
       fix: (list, suggestion) => applyPlanSuggestion(list, suggestion, defaults),
     });
     if (result.list) {
+      // Fällige Leistungstests (alle 8 Wochen, js/analytics/perf-tests.js):
+      // hat die KI einen nicht eingeplant, setzt das Dashboard ihn selbst ein.
+      let finalList = result.list, tests = { added: [], skipped: [] };
+      if (typeof perfTestsDue === "function") {
+        const known = new Set(before.map(p => p.id));
+        // Stand ohne den neuen Vorschlag (bei "Plan neu erstellen" ohne die gelöschten Einheiten)
+        const due = perfTestsDue(goal, windowDates, { planned: plannedWorkouts, history: DATA, profile: athleteProfile, todayKey: todayStr() });
+        tests = perfTestsEnsure(finalList, due, {
+          validate: list => planRuleViolations(list, { planUntil }), build: buildPlannedWorkout, defaults,
+          mutableIds: finalList.filter(p => !known.has(p.id)).map(p => p.id),
+        });
+        finalList = tests.list;
+      }
       // Sicherheitsnetz (js/analytics/plan-guard.js): Trainingstage, die die KI
       // leer gelassen hat, bekommen eine lockere Einheit - innerhalb der Regeln
       // (ein freier Tag pro Woche, Wochenumfang, keine neuen Verstöße).
-      let finalList = result.list, filled = { added: [], skipped: [] };
+      let filled = { added: [], skipped: [] };
       if (typeof planCheckFill === "function") {
-        filled = planCheckFill(result.list, goal, windowDates[0], planUntil);
+        filled = planCheckFill(finalList, goal, windowDates[0], planUntil);
         finalList = filled.list;
       }
       // Bleibt eine Woche deutlich unter ihrem Zielumfang, füllt das Dashboard
@@ -400,6 +415,7 @@ async function generateTrainingPlan(goalId, { replace = false, windowDates: fixe
         aiCount: report.aiCount || 0, dropped: report.dropped || [], structure: report.structure || [],
         filled: filled.added.map(p => ({ date: p.date, sport: p.sport, title: p.title, duration_min: p.duration_min })),
         skipped: filled.skipped, topped,
+        tests: tests.added.map(p => ({ date: p.date, sport: p.sport, title: p.title })), testsSkipped: tests.skipped,
       };
     } else {
       goal._planError = `Der KI-Vorschlag verstößt auch nach ${PLAN_AI_MAX_ATTEMPTS} Versuchen gegen Trainingsregeln und wurde deshalb nicht gespeichert: ${result.violations.map(v => v.text).join(" ")}`;

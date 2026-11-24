@@ -228,6 +228,10 @@ function buildWorkoutDetailHtml(w) {
   if (w.aerobic_te != null || w.anaerobic_te != null) extraStats.push(["Trainingseffekt aerob / anaerob", `${w.aerobic_te != null ? fmtNum(w.aerobic_te, 1) : "–"} / ${w.anaerobic_te != null ? fmtNum(w.anaerobic_te, 1) : "–"}`]);
   if (w.avg_respiration_rate != null) extraStats.push(["Ø Atemfrequenz", `${fmtNum(w.avg_respiration_rate, 0)} Atemzüge/min`]);
   if (w.min_hr != null) extraStats.push(["Min HF", `${w.min_hr}`]);
+  // Auf der Uhr nach der Einheit eingetragen (Garmin) und Temperatur am Gerät
+  if (w.rpe != null) extraStats.push(["Gefühlte Anstrengung (Uhr)", `${fmtNum(w.rpe, 0)}/10 · ${workoutRpeWord(w.rpe)}`]);
+  if (w.feel != null) extraStats.push(["Gefühl (Uhr)", workoutFeelWord(w.feel)]);
+  if (w.avg_temp_c != null) extraStats.push(["Temperatur Ø" + (w.max_temp_c != null ? " / Max" : ""), `${Math.round(w.avg_temp_c)}${w.max_temp_c != null ? " / " + Math.round(w.max_temp_c) : ""} °C`]);
   // Schwimmstil (dominant_stroke) bewusst nicht mehr angezeigt - die Erkennung
   // war falsch (unverifizierte FIT-Feldnummern, siehe fit-parser.js) und wird
   // von der KI ohnehin nicht genutzt, siehe CHANGE_REQUESTS.md.
@@ -304,6 +308,8 @@ function buildWorkoutDetailHtml(w) {
       <div><h4>Belastungsprofil</h4><div class="chart-wrap wd-radar-chart"></div></div>
       ${(() => { const rest = insights.filter(x => !shownCharts.has(x.chart)); return rest.length ? `<div><h4>Weitere Werte eingeordnet</h4>${metricInsightsHtml(rest)}</div>` : ""; })()}
     </div>
+    ${buildWorkoutFeelCheckHtml(w)}
+    ${buildWorkoutLapsHtml(w)}
     ${buildWorkoutLoadStatsHtml(w)}
     ${buildWorkoutEquipmentHtml(w)}
     ${buildWorkoutRatingHtml(w)}
@@ -511,6 +517,77 @@ function wireWorkoutRatingBlock(rootEl, file) {
 // siehe computeTrainingLoadStats() in js/analytics/workout-profile.js. Ohne
 // diese zwei Profilwerte (oder ohne Pulsdaten in dieser Einheit) bleibt der
 // Block komplett weg statt erfundene Zahlen zu zeigen.
+// Gefühlte Anstrengung (Borg CR10, wie auf der Garmin-Uhr) in Worten.
+function workoutRpeWord(v) {
+  return v <= 2 ? "sehr leicht" : v <= 4 ? "leicht" : v <= 6 ? "mittel" : v <= 8 ? "hart" : "maximal";
+}
+// Garmin "Wie hast du dich gefühlt?" (0-100, 5 Smileys).
+function workoutFeelWord(v) {
+  return v >= 87 ? "sehr gut" : v >= 62 ? "gut" : v >= 37 ? "normal" : v >= 12 ? "schlecht" : "sehr schlecht";
+}
+
+// Gefühl gegen Puls: passt die eingetragene Anstrengung zum gemessenen Puls?
+// Fühlt sich ein lockerer Puls hart an, ist das oft ein frühes Müdigkeitszeichen.
+function buildWorkoutFeelCheckHtml(w) {
+  if (w.rpe == null || typeof ctxHrBands !== "function") return "";
+  const b = ctxHrBands(w, athleteProfile);
+  if (!b || !b.total) return "";
+  const easy = b.easy / b.total;
+  const pulse = easy >= 0.8 ? "locker" : (b.hard / b.total) >= 0.3 ? "hart" : "mittel";
+  const felt = w.rpe <= 4 ? "locker" : w.rpe <= 6 ? "mittel" : "hart";
+  let text, cls;
+  if (pulse === "locker" && felt === "hart") {
+    text = "Dein Puls war locker, die Einheit hat sich aber hart angefühlt. Das kann ein Zeichen für Müdigkeit, wenig Schlaf, Hitze oder einen beginnenden Infekt sein. Passiert das öfter, plane ein paar leichtere Tage.";
+    cls = "warn";
+  } else if (pulse === "hart" && felt === "locker") {
+    text = "Dein Puls war hoch, es hat sich aber leicht angefühlt. Das ist meist ein gutes Zeichen (frisch und fit) – oder der Puls wurde am Handgelenk falsch gemessen.";
+    cls = "good";
+  } else if (pulse === felt) {
+    text = `Gefühl und Puls passen zusammen (beides eher ${pulse}).`;
+    cls = "good";
+  } else {
+    text = `Gefühl (eher ${felt}) und Puls (eher ${pulse}) liegen nah beieinander – nichts Auffälliges.`;
+    cls = "good";
+  }
+  return `
+    <div class="wd-feelcheck wd-feelcheck-${cls}">
+      <h4>Gefühl und Puls</h4>
+      <p><b>Eingetragen: ${fmtNum(w.rpe, 0)}/10 (${workoutRpeWord(w.rpe)})</b> · Puls: ${Math.round(easy * 100)} % der Zeit locker (Zone 1–2), ${Math.round(b.hard / b.total * 100)} % hart (Zone 4–5)</p>
+      <p>${text}</p>
+    </div>`;
+}
+
+// Runden/Intervalle aus der Uhr (laps im Parser-Ergebnis) als kleine Tabelle.
+const WORKOUT_LAP_LABELS = { warmup: "Einlaufen", cooldown: "Auslaufen", rest: "Pause", recovery: "Erholung", interval: "Intervall", active: "", other: "" };
+function buildWorkoutLapsHtml(w) {
+  const laps = Array.isArray(w.laps) ? w.laps : [];
+  if (laps.length < 2) return "";
+  const sport = sportGroup(w.sport);
+  const pace = speed => {
+    if (!speed) return "–";
+    if (sport === "Laufen") return `${secondsToPace(1000 / speed)} /km`;
+    if (sport === "Schwimmen") return `${secondsToPace(100 / speed)} /100m`;
+    return `${fmtNum(speed * 3.6, 1)} km/h`;
+  };
+  const hasPower = laps.some(l => l.power), hasHr = laps.some(l => l.hr), hasDist = laps.some(l => l.dist_m);
+  const dist = m => (!m ? "–" : m >= 1000 ? `${fmtNum(m / 1000, 2)} km` : `${Math.round(m)} m`);
+  const rows = laps.map(l => `<tr class="${l.intensity === "rest" || l.intensity === "recovery" ? "wd-lap-rest" : ""}">
+      <td>${l.n}${WORKOUT_LAP_LABELS[l.intensity] ? ` <small>${WORKOUT_LAP_LABELS[l.intensity]}</small>` : ""}</td>
+      <td>${fmtDurationClock(l.dur_s || 0)}</td>
+      ${hasDist ? `<td>${dist(l.dist_m)}</td><td>${pace(l.speed)}</td>` : ""}
+      ${hasHr ? `<td>${l.hr ? Math.round(l.hr) : "–"}${l.max_hr ? ` <small>/ ${Math.round(l.max_hr)}</small>` : ""}</td>` : ""}
+      ${hasPower ? `<td>${l.power ? Math.round(l.power) + " W" : "–"}</td>` : ""}
+    </tr>`).join("");
+  return `
+    <div class="wd-laps">
+      <h4>Runden</h4>
+      <div class="wd-laps-scroll"><table class="wd-laps-table">
+        <thead><tr><th>Runde</th><th>Zeit</th>${hasDist ? "<th>Strecke</th><th>Tempo</th>" : ""}${hasHr ? "<th>Puls Ø / Max</th>" : ""}${hasPower ? "<th>Leistung</th>" : ""}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+    </div>`;
+}
+
 function buildWorkoutLoadStatsHtml(w) {
   // Jeder Wert als Karte mit Farbskala, Vergleich und Erklärung
   // (workoutLoadInsights, js/analytics/metric-insights.js).

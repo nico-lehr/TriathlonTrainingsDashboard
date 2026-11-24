@@ -174,6 +174,77 @@ def summarize_swim_lengths(lengths):
 
 STREAM_TARGET_POINTS = 200  # Downsampling-Ziel je Workout (für Detail-Charts)
 
+# Stand dieses Parsers. Steigt, wenn neue Felder dazukommen - tools/garmin_sync.py
+# liest dann Einheiten mit älterem Stand aus dem Archiv neu ein (reparse_outdated).
+# 2: gefühlte Anstrengung/Gefühl von der Uhr, Temperatur, Runden (laps).
+PARSER_VERSION = 2
+
+MAX_LAPS = 100  # mehr Runden ergeben keine sinnvolle Auswertung (und blähen die Daten auf)
+
+
+def uhr_rpe(value):
+    """Gefühlte Anstrengung, wie sie nach dem Training auf der Uhr eingegeben
+    wird (FIT session.workout_rpe: Borg CR10 mal 10). -> 1,0-10,0 oder None."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    return round(v / 10, 1) if 1 <= v <= 100 else None
+
+
+def uhr_feel(value):
+    """Gefühl nach dem Training (FIT session.workout_feel, 0 = sehr schwach
+    ... 100 = sehr stark). 0 ist ein echter Wert."""
+    try:
+        v = int(value)
+    except (TypeError, ValueError):
+        return None
+    return v if 0 <= v <= 100 else None
+
+
+def get_laps(path, start_time, sport_raw):
+    """Runden (FIT 'lap'): manuelle Runden, Auto-Runden je km oder die
+    Schritte eines Workouts von der Uhr. Kompakt - genug, um Intervalle
+    einzeln auszuwerten. Muss zu buildLaps() in js/data/fit-parser.js passen."""
+    laps = []
+    with fitdecode.FitReader(path) as fit:
+        for frame in fit:
+            if frame.frame_type != fitdecode.FIT_FRAME_DATA or frame.name != "lap":
+                continue
+            v = {f.name: f.value for f in frame.fields}
+            dur = v.get("total_timer_time") or v.get("total_elapsed_time")
+            if not dur or dur < 1:
+                continue
+            st = v.get("start_time")
+            if isinstance(st, datetime) and st.tzinfo is None:
+                st = st.replace(tzinfo=timezone.utc)
+            speed = v.get("enhanced_avg_speed") or v.get("avg_speed")
+            cad = v.get("avg_running_cadence") if v.get("avg_running_cadence") is not None else v.get("avg_cadence")
+            if cad is not None:
+                cad = combine_cadence(cad, v.get("avg_fractional_cadence"), sport_raw)
+            intensity = v.get("intensity")
+            trigger = v.get("lap_trigger")
+            laps.append({
+                "n": len(laps) + 1,
+                "start_s": round((st - start_time).total_seconds(), 1) if isinstance(st, datetime) and isinstance(start_time, datetime) else None,
+                "dur_s": round(dur, 1),
+                "dist_m": round(v["total_distance"], 1) if v.get("total_distance") is not None else None,
+                "hr": v.get("avg_heart_rate"),
+                "max_hr": v.get("max_heart_rate"),
+                "speed": round(speed, 3) if speed else None,
+                "power": v.get("avg_power"),
+                "np": v.get("normalized_power"),
+                "cad": cad,
+                "ascent": v.get("total_ascent"),
+                "temp": v.get("avg_temperature"),
+                "intensity": intensity if isinstance(intensity, str) else None,
+                "trigger": trigger if isinstance(trigger, str) else None,
+                "step": v.get("wkt_step_index") if isinstance(v.get("wkt_step_index"), int) else None,
+            })
+            if len(laps) >= MAX_LAPS:
+                break
+    return laps or None
+
 
 def combine_cadence(cadence, fractional, sport_raw):
     """Kombiniert das rohe FIT-'cadence'-Feld (pro Bein, wie beim Rad) mit dem
@@ -465,6 +536,12 @@ def main():
             "anaerobic_te": fields.get("total_anaerobic_training_effect"),
             "avg_respiration_rate": fields.get("enhanced_avg_respiration_rate") or fields.get("avg_respiration_rate"),
             "dev_raw": dev_raw or None,
+            # Von der Uhr nach dem Training abgefragt (Forerunner & Co.)
+            "rpe": uhr_rpe(fields.get("workout_rpe")),
+            "feel": uhr_feel(fields.get("workout_feel")),
+            "avg_temp_c": fields.get("avg_temperature"),
+            "max_temp_c": fields.get("max_temperature"),
+            "parser_version": PARSER_VERSION,
         }
 
         try:
@@ -474,6 +551,10 @@ def main():
             workout["stream"] = get_record_stream(path, start_dt, sport_raw)
         except Exception:
             workout["stream"] = None
+        try:
+            workout["laps"] = get_laps(path, start_dt, sport_raw)
+        except Exception:
+            workout["laps"] = None
 
         workouts.append(workout)
 

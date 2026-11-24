@@ -118,6 +118,12 @@ DAY_SECTIONS = ("sleep", "hrv", "rhr", "max_metrics", "training_status", "summar
 # fuer Empfehlungen zaehlt der aktuelle Wert; sonst wuerde die Erweiterung
 # einmalig hunderte alte Tage neu abfragen.
 READINESS_DAYS = 45
+# Ebenso nur fuer die letzten Tage: Lifestyle-Protokoll der Uhr (Krank, Reise,
+# Alkohol, Stress ... - "besondere Tage") und Zyklus-Tag. Ob die Personal API
+# diese Dienste freigibt, ist nicht dokumentiert: scheitert ein Abschnitt in
+# einem Lauf mehrfach hintereinander, wird er fuer diesen Lauf ausgelassen.
+RECENT_SECTIONS = ("readiness", "lifestyle", "cycle")
+SECTION_DEAD_AFTER = 3
 
 
 def log(msg):
@@ -377,6 +383,65 @@ def store_workouts(session, athlete_id, fit_dir, fetched, stats):
             stats["vorhanden"] += 1
 
 
+# Neue Felder des Parsers (PARSER_VERSION in parse_fit.py), die bei aelteren
+# Einheiten aus der archivierten .fit-Datei nachgetragen werden. Nur diese
+# Felder - alles andere in fit_data bleibt wie es ist.
+REPARSE_KEYS = ("rpe", "feel", "avg_temp_c", "max_temp_c", "laps", "parser_version")
+REPARSE_PER_RUN = 200  # je Lauf hoechstens so viele - der Rest beim naechsten Mal
+
+
+def parser_version():
+    """Stand von parse_fit.py, ohne fitdecode zu laden (reiner Text-Abgleich)."""
+    try:
+        with open(os.path.join(BASE, "parse_fit.py"), encoding="utf-8") as f:
+            m = re.search(r"^PARSER_VERSION\s*=\s*(\d+)", f.read(), re.M)
+        return int(m.group(1)) if m else 0
+    except OSError:
+        return 0
+
+
+def reparse_outdated(session, athlete_id, fit_dir, limit=REPARSE_PER_RUN):
+    """Liest Garmin-Einheiten mit aelterem Parser-Stand aus dem Archiv neu ein
+    und traegt die neuen Felder nach (gefuehlte Anstrengung, Runden, ...).
+    Ohne Archivdatei wird nur der Stand vermerkt, damit es nicht jedes Mal
+    erneut versucht wird. -> Anzahl ergaenzter Einheiten."""
+    from backend.models import Workout
+    version = parser_version()
+    if not version:
+        return 0
+    todo = [r for r in session.query(Workout).filter_by(athlete_id=athlete_id, source="garmin")
+            if isinstance(r.fit_data, dict) and (r.fit_data.get("parser_version") or 0) < version][:limit]
+    if not todo:
+        return 0
+    parsed = {}
+    with tempfile.TemporaryDirectory() as tmp:
+        files = 0
+        for r in todo:
+            name = os.path.basename(str(r.fit_data.get("file") or ""))
+            src = os.path.join(fit_dir, name)
+            if name.lower().endswith(".fit") and os.path.isfile(src):
+                shutil.copy2(src, tmp)
+                files += 1
+        if files:
+            out = os.path.join(tmp, "workouts.json")
+            subprocess.run([sys.executable, os.path.join(BASE, "parse_fit.py"), tmp, "-o", out],
+                           check=True, stdout=subprocess.DEVNULL)
+            with open(out, encoding="utf-8") as f:
+                parsed = {w.get("file"): w for w in json.load(f).get("workouts", [])}
+    updated = 0
+    for r in todo:
+        fd = dict(r.fit_data)
+        new = parsed.get(fd.get("file"))
+        if new:
+            for k in REPARSE_KEYS:
+                fd[k] = new.get(k)
+            updated += 1
+        fd["parser_version"] = version
+        r.fit_data = fd  # neues dict, damit SQLAlchemy die Aenderung bemerkt
+    session.commit()
+    return updated
+
+
 # --------------------------------------------------------- Gesundheitsdaten
 
 def load_cache(path):
@@ -443,7 +508,7 @@ def sync_wellness(client, start, end, path):
 
     def ohne_readiness(ds):
         e = days.get(ds)
-        return ds >= readiness_from and (not isinstance(e, dict) or "readiness" not in e)
+        return ds >= readiness_from and (not isinstance(e, dict) or any(k not in e for k in RECENT_SECTIONS))
 
     todo = [ds for ds in all_days if ds not in days or ds >= refetch_from or unvollstaendig(ds) or ohne_readiness(ds)]
 
@@ -455,7 +520,9 @@ def sync_wellness(client, start, end, path):
     # get_body_battery lieferte im Praxistest nichts, deshalb je Tag.
     sections = (("sleep", "get_sleep_data"), ("hrv", "get_hrv_data"), ("rhr", "get_rhr_day"),
                 ("max_metrics", "get_max_metrics"), ("training_status", "get_training_status"),
-                ("summary", "get_user_summary"), ("readiness", "get_training_readiness"))
+                ("summary", "get_user_summary"), ("readiness", "get_training_readiness"),
+                ("lifestyle", "get_lifestyle_log"), ("cycle", "get_menstrual_day"))
+    streak = {}  # Fehlschlaege je Abschnitt in Folge (nur dieser Lauf)
     try:
         for i, ds in enumerate(todo, 1):
             entry = days.get(ds, {})
@@ -468,9 +535,15 @@ def sync_wellness(client, start, end, path):
             for key, method in sections:
                 if key in entry and ds < refetch_from:
                     continue
-                if key == "readiness" and ds < readiness_from:
+                if key in RECENT_SECTIONS and ds < readiness_from:
+                    continue
+                if key in ("lifestyle", "cycle") and not hasattr(client, method):
+                    continue  # alter Zugang (garminconnect) kennt den Dienst nicht
+                if streak.get(key, 0) >= SECTION_DEAD_AFTER:
+                    entry.setdefault(key, None)  # Dienst hier nicht verfuegbar - "keine Daten"
                     continue
                 result = call(client, method, ds)
+                streak[key] = streak.get(key, 0) + 1 if result is FAILED else 0
                 if result is not FAILED:
                     entry[key] = result
                     fails.pop(key, None)
@@ -595,6 +668,47 @@ def training_status_label(ts_first):
     return TRAINING_STATUS_DE.get(key, str(phrase))
 
 
+# Lifestyle-Protokoll der Uhr -> deutsche Etiketten. Unbekannte Eintraege
+# werden unveraendert durchgereicht statt geraten.
+LIFESTYLE_DE = {
+    "alcohol": "Alkohol", "caffeine": "Koffein", "illness": "Krank", "sick": "Krank", "sickness": "Krank",
+    "travel": "Reise", "traveling": "Reise", "stress": "Stress", "stressful_day": "Stress",
+    "late_meal": "Spätes Essen", "late_caffeine": "Spätes Koffein", "late_workout": "Spätes Training",
+    "screen_time": "Bildschirm spät", "nap": "Mittagsschlaf", "meditation": "Meditation",
+    "injury": "Verletzung", "jet_lag": "Jetlag", "menstruation": "Periode", "headache": "Kopfschmerzen",
+    "hydration": "Viel getrunken", "sauna": "Sauna", "massage": "Massage", "fasting": "Fasten",
+}
+YES = {"yes", "true", "logged", "y", "1"}
+
+
+def lifestyle_tags(raw):
+    """Antwort von lifestylelogging-service -> Liste deutscher Etiketten der
+    Eintraege, die an dem Tag mit "ja" protokolliert wurden."""
+    tags = []
+
+    def visit(obj, depth=0):
+        if depth > 4:
+            return
+        if isinstance(obj, list):
+            for v in obj:
+                visit(v, depth + 1)
+        elif isinstance(obj, dict):
+            name = obj.get("name") or obj.get("behaviorName") or obj.get("behavior") or obj.get("typeKey")
+            status = obj.get("logStatus", obj.get("status", obj.get("value")))
+            amount = num(obj.get("amount"), obj.get("measurementValue"), obj.get("quantity"))
+            if isinstance(name, str) and (str(status).lower() in YES or status is True or (amount or 0) > 0):
+                key = name.strip().lower().replace(" ", "_").replace("-", "_")
+                label = LIFESTYLE_DE.get(key, name.strip())
+                if label not in tags:
+                    tags.append(label)
+            for v in obj.values():
+                if isinstance(v, (dict, list)):
+                    visit(v, depth + 1)
+
+    visit(raw)
+    return tags or None
+
+
 def normalize(cache):
     """Baut aus den Rohantworten flache Tageswerte. Fehlende Werte bleiben
     None und werden NIE als 0 gezaehlt - ein Tag ohne Uhr am Handgelenk ist
@@ -618,6 +732,11 @@ def normalize(cache):
                               or dig(raw, "max_metrics", "cycling"))
         ts = dig(raw, "training_status", "mostRecentTrainingStatus", "latestTrainingStatusData") or {}
         ts_first = next(iter(ts.values()), {}) if isinstance(ts, dict) else {}
+
+        acute = as_dict(ts_first.get("acuteTrainingLoadDTO")) if isinstance(ts_first, dict) else {}
+        # Belastungsverteilung der letzten 4 Wochen (Garmin "Trainingsbelastungsfokus").
+        lb = dig(raw, "training_status", "mostRecentTrainingLoadBalance", "metricsTrainingLoadBalanceDTOMap") or {}
+        lb_first = as_dict(next(iter(lb.values()), {})) if isinstance(lb, dict) else {}
 
         summ = as_dict(raw.get("summary"))
         readiness = raw.get("readiness")
@@ -665,6 +784,28 @@ def normalize(cache):
             "intensity_min_vigorous": num(find_key(summ, "vigorousIntensityMinutes")),
             "readiness_score": in_range(num(readiness.get("score")), 0, 100),
             "readiness_level": readiness.get("level") if isinstance(readiness.get("level"), str) else None,
+            # Akute (7 Tage) und chronische (4 Wochen) Belastung wie auf der Uhr,
+            # dazu das Verhaeltnis (ACWR) - 0,8-1,3 gilt als "optimal".
+            "load_acute": in_range(num(acute.get("dailyTrainingLoadAcute")), 0, 5000),
+            "load_chronic": in_range(num(acute.get("dailyTrainingLoadChronic")), 0, 5000),
+            "acwr": in_range(num(acute.get("dailyAcuteChronicWorkloadRatio"),
+                                 (lambda v: v / 100 if v is not None else None)(num(acute.get("acwrPercent")))), 0, 5),
+            "load_aerobic_low": in_range(num(lb_first.get("monthlyLoadAerobicLow")), 0, 20000),
+            "load_aerobic_high": in_range(num(lb_first.get("monthlyLoadAerobicHigh")), 0, 20000),
+            "load_anaerobic": in_range(num(lb_first.get("monthlyLoadAnaerobic")), 0, 20000),
+            "load_aerobic_low_target": [num(lb_first.get("monthlyLoadAerobicLowTargetMin")), num(lb_first.get("monthlyLoadAerobicLowTargetMax"))]
+                                       if num(lb_first.get("monthlyLoadAerobicLowTargetMax")) else None,
+            "load_aerobic_high_target": [num(lb_first.get("monthlyLoadAerobicHighTargetMin")), num(lb_first.get("monthlyLoadAerobicHighTargetMax"))]
+                                        if num(lb_first.get("monthlyLoadAerobicHighTargetMax")) else None,
+            "load_anaerobic_target": [num(lb_first.get("monthlyLoadAnaerobicTargetMin")), num(lb_first.get("monthlyLoadAnaerobicTargetMax"))]
+                                     if num(lb_first.get("monthlyLoadAnaerobicTargetMax")) else None,
+            "special": lifestyle_tags(raw.get("lifestyle")),
+            "cycle_phase": (lambda v: v if isinstance(v, str) else None)(
+                find_key(as_dict(raw.get("cycle")), "currentPhaseType") or find_key(as_dict(raw.get("cycle")), "phaseType")
+                or find_key(as_dict(raw.get("cycle")), "currentPhase")),
+            "cycle_day": in_range(num(find_key(as_dict(raw.get("cycle")), "dayInCycle"),
+                                      find_key(as_dict(raw.get("cycle")), "currentDayInCycle")), 1, 60),
+            "load_balance": lb_first.get("trainingBalanceFeedbackPhrase") if isinstance(lb_first.get("trainingBalanceFeedbackPhrase"), str) else None,
         }
         if any(v is not None for v in entry.values()):
             out[ds] = entry
@@ -855,6 +996,13 @@ def sync_user(athlete_id, session_factory, start, end, args):
         if not args.wellness_only:
             st = sync_activities(client, start, end, athlete_id, session)
             parts.append(f"Aktivitäten {st['neu']} neu, {st['vorhanden']} vorhanden, {st['fehler']} Fehler")
+            try:
+                n = reparse_outdated(session, athlete_id, athlete_dir(athlete_id))
+                if n:
+                    parts.append(f"{n} ältere Einheiten ergänzt")
+            except Exception as e:  # nie den ganzen Abruf daran scheitern lassen
+                session.rollback()
+                log(f"  Nachlesen aelterer Einheiten fehlgeschlagen: {e}")
         if not args.activities_only:
             try:
                 cache = sync_wellness(client, start, end, cache_path(athlete_id))

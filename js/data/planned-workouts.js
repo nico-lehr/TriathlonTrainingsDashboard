@@ -89,6 +89,8 @@ function buildPlannedWorkout(entry) {
     // Selbst gewünscht (eigener Eintrag oder Nachricht an den Coach): die
     // Regelprüfung macht diesen Tag nie zum Ruhetag (checkPlanRestDay).
     ...(entry.requested === true ? { requested: true } : {}),
+    // Leistungstest (js/analytics/perf-tests.js): "ftp" | "run" | "css"
+    ...(typeof entry.perfTest === "string" && /^(ftp|run|css)$/.test(entry.perfTest) ? { perfTest: entry.perfTest } : {}),
     createdAt: new Date().toISOString(),
   };
 }

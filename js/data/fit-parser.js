@@ -62,6 +62,35 @@ const FIELD_MAP = {
     132: { name: "avg_vertical_ratio", scale: 100 },
     134: { name: "avg_step_length", scale: 10 },
     168: { name: "training_load_peak", scale: 65536 },
+    57:  { name: "avg_temperature" },
+    58:  { name: "max_temperature" },
+    124: { name: "enhanced_avg_speed", scale: 1000 },
+    // Nach dem Training auf der Uhr abgefragt (FIT SDK 21.x, gegen das
+    // fitdecode-Profil geprüft): Gefühl 0-100, Anstrengung Borg CR10 mal 10.
+    192: { name: "workout_feel" },
+    193: { name: "workout_rpe" },
+  },
+  // lap (Runde): manuelle Runden, Auto-Runden je km oder Workout-Schritte.
+  // Feldnummern wie im fitdecode-Profil (siehe get_laps in parse_fit.py).
+  19: {
+    253: { name: "timestamp", ts: true },
+    2:   { name: "start_time", ts: true },
+    7:   { name: "total_elapsed_time", scale: 1000 },
+    8:   { name: "total_timer_time", scale: 1000 },
+    9:   { name: "total_distance", scale: 100 },
+    13:  { name: "avg_speed", scale: 1000 },
+    15:  { name: "avg_heart_rate" },
+    16:  { name: "max_heart_rate" },
+    17:  { name: "avg_cadence" },
+    19:  { name: "avg_power" },
+    21:  { name: "total_ascent" },
+    23:  { name: "intensity" },
+    24:  { name: "lap_trigger" },
+    33:  { name: "normalized_power" },
+    50:  { name: "avg_temperature" },
+    71:  { name: "wkt_step_index" },
+    80:  { name: "avg_fractional_cadence", scale: 128 },
+    110: { name: "enhanced_avg_speed", scale: 1000 },
   },
   20: { // record
     253: { name: "timestamp", ts: true },
@@ -164,6 +193,7 @@ function parseFitArrayBuffer(buf) {
   let sessionFields = null;
   const records = [];
   const lengths = []; // Schwimmbahnen (mesg 101) - siehe FIELD_MAP-Kommentar oben
+  const laps = [];    // Runden (mesg 19)
   // Developer-Feld-Beschreibungen (mesg 206, "field_description"), Key
   // "devDataIndex:defNum" -> {name, baseType}. Werden VOR ihrer Verwendung in
   // der Datei geschrieben (FIT-Spec-Vorgabe), ein einziger Vorwärts-Durchlauf
@@ -256,6 +286,8 @@ function parseFitArrayBuffer(buf) {
       sessionFields = { ...(sessionFields || {}), ...values };
     } else if (globalMesgNum === 20 && Object.keys(values).length) {
       records.push(values);
+    } else if (globalMesgNum === 19 && Object.keys(values).length) {
+      laps.push(values);
     } else if (globalMesgNum === 101 && Object.keys(values).length) {
       lengths.push(values);
     } else if (globalMesgNum === 206 && values.dev_data_index != null && values.field_def_num != null) {
@@ -320,9 +352,53 @@ function parseFitArrayBuffer(buf) {
     storeMessage(def.globalMesgNum, values);
   }
 
-  return { session: sessionFields, records, lengths };
+  return { session: sessionFields, records, lengths, laps };
 }
 
+
+// Stand des Parsers - muss zu PARSER_VERSION in parse_fit.py passen.
+const FIT_PARSER_VERSION = 2;
+const FIT_MAX_LAPS = 100;
+const LAP_INTENSITY = ["active", "rest", "warmup", "cooldown", "recovery", "interval", "other"];
+const LAP_TRIGGER = ["manual", "time", "distance", "position_start", "position_lap", "position_waypoint", "position_marked", "session_end", "fitness_equipment"];
+
+// Gefühlte Anstrengung von der Uhr (Borg CR10 mal 10) -> 1,0-10,0
+function fitRpe(v) {
+  return v != null && v >= 1 && v <= 100 ? Math.round(v) / 10 : null;
+}
+
+function fitFeel(v) {
+  return v != null && v >= 0 && v <= 100 ? v : null;
+}
+
+// Runden kompakt - gleiche Form wie get_laps() in parse_fit.py.
+function buildLaps(laps, startTime, sportRaw) {
+  const out = [];
+  for (const v of laps || []) {
+    const dur = v.total_timer_time ?? v.total_elapsed_time ?? null;
+    if (!dur || dur < 1) continue;
+    const speed = v.enhanced_avg_speed || v.avg_speed || null;
+    out.push({
+      n: out.length + 1,
+      start_s: v.start_time instanceof Date && startTime ? Math.round((v.start_time - startTime) / 100) / 10 : null,
+      dur_s: Math.round(dur * 10) / 10,
+      dist_m: v.total_distance != null ? Math.round(v.total_distance * 10) / 10 : null,
+      hr: v.avg_heart_rate ?? null,
+      max_hr: v.max_heart_rate ?? null,
+      speed: speed ? Math.round(speed * 1000) / 1000 : null,
+      power: v.avg_power ?? null,
+      np: v.normalized_power ?? null,
+      cad: combineCadence(v.avg_cadence, v.avg_fractional_cadence, sportRaw),
+      ascent: v.total_ascent ?? null,
+      temp: v.avg_temperature ?? null,
+      intensity: LAP_INTENSITY[v.intensity] || null,
+      trigger: LAP_TRIGGER[v.lap_trigger] || null,
+      step: v.wkt_step_index ?? null,
+    });
+    if (out.length >= FIT_MAX_LAPS) break;
+  }
+  return out.length ? out : null;
+}
 
 function fmtPacePerKm(avgSpeed) {
   if (!avgSpeed || avgSpeed <= 0) return null;
@@ -425,7 +501,7 @@ function buildWorkoutFromParsed(fname, parsed) {
   const startTime = s.start_time instanceof Date ? s.start_time : null;
   const durationS = s.total_timer_time ?? s.total_elapsed_time ?? null;
   const distanceM = s.total_distance ?? null;
-  const avgSpeed = s.avg_speed ?? null;
+  const avgSpeed = s.enhanced_avg_speed || s.avg_speed || null;
   const maxSpeed = s.max_speed ?? null;
 
   // Garmin schreibt avg_speed/enhanced_avg_speed NICHT in jede Session - bei
@@ -577,7 +653,13 @@ function buildWorkoutFromParsed(fname, parsed) {
     rpe_estimated: rpeEstimated,
     avg_mets: avgMets,
     dev_raw: Object.keys(devRaw).length ? devRaw : null,
+    rpe: fitRpe(s.workout_rpe),
+    feel: fitFeel(s.workout_feel),
+    avg_temp_c: s.avg_temperature ?? null,
+    max_temp_c: s.max_temperature ?? null,
+    parser_version: FIT_PARSER_VERSION,
     stream: buildStream(parsed.records, startTime, sportRaw),
+    laps: buildLaps(parsed.laps, startTime, sportRaw),
     is_summary: false,
   };
 }
