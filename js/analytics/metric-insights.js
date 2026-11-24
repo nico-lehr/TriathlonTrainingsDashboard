@@ -79,8 +79,27 @@ function miBand(bands, v) {
   return bands[bands.length - 1];
 }
 
-function miScale(bands, v) {
-  return { bands: bands.map(b => ({ from: b[0], to: b[1], level: b[2] })), min: bands[0][0], max: bands[bands.length - 1][1], value: v };
+// Skala für den Farbbalken. fmt(x) schreibt eine Grenze als Text (mit
+// Einheit), opts.span(von, bis) einen Bereich ("6,1–7,5 %"). Daraus wird je
+// Farbe ein Hinweis wie "gut: 6,1–7,5 %", den die Detailansicht beim
+// Zeigen/Antippen eines Farbabschnitts anzeigt. Der erste und letzte
+// Bereich sind nach außen offen ("unter …", "ab …").
+function miScale(bands, v, fmt, opts = {}) {
+  const below = opts.below || "unter", above = opts.above || "ab";
+  const span = opts.span || ((lo, hi) => `${fmt(lo)}–${fmt(hi)}`);
+  const last = bands.length - 1;
+  const range = (b, i) => !fmt ? ""
+    : last === 0 ? span(b[0], b[1])
+    : i === 0 ? `${below} ${fmt(b[1])}`
+    : i === last ? `${above} ${fmt(b[0])}`
+    : span(b[0], b[1]);
+  return {
+    bands: bands.map((b, i) => {
+      const r = range(b, i);
+      return { from: b[0], to: b[1], level: b[2], word: b[3] || "", range: r, text: [b[3], r].filter(Boolean).join(": ") };
+    }),
+    min: bands[0][0], max: bands[last][1], value: v,
+  };
 }
 
 // Text eines Bereichs: "6,1–7,4 %"
@@ -89,9 +108,18 @@ function miRangeText(def, lo, hi) {
   return `${miFmt(lo * s, d)}–${miFmt((hi - step / s) * s, d)}${def.unit ? (def.unit === "%" ? " %" : " " + def.unit) : ""}`;
 }
 
+function miUnit(def) {
+  return def.unit ? " " + def.unit : "";
+}
+
 function miValueText(def, v) {
-  const s = def.scale || 1;
-  return `${miFmt(v * s, def.dec)}${def.unit ? (def.unit === "%" ? " %" : " " + def.unit) : ""}`;
+  return `${miFmt(v * (def.scale || 1), def.dec)}${miUnit(def)}`;
+}
+
+// Farbbalken-Grenzen eines Werts aus MI_DEFS: "6,1–7,5 %", "unter 6,1 %"
+function miDefScale(def, v) {
+  const n = x => miFmt(x * (def.scale || 1), def.dec);
+  return miScale(def.bands, v, x => miValueText(def, x), { span: (lo, hi) => `${n(lo)}–${n(hi)}${miUnit(def)}` });
 }
 
 function miPaceSec(w) {
@@ -178,7 +206,7 @@ function miFromDef(id, w, all) {
     id, label: def.label, value: v, valueText: miValueText(def, v),
     level: band[2], verdict: band[3],
     rangeText: [goodTxt, def.note].filter(Boolean).join(" · "),
-    scale: miScale(def.bands, v),
+    scale: miDefScale(def, v),
     compare: miCompare(def, v, base, w),
     explain: def.explain, tip: def.tip(v),
   };
@@ -199,6 +227,7 @@ function miHrZone(w, profile) {
   const pct = (w.avg_hr - rest) / (max - rest) * 100;
   const bands = [[30, 60, "i1", "Zone 1 · sehr locker"], [60, 70, "i2", "Zone 2 · locker (Grundlage)"], [70, 80, "i3", "Zone 3 · mittel"], [80, 90, "i4", "Zone 4 · hart (Schwelle)"], [90, 101, "i5", "Zone 5 · sehr hart"]];
   const band = miBand(bands, pct);
+  const bpm = x => Math.round(rest + (max - rest) * x / 100);
   const planned = miPlannedIntensity(w);
   let plan = null;
   if (planned === "leicht" && pct >= 70) plan = { level: "warn", text: "härter als geplant (locker geplant)" };
@@ -210,7 +239,8 @@ function miHrZone(w, profile) {
     id: "hr_zone", label: "Puls-Intensität", value: pct, valueText: `Ø ${Math.round(w.avg_hr)} bpm · ${Math.round(pct)} % Reserve`,
     level: band[2], verdict: band[3], plan,
     rangeText: "Grundlage: 60–70 % der Herzfrequenzreserve",
-    scale: miScale(bands, pct),
+    scale: miScale(bands, pct, x => `${Math.round(x)} % (${bpm(x)} bpm)`,
+      { span: (lo, hi) => `${Math.round(lo)}–${Math.round(hi)} % (${bpm(lo)}–${bpm(hi)} bpm)` }),
     compare: null,
     explain: "Wie anstrengend die Einheit im Schnitt war – gemessen an deinem Max- und Ruhepuls. Der Großteil des Trainings (etwa 80 %) sollte locker in Zone 1–2 sein, damit die Ausdauer wächst, ohne dich zu ermüden.",
     tip: plan && plan.level === "warn"
@@ -284,7 +314,7 @@ function miDecoupling(w) {
     id: "decoupling", label: "Puls-Drift", value: pct, valueText: `${pct >= 0 ? "+" : ""}${miFmt(pct, 1)} %`,
     level: band[2], verdict: band[3],
     rangeText: "gut: unter 5 %",
-    scale: miScale(bands, v), compare: null,
+    scale: miScale(bands, v, x => `${miFmt(x, 0)} %`, { span: (lo, hi) => `${miFmt(lo, 0)}–${miFmt(hi, 0)} %` }), compare: null,
     explain: `Wie stark dein Puls in der zweiten Hälfte steigt, obwohl ${usePower ? "die Leistung" : "das Tempo"} gleich bleibt. Unter 5 % zeigt eine gute Ausdauerbasis. Zu schnelles Angehen, Hitze oder zu wenig Trinken erhöhen die Drift.`,
     tip: pct >= 5
       ? "Ruhiger anfangen und unterwegs trinken. Viele lockere, lange Einheiten verbessern die Ausdauerbasis – dann sinkt die Drift."
@@ -311,7 +341,8 @@ function miRidePower(w, profile) {
       valueText: `${Math.round(iF * 100)} % FTP${kg && ap ? ` · ${miFmt(ap / kg, 2)} W/kg` : ""}`,
       level: band[2], verdict: band[3], plan,
       rangeText: "Grundlage: unter 75 % · Triathlon-Renntempo meist 70–85 %",
-      scale: miScale(bands, Math.min(1.29, Math.max(0.4, iF))), compare: null,
+      scale: miScale(bands, Math.min(1.29, Math.max(0.4, iF)), x => `${Math.round(x * 100)} % FTP (${Math.round(x * ftp)} W)`,
+        { span: (lo, hi) => `${Math.round(lo * 100)}–${Math.round(hi * 100)} % FTP (${Math.round(lo * ftp)}–${Math.round(hi * ftp)} W)` }), compare: null,
       explain: "Wie hart die Fahrt war, gemessen an deiner FTP (der Leistung, die du etwa eine Stunde halten kannst). Für eine Mitteldistanz fährt man meist 75–83 % FTP, damit der Lauf danach noch geht.",
       tip: iF > 0.85 && (!planned || planned === "leicht") ? "Lange, lockere Fahrten unter 75 % FTP halten – das trainiert die Ausdauer, ohne zu ermüden." : "Passt.",
     });
@@ -325,7 +356,7 @@ function miRidePower(w, profile) {
       id: "ride_vi", label: "Gleichmäßigkeit", value: vi, valueText: `${miFmt(vi, 2)} (NP ÷ Ø Leistung)`,
       level: band[2], verdict: band[3],
       rangeText: "für Triathlon ideal: unter 1,05",
-      scale: miScale(bands, v), compare: null,
+      scale: miScale(bands, v, x => miFmt(x, 2)), compare: null,
       explain: "Wie gleichmäßig du getreten hast. 1,00 heißt völlig gleichmäßig. Im Triathlon spart gleichmäßiges Fahren Kraft für den Lauf. Bei Intervallen oder im Hügelland ist ein höherer Wert normal.",
       tip: vi >= 1.1 ? "An Anstiegen nicht „draufdrücken“ und bergab weitertreten – so wird die Fahrt gleichmäßiger." : "Sehr gut eingeteilt.",
     });
@@ -358,7 +389,9 @@ function miSwimPace(w, all, profile) {
     id: "swim_pace", label: "Schwimmtempo", value: sec, valueText: `${w.pace_min_per_100m} min/100 m (${d >= 0 ? "+" : "−"}${Math.abs(Math.round(d))} s zur CSS)`,
     level: band[2], verdict: band[3],
     rangeText: `deine CSS: ${secondsToPace(css)} min/100 m`,
-    scale: miScale(bands, v), compare,
+    // Grenzen als echtes Tempo (CSS + Abstand): kleiner = schneller
+    scale: miScale(bands, v, x => `${secondsToPace(css + x)} min/100 m`,
+      { below: "schneller als", above: "langsamer als", span: (lo, hi) => `${secondsToPace(css + lo)}–${secondsToPace(css + hi)} min/100 m` }), compare,
     explain: "Die CSS ist dein Schwellentempo: so schnell kannst du etwa 30 Minuten schwimmen. Lockeres Ausdauerschwimmen liegt etwa 10–15 Sekunden pro 100 m darüber. Der Ø enthält auch Pausen am Rand.",
     tip: d < 6 ? "Viel Tempo heute – gönn dir in der nächsten Einheit ruhige Technikbahnen." : "Passt für eine Ausdauereinheit.",
   };
@@ -375,7 +408,7 @@ function miTrainingEffect(w) {
     id: "aerobic_te", label: "Trainingseffekt (aerob)", value: w.aerobic_te, valueText: `${miFmt(w.aerobic_te, 1)} von 5`,
     level: band[2], verdict: band[3], plan,
     rangeText: "locker: 2–3 · Reiz für mehr Ausdauer: 3–4",
-    scale: miScale(bands.slice(0, 5), Math.min(4.99, w.aerobic_te)), compare: null,
+    scale: miScale(bands.slice(0, 5), Math.min(4.99, w.aerobic_te), x => miFmt(x, 1)), compare: null,
     explain: "Garmins Einschätzung, wie stark die Einheit deine Ausdauer anregt. Lockere Tage liegen bei 2–3, Schlüsseleinheiten bei 3–4. Werte über 4 brauchen danach mehr Erholung.",
     tip: plan ? "Lockere Tage dürfen sich leicht anfühlen – genau dann wirken die harten Tage besser." : "Passt.",
   };

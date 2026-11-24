@@ -120,3 +120,23 @@ test("KI-Zeilen enthalten Bereich und Vergleich", () => {
   const lines = run("workoutMetricInsightLines(__w, __all, {})");
   assert.ok(lines.some(l => /Vertikales Verhältnis: 9,4 %; Bereich: eher hoch \(gut: unter 7,5 %\); besser als sonst – sonst Ø 9,9 %/.test(l)), lines.join("\n"));
 });
+
+test("Farbbalken: jeder Abschnitt nennt seinen Wertebereich (für Zeigen/Antippen)", () => {
+  app.__all = [TODAY].map(app.__fix);
+  const texts = id => get(insights(TODAY, null, { maxHr: 190, restingHr: 50 }), id).scale.bands.map(b => b.text);
+  assert.deepStrictEqual(texts("run_vr"), ["sehr gut: unter 6,1 %", "gut: 6,1–7,5 %", "mittel: 7,5–8,7 %", "eher hoch: 8,7–10,2 %", "hoch: ab 10,2 %"]);
+  assert.deepStrictEqual(texts("run_cadence")[0], "niedrig: unter 153 spm");
+  // Pulszonen: % Reserve und dazu der echte Puls
+  assert.deepStrictEqual(texts("hr_zone")[1], "Zone 2 · locker (Grundlage): 60–70 % (134–148 bpm)");
+  // Rad: % FTP mit Watt
+  const ride = { file: "b", sport: "Rad", _date: at("2026-11-08"), avg_power_w: 180, normalized_power_w: 198 };
+  app.__all = [app.__fix(ride)];
+  const rl = insights(ride, null, { ftpWatts: 250 });
+  assert.strictEqual(get(rl, "ride_if").scale.bands[0].text, "locker / Grundlage: unter 75 % FTP (188 W)");
+  assert.strictEqual(get(rl, "ride_vi").scale.bands[1].text, "gleichmäßig: 1,05–1,10");
+  // Schwimmen: Grenzen als Tempo, schneller = kleiner
+  const swim = { file: "s", sport: "Schwimmen", _date: at("2026-11-08"), pace_min_per_100m: "2:08" };
+  app.__all = [app.__fix(swim)];
+  const sb = get(insights(swim, null, { swimCss: "1:55" }), "swim_pace").scale.bands.map(b => b.text);
+  assert.deepStrictEqual([sb[0], sb[3]], ["schneller als CSS: schneller als 1:53 min/100 m", "locker: langsamer als 2:10 min/100 m"]);
+});

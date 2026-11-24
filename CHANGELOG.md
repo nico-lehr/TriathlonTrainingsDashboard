@@ -4,6 +4,13 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 2.5.56
+
+**Farbskalen zeigen ihre Bereiche**
+- In der Detailansicht eines Trainings zeigt jeder Farbabschnitt der Skalen (z. B. Vertikales Verhältnis, Schrittfrequenz, Puls-Intensität, Trainingseffekt), ab welchem Wert er gilt – z. B. „gut: 6,1–7,5 %“.
+- Am Computer: mit der Maus auf die Farbe zeigen. Am Handy: die Farbe antippen; Tippen daneben blendet den Hinweis wieder aus.
+- Bei der Puls-Intensität steht neben der Herzfrequenzreserve auch dein echter Puls (bpm), bei der Rad-Intensität die Watt und beim Schwimmtempo das Tempo pro 100 m.
+
 ## 2.5.55
 
 **Kein altes Design mehr beim Laden**

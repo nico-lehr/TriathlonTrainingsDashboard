@@ -318,9 +318,11 @@ function metricInsightsHtml(list) {
   const bar = sc => {
     if (!sc) return "";
     const span = sc.max - sc.min;
-    const segs = sc.bands.map(b => `<i class="mi-seg mi-${b.level}" style="flex:${(b.to - b.from) / span}"></i>`).join("");
+    // Jeder Farbabschnitt verrät beim Zeigen (Maus), Antippen (Handy) oder
+    // per Tastatur, ab welchem Wert er gilt (wireMetricScaleTips).
+    const segs = sc.bands.map(b => `<i class="mi-seg mi-${b.level}" style="flex:${(b.to - b.from) / span}"${b.text ? ` tabindex="0" role="note" aria-label="${esc(b.text)}" data-tip="${esc(b.text)}"` : ""}></i>`).join("");
     const pos = Math.max(0, Math.min(100, (sc.value - sc.min) / span * 100));
-    return `<div class="mi-bar" aria-hidden="true">${segs}<b class="mi-mark" style="left:${pos.toFixed(1)}%"></b></div>`;
+    return `<div class="mi-bar">${segs}<b class="mi-mark" style="left:${pos.toFixed(1)}%" aria-hidden="true"></b><span class="mi-tip" role="status" hidden></span></div>`;
   };
   const arrow = c => (c.dir === "same" ? "=" : c.delta > 0 ? "↑" : "↓");
   return `<div class="mi-list">${list.map(x => `
@@ -333,6 +335,54 @@ function metricInsightsHtml(list) {
       <details class="mi-more"><summary>Was heißt das?</summary><p>${esc(x.explain)}</p>${x.tip ? `<p><b>Tipp:</b> ${esc(x.tip)}</p>` : ""}</details>
     </div>`).join("")}</div>`;
 }
+
+// Blase über dem Farbbalken: zeigt den Bereich des Abschnitts unter der
+// Maus bzw. des angetippten/fokussierten Abschnitts. Einmal für die ganze
+// Seite (Event-Delegation), weil die Detailansicht immer neu gezeichnet wird.
+function showMetricScaleTip(seg) {
+  const bar = seg.closest(".mi-bar"), tip = bar && bar.querySelector(".mi-tip");
+  if (!tip) return;
+  bar.querySelectorAll(".mi-seg.is-tip").forEach(el => el.classList.remove("is-tip"));
+  seg.classList.add("is-tip");
+  tip.textContent = seg.dataset.tip;
+  tip.hidden = false;
+  const bw = bar.clientWidth, tw = tip.offsetWidth;
+  const center = seg.offsetLeft + seg.offsetWidth / 2;
+  tip.style.left = `${Math.max(0, Math.min(bw - tw, center - tw / 2))}px`;
+}
+
+function hideMetricScaleTip(bar) {
+  const tip = bar && bar.querySelector(".mi-tip");
+  if (!tip || tip.hidden) return;
+  tip.hidden = true;
+  bar.querySelectorAll(".mi-seg.is-tip").forEach(el => el.classList.remove("is-tip"));
+}
+
+function wireMetricScaleTips(doc) {
+  if (!doc || !doc.addEventListener) return;
+  const segOf = e => (e.target && e.target.closest ? e.target.closest(".mi-seg[data-tip]") : null);
+  doc.addEventListener("pointerover", e => {
+    if (e.pointerType === "touch") return; // Handy: per Antippen (click)
+    const seg = segOf(e);
+    if (seg) showMetricScaleTip(seg);
+  });
+  doc.addEventListener("pointerout", e => {
+    if (e.pointerType === "touch") return;
+    const bar = e.target && e.target.closest ? e.target.closest(".mi-bar") : null;
+    if (bar && !(e.relatedTarget && bar.contains(e.relatedTarget))) hideMetricScaleTip(bar);
+  });
+  doc.addEventListener("click", e => {
+    const seg = segOf(e);
+    doc.querySelectorAll(".mi-bar").forEach(bar => { if (!seg || !bar.contains(seg)) hideMetricScaleTip(bar); });
+    if (seg) showMetricScaleTip(seg);
+  });
+  doc.addEventListener("focusin", e => { const seg = segOf(e); if (seg) showMetricScaleTip(seg); });
+  doc.addEventListener("focusout", e => {
+    const bar = e.target && e.target.closest ? e.target.closest(".mi-bar") : null;
+    if (bar && !(e.relatedTarget && bar.contains(e.relatedTarget))) hideMetricScaleTip(bar);
+  });
+}
+if (typeof document !== "undefined") wireMetricScaleTips(document);
 
 // Eigene Bewertung (1-5 Sterne, Klick toggelt an/aus) + Notiz zu dieser
 // Einheit (js/data/workout-notes.js) - bewusst VOR dem KI-Auswertungs-Block
