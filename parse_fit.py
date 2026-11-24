@@ -177,7 +177,9 @@ STREAM_TARGET_POINTS = 200  # Downsampling-Ziel je Workout (für Detail-Charts)
 # Stand dieses Parsers. Steigt, wenn neue Felder dazukommen - tools/garmin_sync.py
 # liest dann Einheiten mit älterem Stand aus dem Archiv neu ein (reparse_outdated).
 # 2: gefühlte Anstrengung/Gefühl von der Uhr, Temperatur, Runden (laps).
-PARSER_VERSION = 2
+# 3: keine neuen Felder - nur damit Einheiten erneut drankommen, die 3.0.0
+#    mangels Archivdatei als erledigt vermerkt hatte (jetzt: Nachladen von Garmin).
+PARSER_VERSION = 3
 
 MAX_LAPS = 100  # mehr Runden ergeben keine sinnvolle Auswertung (und blähen die Daten auf)
 

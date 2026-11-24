@@ -388,6 +388,7 @@ def store_workouts(session, athlete_id, fit_dir, fetched, stats):
 # Felder - alles andere in fit_data bleibt wie es ist.
 REPARSE_KEYS = ("rpe", "feel", "avg_temp_c", "max_temp_c", "laps", "parser_version")
 REPARSE_PER_RUN = 200  # je Lauf hoechstens so viele - der Rest beim naechsten Mal
+REPARSE_DOWNLOADS_PER_RUN = 40  # fehlende Originaldateien je Lauf neu von Garmin holen
 
 
 def parser_version():
@@ -400,29 +401,110 @@ def parser_version():
         return 0
 
 
-def reparse_outdated(session, athlete_id, fit_dir, limit=REPARSE_PER_RUN):
-    """Liest Garmin-Einheiten mit aelterem Parser-Stand aus dem Archiv neu ein
-    und traegt die neuen Felder nach (gefuehlte Anstrengung, Runden, ...).
-    Ohne Archivdatei wird nur der Stand vermerkt, damit es nicht jedes Mal
-    erneut versucht wird. -> Anzahl ergaenzter Einheiten."""
+def _fit_from_zip(blob):
+    """Die .fit aus Garmins Original-Download (ZIP) - oder None."""
+    with zipfile.ZipFile(io.BytesIO(blob)) as z:
+        for name in z.namelist():
+            if name.lower().endswith(".fit"):
+                return z.read(name)
+    return None
+
+
+def _archive_file(row, fit_dir):
+    """Archivierte .fit dieser Einheit oder None. Gesucht wird unter dem
+    gespeicherten Dateinamen und unter dem Namen, den der Garmin-Abruf vergibt
+    (Startzeit, siehe safe_filename) - Einheiten, die frueher per workouts.json
+    oder Datei-Upload kamen und erst spaeter ihre Garmin-Nummer bekamen,
+    heissen im Archiv oft anders."""
+    fd = row.fit_data
+    names = [os.path.basename(str(fd.get("file") or ""))]
+    start = parse_start_local(fd.get("date"))
+    if start:
+        names.append(start.strftime("%Y-%m-%d-%H-%M-%S") + ".fit")
+    if row.garmin_activity_id:
+        names.append(f"garmin-{row.garmin_activity_id}.fit")
+    for name in names:
+        src = os.path.join(fit_dir, name)
+        if name.lower().endswith(".fit") and os.path.isfile(src) and os.path.getsize(src) > 0:
+            return src
+    return None
+
+
+def parse_start_local(value):
+    """ISO-Startzeit aus fit_data -> naive Ortszeit (wie im Archiv-Dateinamen) oder None."""
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return dt.astimezone().replace(tzinfo=None) if dt.tzinfo else dt
+
+
+def outdated_workouts(session, athlete_id, version=None):
+    """Einheiten mit aelterem Parser-Stand, die sich neu einlesen lassen
+    (von Garmin oder mit Garmin-Nummer), neueste zuerst."""
     from backend.models import Workout
+    from sqlalchemy import or_
+    version = parser_version() if version is None else version
+    if not version:
+        return []
+    rows = (session.query(Workout)
+            .filter(Workout.athlete_id == athlete_id,
+                    or_(Workout.source == "garmin", Workout.garmin_activity_id.isnot(None)))
+            .order_by(Workout.date.desc()))
+    return [r for r in rows
+            if isinstance(r.fit_data, dict) and (r.fit_data.get("parser_version") or 0) < version]
+
+
+def reparse_outdated(session, athlete_id, fit_dir, limit=REPARSE_PER_RUN, client=None,
+                     max_downloads=REPARSE_DOWNLOADS_PER_RUN):
+    """Liest Einheiten mit aelterem Parser-Stand aus der Original-.fit neu ein
+    und traegt die neuen Felder nach (gefuehlte Anstrengung, Runden, ...).
+
+    Betroffen: alles von Garmin (source "garmin") UND alles mit Garmin-Nummer,
+    auch wenn es urspruenglich anders ins Dashboard kam. Fehlt die Datei im
+    Archiv, wird sie mit der Garmin-Nummer neu geholt (client, hoechstens
+    max_downloads je Lauf). Neueste Einheiten zuerst.
+    Endgueltig "erledigt" ohne neue Werte nur, wenn es keine Datei gibt und
+    auch keine zu holen ist. -> Anzahl ergaenzter Einheiten."""
     version = parser_version()
     if not version:
         return 0
-    todo = [r for r in session.query(Workout).filter_by(athlete_id=athlete_id, source="garmin")
-            if isinstance(r.fit_data, dict) and (r.fit_data.get("parser_version") or 0) < version][:limit]
+    todo = outdated_workouts(session, athlete_id, version)[:limit]
     if not todo:
         return 0
+    os.makedirs(fit_dir, exist_ok=True)
+    found, mark_done = {}, set()
+    downloads, download_blocked = 0, client is None
+    for r in todo:
+        src = _archive_file(r, fit_dir)
+        if src is None and r.garmin_activity_id and not download_blocked and downloads < max_downloads:
+            downloads += 1
+            try:
+                data = _fit_from_zip(download_original(client, r.garmin_activity_id))
+                if data:
+                    src = os.path.join(fit_dir, f"garmin-{r.garmin_activity_id}.fit")
+                    with open(src, "wb") as f:
+                        f.write(data)
+                else:
+                    mark_done.add(r.id)  # Garmin hat keine .fit dazu
+            except zipfile.BadZipFile:
+                mark_done.add(r.id)  # manuell angelegt, ohne Geraetedatei
+            except Exception as e:
+                # Rate-Limit o.ae.: fuer diesen Lauf keine weiteren Downloads,
+                # die Einheit bleibt offen und kommt beim naechsten Mal dran.
+                download_blocked = True
+                log(f"  Nachladen der Originaldatei {r.garmin_activity_id} fehlgeschlagen: {e}")
+        if src:
+            found[r.id] = src
+        elif not r.garmin_activity_id:
+            mark_done.add(r.id)  # keine Datei und nichts, womit man sie holen koennte
+
     parsed = {}
-    with tempfile.TemporaryDirectory() as tmp:
-        files = 0
-        for r in todo:
-            name = os.path.basename(str(r.fit_data.get("file") or ""))
-            src = os.path.join(fit_dir, name)
-            if name.lower().endswith(".fit") and os.path.isfile(src):
-                shutil.copy2(src, tmp)
-                files += 1
-        if files:
+    if found:
+        with tempfile.TemporaryDirectory() as tmp:
+            # Je Einheit ein eindeutiger Name - so passt das Ergebnis sicher zur Zeile.
+            for rid, src in found.items():
+                shutil.copy2(src, os.path.join(tmp, f"{rid}.fit"))
             out = os.path.join(tmp, "workouts.json")
             subprocess.run([sys.executable, os.path.join(BASE, "parse_fit.py"), tmp, "-o", out],
                            check=True, stdout=subprocess.DEVNULL)
@@ -430,13 +512,15 @@ def reparse_outdated(session, athlete_id, fit_dir, limit=REPARSE_PER_RUN):
                 parsed = {w.get("file"): w for w in json.load(f).get("workouts", [])}
     updated = 0
     for r in todo:
+        new = parsed.get(f"{r.id}.fit") if r.id in found else None
+        if not new and r.id not in found and r.id not in mark_done:
+            continue  # Datei kommt beim naechsten Lauf - noch nicht als erledigt vermerken
         fd = dict(r.fit_data)
-        new = parsed.get(fd.get("file"))
         if new:
             for k in REPARSE_KEYS:
                 fd[k] = new.get(k)
             updated += 1
-        fd["parser_version"] = version
+        fd["parser_version"] = version  # auch bei unlesbarer Datei: nicht ewig wiederholen
         r.fit_data = fd  # neues dict, damit SQLAlchemy die Aenderung bemerkt
     session.commit()
     return updated
@@ -997,9 +1081,12 @@ def sync_user(athlete_id, session_factory, start, end, args):
             st = sync_activities(client, start, end, athlete_id, session)
             parts.append(f"Aktivitäten {st['neu']} neu, {st['vorhanden']} vorhanden, {st['fehler']} Fehler")
             try:
-                n = reparse_outdated(session, athlete_id, athlete_dir(athlete_id))
+                n = reparse_outdated(session, athlete_id, athlete_dir(athlete_id), client=client)
                 if n:
                     parts.append(f"{n} ältere Einheiten ergänzt")
+                left = len(outdated_workouts(session, athlete_id))
+                if left:
+                    parts.append(f"{left} ältere Einheiten folgen beim nächsten Abruf")
             except Exception as e:  # nie den ganzen Abruf daran scheitern lassen
                 session.rollback()
                 log(f"  Nachlesen aelterer Einheiten fehlgeschlagen: {e}")

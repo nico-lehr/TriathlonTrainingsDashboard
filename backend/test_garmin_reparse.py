@@ -85,8 +85,87 @@ class ReparseTest(unittest.TestCase):
         import tools.garmin_sync as garmin_sync
         garmin_sync.reparse_outdated(self.session_factory(), 1, self.fit_dir, limit=1)
         rows = self.rows()
-        self.assertIn("parser_version", rows[1].fit_data)
-        self.assertNotIn("parser_version", rows[2].fit_data)
+        # Neueste zuerst: der 2. (ohne Datei) ist erledigt, der 1. kommt naechstes Mal.
+        self.assertIn("parser_version", rows[2].fit_data)
+        self.assertNotIn("parser_version", rows[1].fit_data)
+
+    def add_twin(self, aid=555, file="2026-10-04-anders.fit"):
+        """Einheit, die frueher per workouts.json kam und erst spaeter die
+        Garmin-Nummer bekam: andere Quelle, Datei liegt nicht im Archiv."""
+        from backend.models import Workout
+        s = self.session_factory()
+        s.add(Workout(athlete_id=1, date=date(2026, 10, 4), sport="Laufen", duration_min=20,
+                      source="workouts-json", garmin_activity_id=aid, fit_data={"file": file, "notiz": "alt"}))
+        s.commit()
+
+    def zipped_fit(self):
+        import io
+        import zipfile
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            with open(os.path.join(self.fit_dir, "lauf.fit"), "rb") as f:
+                z.writestr("123_ACTIVITY.fit", f.read())
+        return buf.getvalue()
+
+    def test_einheit_mit_garmin_nummer_aber_anderer_quelle(self):
+        import tools.garmin_sync as garmin_sync
+        self.add_twin()
+        shutil.copy2(os.path.join(self.fit_dir, "lauf.fit"), os.path.join(self.fit_dir, "garmin-555.fit"))
+        self.assertEqual(garmin_sync.reparse_outdated(self.session_factory(), 1, self.fit_dir), 2)
+        fd = self.rows()[4].fit_data
+        self.assertEqual((fd["rpe"], fd["notiz"], fd["file"]), (7, "alt", "2026-10-04-anders.fit"))
+
+    def test_archivdatei_ueber_startzeit_gefunden(self):
+        import tools.garmin_sync as garmin_sync
+        from backend.models import Workout
+        s = self.session_factory()
+        s.add(Workout(athlete_id=1, date=date(2026, 10, 5), sport="Laufen", duration_min=20,
+                      source="browser-import", garmin_activity_id=777,
+                      fit_data={"file": "Lauf_HealthFit.fit", "date": "2026-10-05T07:30:00"}))
+        s.commit()
+        shutil.copy2(os.path.join(self.fit_dir, "lauf.fit"), os.path.join(self.fit_dir, "2026-10-05-07-30-00.fit"))
+        garmin_sync.reparse_outdated(self.session_factory(), 1, self.fit_dir)
+        self.assertEqual(self.rows()[5].fit_data["rpe"], 7)
+
+    def test_fehlende_datei_wird_von_garmin_nachgeladen(self):
+        import tools.garmin_sync as garmin_sync
+        self.add_twin()
+        blob = self.zipped_fit()
+        calls = []
+
+        class Client:
+            def download_original(self, aid):
+                calls.append(aid)
+                return blob
+        self.assertEqual(garmin_sync.reparse_outdated(self.session_factory(), 1, self.fit_dir, client=Client()), 2)
+        self.assertEqual(calls, [555])
+        self.assertEqual(self.rows()[4].fit_data["rpe"], 7)
+        self.assertTrue(os.path.isfile(os.path.join(self.fit_dir, "garmin-555.fit")))  # jetzt im Archiv
+
+    def test_gescheiterter_download_bleibt_offen(self):
+        import tools.garmin_sync as garmin_sync
+        self.add_twin()
+
+        class Client:
+            def download_original(self, aid):
+                raise RuntimeError("429 Too Many Requests")
+        garmin_sync.reparse_outdated(self.session_factory(), 1, self.fit_dir, client=Client())
+        self.assertNotIn("parser_version", self.rows()[4].fit_data)  # naechstes Mal erneut
+        # Ohne Client (z.B. reiner Gesundheitsdaten-Lauf) ebenfalls offen lassen.
+        garmin_sync.reparse_outdated(self.session_factory(), 1, self.fit_dir)
+        self.assertNotIn("parser_version", self.rows()[4].fit_data)
+
+    def test_garmin_ohne_datei_wird_erledigt(self):
+        import tools.garmin_sync as garmin_sync
+        self.add_twin()
+
+        class Client:
+            def download_original(self, aid):
+                return b"kein zip"
+        garmin_sync.reparse_outdated(self.session_factory(), 1, self.fit_dir, client=Client())
+        fd = self.rows()[4].fit_data
+        self.assertIn("parser_version", fd)
+        self.assertNotIn("rpe", fd)
 
 
 if __name__ == "__main__":

@@ -357,7 +357,7 @@ function parseFitArrayBuffer(buf) {
 
 
 // Stand des Parsers - muss zu PARSER_VERSION in parse_fit.py passen.
-const FIT_PARSER_VERSION = 2;
+const FIT_PARSER_VERSION = 3;
 const FIT_MAX_LAPS = 100;
 const LAP_INTENSITY = ["active", "rest", "warmup", "cooldown", "recovery", "interval", "other"];
 const LAP_TRIGGER = ["manual", "time", "distance", "position_start", "position_lap", "position_waypoint", "position_marked", "session_end", "fitness_equipment"];

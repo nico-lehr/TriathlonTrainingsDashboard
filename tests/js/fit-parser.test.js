@@ -26,7 +26,7 @@ test("Uhr-Werte: gefühlte Anstrengung, Gefühl, Temperatur", () => {
   assert.strictEqual(w.feel, 75);
   assert.strictEqual(w.avg_temp_c, 21);
   assert.strictEqual(w.max_temp_c, 24);
-  assert.strictEqual(w.parser_version, 2);
+  assert.strictEqual(w.parser_version, 3);
 });
 
 test("Runden: Dauer, Puls, Tempo, Art und Auslöser", () => {

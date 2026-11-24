@@ -4,6 +4,14 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 3.0.1
+
+**Ältere Trainings bekommen jetzt wirklich Anstrengung, Runden und Temperatur**
+- Bisher wurden viele ältere Trainings übersprungen – vor allem solche, die früher auf anderem Weg ins Dashboard kamen und erst später mit Garmin verknüpft wurden. Jetzt kommt jedes Training mit Garmin-Verbindung dran.
+- Fehlt die Original-Trainingsdatei auf dem Dashboard-PC, holt das Dashboard sie neu von Garmin (bis zu 40 Stück je Abruf, damit Garmin nicht bremst).
+- Die neuesten Trainings kommen zuerst dran. Nach dem Garmin-Abruf steht in der Meldung, wie viele ergänzt wurden und wie viele beim nächsten Abruf folgen. Einfach ein paarmal „Jetzt holen“ drücken, bis nichts mehr offen ist – danach die Seite neu laden.
+- Hinweis: Die Anstrengung (1–10) gibt es nur bei Trainings, bei denen du sie nach dem Training auf der Uhr eingetragen hast.
+
 ## 3.0.0
 
 **Großes Update: Das Dashboard holt sich (fast) alles von deiner Garmin-Uhr**
