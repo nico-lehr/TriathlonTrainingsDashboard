@@ -366,11 +366,14 @@ function mRenderHeute() {
       ${w.training_load != null ? `<span class="m-load">${Math.round(w.training_load)}<small>Load</small></span>` : ""}</button>`).join("")
     : `<p class="m-empty">Noch keine Trainings. Verbinde Garmin oder importiere .fit-Dateien.</p>`;
 
-  // Als Nächstes (nur am Computer sichtbar - dort ist Platz dafür)
+  // Als Nächstes (nur am Computer sichtbar - dort ist Platz dafür). Heute noch
+  // offene Einheiten gehören dazu - erst wenn sie erledigt sind, fallen sie raus.
   const todayKey = localDateStr(mDay(now));
   const upcoming = (typeof plannedWorkouts !== "undefined" ? plannedWorkouts : [])
-    .filter(p => p.status === "geplant" && p.date > todayKey).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 4);
-  const nextCard = upcoming.length ? `<section class="m-card m-desk-only"><div class="m-head"><h2>Als Nächstes</h2><button type="button" class="m-link" data-m-page="kalender">Kalender</button></div><div class="m-list">${upcoming.map(p => `<button type="button" class="m-row" data-m-act="plan" data-id="${mEsc(p.id)}">${mIcon(p.sport)}<span class="m-grow"><span class="m-row-title">${mEsc(p.title || p.sport)}</span><span class="m-row-meta">${new Date(p.date + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" })}${p.duration_min ? ` · ${mDur(p.duration_min)}` : ""}${mSwimBit(p)}</span></span>${p.intensity ? `<span class="m-tag plan">${mEsc(p.intensity)}</span>` : ""}</button>`).join("")}</div></section>` : "";
+    .filter(p => p.status === "geplant" && p.date >= todayKey).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 4);
+  const nextDay = p => p.date === todayKey ? "Heute"
+    : new Date(p.date + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "short" });
+  const nextCard = upcoming.length ? `<section class="m-card m-desk-only"><div class="m-head"><h2>Als Nächstes</h2><button type="button" class="m-link" data-m-page="kalender">Kalender</button></div><div class="m-list">${upcoming.map(p => `<button type="button" class="m-row" data-m-act="plan" data-id="${mEsc(p.id)}">${mIcon(p.sport)}<span class="m-grow"><span class="m-row-title">${mEsc(p.title || p.sport)}</span><span class="m-row-meta">${nextDay(p)}${p.duration_min ? ` · ${mDur(p.duration_min)}` : ""}${mSwimBit(p)}</span></span>${p.intensity ? `<span class="m-tag plan">${mEsc(p.intensity)}</span>` : ""}</button>`).join("")}</div></section>` : "";
 
   return mHeaderHtml(now.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" }), "Heute", mSyncPill())
     + mCols3(mGarminKeyCard() + (typeof morningCardHtml === "function" ? morningCardHtml(mEsc) : "")

@@ -11,6 +11,9 @@ im Dashboard unter „Was ist neu?“. Neueste Version oben.
 - Solange er aus ist, fragt das Dashboard nichts dazu beim Server ab und teilt auch keine Abzeichen.
 - Es wird nichts gelöscht: Wer schon mitgemacht hat, findet alles wieder, sobald der Feed später zurückkommt.
 
+**„Als Nächstes“ zeigt auch das heutige Training**
+- Am Computer fehlte in der Karte „Als Nächstes“ die Einheit von heute, solange sie noch offen war. Jetzt steht sie ganz oben mit „Heute“ – sobald sie erledigt ist, rutscht die nächste nach.
+
 ## 3.0.1
 
 **Ältere Trainings bekommen jetzt wirklich Anstrengung, Runden und Temperatur**
