@@ -14,6 +14,11 @@ im Dashboard unter „Was ist neu?“. Neueste Version oben.
 **„Als Nächstes“ zeigt auch das heutige Training**
 - Am Computer fehlte in der Karte „Als Nächstes“ die Einheit von heute, solange sie noch offen war. Jetzt steht sie ganz oben mit „Heute“ – sobald sie erledigt ist, rutscht die nächste nach.
 
+**Trainings verschieben, wie du willst**
+- Du kannst jede Einheit auf jeden Tag legen – auch auf einen Ruhetag. Der Coach sagt dir, was er davon hält, aber er sperrt nichts mehr: Der Knopf „Trotzdem verschieben“ ist immer da. Hat er eine Idee (z. B. einen anderen Tag frei machen), gibt es sie als zweiten Knopf zur Auswahl.
+- Was du selbst verschoben hast, lässt der Coach danach in Ruhe: Er verschiebt oder streicht es nicht von allein wieder. Ob und wann du einen Ruhetag machst, entscheidest du.
+- Der tägliche Plan-Check schaut stattdessen auf deine Erholung (Schlaf, HRV, Erholungs-Check). Brauchst du wirklich eine Pause oder bist du verletzt, macht er die Einheit leichter und sagt dir Bescheid – mit „Rückgängig“.
+
 ## 3.0.1
 
 **Ältere Trainings bekommen jetzt wirklich Anstrengung, Runden und Temperatur**

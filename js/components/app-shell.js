@@ -137,16 +137,20 @@ initDragGrid(document.getElementById("coach-grid"), document.getElementById("res
    false) - z. B. "Trotzdem verschieben" bei der Regelprüfung des Plans
    (commitCheckedPlanChange, training-plan.js). Absätze im Text: "\n\n".
    ====================================================================== */
-function confirmDialog(message, { okLabel = "Löschen", danger = true } = {}) {
+// altLabel (optional): dritter Knopf, z. B. ein Vorschlag des Coachs - dann
+// liefert das Promise "alt" statt true/false.
+function confirmDialog(message, { okLabel = "Löschen", danger = true, altLabel = "" } = {}) {
   const overlay = document.getElementById("confirm-overlay");
   const messageEl = document.getElementById("confirm-message");
   const okBtn = document.getElementById("confirm-ok-btn");
   const cancelBtn = document.getElementById("confirm-cancel-btn");
+  const altBtn = document.getElementById("confirm-alt-btn");
   if (!overlay || !messageEl || !okBtn || !cancelBtn) return Promise.resolve(window.confirm(message));
 
   messageEl.textContent = message;
   okBtn.textContent = okLabel;
   okBtn.classList.toggle("confirm-danger-btn", danger);
+  if (altBtn) { altBtn.textContent = altLabel; altBtn.hidden = !altLabel; }
   overlay.classList.add("open");
 
   return new Promise(resolve => {
@@ -154,16 +158,19 @@ function confirmDialog(message, { okLabel = "Löschen", danger = true } = {}) {
       overlay.classList.remove("open");
       okBtn.removeEventListener("click", onOk);
       cancelBtn.removeEventListener("click", onCancel);
+      if (altBtn) { altBtn.removeEventListener("click", onAlt); altBtn.hidden = true; }
       overlay.removeEventListener("click", onOverlay);
       document.removeEventListener("keydown", onKey);
       resolve(result);
     }
     function onOk() { cleanup(true); }
     function onCancel() { cleanup(false); }
+    function onAlt() { cleanup("alt"); }
     function onOverlay(e) { if (e.target === overlay) cleanup(false); }
     function onKey(e) { if (e.key === "Escape") cleanup(false); }
     okBtn.addEventListener("click", onOk);
     cancelBtn.addEventListener("click", onCancel);
+    if (altBtn && altLabel) altBtn.addEventListener("click", onAlt);
     overlay.addEventListener("click", onOverlay);
     document.addEventListener("keydown", onKey);
   });

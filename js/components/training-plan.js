@@ -817,28 +817,35 @@ function closePlanEdit() {
 /* ---------- Regelprüfung bei Änderungen (Verschieben, Bearbeiten) ----------
    Eine geänderte Planliste wird erst nach validatePlan() (js/analytics/
    plan-rules.js) übernommen. Gezeigt wird nur, was die Änderung NEU
-   verursacht: "warn" -> Rückfrage mit `okLabel` (z. B. "Trotzdem
-   verschieben"); "block" -> so wird nichts gespeichert, der Knopf bietet
-   stattdessen den Vorschlag des Regelwerks an (applyPlanSuggestion) und
-   danach wird erneut geprüft. true = übernommen und gespeichert. */
+   verursacht - als Rat, nie als Sperre: `okLabel` (z. B. "Trotzdem
+   verschieben") übernimmt die Änderung so, ein zweiter Knopf wendet den
+   Vorschlag des Regelwerks an (applyPlanSuggestion), danach wird erneut
+   geprüft. true = übernommen und gespeichert. */
 const PLAN_CHANGE_MAX_ROUNDS = 4;
 
+// Deine Änderung am Plan (Verschieben, Bearbeiten) - du entscheidest. Neue
+// Regelverstöße zeigt ein Hinweis mit "Trotzdem verschieben"; hat der Coach
+// einen Vorschlag (z. B. einen anderen Tag frei machen), gibt es ihn als
+// zusätzlichen Knopf. Selbst verschobene Einheiten werden markiert (pinned):
+// keine automatische Korrektur verschiebt oder streicht sie danach wieder.
 async function commitCheckedPlanChange(nextList, okLabel = "Trotzdem verschieben") {
   const before = planRuleViolations(plannedWorkouts);
+  const oldDate = new Map(plannedWorkouts.map(p => [p.id, p.date]));
   const goal = getPrimaryGoal();
-  let next = nextList;
-  for (let round = 0; ; round++) {
+  let next = nextList.map(p => (oldDate.has(p.id) && oldDate.get(p.id) !== p.date && p.status === "geplant" ? { ...p, pinned: true } : p));
+  for (let round = 0; round <= PLAN_CHANGE_MAX_ROUNDS; round++) {
     const fresh = newPlanViolations(before, planRuleViolations(next));
     if (!fresh.length) break;
-    const block = fresh.find(v => v.severity === "block");
-    if (block && round >= PLAN_CHANGE_MAX_ROUNDS) return false;
-    const intro = block ? "Das verstößt gegen eine Trainingsregel:" : "Bitte beachten:";
     const ordered = [...fresh].sort((a, b) => (a.severity === "block" ? 0 : 1) - (b.severity === "block" ? 0 : 1));
-    const ok = await confirmDialog([intro, ...ordered.map(v => v.text)].join("\n\n"), { okLabel: block ? block.suggestion.text.replace(/\.$/, "") : okLabel, danger: false });
-    if (!ok) return false;
-    if (!block) break;
-    next = applyPlanSuggestion(next, block.suggestion, { goalId: goal ? goal.id : null, source: "manual" });
-    if (!next) return false;
+    const tip = ordered.find(v => v.suggestion && v.suggestion.action);
+    const choice = await confirmDialog(["Der Coach rät davon ab:", ...ordered.map(v => v.text), "Du kannst es trotzdem so machen."].join("\n\n"), {
+      okLabel, danger: false, altLabel: tip && round < PLAN_CHANGE_MAX_ROUNDS ? tip.suggestion.text.replace(/\.$/, "") : "",
+    });
+    if (!choice) return false;
+    if (choice !== "alt") break;
+    const fixedList = applyPlanSuggestion(next, tip.suggestion, { goalId: goal ? goal.id : null, source: "manual" });
+    if (!fixedList) break;
+    next = fixedList;
   }
   replacePlannedWorkouts(next);
   return true;

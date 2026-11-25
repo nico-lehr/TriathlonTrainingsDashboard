@@ -506,6 +506,10 @@ Trainingsplan-Kachel (die filtert bewusst nach dem Hauptevent-Ziel).
                                        // wird beim Verschieben auf ein neues Datum neu berechnet
   steps: null,                        // optional: Schritte fürs Garmin-Workout/.fit, s.u.
   source: "ai",                       // "ai" | "manual"
+  requested: true,                    // optional: selbst gewünscht - nie für einen Ruhetag gestrichen
+  pinned: true,                       // optional: selbst verschoben (commitCheckedPlanChange) - keine
+                                       // automatische Korrektur verschiebt/streicht sie, kein Pflicht-Ruhetag
+                                       // in dieser Woche (nur Rat); Ausnahme Regel 5 (Erholung/Verletzung)
   createdAt: "2026-08-27T...",
   garminSentAt: "2026-09-01T...",     // nur nach "An Garmin senden": wann
   garminWorkoutId: 123456789,         //   und unter welcher Nummer in Garmin Connect

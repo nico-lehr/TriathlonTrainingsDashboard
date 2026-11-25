@@ -143,7 +143,7 @@ function planSessions(plannedWorkouts, history, todayKey) {
   const fromPlan = (plannedWorkouts || []).filter(p =>
     (p.status === "geplant" && p.date >= todayKey) ||
     (p.status === "erledigt" && p.date <= todayKey && !seen.has(p.date + "|" + p.sport))
-  ).map(p => ({ id: p.id, date: p.date, sport: p.sport, title: p.title || p.sport, duration_min: Number(p.duration_min) || 0, intensity: p.intensity || null, planned: p.status === "geplant", requested: p.requested === true }));
+  ).map(p => ({ id: p.id, date: p.date, sport: p.sport, title: p.title || p.sport, duration_min: Number(p.duration_min) || 0, intensity: p.intensity || null, planned: p.status === "geplant", requested: p.requested === true, pinned: p.pinned === true }));
   return [...done, ...fromPlan];
 }
 
@@ -283,17 +283,23 @@ function checkPlanRestDay(ctx) {
     const open = days.filter(k => k >= ctx.todayKey && planDaySessions(ctx, k).every(s => s.planned))
       .sort((a, b) => dayMin(a) - dayMin(b));
     if (!open.length) return; // nichts mehr, was der Plan noch ändern könnte
-    const wanted = s => s.requested || ctx.protect.has(s.id);
+    const wanted = s => s.requested || s.pinned || ctx.protect.has(s.id);
     const pool = open.filter(k => !planDaySessions(ctx, k).some(wanted));
-    // Nur gewünschte Tage übrig: Vorschlag bleibt ein Hinweis (warn) - die
-    // automatische Korrektur wendet ihn nie an, man entscheidet selbst.
-    const own = !pool.length;
-    const pick = own ? open : pool;
+    // Nur gewünschte Tage übrig - oder du hast in dieser Woche selbst eine
+    // Einheit verschoben (pinned): Vorschlag bleibt ein Hinweis (warn). Die
+    // automatische Korrektur wendet ihn nie an, du entscheidest selbst, ob und
+    // wann du frei machst. Ob ein Ruhetag wirklich nötig ist, prüft der
+    // tägliche Plan-Check an deiner Erholung (Regel 5, planGuardReadiness).
+    const pinnedWeek = list.some(s => s.planned && s.pinned);
+    const own = !pool.length || pinnedWeek;
+    const pick = pool.length ? pool : open;
     const date = pick.find(k => planRestDaySafe(ctx, list, k)) || pick[0];
     const sessions = planDaySessions(ctx, date);
     out.push({
       rule: "rest_day", severity: own ? "warn" : "block", date: wk, workoutId: null,
-      text: own
+      text: pinnedWeek
+        ? `In der ${planWeekLabel(wk)} ist jetzt jeden Tag Training geplant. Das ist deine Entscheidung – der Coach rät aber zu einem freien Tag, stärker wird der Körper erst in den Pausen. Er behält deine Erholung im Blick und meldet sich, wenn du eine Pause brauchst.`
+        : own
         ? `In der ${planWeekLabel(wk)} ist jeden Tag Training geplant – so wie du es dir gewünscht hast. Gönn dir trotzdem bald einen freien Tag, stärker wird der Körper erst in den Pausen.`
         : `In der ${planWeekLabel(wk)} ist jeden Tag Training geplant. Stärker wird der Körper erst in den Pausen – mindestens ein freier Tag pro Woche muss sein.`,
       suggestion: {
@@ -572,6 +578,16 @@ function validatePlan(plannedWorkouts, history, wellness, recovery, options = {}
   };
 
   const severityOrder = { block: 0, warn: 1 };
+  // Was du selbst verschoben hast (pinned), ändert keine automatische
+  // Korrektur: Regeln, deren Vorschlag diese Einheit anfassen würde, bleiben
+  // ein Hinweis (warn) - du entscheidest. Ausnahme: Regel 5 (Erholung,
+  // Verletzung) - meldet dein Körper, dass es heute nur locker geht, passt der
+  // Coach auch eine selbst verschobene Einheit an.
+  const pinnedIds = new Set(sessions.filter(s => s.pinned).map(s => s.id));
+  const touchesPinned = v => {
+    const s = v.suggestion || {};
+    return (s.workoutId != null && pinnedIds.has(s.workoutId)) || (Array.isArray(s.workoutIds) && s.workoutIds.some(id => pinnedIds.has(id)));
+  };
   return [
     ...checkPlanHardDays(ctx),
     ...checkPlanWeekLoad(ctx),
@@ -580,7 +596,7 @@ function validatePlan(plannedWorkouts, history, wellness, recovery, options = {}
     ...checkPlanReadiness(ctx, gate, wellness),
     ...checkPlanGoalSports(ctx, goal),
     ...checkPlanRecoveryWeek(ctx),
-  ].sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999") || severityOrder[a.severity] - severityOrder[b.severity]);
+  ].map(v => (v.severity === "block" && v.rule !== "recovery" && pinnedIds.size && touchesPinned(v) ? { ...v, severity: "warn" } : v)).sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999") || severityOrder[a.severity] - severityOrder[b.severity]);
 }
 
 // Die Regeln als kurze Sätze für den KI-Trainingsplan-Prompt

@@ -203,6 +203,30 @@ test("Regel 3: selbst gewünschte Einheiten werden nie für einen Ruhetag gestri
   assert.strictEqual(all[0].severity, "warn"); // wird nie automatisch angewendet
 });
 
+test("Selbst verschoben (pinned): kein Pflicht-Ruhetag, keine automatische Korrektur", () => {
+  const plan = [
+    pw(day(0), "Schwimmen", 30, "leicht"),
+    pw(day(1), "Laufen", 45, "leicht"),
+    pw(day(2), "Rad", 60, "hart"),
+    { ...pw(day(3), "Laufen", 40, "hart"), pinned: true }, // auf den Ruhetag gelegt, direkt nach dem harten Rad-Tag
+    pw(day(4), "Schwimmen", 45, "leicht"),
+    pw(day(5), "Rad", 100, "leicht"),
+    pw(day(6), "Laufen", 50, "leicht"),
+  ];
+  const all = validate(plan);
+  const rest = byRule(all, "rest_day");
+  assert.strictEqual(rest.length, 1);
+  assert.strictEqual(rest[0].severity, "warn"); // nur ein Rat - der Plan-Check streicht nichts
+  assert.match(rest[0].text, /deine Entscheidung/);
+  assert.ok(!rest[0].suggestion.workoutIds.includes(plan[3].id)); // Vorschlag lässt deine Einheit in Ruhe
+  // Zwei harte Tage hintereinander: Vorschlag würde die verschobene Einheit ändern -> nur Hinweis
+  const hard = byRule(all, "hard_in_row").filter(v => v.suggestion.workoutId === plan[3].id);
+  hard.forEach(v => assert.strictEqual(v.severity, "warn"));
+  assert.ok(!all.some(v => v.severity === "block" && v.suggestion && v.suggestion.workoutId === plan[3].id));
+  // Ohne Markierung bleibt die Pflicht wie bisher
+  assert.strictEqual(byRule(validate(plan.map(p => ({ ...p, pinned: undefined }))), "rest_day")[0].severity, "block");
+});
+
 test("Regel 4: +25 % Wochenumfang -> warn mit gleichmäßiger Kürzung", () => {
   const plan = [
     pw(day(1), "Schwimmen", 60, "leicht"),
