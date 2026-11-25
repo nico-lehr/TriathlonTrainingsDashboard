@@ -780,6 +780,7 @@ function mMoveTabIndicator() {
 }
 
 function mShow(page) {
+  if (page === "gruppe" && !(typeof groupFeatureEnabled === "function" && groupFeatureEnabled())) page = "heute"; // Feed ist abgeschaltet
   if (page !== mState.page) {
     mState.anim = true;
     if (typeof mTrack === "function") mTrack("page", page);
@@ -1260,14 +1261,14 @@ function initMApp() {
   host.id = "m-app";
   host.hidden = true;
   host.innerHTML = `
-    <nav class="m-tabs" id="m-tabs" aria-label="Bereiche">
+    <nav class="m-tabs${typeof groupFeatureEnabled === "function" && groupFeatureEnabled() ? " m-tabs-6" : ""}" id="m-tabs" aria-label="Bereiche">
       <span class="m-tab-ind" id="m-tab-ind" aria-hidden="true"></span>
       <div class="m-brand" aria-hidden="true"><span class="m-brand-dots"><i></i><i></i><i></i></span>Triathlon<small>Trainings-Dashboard</small></div>
       <button type="button" data-m-page="heute"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z"/></svg>Übersicht</button>
       <button type="button" data-m-page="kalender"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2.5"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></svg>Kalender</button>
       <button type="button" data-m-page="coach"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.5V16h0.5A2.5 2.5 0 0 1 5 13.5z"/></svg>Coach</button>
       <button type="button" data-m-page="training"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9.5v5M6.5 7.5v9M17.5 7.5v9M20.5 9.5v5M6.5 12h11"/></svg>Training</button>
-      <button type="button" data-m-page="gruppe"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="16.5" cy="9.5" r="2.6"/><path d="M15.2 14.2c2.6-.3 4.6 1.2 5.3 4.3"/></svg>Feed</button>
+      ${typeof groupFeatureEnabled === "function" && groupFeatureEnabled() ? `<button type="button" data-m-page="gruppe"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="16.5" cy="9.5" r="2.6"/><path d="M15.2 14.2c2.6-.3 4.6 1.2 5.3 4.3"/></svg>Feed</button>` : ""}
       <button type="button" class="m-side-only" data-m-classic="analysis"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5h16M6.5 16l4-5 3.5 3 5-7"/></svg>Analyse</button>
       <button type="button" class="m-side-only" data-m-classic="overview"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19.5V12M10 19.5V7M15 19.5v-5M20 19.5V4.5"/></svg>Insights</button>
       <button type="button" data-m-page="mehr"><svg class="m-tab-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/></svg>Mehr</button>

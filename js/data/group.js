@@ -6,6 +6,15 @@
 // Trainings, Puls, Tempo-Verlauf, GPS oder Gesundheitswerte. Mitmachen ist
 // freiwillig; erst ab dem Beitritt werden Abzeichen geteilt.
 
+// Schalter für den ganzen Bereich "Feed" (Highlights, Reaktionen, Challenges).
+// Vorerst AUS: kein Reiter, keine Abfragen, nichts wird geteilt. Gespeicherte
+// Daten auf dem Server bleiben unberührt - zum Wieder-Einschalten auf true.
+const GROUP_FEATURE_ENABLED = false;
+
+function groupFeatureEnabled() {
+  return GROUP_FEATURE_ENABLED;
+}
+
 const GROUP_SHARED_KEY = "triathlon_dashboard_group_shared_v1"; // schon geteilte Abzeichen-IDs
 const GROUP_REACTIONS = { fire: "🔥", muscle: "💪", clap: "👏", party: "🎉", wow: "🤩" };
 const GROUP_REFRESH_MS = 30000;

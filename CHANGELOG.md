@@ -4,6 +4,13 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 3.0.2
+
+**Der Bereich „Feed“ ist vorerst ausgeblendet**
+- Der Reiter „Feed“ (Highlights und Challenges mit anderen) ist erstmal weg, weil er gerade noch nicht gebraucht wird. Oben stehen am Handy wieder fünf Bereiche.
+- Solange er aus ist, fragt das Dashboard nichts dazu beim Server ab und teilt auch keine Abzeichen.
+- Es wird nichts gelöscht: Wer schon mitgemacht hat, findet alles wieder, sobald der Feed später zurückkommt.
+
 ## 3.0.1
 
 **Ältere Trainings bekommen jetzt wirklich Anstrengung, Runden und Temperatur**

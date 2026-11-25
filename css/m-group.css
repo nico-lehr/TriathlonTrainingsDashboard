@@ -1,12 +1,13 @@
 /* Bereich "Gruppe" (js/components/m-group.js) - im Stil von Graphit:
    ruhige dunkle Karten, runde Verläufe, wenig Linien, klare Typografie. */
 
-/* Sechs Bereiche oben am Handy: etwas enger, damit alle Namen passen. */
+/* Sechs Bereiche oben am Handy (nur wenn der Feed an ist, m-app.js setzt
+   dann .m-tabs-6): etwas enger, damit alle Namen passen. */
 @media (max-width: 1099px) {
-  .m-tabs { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .m-tabs.m-tabs-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
 @media (max-width: 430px) {
-  .m-tabs button { font-size: 11.5px; letter-spacing: -0.025em; padding-left: 0; padding-right: 0; }
+  .m-tabs.m-tabs-6 button { font-size: 11.5px; letter-spacing: -0.025em; padding-left: 0; padding-right: 0; }
 }
 
 .g-svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }

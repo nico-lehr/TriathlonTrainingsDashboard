@@ -98,7 +98,7 @@ function checkAutoReplan() {
   initAnalysis();
   renderAll();
   initMApp();
-  if (typeof initGroupUi === "function") { initGroupUi(); initGroup(); }
+  if (typeof initGroupUi === "function" && groupFeatureEnabled()) { initGroupUi(); initGroup(); }
   initSettingsHub();
   if (typeof initUsageTracking === "function") initUsageTracking();
   checkAutoReplan();
