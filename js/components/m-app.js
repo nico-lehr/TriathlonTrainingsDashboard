@@ -534,7 +534,7 @@ function mRenderCoach() {
   // "Sag dem Coach Bescheid": freie Nachricht -> KI plant die nächsten 7 Tage um.
   const cn = mState.coachNote || {};
   const noteCard = `<section class="m-card"><div class="m-head"><h2>Sag dem Coach Bescheid</h2></div>
-      <textarea id="m-coach-note" class="m-note" rows="2" maxlength="500" placeholder="z. B. „Heute spontan 45 min schwimmen“"${cn.loading ? " disabled" : ""}>${mEsc(mState.coachText)}</textarea>
+      <textarea id="m-coach-note" class="m-note" rows="2" maxlength="2000" placeholder="z. B. „Heute spontan 45 min schwimmen“"${cn.loading ? " disabled" : ""}>${mEsc(mState.coachText)}</textarea>
       <div class="m-actions"><button type="button" class="m-btn primary wide" data-m-act="coach-note"${cn.loading ? " disabled" : ""}>${cn.loading ? "Coach plant um …" : "Plan anpassen"}</button></div>
       ${cn.error ? `<p class="m-say bad">${mEsc(cn.error)}</p>` : ""}
       ${cn.reply ? `<div class="m-reply"><p class="m-say">${mEsc(cn.reply)}</p>${(cn.hints || []).map(h => `<p class="m-say small">${mEsc(h)}</p>`).join("")}${cn.undo ? `<button type="button" class="m-link" data-m-act="coach-undo">Rückgängig</button>` : ""}</div>` : ""}

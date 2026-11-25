@@ -4,6 +4,14 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 3.0.4
+
+**Behoben: „Sag dem Coach Bescheid“ trägt zusätzliche Einheiten jetzt wirklich ein**
+- Hast du um eine *zusätzliche* Einheit gebeten (z. B. ein zweites Schwimmtraining am selben Tag), meldete der Coach „erstellt“ – im Kalender stand aber nichts. Das Dashboard hielt die zweite Einheit derselben Sportart fälschlich für doppelt und warf sie weg. Jetzt bleiben beide stehen, solange sie verschiedene Titel haben.
+- Deine Nachricht an den Coach darf jetzt bis zu 2000 Zeichen lang sein (vorher wurde sie nach 500 Zeichen abgeschnitten). Auch lange Trainingsbeschreibungen mit genauen Vorgaben bleiben vollständig erhalten.
+- Wird ein Vorschlag des Coaches doch einmal nicht übernommen, steht in der Antwort jetzt genau, welcher und warum – statt still „erstellt“ zu melden.
+- Gibst du Titel, Dauer oder Ablauf genau vor, übernimmt der Coach sie wörtlich.
+
 ## 3.0.3
 
 **Neu: Garmin-Datencheck**

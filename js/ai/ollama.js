@@ -128,7 +128,11 @@ const normalizePlanIntensity = x => PLAN_INTENSITY_ALIASES[String(x || "").trim(
 
 // report (optional): bekommt in report.dropped jede verworfene Einheit mit
 // Grund ({ date, sport, reason }) - für den Plan-Bericht nach der Planung.
-function parsePlanResponse(rawText, windowDates, report) {
+// options.sameSportTwice: zwei Einheiten derselben Sportart an einem Tag sind
+// erlaubt, solange sie verschiedene Titel haben ("Sag dem Coach Bescheid":
+// z. B. zusätzlich ein Technik-Schwimmen). options.descMax: längere
+// Beschreibungen (vom Athleten vorgegebene Trainingspläne).
+function parsePlanResponse(rawText, windowDates, report, { sameSportTwice = false, descMax = 500 } = {}) {
   let data;
   try {
     // Modelle liefern trotz format:"json" gelegentlich noch Text drumherum
@@ -173,7 +177,7 @@ function parsePlanResponse(rawText, windowDates, report) {
       }
     }
 
-    const dedupeKey = entry.date + "|" + entry.sport;
+    const dedupeKey = entry.date + "|" + entry.sport + (sameSportTwice ? "|" + String(entry.title || "").trim().toLowerCase() : "");
     if (seen.has(dedupeKey)) return drop("doppelt am selben Tag");
     seen.add(dedupeKey);
     const intensity = normalizePlanIntensity(entry.intensity);
@@ -207,7 +211,7 @@ function parsePlanResponse(rawText, windowDates, report) {
       title: entry.title ? String(entry.title).slice(0, 80) : entry.sport,
       duration_min: dur,
       intensity,
-      description: entry.description ? String(entry.description).slice(0, 500) : null,
+      description: entry.description ? String(entry.description).slice(0, descMax) : null,
       distance_m: entry.sport === "Schwimmen" && Number(entry.distance_m) > 0 ? Math.round(Number(entry.distance_m)) : null,
       // Technikübungen: nur IDs aus der Sammlung (js/data/swim-drills.js)
       drills: entry.sport === "Schwimmen" && Array.isArray(entry.drills) && typeof SWIM_DRILL_BY_ID !== "undefined"
@@ -440,8 +444,9 @@ async function generateTrainingPlan(goalId, { replace = false, windowDates: fixe
 // den Plan von vorher wieder her. Wirft bei KI-Fehler/Regelverstoß, der Plan
 // bleibt dann unverändert.
 const COACH_NOTE_DAYS = 7;
+const COACH_NOTE_MAX_CHARS = 2000; // Platz für einen fertigen Trainingsplan in der Nachricht
 async function replanFromCoachNote(note) {
-  const text = String(note || "").trim().slice(0, 500);
+  const text = String(note || "").trim().slice(0, COACH_NOTE_MAX_CHARS);
   if (!text) throw new Error("Schreib kurz, was der Coach ändern soll.");
   const goal = typeof getPrimaryGoal === "function" ? getPrimaryGoal() : null;
   if (!goal) throw new Error("Lege zuerst ein Hauptziel an – der Coach plant immer auf ein Ziel hin.");
@@ -451,7 +456,7 @@ async function replanFromCoachNote(note) {
   const before = plannedWorkouts;
   const oldPlan = before.filter(inWindow).sort((a, b) => a.date.localeCompare(b.date));
   const defaults = { goalId: goal.id, source: "ai" };
-  let reply = "", newIds = [];
+  let reply = "", newIds = [], dropped = [];
   // Tage, an denen bisher nichts Offenes geplant war (z. B. ein Ruhetag, an
   // dem man jetzt doch trainieren will): Was der Coach dort einträgt, ist
   // ausdrücklich gewünscht und bleibt auch beim täglichen Plan-Check stehen.
@@ -463,7 +468,10 @@ async function replanFromCoachNote(note) {
       let data = null;
       try { const m = raw.match(/\{[\s\S]*\}/); data = JSON.parse(m ? m[0] : raw); } catch (e) { /* parsePlanResponse meldet den Fehler */ }
       if (data && typeof data.antwort === "string") reply = data.antwort.trim().slice(0, 400);
-      const entries = data && Array.isArray(data.workouts) && !data.workouts.length ? [] : parsePlanResponse(raw, windowDates);
+      const report = {};
+      const entries = data && Array.isArray(data.workouts) && !data.workouts.length ? []
+        : parsePlanResponse(raw, windowDates, report, { sameSportTwice: true, descMax: 1500 });
+      dropped = report.dropped || [];
       // Die KI schickt nur die geänderten Tage (spart Antwort-Tokens); alle
       // anderen Tage behalten ihren Plan. Fehlt die Liste, gilt die Antwort
       // wie früher als kompletter Plan für das ganze Zeitfenster.
@@ -494,7 +502,11 @@ async function replanFromCoachNote(note) {
     reply: reply || "Erledigt – dein Plan ist angepasst.",
     // Was die Regelprüfung danach noch selbst geändert hat, gehört mit in die
     // Antwort - sonst passt "erledigt" nicht zu dem, was im Kalender steht.
-    hints: [...result.corrected.map(t => `Zusätzlich angepasst: ${t}`), ...result.violations.map(v => v.text)],
+    // Verworfene Vorschläge immer nennen - sonst steht "erstellt" in der
+    // Antwort, im Kalender aber nichts.
+    hints: [
+      ...dropped.map(d => `Nicht übernommen: ${d.sport || "Einheit"}${d.date ? ` am ${fmtDateFull(new Date(d.date + "T00:00:00"))}` : ""} – ${d.reason}.`),
+      ...result.corrected.map(t => `Zusätzlich angepasst: ${t}`), ...result.violations.map(v => v.text)],
     undo: () => {
       replacePlannedWorkouts(before);
       if (typeof renderTrainingPlanCard === "function") renderTrainingPlanCard();

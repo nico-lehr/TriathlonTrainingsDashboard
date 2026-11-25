@@ -238,6 +238,47 @@ test("Coach-Nachricht: gewünschtes Training am Ruhetag bleibt, auch wenn die Wo
   blocks.forEach(b => assert.ok(!b.suggestion.workoutIds.includes(swim[0].id)));
 });
 
+// Fehler aus der Praxis (3.0.3): "heute ZUSÄTZLICH Schwimmen" an einem Tag, an
+// dem schon Schwimmen geplant war. Die KI schickte beide Einheiten, das
+// Dashboard warf die zweite als "doppelt" weg - "erstellt", aber nichts im
+// Kalender. Außerdem schnitt das Feld die Nachricht nach 500 Zeichen ab.
+test("Coach-Nachricht: zusätzliche Einheit derselben Sportart am selben Tag bleibt, lange Beschreibung vollständig", async () => {
+  const today = run("todayStr()");
+  run(`getPrimaryGoal = () => ({ id: "g1", name: "Ziel" });
+    buildPlanPrompt = () => ""; buildPlanRulesPrompt = () => ""; buildPlanRetryPrompt = () => "";
+    buildCoachNotePrompt = note => { globalThis.__note = note; return ""; }; planRuleViolations = () => [];`);
+  run(`replacePlannedWorkouts(${JSON.stringify([
+    { id: "s", date: today, sport: "Schwimmen", title: "Lockeres Schwimmen", duration_min: 45, intensity: "leicht", status: "geplant", goalId: "g1" },
+  ])})`);
+  const longDesc = "Test 8×50 m: " + Array.from({ length: 8 }, (_, i) => `${i + 1}) ${27 + 3 * i} Züge/min`).join("\n") + "\n" + "x".repeat(700);
+  run(`callAiText = async () => JSON.stringify({ antwort: "Ist drin.", geaenderte_tage: ["${today}"], workouts: [
+    { date: "${today}", sport: "Schwimmen", title: "Lockeres Schwimmen", duration_min: 45, intensity: "leicht", description: "locker" },
+    { date: "${today}", sport: "Schwimmen", title: "Zugfrequenz-Test 8×50 m", duration_min: 35, intensity: "mittel", distance_m: 900, description: ${JSON.stringify(longDesc)} }] })`);
+  const note = "Heute ZUSÄTZLICH: " + "y".repeat(1200);
+  await run(`replanFromCoachNote(${JSON.stringify(note)}).then(r => { globalThis.__res = r; })`);
+  assert.strictEqual(run("__note").length, note.length, "lange Nachricht kommt vollständig beim Coach an");
+  const swims = plain(run(`plannedWorkouts.filter(p => p.date === "${today}")`));
+  assert.deepStrictEqual(swims.map(p => p.title).sort(), ["Lockeres Schwimmen", "Zugfrequenz-Test 8×50 m"]);
+  assert.strictEqual(swims.find(p => p.title.startsWith("Zug")).description, longDesc.replace(/\\n/g, "\n"));
+  assert.deepStrictEqual(plain(run("__res.hints")), []);
+});
+
+test("Coach-Nachricht: verworfene Vorschläge stehen in der Antwort (nie still \"erstellt\")", async () => {
+  const today = run("todayStr()");
+  run(`getPrimaryGoal = () => ({ id: "g1", name: "Ziel" });
+    buildPlanPrompt = () => ""; buildPlanRulesPrompt = () => ""; buildPlanRetryPrompt = () => "";
+    buildCoachNotePrompt = () => ""; planRuleViolations = () => [];`);
+  run(`replacePlannedWorkouts([])`);
+  run(`callAiText = async () => JSON.stringify({ antwort: "Erstellt.", workouts: [
+    { date: "${today}", sport: "Schwimmen", title: "Schwimmen", duration_min: 35, intensity: "mittel", description: "x" },
+    { date: "${today}", sport: "Schwimmen", title: "Schwimmen", duration_min: 35, intensity: "mittel", description: "x" },
+    { date: "2000-01-01", sport: "Rad", title: "Rad", duration_min: 60, intensity: "leicht", description: "x" }] })`);
+  await run(`replanFromCoachNote("Heute schwimmen").then(r => { globalThis.__res = r; })`);
+  const hints = plain(run("__res.hints"));
+  assert.ok(hints.some(h => /Nicht übernommen: Schwimmen .*doppelt/.test(h)), JSON.stringify(hints));
+  assert.ok(hints.some(h => /Nicht übernommen: Rad .*außerhalb/.test(h)), JSON.stringify(hints));
+});
+
 test("Coach-Nachricht: leerer Text und fehlendes Ziel geben eine klare Meldung, der Plan bleibt", async () => {
   await assert.rejects(run(`replanFromCoachNote("  ")`), /Schreib kurz/);
   run(`getPrimaryGoal = () => null`);

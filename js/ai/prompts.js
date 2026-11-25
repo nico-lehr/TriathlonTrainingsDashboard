@@ -287,6 +287,8 @@ Setze diese Nachricht um. Schreib NICHT die ganze Woche neu, sondern nur die Tag
 - "workouts": die neuen Einheiten NUR für diese Tage. Ein Tag aus "geaenderte_tage" ohne Einheit wird Ruhetag.
 - Die Nachricht hat Vorrang vor den Trainingstagen, Schwimmtagen und dem Tagesraster im Profil (z.B. "heute spontan 45 min schwimmen" -> heute Schwimmen, 45 min, auch wenn heute kein Trainings- oder Schwimmtag ist).
 - Ändere nur, was dafür nötig ist: andere Tage nur anfassen, wenn sonst die Belastung zu hoch wird (z.B. zwei harte Einheiten direkt hintereinander) oder die Nachricht es verlangt.
+- Will der Athlet eine Einheit ZUSÄTZLICH, schick für diesen Tag die bisherigen Einheiten unverändert mit UND die neue. Zwei Einheiten derselben Sportart an einem Tag sind dann erlaubt - gib ihnen verschiedene Titel.
+- Gibt der Athlet Titel, Dauer, Strecke, Intensität oder eine Beschreibung vor, übernimm sie wörtlich (Beschreibung vollständig, mit Zeilenumbrüchen als \n).
 - "antwort": 1-2 kurze Sätze an den Athleten (du-Form, Klartext), was du geändert hast und warum.
 
 Antwortformat diesmal: {"antwort":"...","geaenderte_tage":["JJJJ-MM-TT"],"workouts":[...]} - "workouts" wie oben beschrieben, darf leer sein.`;
