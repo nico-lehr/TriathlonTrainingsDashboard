@@ -79,10 +79,15 @@ TASK_GROUPS = [
     ("plan", "Trainingsplan", "Plan erstellen und ändern, täglicher Plan-Check", {"plan", "planbatch", "dailycheck", "alternative", "replan"}),
     ("analysis", "Analysen", "Auswertung einzelner Einheiten, Lessons Learned, Belastung, Leistungszustand",
      {"analysis", "lessons", "focus", "perfSummary"}),
-    ("coach", "Coach, Chat & Morgenbericht", "Empfehlungen zum Ziel, Chat mit dem Coach und der Satz im Morgenbericht", {"recommendation", "morning", "chat", ""}),
+    ("coach", "Coach & Morgenbericht", "Empfehlungen zum Ziel und der Satz im Morgenbericht", {"recommendation", "morning", ""}),
+    ("chat", "Chat mit dem Coach", "Gespräche unter „Frag den Coach“ – viele kurze Nachrichten", {"chat"}),
     ("mobility", "Mobility", "Mobility-Einheiten zusammenstellen", {"mobility"}),
 ]
 TASK_GROUP_OF = {task: gid for gid, _, _, tasks in TASK_GROUPS for task in tasks}
+# Eigener Standard einer Gruppe (ohne Wahl des Betreibers), sonst gilt das
+# allgemeine Standard-Modell. Der Chat schickt viele Nachrichten mit viel
+# Kontext - Haiku ist dafuer schnell und guenstig.
+GROUP_DEFAULT_MODEL = {"chat": "claude-haiku-5-5"}
 
 KEY_MIN_LEN, KEY_MAX_LEN = 20, 300
 PROMPT_MAX_CHARS = 120_000
@@ -186,6 +191,9 @@ def model_for(data, task):
     own = _task_models(data).get(TASK_GROUP_OF.get(task or ""))
     if own:
         return own
+    group_default = GROUP_DEFAULT_MODEL.get(TASK_GROUP_OF.get(task or ""))
+    if group_default in MODELS:
+        return group_default
     return data.get("model") if data.get("model") in MODELS else DEFAULT_MODEL
 
 
@@ -204,7 +212,8 @@ def status(admin):
         "available": st["configured"] and (admin or st["shared"]) and sdk_available(),
         "sdk": sdk_available(),
         "models": [{"id": k, "label": v} for k, v in MODELS.items()],
-        "task_groups": [{"id": gid, "label": label, "hint": hint} for gid, label, hint, _ in TASK_GROUPS],
+        "task_groups": [{"id": gid, "label": label, "hint": hint, "default_model": GROUP_DEFAULT_MODEL.get(gid)}
+                        for gid, label, hint, _ in TASK_GROUPS],
     }
 
 

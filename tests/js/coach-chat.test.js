@@ -125,6 +125,11 @@ test("Gespeicherte Gespräche laden, Obergrenzen, löschen", () => {
     saveCoachChats();`);
   assert.strictEqual(store.triathlon_dashboard_coach_chats_v1.chats.length, 40);
   assert.strictEqual(store.triathlon_dashboard_coach_chats_v1.chats[0].id, "a", "neuestes zuerst");
+  // Anhänge: Inhalt nur in den 5 neuesten Gesprächen
+  run(`coachChats.forEach(c => c.messages.push({ id: "u", role: "user", text: "t", attachments: [{ kind: "plan", label: "Plan", text: "INHALT" }] })); saveCoachChats();`);
+  const kept = store.triathlon_dashboard_coach_chats_v1.chats.map(c => c.messages.find(m => m.attachments).attachments[0].text);
+  assert.deepStrictEqual([kept.slice(0, 5).every(t => t === "INHALT"), kept.slice(5).every(t => t === "")], [true, true]);
+  assert.match(run(`buildCoachChatPrompt(coachChats[10])`), /### Plan\n\(Inhalt nicht mehr gespeichert/);
   run(`deleteCoachChat("a")`);
   assert.ok(!store.triathlon_dashboard_coach_chats_v1.chats.some(c => c.id === "a"));
 });

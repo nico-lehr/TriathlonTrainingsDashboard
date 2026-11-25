@@ -13,6 +13,8 @@ im Dashboard unter „Was ist neu?“. Neueste Version oben.
 - Deinen Plan ändert der Chat nie von allein. Schlägt der Coach eine Änderung vor, erscheint ein Kasten „Vorschlag für deinen Plan“ mit dem Knopf „Übernehmen“ – erst dann wird der Kalender angepasst, mit denselben Regeln wie bei „Sag dem Coach Bescheid“ und mit „Rückgängig“.
 - Deine Gespräche werden gespeichert. Du kannst alte wieder öffnen, weiterführen oder löschen.
 - Am Computer schickt Enter die Nachricht ab (Shift+Enter = neue Zeile), am Handy der Pfeil-Knopf.
+- Der Chat nutzt standardmäßig **Claude Haiku** – schnell und günstig für viele kurze Nachrichten. In den KI-Einstellungen hat der Chat eine eigene Zeile „Chat mit dem Coach“; dort kann der Betreiber ein anderes Modell wählen.
+- Bei älteren Gesprächen bleibt von Anhängen nur der Name gespeichert (der Inhalt nur in den 5 neuesten), damit deine Daten klein bleiben. Brauchst du ihn dort nochmal, häng ihn einfach neu an.
 
 ## 3.0.5
 

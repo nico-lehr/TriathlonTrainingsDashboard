@@ -18,6 +18,7 @@ const COACH_CHAT_MSG_MAX = 4000;           // Zeichen je eigener Nachricht
 const COACH_CHAT_HISTORY_CHARS = 24000;    // so viel vom bisherigen Gespräch geht mit
 const COACH_CHAT_ATTACH_CHARS = 12000;     // je Anhang
 const COACH_CHAT_ATTACH_TOTAL = 40000;     // alle Anhänge eines Gesprächs zusammen
+const COACH_CHAT_KEEP_ATTACH = 5;          // nur die neuesten Gespräche behalten den Inhalt der Anhänge
 
 // Gespräch: { id, title, createdAt, updatedAt, messages: [Nachricht] }
 // Nachricht: { id, role: "user"|"coach", text, at,
@@ -38,7 +39,12 @@ function loadCoachChats() {
 function saveCoachChats() {
   coachChats.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
   coachChats = coachChats.slice(0, COACH_CHAT_MAX_CHATS);
-  coachChats.forEach(c => { if (c.messages.length > COACH_CHAT_MAX_MESSAGES) c.messages = c.messages.slice(-COACH_CHAT_MAX_MESSAGES); });
+  coachChats.forEach((c, i) => {
+    if (c.messages.length > COACH_CHAT_MAX_MESSAGES) c.messages = c.messages.slice(-COACH_CHAT_MAX_MESSAGES);
+    // Ältere Gespräche: Anhänge nur noch mit Namen (die Ablage wird bei jeder
+    // Änderung ganz übertragen - so bleibt sie klein).
+    if (i >= COACH_CHAT_KEEP_ATTACH) c.messages.forEach(m => (m.attachments || []).forEach(a => { a.text = ""; }));
+  });
   if (typeof storeSet === "function") storeSet(COACH_CHAT_KEY, { chats: coachChats });
 }
 
@@ -202,6 +208,7 @@ function buildCoachChatPrompt(chat) {
   const attach = [];
   let attachChars = 0;
   [...msgs].reverse().forEach(m => (m.attachments || []).forEach(a => {
+    if (!a.text) { attach.unshift(`### ${a.label}\n(Inhalt nicht mehr gespeichert - bei Bedarf neu anhängen lassen)`); return; }
     if (attachChars + a.text.length > COACH_CHAT_ATTACH_TOTAL) return;
     attachChars += a.text.length;
     attach.unshift(`### ${a.label}\n${a.text}`);

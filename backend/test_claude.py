@@ -209,7 +209,7 @@ class ClaudeTest(unittest.TestCase):
         r = self.put(self.admin, task_models={"analysis": "claude-sonnet-5-5", "coach": "claude-haiku-5-5"})
         self.assertEqual(r.status_code, 200, r.get_json())
         self.assertEqual(r.get_json()["data"]["task_models"], {"analysis": "claude-sonnet-5-5", "coach": "claude-haiku-5-5"})
-        self.assertEqual([g["id"] for g in r.get_json()["data"]["task_groups"]], ["plan", "analysis", "coach", "mobility"])
+        self.assertEqual([g["id"] for g in r.get_json()["data"]["task_groups"]], ["plan", "analysis", "coach", "chat", "mobility"])
 
         def model(headers, task):
             self.client.post("/api/v1/ai/claude/chat", headers=headers, json={"prompt": "x", "task": task})
@@ -219,6 +219,12 @@ class ClaudeTest(unittest.TestCase):
         self.assertEqual(model(self.friend, "lessons"), "claude-sonnet-5-5")
         self.assertEqual(model(self.admin, "morning"), "claude-haiku-5-5")
         self.assertEqual(model(self.admin, ""), "claude-haiku-5-5")
+        # Chat: eigener Standard Haiku, auch wenn das allgemeine Standard-Modell anders ist
+        self.assertEqual(model(self.friend, "chat"), "claude-haiku-5-5")
+        self.put(self.admin, task_models={"chat": "claude-sonnet-5-5"})
+        self.assertEqual(model(self.friend, "chat"), "claude-sonnet-5-5")
+        self.put(self.admin, task_models={"chat": ""})
+        self.assertEqual(model(self.friend, "chat"), "claude-haiku-5-5")
         # "" setzt auf den Standard zurück, der Standard selbst bleibt wählbar
         self.put(self.admin, task_models={"analysis": ""}, model="claude-sonnet-5-5")
         self.assertEqual(model(self.admin, "analysis"), "claude-sonnet-5-5")

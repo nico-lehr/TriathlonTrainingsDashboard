@@ -107,7 +107,7 @@ function initAiSettings() {
       <div class="settings-list-row claude-task-row">
         <label for="claude-task-${g.id}"><span>${escapeHtml(g.label)}</span><small>${escapeHtml(g.hint)}</small></label>
         <select id="claude-task-${g.id}" class="coach-input" data-task-group="${g.id}">
-          <option value="">Wie Standard (${escapeHtml(std)})</option>
+          <option value="">${g.default_model ? `Standard (${escapeHtml(short(g.default_model))})` : `Wie Standard (${escapeHtml(std)})`}</option>
           ${(st.models || []).map(m => `<option value="${m.id}"${own[g.id] === m.id ? " selected" : ""}>${escapeHtml(short(m.id))}</option>`).join("")}
         </select>
       </div>${g.id === "plan" ? effortRow : ""}`).join("") + (hasPlan ? "" : effortRow);
