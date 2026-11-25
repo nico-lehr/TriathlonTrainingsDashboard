@@ -697,6 +697,17 @@
   .coach-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 
   .coach-test-status { font-size: 12px; color: var(--text-secondary); }
+  /* Garmin-Datencheck (js/components/garmin-datacheck.js) */
+  .gc-result:empty { display: none; }
+  .gc-sum { font-size: 13px; font-weight: 600; margin: 10px 0 4px; }
+  .gc-group { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-secondary); margin: 14px 0 4px; }
+  .gc-list { list-style: none; margin: 0; padding: 0; }
+  .gc-row { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--border, rgba(127,127,127,.15)); }
+  .gc-row:last-child { border-bottom: none; }
+  .gc-mark { flex: 0 0 auto; width: 1.4em; text-align: center; }
+  .gc-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; }
+  .gc-text small { color: var(--text-secondary); font-size: 12px; }
+  .gc-new { display: inline-block; white-space: nowrap; font-size: 11px; font-weight: 500; color: var(--text-secondary); border: 1px solid currentColor; border-radius: 6px; padding: 0 5px; margin-left: 4px; }
 
   .coach-test-status.ok { color: var(--c-good-text); }
 

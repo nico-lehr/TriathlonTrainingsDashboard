@@ -165,6 +165,7 @@ Bedarf schrittweise weiter aufgeteilt werden, sobald es sich lohnt.
 - `update.js` — Hinweis „Neue Version verfügbar“ oben und Karte „Programm-Updates“ in den Einstellungen (nur für den Betreiber; Freunde sehen nur die Versionsnummer).
 - `garmin-push-settings.js` — Karte „Trainings auf die Uhr“ (Einstellungen → Garmin): einmal mit Garmin anmelden (ggf. Zwei-Faktor-Code), Automatik an/aus, Stand der nächsten 7 Tage, „Jetzt abgleichen“, offizielle Verbindung (sobald freigeschaltet).
 - `garmin-settings.js` — „Daten von Garmin“-Karte in den Einstellungen: eigenen Personal-API-Schlüssel eintragen/entfernen, Ablaufwarnung, „Jetzt von Garmin holen“.
+- `garmin-datacheck.js` — „Datencheck“ in der Garmin-Karte: `POST /api/v1/garmin/datacheck` (tools/garmin_datacheck.py) fragt jede Garmin-Quelle einmal ab; Anzeige ✅ geliefert / ⚪ leer / ⛔ nicht freigegeben. Nur lesen.
 - `garmin-import.js` — Garmin verbinden im Onboarding (Werte werden automatisch übernommen) und „Dein Profil“ in den Einstellungen: Garmin-Werte nur anzeigen, täglicher Abgleich, eigene Änderungen bleiben (`garminValues`/`garminOverrides`).
 - `invites.js` — „Freunde einladen“: Einladungen an/aus, Code teilen/erneuern, Kontenliste (nur Betreiber).
 - `security-settings.js` — Einstellungen → „Sicherheit“: „Überall abmelden“ für alle, „Nur über Tailscale erreichbar“ nur für den Betreiber (`backend/access_guard.py`).

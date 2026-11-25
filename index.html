@@ -872,6 +872,13 @@
           <button type="button" class="reset-link" id="garmin-api-change-btn">Schlüssel ändern</button>
           <button type="button" class="reset-link" id="garmin-api-delete-btn">Entfernen</button>
         </div>
+        <div id="garmin-check" hidden>
+          <h3 class="sh-sec">Datencheck</h3>
+          <p class="card-sub">Prüft einmal, welche Daten Garmin für deinen Schlüssel wirklich herausgibt – Trainings, Gesundheit, Kennwerte. Nur lesen, es wird nichts geändert.</p>
+          <div class="sh-actions"><button type="button" class="cal-today-btn" id="garmin-check-btn">Datencheck starten</button></div>
+          <p class="coach-test-status" id="garmin-check-status"></p>
+          <div id="garmin-check-result" class="gc-result"></div>
+        </div>
         <div id="garmin-api-form">
         <p class="card-sub">Schlüssel in Garmin Connect erstellen: <a href="https://connect.garmin.com/app/settings/personalApiToken" target="_blank" rel="noopener">Einstellungen → Personal API</a>.</p>
         <div class="coach-settings-row">
@@ -1373,6 +1380,7 @@
 <script src="js/components/account.js"></script>
 <script src="js/components/security-settings.js"></script>
 <script src="js/components/garmin-settings.js"></script>
+<script src="js/components/garmin-datacheck.js"></script>
 <script src="js/components/update.js"></script>
 <script src="js/components/ai-settings.js"></script>
 <script src="js/components/training-profile.js"></script>

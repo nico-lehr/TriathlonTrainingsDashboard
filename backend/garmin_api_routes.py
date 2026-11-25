@@ -8,6 +8,8 @@ Personal-API-Schluessel hinterlegen und Garmin-Daten auf Knopfdruck holen.
                                          {quick: true}: nur die letzten Tage (schnell)
                                          {auto: true}: schnell, aber hoechstens alle 30 Minuten -
                                          beim Oeffnen des Dashboards; sonst 200 mit "skipped"
+    POST   /api/v1/garmin/datacheck      Garmin-Datencheck: jede Datenquelle einmal abfragen und
+                                         melden, was ankommt (nur lesen, tools/garmin_datacheck.py)
 
 Der Schluessel liegt nur in ~/.triathlon/garmin_api_<id>.json
 (tools/garmin_personal_api.py) und wird nie zurueckgegeben oder geloggt.
@@ -24,7 +26,7 @@ from datetime import date, datetime, timedelta
 from flask import request
 
 from tools import garmin_personal_api as personal_api
-from tools import garmin_profile, garmin_sync
+from tools import garmin_datacheck, garmin_profile, garmin_sync
 
 from . import get_current_athlete_id
 from .routes import api_bp, response_error, response_success
@@ -178,6 +180,34 @@ def start_garmin_sync():
             return response_success({**_status(athlete_id), "skipped": err[1]})
         return response_error(*err)
     return response_success(_status(athlete_id), status=202)
+
+
+_check_lock = threading.Lock()
+_check_running = set()  # athlete_id - nie zwei Datenchecks gleichzeitig je Person
+
+
+@api_bp.route("/garmin/datacheck", methods=["POST"])
+def run_garmin_datacheck():
+    """POST /api/v1/garmin/datacheck - fragt jede Garmin-Datenquelle einmal ab
+    (rund 25 Anfragen, dauert etwas) und meldet je Quelle: geliefert / leer /
+    nicht freigegeben. Nur lesen, nur eigene Daten. Nicht waehrend eines Abrufs
+    (Garmin drosselt sonst)."""
+    athlete_id = get_current_athlete_id()
+    if not personal_api.has_key(athlete_id):
+        return response_error("Garmin ist für dich noch nicht verbunden – zuerst den Schlüssel eintragen.",
+                              "garmin_not_connected", 409)
+    with _sync_lock:
+        if (_sync_state.get(athlete_id) or {}).get("running"):
+            return response_error("Gerade läuft ein Abruf – bitte kurz warten und dann erneut prüfen.", "sync_running", 409)
+    with _check_lock:
+        if athlete_id in _check_running:
+            return response_error("Der Datencheck läuft schon.", "check_running", 409)
+        _check_running.add(athlete_id)
+    try:
+        return response_success(garmin_datacheck.run_check(personal_api.PersonalApiClient(athlete_id)))
+    finally:
+        with _check_lock:
+            _check_running.discard(athlete_id)
 
 
 @api_bp.route("/garmin/profile", methods=["GET"])

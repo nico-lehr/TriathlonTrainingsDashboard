@@ -4,6 +4,14 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 3.0.3
+
+**Neu: Garmin-Datencheck**
+- In den Einstellungen unter „Daten von Garmin“ gibt es jetzt den Knopf „Datencheck starten“. Er fragt jede Garmin-Datenquelle einmal ab und zeigt dir, was wirklich ankommt: ✅ geliefert, ⚪ leer (Garmin hat gerade nichts) oder ⛔ nicht freigegeben (Garmin gibt es für deinen Schlüssel nicht heraus).
+- Geprüft werden deine Trainings – inklusive der Datei des letzten Trainings: Steckt die gefühlte Anstrengung drin? Temperatur? Runden? –, Gesundheitswerte (Schlaf, HRV, Ruhepuls, Body Battery, Schritte, Gewicht, besondere Tage, Zyklus), Profil und Pulszonen sowie Kennwerte (Wettkampf-Prognosen, Ausdauer-/Hill-Score, Hitze-Gewöhnung, CSS).
+- Dazu ein paar Quellen, die das Dashboard noch nicht abruft (Trainingszustand, VO2max von der Uhr). Kommen sie bei dir an, lohnt es sich, sie einzubauen.
+- Nur lesen: Es wird nichts gespeichert oder geändert. Dauert etwa eine halbe Minute.
+
 ## 3.0.2
 
 **Der Bereich „Feed“ ist vorerst ausgeblendet**

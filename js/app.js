@@ -85,6 +85,7 @@ function checkAutoReplan() {
   initAccount();
   initSecuritySettings();
   initGarminSettings();
+  if (typeof initGarminDatacheck === "function") initGarminDatacheck();
   initGarminPushSettings();
   initUpdates();
   initAiSettings();
