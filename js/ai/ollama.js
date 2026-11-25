@@ -132,7 +132,7 @@ const normalizePlanIntensity = x => PLAN_INTENSITY_ALIASES[String(x || "").trim(
 // erlaubt, solange sie verschiedene Titel haben ("Sag dem Coach Bescheid":
 // z. B. zusätzlich ein Technik-Schwimmen). options.descMax: längere
 // Beschreibungen (vom Athleten vorgegebene Trainingspläne).
-function parsePlanResponse(rawText, windowDates, report, { sameSportTwice = false, descMax = 500 } = {}) {
+function parsePlanResponse(rawText, windowDates, report, { sameSportTwice = false, descMax = 500, allowSteps = false } = {}) {
   let data;
   try {
     // Modelle liefern trotz format:"json" gelegentlich noch Text drumherum
@@ -205,6 +205,15 @@ function parsePlanResponse(rawText, windowDates, report, { sameSportTwice = fals
         }).filter(x => x.name && x.name !== "undefined")
       : null;
     if (entry.sport === "Mobility" && exercises && typeof fitMobilityExercises === "function") fitPlanMobility(exercises, dur);
+    // Genauer Ablauf für die Uhr (nur auf ausdrücklichen Wunsch des Athleten,
+    // z. B. ein Test mit festen Zugzahlen je Wiederholung). Ungültig -> die
+    // Einheit bleibt, die Uhr bekommt den Standardablauf, und die Antwort sagt es.
+    let steps = null;
+    if (allowSteps && Array.isArray(entry.steps) && ["Laufen", "Rad", "Schwimmen"].includes(entry.sport) && typeof validateWorkoutSteps === "function") {
+      const checked = validateWorkoutSteps(entry.steps);
+      if (checked.steps) steps = checked.steps;
+      else if (report) (report.stepIssues = report.stepIssues || []).push({ date: entry.date, sport: entry.sport, title: entry.title || entry.sport, errors: checked.errors });
+    }
     valid.push({
       date: entry.date,
       sport: entry.sport,
@@ -217,6 +226,7 @@ function parsePlanResponse(rawText, windowDates, report, { sameSportTwice = fals
       drills: entry.sport === "Schwimmen" && Array.isArray(entry.drills) && typeof SWIM_DRILL_BY_ID !== "undefined"
         ? [...new Set(entry.drills.filter(id => typeof id === "string" && SWIM_DRILL_BY_ID[id]))].slice(0, 3) : null,
       exercises,
+      ...(steps ? { steps } : {}),
       // Leistungstest nur, wenn Art und Sportart zusammenpassen (js/analytics/perf-tests.js)
       ...(typeof PERF_TEST_BY_KEY !== "undefined" && PERF_TEST_BY_KEY[entry.test] && PERF_TEST_BY_KEY[entry.test].sport === entry.sport ? { perfTest: entry.test } : {}),
     });
@@ -456,7 +466,7 @@ async function replanFromCoachNote(note) {
   const before = plannedWorkouts;
   const oldPlan = before.filter(inWindow).sort((a, b) => a.date.localeCompare(b.date));
   const defaults = { goalId: goal.id, source: "ai" };
-  let reply = "", newIds = [], dropped = [];
+  let reply = "", newIds = [], dropped = [], stepIssues = [];
   // Tage, an denen bisher nichts Offenes geplant war (z. B. ein Ruhetag, an
   // dem man jetzt doch trainieren will): Was der Coach dort einträgt, ist
   // ausdrücklich gewünscht und bleibt auch beim täglichen Plan-Check stehen.
@@ -470,8 +480,9 @@ async function replanFromCoachNote(note) {
       if (data && typeof data.antwort === "string") reply = data.antwort.trim().slice(0, 400);
       const report = {};
       const entries = data && Array.isArray(data.workouts) && !data.workouts.length ? []
-        : parsePlanResponse(raw, windowDates, report, { sameSportTwice: true, descMax: 1500 });
+        : parsePlanResponse(raw, windowDates, report, { sameSportTwice: true, descMax: 1500, allowSteps: true });
       dropped = report.dropped || [];
+      stepIssues = report.stepIssues || [];
       // Die KI schickt nur die geänderten Tage (spart Antwort-Tokens); alle
       // anderen Tage behalten ihren Plan. Fehlt die Liste, gilt die Antwort
       // wie früher als kompletter Plan für das ganze Zeitfenster.
@@ -506,6 +517,7 @@ async function replanFromCoachNote(note) {
     // Antwort, im Kalender aber nichts.
     hints: [
       ...dropped.map(d => `Nicht übernommen: ${d.sport || "Einheit"}${d.date ? ` am ${fmtDateFull(new Date(d.date + "T00:00:00"))}` : ""} – ${d.reason}.`),
+      ...stepIssues.map(x => `Ablauf für die Uhr bei „${x.title}“ war fehlerhaft (${x.errors.slice(0, 2).join(" ")}) – die Uhr bekommt den Standardablauf.`),
       ...result.corrected.map(t => `Zusätzlich angepasst: ${t}`), ...result.violations.map(v => v.text)],
     undo: () => {
       replacePlannedWorkouts(before);

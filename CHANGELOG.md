@@ -4,6 +4,14 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 3.0.5
+
+**Neu: Der Coach legt deinen genauen Ablauf auf die Uhr**
+- Gibst du dem Coach einen genauen Ablauf vor – zum Beispiel einen Test mit 8 × 50 m und einer eigenen Zugzahl pro Minute für jede Wiederholung –, steht genau dieser Ablauf jetzt unter „Ablauf“ und auf der Uhr. Jede Wiederholung zeigt ihren eigenen Hinweis (z. B. „50 m #3 · 36 Züge/min“).
+- Vorher hat das Dashboard daraus seine Standard-Vorlage gebaut: immer ein Technikblock und ein gleicher Hauptsatz ohne deine Vorgaben.
+- Ohne genaue Vorgabe bleibt alles wie bisher (Vorlage mit Technikübungen).
+- Ist der Ablauf des Coaches fehlerhaft, bleibt das Training trotzdem im Kalender, und die Antwort sagt dir, dass die Uhr den Standardablauf bekommt.
+
 ## 3.0.4
 
 **Behoben: „Sag dem Coach Bescheid“ trägt zusätzliche Einheiten jetzt wirklich ein**

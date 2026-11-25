@@ -263,6 +263,50 @@ test("Coach-Nachricht: zusätzliche Einheit derselben Sportart am selben Tag ble
   assert.deepStrictEqual(plain(run("__res.hints")), []);
 });
 
+// Fehler aus der Praxis (3.0.4): Der Test mit festen Zugzahlen stand im
+// Kalender, auf der Uhr aber die Standard-Vorlage (Technikblock + 8 × 50 m
+// ohne Zugzahlen). Ein genauer Ablauf des Coaches muss 1:1 auf die Uhr.
+test("Coach-Nachricht: genauer Ablauf (steps) kommt 1:1 auf die Uhr, ohne Technikblock", async () => {
+  const today = run("todayStr()");
+  run(`getPrimaryGoal = () => ({ id: "g1", name: "Ziel" });
+    buildPlanPrompt = () => ""; buildPlanRulesPrompt = () => ""; buildPlanRetryPrompt = () => "";
+    buildCoachNotePrompt = () => ""; planRuleViolations = () => [];`);
+  run(`replacePlannedWorkouts([])`);
+  const spm = [30, 33, 36, 39, 42, 45, 48, 51];
+  const steps = [
+    { type: "warmup", distance_km: 0.2, stroke: "free", note: "Einschwimmen · locker" },
+    { type: "rest", duration_min: 0.5, note: "Pause · Tempo Trainer einstellen" },
+    ...spm.flatMap((z, i) => [
+      { type: "interval", distance_km: 0.05, stroke: "free", note: `50 m #${i + 1} · ${z} Züge/min` },
+      { type: "rest", duration_min: 0.5, note: "Pause · Züge zählen, neu einstellen" }]),
+    { type: "cooldown", distance_km: 0.1, stroke: "any", note: "Ausschwimmen · locker" },
+  ];
+  run(`callAiText = async () => JSON.stringify({ antwort: "Ist drin.", workouts: [
+    { date: "${today}", sport: "Schwimmen", title: "Zugfrequenz-Test", duration_min: 30, intensity: "mittel", distance_m: 700, description: "Test", drills: ["torpedo"], steps: ${JSON.stringify(steps)} }] })`);
+  await run(`replanFromCoachNote("Genauer Ablauf: 8 × 50 m mit 30 bis 51 Zügen pro Minute").then(r => { globalThis.__res = r; })`);
+  const onWatch = plain(run(`plannedWorkoutSteps(plannedWorkouts.find(p => p.title === "Zugfrequenz-Test"))`));
+  const intervals = onWatch.filter(x => x.type === "interval");
+  assert.deepStrictEqual(intervals.map(x => x.note), spm.map((z, i) => `50 m #${i + 1} · ${z} Züge/min`));
+  assert.ok(!onWatch.some(x => x.type === "repeat" || /Torpedo/.test(x.note || "")), "kein automatischer Technikblock");
+  assert.strictEqual(run(`plannedSwimMeters(plannedWorkouts.find(p => p.title === "Zugfrequenz-Test"))`), 700);
+  assert.deepStrictEqual(plain(run("__res.hints")), []);
+});
+
+test("Coach-Nachricht: fehlerhafter Ablauf -> Einheit bleibt, Standardablauf, Hinweis in der Antwort", async () => {
+  const today = run("todayStr()");
+  run(`getPrimaryGoal = () => ({ id: "g1", name: "Ziel" });
+    buildPlanPrompt = () => ""; buildPlanRulesPrompt = () => ""; buildPlanRetryPrompt = () => "";
+    buildCoachNotePrompt = () => ""; planRuleViolations = () => [];`);
+  run(`replacePlannedWorkouts([])`);
+  run(`callAiText = async () => JSON.stringify({ antwort: "Ist drin.", workouts: [
+    { date: "${today}", sport: "Schwimmen", title: "Test", duration_min: 30, intensity: "mittel", description: "x",
+      steps: [{ type: "sprint", distance_km: 0.05 }] }] })`);
+  await run(`replanFromCoachNote("Genauer Ablauf bitte").then(r => { globalThis.__res = r; })`);
+  const p = plain(run(`plannedWorkouts.find(p => p.title === "Test")`));
+  assert.ok(p && !p.steps, "Einheit da, ohne kaputten Ablauf");
+  assert.ok(plain(run("__res.hints")).some(h => /Ablauf für die Uhr bei „Test“ war fehlerhaft/.test(h)));
+});
+
 test("Coach-Nachricht: verworfene Vorschläge stehen in der Antwort (nie still \"erstellt\")", async () => {
   const today = run("todayStr()");
   run(`getPrimaryGoal = () => ({ id: "g1", name: "Ziel" });
