@@ -4,6 +4,16 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 3.1.0
+
+**Neu: Chat mit dem Coach**
+- Auf der Coach-Seite gibt es jetzt die Karte „Frag den Coach“. Dort kannst du mit dem KI-Coach richtig diskutieren – mit Rückfragen, Nachhaken und Gegenargumenten, wie in einem Chat.
+- Der Coach kennt automatisch deinen Überblick: Ziel und Profil, deine Form, die Erholung (Schlaf, HRV, Ruhepuls), deine Trainings der letzten 14 Tage und den Plan der nächsten 14 Tage.
+- Über die Büroklammer hängst du mehr an: ein bestimmtes Training mit Runden, Puls und Notiz, dein Training der letzten 3 Monate, deine Erholung der letzten 30 Tage oder den Plan der nächsten 6 Wochen.
+- Deinen Plan ändert der Chat nie von allein. Schlägt der Coach eine Änderung vor, erscheint ein Kasten „Vorschlag für deinen Plan“ mit dem Knopf „Übernehmen“ – erst dann wird der Kalender angepasst, mit denselben Regeln wie bei „Sag dem Coach Bescheid“ und mit „Rückgängig“.
+- Deine Gespräche werden gespeichert. Du kannst alte wieder öffnen, weiterführen oder löschen.
+- Am Computer schickt Enter die Nachricht ab (Shift+Enter = neue Zeile), am Handy der Pfeil-Knopf.
+
 ## 3.0.5
 
 **Neu: Der Coach legt deinen genauen Ablauf auf die Uhr**

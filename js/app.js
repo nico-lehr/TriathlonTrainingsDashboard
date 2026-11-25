@@ -95,6 +95,7 @@ function checkAutoReplan() {
   initGarminMenu();
   initMobility();
   loadStrengthState();
+  if (typeof loadCoachChats === "function") loadCoachChats();
   initWeatherSettings();
   initAnalysis();
   renderAll();

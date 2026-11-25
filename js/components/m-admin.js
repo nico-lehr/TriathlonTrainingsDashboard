@@ -54,7 +54,7 @@ async function mLoadAdminStats(force) {
 
 const M_PAGE_NAMES = { heute: "Übersicht", kalender: "Kalender", coach: "Coach", training: "Training", gruppe: "Feed", mehr: "Mehr",
   overview: "Insights", nutrition: "Ernährung", records: "Rekorde", analysis: "Analyse", settings: "Einstellungen", calendar: "Kalender (klassisch)", mobility: "Mobility (klassisch)" };
-const M_FEATURE_NAMES = { "coach-note": "Coach-Nachricht", "coach-undo": "Coach rückgängig", outlook: "Ausblick erstellt", "mob-start": "Mobility gestartet",
+const M_FEATURE_NAMES = { "chat-send": "Chat-Nachricht", "chat-apply": "Chat-Vorschlag übernommen", "coach-note": "Coach-Nachricht", "coach-undo": "Coach rückgängig", outlook: "Ausblick erstellt", "mob-start": "Mobility gestartet",
   "strength-start": "Kraft gestartet", "mob-claude": "Mobility mit KI-Coach", "plan-new": "Einheit geplant", "plan-open": "Geplante Einheit geöffnet",
   "workout-open": "Training angesehen", "garmin-send": "An Garmin gesendet", "garmin-push-login": "Uhr-Anmeldung", "classic-view": "Klassische Ansicht",
   "group-join": "Feed beigetreten", "group-react": "Reaktion im Feed", "challenge-new": "Challenge gestartet", "cal-drag": "Einheit im Kalender verschoben" };

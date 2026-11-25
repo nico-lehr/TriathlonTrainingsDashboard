@@ -546,7 +546,7 @@ function mRenderCoach() {
         <div class="m-check"><span>Energie</span>${mSeg("energy", energy, en)}</div>
         <div class="m-check"><span>Verletzung</span>${mSeg("injury", inj, rc.injury || "no")}</div></section>`
     + `<section class="m-card"><div class="m-head"><h2>Empfehlung</h2><button type="button" class="m-link" data-m-act="outlook">${typeof outlook !== "undefined" && outlook.loading ? "…" : "Neu"}</button></div>${say}</section>`,
-    noteCard + mRaceListCard(),
+    (typeof mChatCardHtml === "function" ? mChatCardHtml() : "") + noteCard + mRaceListCard(),
     `<section class="m-card"><div class="m-head"><h2>Nächste Einheiten</h2><button type="button" class="m-link" data-m-classic="coach" data-m-scroll="trainingplan">Plan bearbeiten</button></div>${mPlanCheckStatus()}<div class="m-cdays">${nextHtml}</div></section>`
     + `<button type="button" class="m-more" data-m-classic="coach">Ganzer Coach-Bereich</button>`);
 }

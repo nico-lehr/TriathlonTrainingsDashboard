@@ -4,7 +4,7 @@
 // generateRecommendation/generateTrainingPlan/... rufen nur callAiText auf.
 //
 // task-Namen: "plan", "analysis", "recommendation", "lessons", "focus",
-// "perfSummary", "mobility", "dailycheck", "morning", "alternative", "replan" - der Server wählt daran Antwortlänge und
+// "perfSummary", "mobility", "dailycheck", "morning", "alternative", "replan", "chat" - der Server wählt daran Antwortlänge und
 // Gründlichkeit (backend/claude_api.py).
 
 async function callAiText(prompt, { task = "recommendation", json = false, schema = null } = {}) {

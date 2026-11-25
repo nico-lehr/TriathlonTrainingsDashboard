@@ -79,7 +79,7 @@ TASK_GROUPS = [
     ("plan", "Trainingsplan", "Plan erstellen und ändern, täglicher Plan-Check", {"plan", "planbatch", "dailycheck", "alternative", "replan"}),
     ("analysis", "Analysen", "Auswertung einzelner Einheiten, Lessons Learned, Belastung, Leistungszustand",
      {"analysis", "lessons", "focus", "perfSummary"}),
-    ("coach", "Coach & Morgenbericht", "Empfehlungen zum Ziel und der Satz im Morgenbericht", {"recommendation", "morning", ""}),
+    ("coach", "Coach, Chat & Morgenbericht", "Empfehlungen zum Ziel, Chat mit dem Coach und der Satz im Morgenbericht", {"recommendation", "morning", "chat", ""}),
     ("mobility", "Mobility", "Mobility-Einheiten zusammenstellen", {"mobility"}),
 ]
 TASK_GROUP_OF = {task: gid for gid, _, _, tasks in TASK_GROUPS for task in tasks}
@@ -88,7 +88,7 @@ KEY_MIN_LEN, KEY_MAX_LEN = 20, 300
 PROMPT_MAX_CHARS = 120_000
 # Obergrenze der Antwort je Aufgabe. Denken zaehlt bei den aktuellen Modellen
 # mit hinein, deshalb grosszuegig - bezahlt wird nur, was wirklich entsteht.
-MAX_TOKENS = {"plan": 16000, "planbatch": 16000, "replan": 16000, "mobility": 8000}
+MAX_TOKENS = {"plan": 16000, "planbatch": 16000, "replan": 16000, "mobility": 8000, "chat": 8000}
 MAX_TOKENS_DEFAULT = 6000
 # Gruendlichkeit je Aufgabe: kurze Texte brauchen wenig Nachdenken.
 # "alternative" (eine einzelne Einheit neu vorschlagen) ist klein und klar
