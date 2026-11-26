@@ -40,8 +40,17 @@ const PLAN_MAX_HARD_PER_WEEK = 3;
 const PLAN_EASY_SHARE_TARGET = 0.8;
 const PLAN_EASY_SHARE_MIN_SESSIONS = 3;
 
-// Mindestens 1 komplett freier Tag pro Woche (Mo-So).
+// Mindestens 1 freier Tag pro Woche (Mo-So).
 const PLAN_MIN_FREE_DAYS = 1;
+
+// Was einen freien Tag NICHT kaputt macht (aktive Erholung): Mobility,
+// Beweglichkeit und Yoga - als Plan oder erledigt, solange die gemessene
+// Belastung (Garmin Training Load) nicht über PLAN_REST_RECOVERY_MAX_LOAD
+// liegt - und jede erledigte Aktivität mit sehr niedriger Belastung
+// (z. B. ein Spaziergang, bis PLAN_REST_MAX_LOAD).
+const PLAN_REST_SPORTS = ["Mobility", "Flexibilität", "Yoga"];
+const PLAN_REST_RECOVERY_MAX_LOAD = 40;
+const PLAN_REST_MAX_LOAD = 20;
 
 // Wochenumfang (Minuten) höchstens +10 % gegenüber der letzten normalen Woche.
 const PLAN_MAX_WEEKLY_INCREASE = 0.10;
@@ -120,6 +129,15 @@ const planMinutes = list => list.reduce((sum, s) => sum + s.duration_min, 0);
 // 360 * 0,7 = 251,99999… ab.
 const planFloorMin = x => Math.floor(x + 1e-9);
 const planDaySessions = (ctx, key) => ctx.byDay.get(key) || [];
+
+// Lässt diese Einheit den Tag ein Ruhetag bleiben?
+function planKeepsRestDay(s) {
+  const load = typeof s.load === "number" ? s.load : null;
+  if (PLAN_REST_SPORTS.includes(s.sport)) return load == null || load <= PLAN_REST_RECOVERY_MAX_LOAD;
+  return !s.planned && load != null && load <= PLAN_REST_MAX_LOAD;
+}
+// Ruhetag = nichts oder nur Erholung (siehe oben).
+const planIsRestDay = sessions => (sessions || []).every(planKeepsRestDay);
 const planWeekSessions = (ctx, wk) => planWeekDays(wk).flatMap(k => planDaySessions(ctx, k));
 
 // Lockere Grundlage in einer Sportart = als "leicht" geplant/erledigt. Echte
@@ -137,7 +155,8 @@ function planSessions(plannedWorkouts, history, todayKey) {
   const done = (history || []).map(w => {
     const d = w._date || (w.date ? new Date(w.date) : null);
     if (!d || isNaN(d)) return null;
-    return { id: null, date: localDateStr(d), sport: w.sport, title: w.sport, duration_min: Number(w.duration_min) || 0, intensity: w.intensity || null, planned: false };
+    return { id: null, date: localDateStr(d), sport: w.sport, title: w.sport, duration_min: Number(w.duration_min) || 0, intensity: w.intensity || null, planned: false,
+      load: typeof w.training_load === "number" ? w.training_load : null };
   }).filter(s => s && s.date <= todayKey);
   const seen = new Set(done.map(s => s.date + "|" + s.sport));
   const fromPlan = (plannedWorkouts || []).filter(p =>
@@ -188,12 +207,12 @@ function planMoveTarget(ctx, byDay, s) {
   const others = k => (byDay.get(k) || []).filter(o => o !== s);
   const hardOn = k => others(k).some(planIsHard);
   const days = planWeekDays(planWeekKey(s.date));
-  const freeDays = days.filter(k => !others(k).length).length;
+  const freeDays = days.filter(k => planIsRestDay(others(k))).length;
   const dist = k => Math.abs(Date.parse(k) - Date.parse(s.date));
   return days
     .filter(k => k >= ctx.todayKey && k !== s.date && !(ctx.gateDay && k <= ctx.gateDay))
     .filter(k => !hardOn(k) && !hardOn(planShiftDay(k, -1)) && !hardOn(planShiftDay(k, 1)))
-    .filter(k => others(k).length || freeDays > PLAN_MIN_FREE_DAYS)
+    .filter(k => !planIsRestDay(others(k)) || freeDays > PLAN_MIN_FREE_DAYS)
     // Wochenplan (Trainingstage, Schwimmtage, Einheiten pro Tag) - js/analytics/plan-structure.js
     .filter(k => !ctx.structure || typeof planStructDayAccepts !== "function" || planStructDayAccepts(ctx.structure, k, s, others(k)))
     .sort((a, b) => dist(a) - dist(b))[0] || null;
@@ -277,7 +296,8 @@ function checkPlanRestDay(ctx) {
   const out = [];
   ctx.weeks.forEach(wk => {
     const days = planWeekDays(wk);
-    if (days.filter(k => !planDaySessions(ctx, k).length).length >= PLAN_MIN_FREE_DAYS) return;
+    // Frei ist auch ein Tag mit nur lockerer Erholung (Mobility, Yoga, Spaziergang).
+    if (days.filter(k => planIsRestDay(planDaySessions(ctx, k))).length >= PLAN_MIN_FREE_DAYS) return;
     const list = planWeekSessions(ctx, wk);
     const dayMin = k => planMinutes(planDaySessions(ctx, k));
     const open = days.filter(k => k >= ctx.todayKey && planDaySessions(ctx, k).every(s => s.planned))
@@ -615,7 +635,7 @@ function planRulesText(goal, { daysUntil = null } = {}) {
     `Nie zwei harte Tage hintereinander. Hart ist eine Einheit mit Intensität "hart" oder mit mehr als ${PLAN_HARD_MIN_DURATION} Minuten (auch wenn sie locker ist).`,
     `Höchstens ${PLAN_MAX_HARD_PER_WEEK} harte Einheiten pro Woche (Montag bis Sonntag).`,
     `Etwa ${pct(PLAN_EASY_SHARE_TARGET)} % der Trainingsminuten einer Woche "leicht".`,
-    `Mindestens ${PLAN_MIN_FREE_DAYS} komplett freier Tag pro Woche (Montag bis Sonntag).`,
+    `Mindestens ${PLAN_MIN_FREE_DAYS} freier Tag pro Woche (Montag bis Sonntag) - ohne Training; lockere Mobility oder Yoga sind an diesem Tag erlaubt und zählen nicht als Training.`,
     `Der Wochenumfang (Minuten) steigt höchstens um ${pct(PLAN_MAX_WEEKLY_INCREASE)} % gegenüber der letzten normalen Woche.`,
     `Nach ${PLAN_RETURN_LIGHT_WEEKS} oder mehr leichteren Wochen in Folge (z. B. Krankheit, Urlaub) gilt die stärkste dieser Wochen als Ausgangswert für die ${pct(PLAN_MAX_WEEKLY_INCREASE)} %, mindestens ${pct(PLAN_RETURN_MIN_SHARE)} % der letzten normalen Woche.`,
     `Nach ${PLAN_DELOAD_EVERY_WEEKS - 1} Aufbauwochen in Folge kommt eine Entlastungswoche mit mindestens ${pct(PLAN_DELOAD_REDUCTION)} % weniger Minuten.`,

@@ -4,6 +4,14 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 3.1.1
+
+**Geändert: Lockere Erholung zählt als freier Tag**
+- Bisher galt ein Tag nur dann als frei, wenn dort gar nichts passiert ist. Hast du an deinem freien Tag z. B. 40 min ganz entspannt Mobility gemacht, hat der Coach den Ruhetag auf den nächsten Tag verschoben – und dort dein Training gestrichen.
+- Jetzt schaut der Coach auf die Belastung: Ein Tag bleibt frei, wenn dort nur Erholung war – Mobility, Beweglichkeit oder Yoga (bis zu einer moderaten Belastung) oder eine Aktivität mit sehr geringer Trainingsbelastung laut Garmin, z. B. ein lockerer Spaziergang.
+- Ein richtiges Training (Laufen, Rad, Schwimmen, Kraft) oder eine hohe Belastung macht den Tag weiterhin zum Trainingstag.
+- Auch der KI-Coach kennt die neue Regel beim Planen.
+
 ## 3.1.0
 
 **Neu: Chat mit dem Coach**

@@ -125,7 +125,7 @@ function buildPlanTrainingDaysRule(windowDates) {
   (typeof DATA !== "undefined" ? DATA : []).forEach(w => { if (w._date) busy.add(localDateStr(w._date)); });
   const open = windowDates.filter(d => days.includes(dow[new Date(d + "T00:00:00").getDay()]) && !busy.has(d));
   if (!open.length) return "";
-  return `- Offene Trainingstage im Zeitfenster: ${open.map(d => `${d} (${dowFull[new Date(d + "T00:00:00").getDay()]})`).join(", ")}. Plane an JEDEM davon mindestens eine Einheit - der Athlet hat diese Tage ausdrücklich zum Trainieren freigehalten. Einzige Ausnahmen: ein komplett freier Tag pro Woche (Mo-So), falls die Woche sonst keinen hätte, und Tage, an denen "Erholung heute" oder die Belastung einen Ruhetag nötig macht. Reicht der Zielumfang der Woche nicht für alle Tage, plane lieber kürzere lockere Einheiten (mindestens 20 min) statt Tage leer zu lassen.`;
+  return `- Offene Trainingstage im Zeitfenster: ${open.map(d => `${d} (${dowFull[new Date(d + "T00:00:00").getDay()]})`).join(", ")}. Plane an JEDEM davon mindestens eine Einheit - der Athlet hat diese Tage ausdrücklich zum Trainieren freigehalten. Einzige Ausnahmen: ein freier Tag pro Woche (Mo-So; lockere Mobility/Yoga zählt dort nicht als Training), falls die Woche sonst keinen hätte, und Tage, an denen "Erholung heute" oder die Belastung einen Ruhetag nötig macht. Reicht der Zielumfang der Woche nicht für alle Tage, plane lieber kürzere lockere Einheiten (mindestens 20 min) statt Tage leer zu lassen.`;
 }
 
 function buildWorkoutAnalysisPrompt(w, comparable) {

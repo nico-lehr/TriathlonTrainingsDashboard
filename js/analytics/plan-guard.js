@@ -115,7 +115,7 @@ function planGuardFillDescription(sport, long) {
 }
 
 // Füllt leere Trainingstage mit je einer lockeren Einheit. Grenzen:
-// - mindestens ein komplett freier Tag pro Woche bleibt (plan-rules.js Regel 3);
+// - mindestens ein freier Tag pro Woche bleibt (plan-rules.js Regel 3, nur Mobility/Yoga zählt als frei);
 //   frei bleibt der Tag nach dem längsten Trainingstag,
 // - das Wochenbudget (planGuardWeekTarget) wird nicht überschritten,
 // - eine Einheit, die einen neuen "block"-Verstoß erzeugen würde, entfällt.
@@ -133,8 +133,9 @@ function planGuardFill(list, history, o) {
   const longDays = o.profile.longDays || [];
 
   weeks.forEach((wkGaps, wk) => {
-    const busy = planGuardBusyDays(cur, history);
-    const freeCount = planWeekDays(wk).filter(k => !busy.has(k)).length;
+    // Freie Tage der Woche - Tage mit nur Mobility/Yoga/sehr wenig Belastung zählen als frei.
+    const sessNow = planSessions(cur, history, o.todayKey);
+    const freeCount = planWeekDays(wk).filter(k => planIsRestDay(sessNow.filter(s => s.date === k))).length;
     const fill = wkGaps.slice();
     const dayMin = k => planMinutes(planSessions(cur, history, o.todayKey).filter(s => s.date === k));
     while (fill.length && freeCount - fill.length < PLAN_MIN_FREE_DAYS) {

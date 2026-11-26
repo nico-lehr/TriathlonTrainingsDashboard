@@ -179,6 +179,27 @@ test("Regel 3: Woche ohne Ruhetag -> block, Ruhetag kostet nicht die einzige loc
   assert.strictEqual(byRule(fixed, "goal_base").length, 0);
 });
 
+// Praxisfall: freier Tag, aber 40 min ganz lockere Mobility gemacht - der
+// Coach machte daraufhin den nächsten Tag zum Ruhetag (Training gestrichen).
+test("Regel 3: Mobility/Yoga oder sehr geringe Belastung lassen den Tag frei", () => {
+  const week = [
+    pw(day(1), "Laufen", 45, "leicht"), pw(day(2), "Rad", 60, "hart"), pw(day(3), "Laufen", 40, "leicht"),
+    pw(day(4), "Schwimmen", 45, "leicht"), pw(day(5), "Rad", 100, "leicht"), pw(day(6), "Laufen", 50, "leicht"),
+  ];
+  const rest = h => byRule(validate(week, { history: [...HISTORY, h] }), "rest_day");
+  // heute (Mo) erledigt: Mobility ohne Belastungswert, Yoga mit wenig, Spaziergang mit sehr wenig Belastung
+  assert.deepStrictEqual(rest(hist(day(0), "Mobility", 40)), []);
+  assert.deepStrictEqual(rest(hist(day(0), "Yoga", 60, { training_load: 25 })), []);
+  assert.deepStrictEqual(rest(hist(day(0), "Gehen", 50, { training_load: 12 })), []);
+  // echtes Training oder hohe Belastung: der Tag ist nicht mehr frei
+  assert.strictEqual(rest(hist(day(0), "Laufen", 30)).length, 1);
+  assert.strictEqual(rest(hist(day(0), "Gehen", 120, { training_load: 45 })).length, 1);
+  assert.strictEqual(rest(hist(day(0), "Yoga", 75, { training_load: 70 })).length, 1);
+  // geplante Mobility an einem sonst freien Tag zählt auch als frei
+  const withMob = [...week, pw(day(0), "Mobility", 20, "leicht")];
+  assert.deepStrictEqual(byRule(validate(withMob), "rest_day"), []);
+});
+
 test("Regel 3: selbst gewünschte Einheiten werden nie für einen Ruhetag gestrichen", () => {
   const plan = [
     { ...pw(day(0), "Schwimmen", 30, "leicht"), requested: true }, // kürzester Tag, aber gewünscht

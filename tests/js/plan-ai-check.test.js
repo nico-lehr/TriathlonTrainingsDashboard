@@ -122,7 +122,7 @@ test("planRulesText: Zahlen kommen aus den Konstanten des Regelwerks", () => {
   const c = run(`({ hardMin: PLAN_HARD_MIN_DURATION, maxHard: PLAN_MAX_HARD_PER_WEEK, easy: PLAN_EASY_SHARE_TARGET,
     free: PLAN_MIN_FREE_DAYS, inc: PLAN_MAX_WEEKLY_INCREASE, deloadEvery: PLAN_DELOAD_EVERY_WEEKS, deload: PLAN_DELOAD_REDUCTION,
     acwr: PLAN_ACWR_LIMIT, hrv: PLAN_HRV_DROP_PCT, rhr: PLAN_RHR_RISE_BPM })`);
-  [`${c.hardMin} Minuten`, `Höchstens ${c.maxHard} harte`, `${Math.round(c.easy * 100)} %`, `Mindestens ${c.free} komplett freier`,
+  [`${c.hardMin} Minuten`, `Höchstens ${c.maxHard} harte`, `${Math.round(c.easy * 100)} %`, `Mindestens ${c.free} freier Tag`,
     `${Math.round(c.inc * 100)} %`, `Nach ${c.deloadEvery - 1} Aufbauwochen`, `${Math.round(c.deload * 100)} % weniger`,
     `über ${String(c.acwr).replace(".", ",")}`, `${c.hrv} % unter`, `${c.rhr} Schläge`, "Schwimmen, Rad, Laufen"]
     .forEach(part => assert.ok(text.includes(part), `fehlt: ${part}\n${text}`));
