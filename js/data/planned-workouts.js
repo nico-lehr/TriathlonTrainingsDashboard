@@ -316,11 +316,19 @@ function stepProfile() {
   return typeof athleteProfile !== "undefined" && athleteProfile ? athleteProfile : {};
 }
 
+// Laufen nach Pace nur, wenn im Profil ausdrücklich gewählt (und eine
+// Schwellenpace da ist). Standard ist Puls: Hitze, Höhenmeter und Untergrund
+// verändern die Pace, die Belastung zeigt der Puls.
+function runByPace() {
+  const prof = stepProfile();
+  return prof.runTarget === "pace" && !!prof.runThresholdPace;
+}
+
 // Ziel-Zone als Target je Sportart (siehe oben).
 function stepTarget(sport, zone) {
   if (!zone) return { kind: "none" };
   const prof = stepProfile();
-  if (sport === "Laufen") return { kind: prof.runThresholdPace ? "pace_zone" : "hr_zone", zone };
+  if (sport === "Laufen") return { kind: runByPace() ? "pace_zone" : "hr_zone", zone };
   if (sport === "Rad") return { kind: prof.ftpWatts ? "power_zone" : "hr_zone", zone };
   // Schwimmen: bewusst ohne Tempo-Vorgabe - die Einheit steht in Metern,
   // die Intensität im Hinweis ("Gleichmäßig locker", "Zügig" ...).
@@ -655,5 +663,10 @@ function swimSteps(pw, d, intensity) {
 // Die Schritte, die wirklich verwendet werden (.fit-Export, Garmin-Versand):
 // eigene, sofern gültig, sonst die Standard-Schritte.
 function plannedWorkoutSteps(pw) {
-  return (pw.steps && validateWorkoutSteps(pw.steps).steps) || defaultWorkoutSteps(pw);
+  const steps = (pw.steps && validateWorkoutSteps(pw.steps).steps) || defaultWorkoutSteps(pw);
+  // Laufen nach Puls: auch eigene/vom Coach geschickte Schritte mit
+  // Pace-Zone bekommen dieselbe Zone als Puls-Zone.
+  if (!pw || pw.sport !== "Laufen" || runByPace()) return steps;
+  const hr = s => (s.target && s.target.kind === "pace_zone" ? { ...s, target: { kind: "hr_zone", zone: s.target.zone } } : s);
+  return steps.map(s => (s.type === "repeat" ? { ...s, steps: s.steps.map(hr) } : hr(s)));
 }

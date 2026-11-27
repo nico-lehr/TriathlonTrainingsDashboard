@@ -398,6 +398,7 @@ aus dem Browser-Import speichert `saveImportedWorkouts()` per
   weeklyHours: 8,
   ftpWatts: 250,
   runThresholdPace: "4:30",
+  runTarget: "hr",                    // Laufen nach "hr" (Puls-Zonen, Standard) oder "pace" (Pace-Zonen, braucht runThresholdPace)
   swimCss: "1:45",
   maxHr: 188,                         // optional, nur für TRIMP/HFR in der Trainings-Detailansicht + VO2max-Regression
   restingHr: 52,                      // optional, siehe js/analytics/workout-profile.js

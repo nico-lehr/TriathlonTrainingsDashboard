@@ -937,6 +937,7 @@ function initCoach() {
     ["profile-birthdate", "birthDate", v => v || null],
     ["profile-ftp", "ftpWatts", v => v ? Number(v) : null],
     ["profile-run-pace", "runThresholdPace", v => v.trim() || null],
+    ["profile-run-target", "runTarget", v => (v === "pace" ? "pace" : "hr")],
     ["profile-swim-pace", "swimCss", v => v.trim() || null],
     ["profile-weekly-hours", "weeklyHours", v => v ? Number(v) : null],
     ["profile-max-hr", "maxHr", v => v ? Number(v) : null],

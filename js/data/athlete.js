@@ -4,6 +4,7 @@ const ATHLETE_PROFILE_KEY = "triathlon_dashboard_athlete_profile_v1";
 
 let athleteProfile = {
   ftpWatts: null, runThresholdPace: null, swimCss: null, weeklyHours: null,
+  runTarget: "hr", // Laufen auf der Uhr nach "hr" (Puls-Zonen, Standard - Hitze/Höhenmeter verfälschen die Pace) oder "pace" (Pace-Zonen, braucht runThresholdPace)
   experienceLevel: null, strongDiscipline: null, weakDiscipline: null, trainingDaysPerWeek: null,
   age: null, trainingDays: [], swimDays: [], longDays: [], typicalSessionMin: null,
   maxHr: null, restingHr: null, // für TRIMP/Herzfrequenzreserve in der Trainings-Detailansicht (js/analytics/workout-profile.js)

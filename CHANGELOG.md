@@ -4,6 +4,14 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 3.1.2
+
+**Geändert: Laufen jetzt nach Puls statt nach Pace**
+- Laufeinheiten auf der Garmin-Uhr richten sich jetzt nach deinen Puls-Zonen (Herzfrequenz-Zonen deiner Uhr) – nicht mehr nach einem Tempo. Der Puls ist ehrlicher, weil Hitze, Wind oder Höhenmeter die Pace verfälschen.
+- Das gilt für alle Laufeinheiten: den Standardablauf, eigene Abläufe aus dem Plan und Abläufe aus Coach-Notizen. Auch die KI plant beim Laufen nur noch mit Puls-Zonen.
+- Neu im Profil: „Laufen nach“ – Puls-Zonen (Standard) oder Pace-Zonen, falls du doch einmal nach Tempo laufen möchtest.
+- Schon an die Uhr geschickte Laufeinheiten bitte noch einmal senden, damit dort die Puls-Zonen ankommen.
+
 ## 3.1.1
 
 **Geändert: Lockere Erholung zählt als freier Tag**

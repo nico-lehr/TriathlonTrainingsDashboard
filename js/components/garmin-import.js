@@ -230,6 +230,7 @@ async function renderProfileGarmin() {
   const gv = athleteProfile.garminValues || {};
   card.querySelectorAll(".pf-row[data-pf]").forEach(row => {
     const key = row.dataset.pf;
+    if (!row.querySelector(".pf-garmin-val")) return; // Felder ohne Garmin-Wert (z. B. „Laufen nach“)
     const fromG = profileFromGarmin(key) && athleteProfile[key] != null;
     row.classList.toggle("is-garmin", fromG);
     row.querySelector(".pf-garmin-val").textContent = fromG ? garminFieldFmt(key)(athleteProfile[key]) : "";

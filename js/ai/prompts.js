@@ -70,7 +70,7 @@ ${planVolumeRule()}
 ${optional ? optional + "\n" : ""}${typeof strengthPlanRule === "function" ? strengthPlanRule() : "- Bei \"Kraft\": \"exercises\"-Array mit 3-6 konkreten Übungen (Name, Sätze, Wiederholungen)."}
 ${mobilityPlanRule()}
 ${swimPlanRule()}
-- Bei Rad/Laufen: "description" = kurze Struktur (z.B. "10 min Einrollen, 6x400 m zügig mit 90 s Pause, 10 min Auslaufen") plus Ziel-Bereich aus den Zonen oben für die gewählte Intensität (z.B. "Hauptteil Z2 128-142 bpm"). Nur die Zonenwerte von oben verwenden, keine eigenen Zahlen; ohne Zonen für die Sportart nur "leicht/mittel/hart".
+- Bei Rad/Laufen: "description" = kurze Struktur (z.B. "10 min Einrollen, 6x400 m zügig mit 90 s Pause, 10 min Auslaufen") plus Ziel-Bereich aus den Zonen oben für die gewählte Intensität (z.B. "Hauptteil Z2 128-142 bpm"). Nur die Zonenwerte von oben verwenden, keine eigenen Zahlen; ohne Zonen für die Sportart nur "leicht/mittel/hart".${runTargetRule()}
 - Liefen ähnliche Einheiten laut "Zuletzt tatsächlich absolviert" zu hart/zu leicht oder wurden übersprungen: kurz in "description" berücksichtigen.
 - Kurz halten: "title" höchstens 4 Wörter, "description" höchstens 2 kurze Sätze (ca. 30 Wörter). Reiner Klartext ohne Markdown.
 - Konsistenz: "sport" muss zu "title"/"description" passen (Kräftigungsübungen wie Klimmzüge, Kniebeugen, Hanteltraining -> immer "Kraft"). "duration_min" = die Gesamtdauer, die "description" nennt.
@@ -95,6 +95,12 @@ function planVolumeRule() {
     ? " oder ergänze an Tagen mit nur einem Haupttraining eine kurze zweite lockere Einheit (20-45 min, andere Sportart) - der Athlet möchte gern mehr trainieren"
     : "";
   return `- Umfang: Plane jede Woche auf ihren Zielumfang aus der Periodisierung - alle Minuten der Woche zusammen (schon absolviert/geplant + neu) mindestens 90 % davon, höchstens der Zielumfang selbst${hours}. Fehlen Minuten, verlängere lockere Einheiten${second}. Entlastungs-, Taper- und Erholungswochen bewusst beim (niedrigeren) Zielumfang lassen.`;
+}
+
+// Laufen nach Puls (Standard) oder Pace - Profil "Laufen nach" (athleteProfile.runTarget).
+function runTargetRule() {
+  const pace = typeof runByPace === "function" ? runByPace() : false;
+  return pace ? "" : " Laufen: Ziel-Bereich IMMER als Puls (Zone und bpm), nie als Pace (min/km) - der Athlet läuft nach Puls, weil Hitze und Höhenmeter die Pace verfälschen.";
 }
 
 // gewünschter Meterbereich: swimMetersPer10Min()/swimMeterRange() in

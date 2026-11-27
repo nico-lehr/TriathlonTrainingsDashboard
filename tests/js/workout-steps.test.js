@@ -67,14 +67,40 @@ test("Standard: Laufen/Rad ergeben zusammen genau die geplante Dauer", () => {
   })));
 });
 
-test("Standard: Ziele aus dem Profil - Pace (Schwellenpace), Watt (FTP), sonst Puls", () => {
+test("Standard: Ziele aus dem Profil - Pace (Schwellenpace + „nach Pace“), Watt (FTP), sonst Puls", () => {
   app.athleteProfile.runThresholdPace = "5:00";
+  app.athleteProfile.runTarget = "pace";
   app.athleteProfile.ftpWatts = 250;
   assert.deepStrictEqual(defaults({ sport: "Laufen", duration_min: 45, intensity: "hart" })[1].steps[0].target, { kind: "pace_zone", zone: 5 });
   assert.deepStrictEqual(defaults({ sport: "Rad", duration_min: 60, intensity: "mittel" })[2].steps[0].target, { kind: "power_zone", zone: 3 });
   app.athleteProfile.runThresholdPace = null;
   app.athleteProfile.ftpWatts = null;
+  delete app.athleteProfile.runTarget;
   assert.deepStrictEqual(defaults({ sport: "Laufen", duration_min: 45, intensity: "hart" })[1].steps[0].target, { kind: "hr_zone", zone: 5 });
+});
+
+test("Laufen nach Puls (Standard): auch mit Schwellenpace gibt es Puls-Zonen", () => {
+  app.athleteProfile.runThresholdPace = "5:00";
+  app.athleteProfile.runTarget = "hr";
+  assert.deepStrictEqual(defaults({ sport: "Laufen", duration_min: 45, intensity: "hart" })[1].steps[0].target, { kind: "hr_zone", zone: 5 });
+  delete app.athleteProfile.runTarget; // nicht gesetzt = Puls
+  assert.deepStrictEqual(defaults({ sport: "Laufen", duration_min: 45, intensity: "hart" })[1].steps[0].target, { kind: "hr_zone", zone: 5 });
+  app.athleteProfile.runThresholdPace = null;
+});
+
+test("Laufen nach Puls: eigene Pace-Ziele werden zur gleichen Puls-Zone, nach Pace bleiben sie", () => {
+  const pw = { sport: "Laufen", duration_min: 50, intensity: "hart", steps: INTERVALS };
+  const target = st => st[1].steps[0].target;
+  assert.deepStrictEqual(target(plain(app.plannedWorkoutSteps(pw))), { kind: "hr_zone", zone: 4 });
+  assert.deepStrictEqual(plain(app.plannedWorkoutSteps(pw))[1].steps[1].target, { kind: "none" });
+  app.athleteProfile.runThresholdPace = "5:00";
+  app.athleteProfile.runTarget = "pace";
+  assert.deepStrictEqual(target(plain(app.plannedWorkoutSteps(pw))), { kind: "pace_zone", zone: 4 });
+  app.athleteProfile.runThresholdPace = null;
+  delete app.athleteProfile.runTarget;
+  // Rad bleibt unberührt
+  const bike = [{ type: "interval", duration_min: 10, target: { kind: "power_zone", zone: 3 } }];
+  assert.deepStrictEqual(plain(app.plannedWorkoutSteps({ sport: "Rad", duration_min: 10, steps: bike }))[0].target, { kind: "power_zone", zone: 3 });
 });
 
 test("Standard: Schwimmen = Einschwimmen / Pause / Technik / Pause / Hauptsatz / Ausschwimmen, in Metern mit Stil", () => {
@@ -251,7 +277,9 @@ test("ungültige Schritte: steps = null und eine verständliche Meldung je Fehle
 
 test("plannedWorkoutSteps: eigene gültige Schritte, sonst die Standard-Schritte", () => {
   const base = { sport: "Laufen", duration_min: 50, intensity: "leicht" };
-  assert.deepStrictEqual(plain(app.plannedWorkoutSteps({ ...base, steps: INTERVALS })), validate(INTERVALS).steps);
+  const asHr = plain(validate(INTERVALS).steps);
+  asHr[1].steps[0].target = { kind: "hr_zone", zone: 4 }; // Laufen läuft standardmäßig nach Puls
+  assert.deepStrictEqual(plain(app.plannedWorkoutSteps({ ...base, steps: INTERVALS })), asHr);
   assert.deepStrictEqual(plain(app.plannedWorkoutSteps({ ...base, steps: null })), defaults(base));
   assert.deepStrictEqual(plain(app.plannedWorkoutSteps({ ...base, steps: [{ type: "kaputt" }] })), defaults(base));
 });
@@ -270,7 +298,7 @@ test(".fit: Wiederholung steht hinter ihren Schritten und zeigt auf den ersten d
   const recs = plain(app.fitWorkoutStepRecords({ sport: "Laufen", title: "6x400", steps: INTERVALS }));
   assert.deepStrictEqual(recs.map(r => [r.name, r.durationType, r.durationValue, r.targetType, r.targetValue, r.intensity]), [
     ["Aufwärmen", 0, 900000, 2, 0, 2],     // 15 min in ms, ohne Ziel, warmup
-    ["Belastung", 1, 40000, 2, 0, 0],      // 400 m in cm; Pace-Zone ohne Schwellenpace -> ohne Ziel
+    ["Belastung", 1, 40000, 1, 4, 0],      // 400 m in cm; Laufen nach Puls -> Pace-Zone 4 wird HF-Zone 4
     ["Erholung", 0, 90000, 2, 0, 4],
     ["Wiederholung", 6, 1, 2, 6, 0xFF],    // ab Schritt 1, 6 Durchgänge
     ["Abwärmen", 5, 0, 2, 0, 3],           // ohne Dauer = offen
@@ -279,6 +307,7 @@ test(".fit: Wiederholung steht hinter ihren Schritten und zeigt auf den ersten d
 
 test(".fit: HF-/Leistungszone als Zonennummer, Pace-Zone als Tempobereich aus der Schwellenpace", () => {
   app.athleteProfile.runThresholdPace = "5:00"; // Z4 = 0,98-1,05 x 300 s/km = 4:54-5:15 /km
+  app.athleteProfile.runTarget = "pace";
   const recs = plain(app.fitWorkoutStepRecords({ sport: "Laufen", steps: [
     { type: "interval", duration_min: 10, target: { kind: "hr_zone", zone: 3 } },
     { type: "interval", duration_min: 10, target: { kind: "power_zone", zone: 2 } },
@@ -288,6 +317,7 @@ test(".fit: HF-/Leistungszone als Zonennummer, Pace-Zone als Tempobereich aus de
   assert.strictEqual(recs[2].low, Math.round(1000 / 315 * 1000));  // langsamer Rand 5:15 /km in mm/s
   assert.strictEqual(recs[2].high, Math.round(1000 / 294 * 1000)); // schneller Rand 4:54 /km
   app.athleteProfile.runThresholdPace = null;
+  delete app.athleteProfile.runTarget;
 });
 
 test(".fit: eine Einheit ohne eigene Schritte heißt wie bisher nach ihrem Titel, Datei-CRC stimmt", () => {
@@ -305,6 +335,7 @@ test(".fit: eine Einheit ohne eigene Schritte heißt wie bisher nach ihrem Titel
 
 test("resolvedWorkoutSteps: Pace-Zone bekommt den Tempobereich, alles andere bleibt", () => {
   app.athleteProfile.runThresholdPace = "5:00";
+  app.athleteProfile.runTarget = "pace";
   const out = plain(app.resolvedWorkoutSteps({ sport: "Laufen", steps: INTERVALS }));
   const pace = out[1].steps[0].target;
   assert.deepStrictEqual([pace.kind, pace.zone], ["pace_zone", 4]);
@@ -313,6 +344,7 @@ test("resolvedWorkoutSteps: Pace-Zone bekommt den Tempobereich, alles andere ble
   // Rad kennt keine Pace -> ohne Tempobereich (der Server sendet dann "kein Ziel")
   assert.strictEqual(plain(app.resolvedWorkoutSteps({ sport: "Rad", steps: INTERVALS }))[1].steps[0].target.low_mps, undefined);
   app.athleteProfile.runThresholdPace = null;
+  delete app.athleteProfile.runTarget;
 });
 
 test("sendPlannedWorkoutToGarmin: schickt die Schritte an den Endpunkt und vermerkt das Senden", async () => {
