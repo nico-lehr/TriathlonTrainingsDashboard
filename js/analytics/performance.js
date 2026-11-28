@@ -177,7 +177,20 @@ function vo2maxFromBikeEffort(watts, hr, kg, maxHr, restHr) {
 
 // Eine Radeinheit -> VO2max-Schätzung (oder null). Mit Zeitreihe aus den
 // gleichmäßigen Abschnitten, ohne nur aus Normalized Power + Ø-Puls (gröber).
+// Gemerkt je Einheit (der Verlauf rechnet dieselben Fahrten für mehrere
+// Stichtage) - neu gerechnet, wenn sich Gewicht/HFmax/Ruhepuls ändern.
+const bikeVo2RideMemo = new WeakMap();
 function bikeVo2RideEstimate(w, kg, maxHr, restHr) {
+  if (!w || typeof w !== "object") return null;
+  const key = `${kg}|${maxHr}|${restHr}|${w.stream ? 1 : 0}`; // Zeitreihe kann später nachgeladen werden
+  const hit = bikeVo2RideMemo.get(w);
+  if (hit && hit.key === key) return hit.value;
+  const value = bikeVo2RideEstimateRaw(w, kg, maxHr, restHr);
+  bikeVo2RideMemo.set(w, { key, value });
+  return value;
+}
+
+function bikeVo2RideEstimateRaw(w, kg, maxHr, restHr) {
   if (!w || !(w.duration_min >= 20)) return null;
   const s = w.stream;
   if (s && Array.isArray(s.t) && Array.isArray(s.hr) && Array.isArray(s.power) && s.t.length >= 20) {
@@ -279,11 +292,11 @@ function vo2TrendLabel(current, prior) {
 // Sauerstoffbedarf)-Punkte der letzten 120 Tage (genug Dichte für eine
 // stabile Gerade) und der 120 Tage davor (nur fürs Trend), rechnet je einmal
 // die Regression. `pointFn` ist runVo2SubmaxPoint oder bikeVo2SubmaxPoint.
-function sportVo2Regression(sportName, pointFn, maxHr) {
+function sportVo2Regression(sportName, pointFn, maxHr, now = Date.now()) {
   if (!maxHr) return null;
-  const workouts = ALL.filter(w => w.sport === sportName && w._date && !w.is_summary);
+  const workouts = ALL.filter(w => w.sport === sportName && w._date && !w.is_summary && w._date.getTime() <= now);
   if (!workouts.length) return null;
-  const now = Date.now(), dayMs = 86400000;
+  const dayMs = 86400000;
   const currentPoints = workouts.filter(w => now - w._date.getTime() <= 120 * dayMs).map(pointFn).filter(Boolean);
   const value = vo2LinearRegressionToMaxHr(currentPoints, maxHr);
   if (value == null) return null;
@@ -326,13 +339,18 @@ function syncedVo2ForSport(sportName) {
   return null;
 }
 
-function computeRunVo2MaxEstimate() {
+// opts.now: Stichtag (ms) - für den Verlauf (vo2EstimateHistory, insight-ratings.js)
+// wird die eigene Schätzung auch für frühere Zeitpunkte gerechnet, nur mit den
+// Einheiten bis dahin. opts.skipSynced: Garmin-Wert überspringen (der hat
+// einen eigenen Verlauf).
+function computeRunVo2MaxEstimate(opts = {}) {
+  const now = opts.now || Date.now();
   // 1) Künftiger Direktwert aus Strava/Garmin Connect
-  const synced = syncedVo2ForSport("Laufen");
+  const synced = opts.skipSynced ? null : syncedVo2ForSport("Laufen");
   if (synced) return synced;
 
   // 2) Submax-Schätzung aus Pace + Puls mehrerer Trainingsläufe (Regression)
-  const reg = sportVo2Regression("Laufen", runVo2SubmaxPoint, athleteProfile.maxHr);
+  const reg = sportVo2Regression("Laufen", runVo2SubmaxPoint, athleteProfile.maxHr, now);
   if (reg) {
     return {
       value: reg.value,
@@ -342,9 +360,8 @@ function computeRunVo2MaxEstimate() {
   }
 
   // 3) Fallback: VDOT-Formel auf die schnellste gemessene Zeit
-  const runs = ALL.filter(w => w.sport === "Laufen" && w._date && !w.is_summary);
+  const runs = ALL.filter(w => w.sport === "Laufen" && w._date && !w.is_summary && w._date.getTime() <= now);
   if (runs.length) {
-    const now = Date.now();
     const dayMs = 86400000;
     const recentRuns = runs.filter(w => now - w._date.getTime() <= 90 * dayMs);
     const olderRuns = runs.filter(w => { const age = now - w._date.getTime(); return age > 90 * dayMs && age <= 180 * dayMs; });
@@ -372,9 +389,10 @@ function computeRunVo2MaxEstimate() {
   return null; // keine ausreichende Datenbasis - lieber leer als erfunden
 }
 
-function computeBikeVo2MaxEstimate() {
+function computeBikeVo2MaxEstimate(opts = {}) {
+  const now = opts.now || Date.now();
   // 1) Künftiger Direktwert aus Strava/Garmin Connect
-  const synced = syncedVo2ForSport("Rad");
+  const synced = opts.skipSynced ? null : syncedVo2ForSport("Rad");
   if (synced) return synced;
 
   // 2) Je Einheit aus gleichmäßigen Abschnitten (Leistung + Herzfrequenz-
@@ -383,8 +401,8 @@ function computeBikeVo2MaxEstimate() {
   const kg = typeof getLatestWeightKg === "function" ? getLatestWeightKg() : athleteProfile.weightKg;
   const maxHr = athleteProfile.maxHr, restHr = vo2RestingHr();
   if (kg > 0 && maxHr > 0 && restHr > 0 && maxHr > restHr) {
-    const rides = ALL.filter(w => w.sport === "Rad" && w._date && !w.is_summary);
-    const now = Date.now(), dayMs = 86400000;
+    const rides = ALL.filter(w => w.sport === "Rad" && w._date && !w.is_summary && w._date.getTime() <= now);
+    const dayMs = 86400000;
     const age = w => (now - w._date.getTime()) / dayMs;
     const cur = bikeVo2FromRides(rides.filter(w => age(w) <= 120), kg, maxHr, restHr);
     if (cur) {
@@ -398,7 +416,7 @@ function computeBikeVo2MaxEstimate() {
   }
 
   // 3) Ohne Ruhepuls: alte Regression über ganze Einheiten (ungenauer, siehe oben).
-  const reg = sportVo2Regression("Rad", bikeVo2SubmaxPoint, athleteProfile.maxHr);
+  const reg = sportVo2Regression("Rad", bikeVo2SubmaxPoint, athleteProfile.maxHr, now);
   if (reg) {
     return {
       value: reg.value,

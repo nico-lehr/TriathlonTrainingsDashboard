@@ -139,6 +139,7 @@
       <div class="legend" id="legend-pmc"></div>
       <div class="chart-wrap" id="chart-pmc"></div>
       <div class="pmc-substats" id="pmc-substats"></div>
+      <div class="ir-block" id="pmc-rating"></div>
     </div>
 
     <div class="card" data-card-id="acwr">
@@ -147,6 +148,7 @@
         <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Akute (7-Tage-Ø) im Verhältnis zur chronischen (42-Tage-Ø) Belastung</div></span>
       </h2>
       <div class="gauge-wrap chart-wrap" id="chart-acwr"></div>
+      <div class="ir-block" id="acwr-rating"></div>
     </div>
     <div class="card" data-card-id="focus">
       <span class="card-drag-handle" title="Karte verschieben">⠿</span>
@@ -189,6 +191,7 @@
         <span class="info-wrap"><button type="button" class="info-btn" aria-label="Erklärung anzeigen">i</button><div class="info-popover">Nach Foster (1998): Ø Tagesbelastung ÷ Standardabweichung der Tagesbelastung über ein rollierendes 7-Tage-Fenster. Hohe Werte (&gt; 2,0) bedeuten sehr gleichmäßige Belastung ohne echte Erholungstage — das erhöht unabhängig von der absoluten Belastungshöhe das Übertrainingsrisiko.</div></span>
       </h2>
       <div class="chart-wrap" id="chart-monotony"></div>
+      <div class="ir-block" id="monotony-rating"></div>
     </div>
 
     <div class="card full" data-card-id="recovery" id="recovery-card" hidden>
@@ -198,6 +201,7 @@
       </h2>
       <p class="card-sub" id="recovery-sub">Zuletzt gemessene Werte im Vergleich zum eigenen Mittel</p>
       <div class="stat-row" id="recovery-tiles"></div>
+      <div class="ir-block" id="recovery-rating"></div>
       <div class="small-multiples" id="recovery-charts"></div>
     </div>
 
@@ -1262,6 +1266,15 @@
   </div>
 </div>
 
+<!-- Kachel-Detail auf der Insights-Seite: Verlauf + Bewertung, siehe
+     js/components/stat-detail.js -->
+<div class="modal-overlay" id="stat-detail-overlay" role="dialog" aria-modal="true" aria-labelledby="stat-detail-title">
+  <div class="modal-card stat-detail-card">
+    <button class="modal-close" id="stat-detail-close" type="button" aria-label="Schließen">✕</button>
+    <div id="stat-detail-body"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="compare-overlay">
   <div class="modal-card compare-card">
     <button class="modal-close" id="compare-close" type="button">✕</button>
@@ -1334,6 +1347,7 @@
 <script src="js/analytics/hr-distribution.js"></script>
 <script src="js/analytics/workout-profile.js"></script>
 <script src="js/analytics/metric-insights.js"></script>
+<script src="js/analytics/insight-ratings.js"></script>
 <script src="js/analytics/training-plan.js"></script>
 <script src="js/analytics/plan-rules.js"></script>
 <script src="js/analytics/periodization.js"></script>
@@ -1367,6 +1381,7 @@
 <script src="js/components/card-search.js"></script>
 <script src="js/components/dashboard.js"></script>
 <script src="js/components/recovery.js"></script>
+<script src="js/components/stat-detail.js"></script>
 <script src="js/components/calendar.js"></script>
 <script src="js/components/weather.js"></script>
 <script src="js/components/records.js"></script>

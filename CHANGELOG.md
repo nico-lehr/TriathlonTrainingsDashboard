@@ -4,6 +4,16 @@ Jede Version hat hier einen Abschnitt `## <Versionsnummer>` (genau wie in der
 Datei `VERSION`). Der Text darunter erscheint auf GitHub als Release-Text und
 im Dashboard unter „Was ist neu?“. Neueste Version oben.
 
+## 3.2.0
+
+**Neu: Bewertungen auf der Insights-Seite**
+- Jede Kachel oben lässt sich jetzt antippen. Es öffnet sich ein Fenster mit dem Verlauf, einer Bewertung (Farbbalken von „niedrig“ bis „hervorragend“) und einer Erklärung in einfachen Worten samt Tipp.
+- **VO2max:** Bewertung im Vergleich mit Menschen gleichen Alters und Geschlechts (dieselbe Tabelle, die auch Garmin nutzt), dazu der Trend gegenüber vor 3 Monaten und der Verlauf der letzten 12 Monate. Die Bewertung steht auch direkt auf der Kachel. Dafür müssen Geburtsdatum und Geschlecht im Profil eingetragen sein.
+- **Trainingsstatus:** zeigt, wie schnell deine Fitness wächst, wie frisch du bist, das Belastungsverhältnis und die Abwechslung – mit dem Fitness-Verlauf der letzten 6 Monate.
+- **Gesamtzeit und Einheiten:** Vergleich mit deinem Wochenziel aus dem Profil und mit den Wochen davor, plus Wochen-Verlauf.
+- **Laufen, Rad, Schwimmen:** wie regelmäßig du die Sportart in den letzten 8 Wochen gemacht hast und wie sich der Wochenumfang entwickelt.
+- Unter „Fitness & Form“, „Trainingsbelastungsverhältnis“, „Trainingsmonotonie“ und „Erholung & Gesundheit“ steht jetzt jeweils eine kurze Ampel-Bewertung. Bei der Erholung werden HRV und Ruhepuls mit deinem eigenen Normalwert verglichen, dazu kommt dein Schlaf.
+
 ## 3.1.2
 
 **Geändert: Laufen jetzt nach Puls statt nach Pace**

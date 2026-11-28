@@ -17,6 +17,7 @@ function renderAll() {
   renderTrainingFocus(filtered);
   renderPace(filtered);
   renderRecovery(); // Garmin-Erholungsdaten; blendet sich selbst aus, solange nichts synchronisiert wurde
+  if (typeof renderInsightRatings === "function") renderInsightRatings(); // Bewertungen unter Fitness & Form, ACWR, Monotonie, Erholung (stat-detail.js)
   renderTable(filtered);
   renderCoachWorkoutsMini(filtered);
   renderRaceCountdown(); // Ist-Minuten dieser Woche hängen an den Trainings (volle Historie)

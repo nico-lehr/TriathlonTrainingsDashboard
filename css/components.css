@@ -2884,3 +2884,21 @@ body.m-graphit .mi-mark { box-shadow: 0 0 0 2px var(--m-bg, #0b0b0b); }
 body.m-graphit .mi-tip { background: #2c2c2e; color: #fff; box-shadow: 0 4px 14px rgba(0,0,0,.5); }
 body.m-graphit .mi-cmp-better .mi-cmp-dir, body.m-graphit .mi-t-good { color: #30d158; }
 body.m-graphit .mi-cmp-worse .mi-cmp-dir, body.m-graphit .mi-t-warn { color: #ff9f0a; }
+
+/* Insights: antippbare Kacheln + Detailfenster (js/components/stat-detail.js) */
+.stat-tile.is-clickable { cursor: pointer; }
+.stat-tile.is-clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stat-tile .label .stat-more { float: right; margin-left: 6px; color: var(--text-muted); font-size: 15px; line-height: 1; }
+.stat-tile .stat-chip { display: inline-block; margin: 2px 0 4px; }
+.stat-detail-card { max-width: 600px; width: calc(100% - 32px); max-height: calc(100dvh - 48px); overflow-y: auto; }
+.sd-kicker { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+.sd-title { margin: 2px 40px 4px 0; font-size: 22px; }
+.sd-value { font-size: 28px; font-weight: 680; color: var(--text-primary); }
+.sd-lead { margin: 6px 0 0; font-size: 14px; color: var(--text-secondary); line-height: 1.45; }
+.sd-h { margin: 18px 0 4px; font-size: 14px; font-weight: 650; color: var(--text-primary); }
+.sd-empty { margin: 8px 0 0; font-size: 13px; color: var(--text-muted); }
+.sd-source { margin: 14px 0 0; font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+.sd-chart { margin-top: 6px; }
+.ir-block:empty { display: none; }
+.ir-block { margin-top: 14px; }
+.ir-block .sd-h { margin-top: 0; }

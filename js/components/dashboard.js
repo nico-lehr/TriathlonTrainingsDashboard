@@ -64,6 +64,7 @@ function renderStats(data) {
     fmt: () => `${trainingStatus.icon} ${trainingStatus.label}`,
     sub: trainingStatus.desc,
     extraClass: ` training-tile-${trainingStatus.cls}`,
+    detail: "status",
   });
 
   // Trainingsplan-Treue-Streak (js/analytics/streak.js) - nutzt wie VO2max
@@ -82,6 +83,7 @@ function renderStats(data) {
       fmt: v => "🔥 " + Math.round(v) + (Math.round(v) === 1 ? " Tag" : " Tage"),
       sub: subBits.length ? subBits.join(" · ") : "eingehaltene Trainings- und Ruhetage in Folge",
       extraClass: streak.atRisk ? " at-risk" : "",
+      detail: "streak",
     });
   }
 
@@ -94,11 +96,11 @@ function renderStats(data) {
   const radTileSub = radList.length + " Einheiten";
 
   tiles.push(
-    { label: "Trainingseinheiten", target: data.length, fmt: v => fmtNum(v, 0), sub: "im gewählten Zeitraum" },
-    { label: "Gesamtzeit", target: totalMin, fmt: v => fmtH(v) + " h", sub: fmtNum(totalMin, 0) + " Minuten" },
-    { label: "Rad", target: kmBy("Rad"), fmt: v => fmtNum(v, 1) + " km", sub: radTileSub },
-    { label: "Laufen", target: kmBy("Laufen"), fmt: v => fmtNum(v, 1) + " km", sub: data.filter(w => w.sport === "Laufen").length + " Einheiten" },
-    { label: "Schwimmen", target: kmBy("Schwimmen"), fmt: v => fmtNum(v, 2) + " km", sub: data.filter(w => w.sport === "Schwimmen").length + " Einheiten" },
+    { label: "Trainingseinheiten", target: data.length, fmt: v => fmtNum(v, 0), sub: "im gewählten Zeitraum", detail: "count" },
+    { label: "Gesamtzeit", target: totalMin, fmt: v => fmtH(v) + " h", sub: fmtNum(totalMin, 0) + " Minuten", detail: "time" },
+    { label: "Rad", target: kmBy("Rad"), fmt: v => fmtNum(v, 1) + " km", sub: radTileSub, detail: "Rad" },
+    { label: "Laufen", target: kmBy("Laufen"), fmt: v => fmtNum(v, 1) + " km", sub: data.filter(w => w.sport === "Laufen").length + " Einheiten", detail: "Laufen" },
+    { label: "Schwimmen", target: kmBy("Schwimmen"), fmt: v => fmtNum(v, 2) + " km", sub: data.filter(w => w.sport === "Schwimmen").length + " Einheiten", detail: "Schwimmen" },
   );
 
   // VO2max nutzt immer die volle Historie (wie PMC/ACWR), nicht den oben
@@ -112,6 +114,7 @@ function renderStats(data) {
     fmt: v => vo2.laufen ? fmtNum(v, 1) + " ml/kg/min" : "–",
     sub: vo2.laufen ? (vo2.laufen.trendLabel || vo2.laufen.methodLabel) : "Noch keine Laufdaten oder Profil-Herzfrequenzen für eine Schätzung",
     title: vo2.laufen ? vo2.laufen.methodLabel : "",
+    detail: "vo2run",
   });
   tiles.push({
     label: "VO2max Rad",
@@ -119,13 +122,22 @@ function renderStats(data) {
     fmt: v => vo2.rad ? fmtNum(v, 1) + " ml/kg/min" : "–",
     sub: vo2.rad ? (vo2.rad.trendLabel || vo2.rad.methodLabel) : "Braucht Leistungsmesser-Daten, Körpergewicht, max. Puls & Ruhepuls",
     title: vo2.rad ? vo2.rad.methodLabel : "",
+    detail: "vo2bike",
   });
-  document.getElementById("stat-row").innerHTML = tiles.map((t, i) => `
-    <div class="stat-tile${t.extraClass || ""}"${t.title ? ` title="${escapeHtml(t.title)}"` : ""}>
-      <div class="label">${t.label}</div>
+  // Jede Kachel öffnet beim Antippen Verlauf + Bewertung (stat-detail.js).
+  // VO2max zeigt die Bewertung (Alter/Geschlecht) direkt als Chip.
+  const rating = key => (typeof statTileRating === "function" ? statTileRating(key) : null);
+  document.getElementById("stat-row").innerHTML = tiles.map((t, i) => {
+    const r = t.detail ? rating(t.detail) : null;
+    const open = t.detail ? ` data-stat-detail="${t.detail}" role="button" tabindex="0" aria-label="${escapeHtml(t.label)}: Verlauf und Bewertung anzeigen"` : "";
+    return `
+    <div class="stat-tile${t.extraClass || ""}${t.detail ? " is-clickable" : ""}"${t.title ? ` title="${escapeHtml(t.title)}"` : ""}${open}>
+      <div class="label">${t.label}${t.detail ? '<span class="stat-more" aria-hidden="true">›</span>' : ""}</div>
       <div class="value" id="stat-val-${i}">${t.fmt(0)}</div>
+      ${r ? `<span class="mi-chip mi-${r.level} stat-chip">${escapeHtml(r.word)}</span>` : ""}
       <div class="sub">${t.sub}</div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
   tiles.forEach((t, i) => animateStatValue(document.getElementById(`stat-val-${i}`), t.target, t.fmt));
   initStatTileTilt();
 }
